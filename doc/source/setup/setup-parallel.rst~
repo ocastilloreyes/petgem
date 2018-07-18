@@ -1,0 +1,6 @@
+setup.py (mesh directory)
+=========================
+
+.. automodule:: petgem.mesh.setup
+   :members:
+   :undoc-members:

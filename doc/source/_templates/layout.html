@@ -1,0 +1,28 @@
+{% extends "!layout.html" %}
+
+{% block rootrellink %}
+        <li><a href="{{ pathto('index') }}">Home</a>|&nbsp;</li>
+        <li><a href="{{ pathto('WhatIs.html', 1) }}">What is PETGEM?</a>|&nbsp;</li>
+        <li><a href="{{ pathto('Features.html', 1) }}">Features</a>|&nbsp;</li>
+        <li><a href="{{ pathto('CSEMEdges.html', 1) }}">CSEM FM modelling</a>|&nbsp;</li>
+        <li><a href="{{ pathto('Installation.html', 1) }}">Installation</a>|&nbsp;</li>
+        <li><a href="{{ pathto('Tutorial.html', 1) }}">Tutorial</a>|&nbsp;</li>
+        <li><a href="{{ pathto('Manual.html', 1) }}">Manual</a>|&nbsp;</li>
+        <li><a href="{{ pathto('Publications.html', 1) }}">Publications</a>|&nbsp;</li>
+	      <li><a href="{{ pathto('Download.html', 1) }}">Download</a>|&nbsp;</li>
+        <li><a href="{{ pathto('Contact.html', 1) }}">Contact</a></li>
+{% endblock %}
+
+{% block relbar1 %}
+<div style="background-color: white; text-align: left; padding: 10px 10px 15px 15px">
+  <a href="{{ pathto('index') }}"><img style="vertical-align: middle" src="{{
+    pathto("_static/figures/petgem_logo.png", 1) }}" border="0" height="80px" alt="PETGEM"/></a>
+    <a href="{{ pathto('index') }}"><strong><font color="#355f7c"> Parallel Edge-based Tool for Geophysical Electromagnetic Modelling</font></strong></a>
+  <a href="http://www.bsc.es/"><img src="{{
+    pathto("_static/figures/logo_bsc.jpeg", 1) }}" align="right" border="0" height="80px" alt="BSC"/></a>
+</div>
+{{ super() }}
+{% endblock %}
+
+{% block sidebar1 %}{{ sidebar() }}{% endblock %}
+{% block sidebar2 %}{% endblock %}

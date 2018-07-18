@@ -1,0 +1,95 @@
+.. _Features:
+
+Features
+===============
+
+**PETGEM** use a code structure for the Nédelec FE algorithm that emphasizes
+good parallel scalability, which is crucial in the multi-core era.
+Furthermore, it’s modularity should simplify the process of reaching the
+best possible performance in terms of percentage of the peak amount of
+floating point operations provided by the architecture.
+
+.. _Software stack:
+
+Software stack
+--------------
+An outline of the primary groups of modules in **PETGEM** design is
+given in `Figure 2.1`_.
+
+.. _Figure 2.1:
+.. figure:: figures/softwareStack.jpg
+   :scale: 50%
+   :alt: Upper view of PETGEM software stack.
+   :align: center
+
+   Figure 2.1. Upper view of **PETGEM** software stack.
+
+A more detailed explanation is the following:
+
+* Modular and extensible EFEM kernel – The kernel is extensible in any direction. Therefore, the possibility of adding new features such as new boundary conditions, numerical algorithms, analysis modules, among others.
+
+* Independent of problem formulation, numerical solution, and data storage – The kernel provides the independent abstractions for modeling, numerical methods, data storage and analysis.
+* Parallel processing support – Based on an hybrid parallel scheme, domain decomposition and dynamic load balancing.
+
+* Confidence and performance monitoring – Based on an intensive error checking module and an automatic profiling module.
+
+* Efficient solvers & preconditioners – Direct as well as iterative solvers and preconditioners are supported through an interface to third party libraries (`PETSc <http://www.mcs.anl.gov/petsc/>`_, `MUMPs <http://mumps.enseeiht.fr/>`_, `PARDISO <http://www.pardiso-project.org/>`_).
+
+* Interface to mesh generators – Not dependent on a specific mesh generator. Because most of the FEM codes were developed for node-based formulations, it is necessary to develop a module to compute edge-based data structures. As a result, different mesh formats are supported.
+
+* Edge FEM library – Edge-based discretisations, vector basis functions, their geometry description, and generalized integration rules provides a generic support for implementing edge-based solution algorithms.
+
+* Linear systems library – Support to Compressed Row Storage (CSR) format for sparse matrices and their easy and efficient parallel assembly.
+
+* CSEM module – Ad-hoc design to meet specific requirements to simulate 3D CSEM surveys, namely, conductivity model, physical parameters, transmitter and receiver lists.
+
+* Tests suite – Sample output for many examples are included. Furthermore, a set of matlab functions to data analysis are included.
+
+* Postprocessing – Export to binary files and `VTK <http://www.vtk.org/>`_ format is supported, allowing the analysis not just in different visualization tools but also on different platforms. Performance analysis such as hardware counters and timers is supported.
+
+.. _Programming language:
+
+Programming language
+--------------------
+
+**PETGEM** is based on `Python <https://www.python.org/>`_ language
+programming because:
+
+* It is open source, cross-platform and functional on a wide number of platforms, including HPC environments.
+* It uses a high level and very expressive language.
+* It is based on a sophisticated array manipulation in a Fortran-like manner.
+* It uses a good body of bindings to common tools needed in scientific computing: plotting, numerical libraries, debugging and testing.
+
+The code structure is modular, simple and flexible which allows exploiting
+not just our own modules but also third party libraries. Therefore,
+the software stack includes interfaces to external suites of data structures
+and libraries that contain most of the necessary building blocks needed
+for programming large scale numerical applications, i.e. sparse matrices,
+vectors, iterative and direct solvers or domain decomposition. As a result,
+the framework is compact and eliminates the need to write such libraries
+and thus speeds up development time by orders of magnitude [1]_, [2]_,
+[3]_ and [5]_.
+
+In order to meet the high computational cost of the modeling, the code will
+be based on a hybrid parallel approach (MPI-OpenMP) [1]_, [2]_, [3]_ and [4]_.
+
+.. _Target architecture:
+
+Target architecture
+--------------------
+The HPC goal of the **PETGEM** involves using cutting-edge architectures.
+To that goal, the framework is implemented in current state-of-the-art
+platforms such as Intel Haswell and Intel Xeon Phi processors, which offer
+high performance, flexibility and power efficiency. Nevertheless,
+**PETGEM** support older architectures such as SandyBridge, for the sake
+of usability and to be able to compare performance.
+
+.. _References Features:
+
+References
+----------
+.. [1] Bangerth, W., Burstedde, C., Heister, T., and Kronbichler, M. (2011). Algorithms and data structures for massively parallel generic adaptive finite element codes. ACM Transactions on Mathematical Software (TOMS), 38(2):14.
+.. [2] Heister, T., Kronbichler, M., and Bangerth, W. (2010). Massively parallel finite element programming. Recent Advances in the Message Passing Interface, pages 122–131.
+.. [3] Key, K. and Ovall, J. (2011). A parallel goal-oriented adaptive finite element method for 2.5-d electromagnetic modelling. Geophysical Journal International, 186(1):137– 154.
+.. [4] Logg, A. (2007). Automating the finite element method. Archives of Computational Methods in Engineering, 14(2):93–138.
+.. [5] Osseyran, A. and Giles, M. (2015). Industrial Applications of High-Performance Computing: Best Global Practices. Chapman & Hall/CRC Computational Science. CRC Press, first edition.

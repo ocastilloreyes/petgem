@@ -1,0 +1,6 @@
+setup.py (parallel directory)
+=============================
+
+.. automodule:: petgem.parallel.setup
+   :members:
+   :undoc-members:

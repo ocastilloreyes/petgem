@@ -1,0 +1,6 @@
+config.py
+========
+
+.. automodule:: petgem.config
+   :members:
+   :undoc-members:

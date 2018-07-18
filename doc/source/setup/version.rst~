@@ -1,0 +1,6 @@
+version.py
+==========
+
+.. automodule:: petgem.version
+   :members:
+   :undoc-members:
