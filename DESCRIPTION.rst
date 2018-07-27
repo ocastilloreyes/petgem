@@ -1,7 +1,7 @@
-petgem
+PETGEM
 ======
 
-petgem is a parallel python code for 3D Controlled-Source
+PETGEM is a parallel python code for 3D Controlled-Source
 Electromagnetic Method (3D CSEM) in geophysics using edge finite
 elements (Nedelec finite elements).
 
@@ -71,11 +71,16 @@ Install
 Citations
 ---------
 
-If petgem been significant to a project that leads to an academic
+If PETGEM been significant to a project that leads to an academic
 publication, please acknowledge that fact by citing the project:
+
+* Castillo-Reyes, O., de la Puente, J., Cela, J. M. (2018).
+  *PETGEM: A parallel code for 3D CSEM forward modeling using edge finite
+  elements*. Computers & Geosciences, vol 119: 123-136. ISSN 0098-3004,
+  Elsevier. https://doi.org/10.1016/j.cageo.2018.07.005
 
 *  Castillo-Reyes, O., de la Puente, J., Cela, J.M. (2017).
    *Three-Dimensional CSEM Modelling on Unstructured Tetrahedral Meshes
-   Using Edge Finite Elements*, Communications in Computer and
-   Information Science, vol 697: 247-256. ISBN 978-3-319-57971-9
+   Using Edge Finite Elements*. Communications in Computer and
+   Information Science, vol 697: 247-256. ISBN 978-3-319-57971-9,
    Springer, Cham. https://doi.org/10.1007/978-3-319-57972-6_18
