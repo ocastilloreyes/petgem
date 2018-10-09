@@ -50,6 +50,7 @@ def get_ext_modules():
 
     return numpy_includes
 
+
 if __name__ == '__main__':
     from setuptools import setup
     import os
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     setup(name=name(),
           maintainer="Octavio Castillo Reyes",
           maintainer_email="octavio.castillo@bsc.es",
-          version='0.30.48',
+          version='0.5',
           long_description=long_description(),
           description=description(),
           url="https://www.bsc.es/castillo-octavio",

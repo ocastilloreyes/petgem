@@ -6,10 +6,12 @@ Element Method (EFEM) of lowest order in tetrahedral meshes.
 '''
 
 
-def computeElementalContributionsMPI(modelling, coordEle, nodesEle, sigmaEle):
-    '''Compute the elemental contributions of matrix A (LHS) and right hand
-    side (RHS) in a parallel-vectorized manner for CSEM surveys by EFEM. Here,
-    all necessary arrays are populated (Distributed-memory approach).
+def computeElementalContributionsMPI_FirstOrder(modelling, coordEle,
+                                                nodesEle, sigmaEle):
+    '''Compute the first order elemental contributions of matrix A (LHS) and
+    right hand side (RHS) in a parallel-vectorized manner for CSEM surveys by
+    EFEM. Here, all necessary arrays are populated (Distributed-memory
+    approach).
 
     :param dictionary modelling: CSEM modelling with physical parameters.
     :param ndarray coordEle: array with nodal coordinates of element.
@@ -23,17 +25,17 @@ def computeElementalContributionsMPI(modelling, coordEle, nodesEle, sigmaEle):
     SIGMA_BGROUND = np.float(modelling['CONDUCTIVITY_BACKGROUND'])
     SRC_POS = np.asarray(modelling['SRC_POS'], dtype=np.float)
     SRC_DIREC = np.int(modelling['SRC_DIREC'])
-    I = np.float(modelling['SRC_CURRENT'])
+    II = np.float(modelling['SRC_CURRENT'])
     dS = np.float(modelling['SRC_LENGTH'])
 
     # ----------- Edge order -----------
-    edgeOrder = 6
+    firstOrderEdgeElement = 6
     # ----------- Nodal order -----------
     nodalOrder = 4
     # ----------- Number of dimensions -----------
     nDimensions = 3
 
-    # ----------- Definition of constants-----------
+    # ----------- Definition of constants-|----------
     ZERO = np.float(0.0)
     ONE = np.float(1.0)
     TWO = np.float(2.0)
@@ -53,7 +55,7 @@ def computeElementalContributionsMPI(modelling, coordEle, nodesEle, sigmaEle):
     # Propagation parameter
     WAVENUMBER = np.complex(np.sqrt(-IMAG_PART*MU*OMEGA*SIGMA_BGROUND))
     # Physical constants
-    CONST_PHY1 = I * dS
+    CONST_PHY1 = II * dS
     CONST_PHY2 = FOUR * np.pi * SIGMA_BGROUND
     CONST_PHY3 = -IMAG_PART * WAVENUMBER
     CONST_PHY4 = -WAVENUMBER**2
@@ -97,7 +99,7 @@ def computeElementalContributionsMPI(modelling, coordEle, nodesEle, sigmaEle):
     pEvalY = np.zeros(allocate, dtype=np.float)
     pEvalZ = np.zeros(allocate, dtype=np.float)
     # Nedelec basis functions
-    allocate = ngaussP*edgeOrder
+    allocate = ngaussP*firstOrderEdgeElement
     temp_A1 = np.zeros(allocate, dtype=np.float)
     temp_A2 = np.zeros(allocate, dtype=np.float)
     temp_b1 = np.zeros(allocate, dtype=np.float)
@@ -105,24 +107,24 @@ def computeElementalContributionsMPI(modelling, coordEle, nodesEle, sigmaEle):
     basis = np.zeros((nDimensions, allocate), dtype=np.float)
     # Vector operations over edges
     rep_edges1 = np.repeat((0, 1, 2, 3, 4, 5), ngaussP)
-    rep_edges2 = np.repeat((0, 1, 2, 3, 4, 5), edgeOrder)
-    rep_edges3 = np.tile((0, 1, 2, 3, 4, 5), edgeOrder)
+    rep_edges2 = np.repeat((0, 1, 2, 3, 4, 5), firstOrderEdgeElement)
+    rep_edges3 = np.tile((0, 1, 2, 3, 4, 5), firstOrderEdgeElement)
     # Vector operations over gauss points
     idxbx1 = np.repeat((1, 2, 3, 2, 1, 3), ngaussP)
     idxbx2 = np.repeat((0, 0, 0, 1, 3, 2), ngaussP)
     # Mass matrix
-    allocate = edgeOrder**2
+    allocate = firstOrderEdgeElement**2
     Me = np.zeros(allocate, dtype=np.float)
     # Stiffness matrix
-    rep_edges_stiff1 = np.tile((0, 0, 0, 1, 3, 2), edgeOrder)
-    rep_edges_stiff2 = np.tile((1, 2, 3, 2, 1, 3), edgeOrder)
+    rep_edges_stiff1 = np.tile((0, 0, 0, 1, 3, 2), firstOrderEdgeElement)
+    rep_edges_stiff2 = np.tile((1, 2, 3, 2, 1, 3), firstOrderEdgeElement)
     rep_edges_stiff3 = np.array([0, 0, 0, 0, 0, 0,
                                  0, 0, 0, 0, 0, 0,
                                  0, 0, 0, 0, 0, 0,
                                  1, 1, 1, 1, 1, 1,
                                  3, 3, 3, 3, 3, 3,
                                  2, 2, 2, 2, 2, 2], dtype=np.int)
-    rep_edges_stiff4 = np.repeat((1, 2, 3, 2, 1, 3), edgeOrder)
+    rep_edges_stiff4 = np.repeat((1, 2, 3, 2, 1, 3), firstOrderEdgeElement)
     # Stiffness matrix
     Ke = np.zeros(allocate, dtype=np.float)
     # Auxiliar vectors
@@ -132,7 +134,7 @@ def computeElementalContributionsMPI(modelling, coordEle, nodesEle, sigmaEle):
     f2 = np.zeros(allocate, dtype=np.float)
     f3 = np.zeros(allocate, dtype=np.float)
     f4 = np.zeros(allocate, dtype=np.float)
-    allocate = edgeOrder**2
+    allocate = firstOrderEdgeElement**2
     std_v1 = np.zeros(allocate, dtype=np.float)
     std_v2 = np.zeros(allocate, dtype=np.float)
     std_v3 = np.zeros(allocate, dtype=np.float)
@@ -166,13 +168,13 @@ def computeElementalContributionsMPI(modelling, coordEle, nodesEle, sigmaEle):
     distance = np.zeros(allocate, dtype=np.float)
     # Electric field
     field = np.zeros((nDimensions, allocate), dtype=np.complex)
-    indx_field = np.tile((np.arange(0, ngaussP)), edgeOrder)
-    allocate = edgeOrder*ngaussP
+    indx_field = np.tile((np.arange(0, ngaussP)), firstOrderEdgeElement)
+    allocate = firstOrderEdgeElement*ngaussP
     temp_field = np.zeros((nDimensions, allocate), dtype=np.complex)
     # Elemental matrix and elemental vector
-    allocate = edgeOrder**2
+    allocate = firstOrderEdgeElement**2
     Ae = np.zeros(allocate, dtype=np.complex)
-    allocate = edgeOrder
+    allocate = firstOrderEdgeElement
     be = np.zeros(allocate, dtype=np.complex)
     # Indexes within dimensions of gauss points and basis functions
     idx_gaussP_1 = ngaussP
@@ -477,9 +479,238 @@ def computeElementalContributionsMPI(modelling, coordEle, nodesEle, sigmaEle):
     temp = np.sum(temp_field*basis, 0) * signsEle * weightEle * deltaSigma
 
     # Integral over edges
-    for iBasis in np.arange(edgeOrder):
+    for iBasis in np.arange(firstOrderEdgeElement):
         for iPoint in np.arange(ngaussP):
             be[iBasis] = be[iBasis] + temp[(iBasis*ngaussP)+iPoint]
+
+    # Scale vector by constant -1i*OMEGA*MU
+    be = be*-CONST_PHY6
+
+    return Ae, be
+
+
+def computeElementalContributionsMPI_HighOrder(modelling, coordEle, nodesEle,
+                                               sigmaEle, nedelec_order):
+    '''Compute the second or third order elemental contributions of matrix A
+    (LHS) and right hand side (RHS) in a parallel-vectorized manner for CSEM
+    surveys by EFEM. Here, all necessary arrays are populated
+    (Distributed-memory approach).
+
+    :param dictionary modelling: CSEM modelling with physical parameters.
+    :param ndarray coordEle: array with nodal coordinates of element.
+    :param ndarray nodesEle: array with nodal indexes of element.
+    :param float sigmaEle: element conductiviy.
+    :param int nedelec_order: nedelec element order.
+    :return: Ae, be.
+    :rtype: complex.
+    '''
+    # ----------- Nodal order -----------
+    nodalOrder = 4
+
+    # ----------- Edge element order -----------
+    if nedelec_order == 2:
+        orderEle = 20
+        ngaussP = 15
+    elif nedelec_order == 3:
+        orderEle = 45
+        ngaussP = 24
+
+    # ----------- Number of dimensions -----------
+    nDimensions = 3
+
+    # ----------- Read physical parameters -----------
+    FREQ = np.float(modelling['FREQ'])
+    SIGMA_BGROUND = np.float(modelling['CONDUCTIVITY_BACKGROUND'])
+    SRC_POS = np.asarray(modelling['SRC_POS'], dtype=np.float)
+    SRC_DIREC = np.int(modelling['SRC_DIREC'])
+    II = np.float(modelling['SRC_CURRENT'])
+    dS = np.float(modelling['SRC_LENGTH'])
+
+    # ----------- Definition of constants -----------
+    ZERO = np.float(0.0)
+    ONE = np.float(1.0)
+    TWO = np.float(2.0)
+    THREE = np.float(3.0)
+    FOUR = np.float(4.0)
+    SIX = np.float(6.0)
+    # Imaginary part for complex numbers
+    IMAG_PART = np.complex128(0.0 + 1.0j)
+    # Vacuum permeability
+    MU = np.float(FOUR*np.pi*np.float(1.0e-7))
+    # Angular frequency
+    OMEGA = np.float(FREQ*TWO*np.pi)
+    # Propagation parameter
+    WAVENUMBER = np.complex(np.sqrt(-IMAG_PART*MU*OMEGA*SIGMA_BGROUND))
+    # Physical constants
+    CONST_PHY1 = II * dS
+    CONST_PHY2 = FOUR * np.pi * SIGMA_BGROUND
+    CONST_PHY3 = -IMAG_PART * WAVENUMBER
+    CONST_PHY4 = -WAVENUMBER**2
+    CONST_PHY5 = THREE * IMAG_PART * WAVENUMBER
+    CONST_PHY6 = IMAG_PART*OMEGA*MU
+
+    # Gaussian points for the unit reference tetrahedron
+    [Wi, rx, ry, rz] = gauss_points_reference_tetrahedron(ngaussP,
+                                                          nedelec_order)
+
+    # ----- Initialization of edges/vertices/faces numbering ------
+    [edge_vertices, face_vertices, ref_ele] = edgeFaceVerticesInit()
+
+    # ----------- Delta sigma of element -----------
+    deltaSigma = sigmaEle - SIGMA_BGROUND
+
+    # Element's nodes coordinates
+    coordEle = coordEle.reshape((nDimensions, nodalOrder), order='F')
+
+    # Elemental computations (Signs, jacobian, edges length, area faces)
+    [_, _, signs, nreal,
+     jacob, DetJacob, _] = computeSignsJacobLegth(coordEle, edge_vertices,
+                                                  face_vertices,
+                                                  nedelec_order)
+    # Definition of q vectors on faces
+    [qface1, qface2,
+     qface3, qface4,
+     invjj, GR] = definitionHighOrderTet(nreal, signs, jacob, nedelec_order)
+
+    # Traslation of gauss points to real element
+    L = np.vstack((np.float(1)-rx-ry-rz, rx, ry, rz))
+    pEval = volumetricToCartesianCoordinates(coordEle[0, :], coordEle[1, :],
+                                             coordEle[2, :], L)
+
+    # Computation coefficients for basis functions
+    if nedelec_order == 2:
+        # Gaussian points weigths (normalization)
+        weightEle = Wi*DetJacob*1./6.
+
+        # Computation of coefficients
+        [a1, a2, a3, a4,
+         b1, b2, b3, b4,
+         c1, c2, c3, c4,
+         D, E, F, G, H,
+         II, JJ, K] = computeCoefficientsSecondOrder(qface1, qface2, qface3,
+                                                     qface4, ref_ele,
+                                                     edge_vertices,
+                                                     face_vertices)
+        # Computation of basis functions
+        basis = nedelecBasisSecondOrder(a1, a2, a3, a4, b1, b2, b3, b4, c1,
+                                        c2, c3, c4, D, E, F, G, H, II, JJ,
+                                        K, coordEle, pEval)
+
+        # Compute mass matrix
+        Me = computeMassMatrixSecondOrder(a1, a2, a3, a4, b1, b2, b3, b4,
+                                          c1, c2, c3, c4, D, E, F, G, H,
+                                          II, JJ, K, ref_ele, GR, signs,
+                                          DetJacob, Wi, rx, ry, rz, ngaussP)
+
+        # Compute stiffness matrix
+        Ke = computeStiffnessMatrixSecondOrder(a2, a3, a4, b2, b3, b4, c2, c3,
+                                               c4, D, E, F, G, H, II, JJ, K,
+                                               invjj, signs, DetJacob, Wi,
+                                               rx, ry, rz, ngaussP)
+
+        # Compute elemental matrix
+        Ae = Ke + CONST_PHY6*sigmaEle*Me
+        Ae = Ae.flatten()
+
+        # Allocate RHS
+        be = np.zeros(orderEle, dtype=np.complex)
+
+    elif nedelec_order == 3:
+        # Gaussian points weigths (normalization)
+        weightEle = Wi*DetJacob
+
+        # Computation of coefficients
+        [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
+         b1, b2, b3, b4, b5, b6, b7, b8, b9, b10,
+         c1, c2, c3, c4, c5, c6, c7, c8, c9, c10,
+         D, E, F, G, H, II, JJ, K, L, M, N, O,
+         P, Q, R] = computeCoefficientsThirdOrder(qface1, qface2,
+                                                  qface3, qface4)
+
+        # Computation of basis functions
+        basis = nedelecBasisThirdOrder(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
+                                       b1, b2, b3, b4, b5, b6, b7, b8, b9, b10,
+                                       c1, c2, c3, c4, c5, c6, c7, c8, c9, c10,
+                                       D, E, F, G, H, II, JJ, K, L, M, N,
+                                       O, P, Q, R, coordEle, pEval)
+
+        # Compute mass matrix
+        Me = computeMassMatrixThirdOrder(a1, a2, a3, a4, a5, a6, a7, a8, a9,
+                                         a10, b1, b2, b3, b4, b5, b6, b7, b8,
+                                         b9, b10, c1, c2, c3, c4, c5, c6, c7,
+                                         c8, c9, c10, D, E, F, G, H, II, JJ,
+                                         K, L, M, N, O, P, Q, R, ref_ele,
+                                         GR, signs, DetJacob)
+
+        # Compute stiffness matrix
+        Ke = computeStiffnessMatrixThirdOrder(a2, a3, a4, a5, a6, a7, a8, a9,
+                                              a10, b2, b3, b4, b5, b6, b7, b8,
+                                              b9, b10, c2, c3, c4, c5, c6, c7,
+                                              c8, c9, c10, D, E, F, G, H, II,
+                                              JJ, K, L, M, N, O, P, Q, R,
+                                              invjj, signs, DetJacob)
+
+        # Compute elemental matrix
+        Ae = Ke + CONST_PHY6*sigmaEle*Me
+        Ae = Ae.flatten()
+
+        # Allocate RHS
+        be = np.zeros(orderEle, dtype=np.complex)
+
+    # Compute primary field for all gauss points
+    # Allocate
+    field = np.zeros(nDimensions, dtype=np.complex)
+    for iPoint in np.arange(ngaussP):
+        # Basis functions
+        Ni = basis[:, :, iPoint]
+
+        # Evaluation point
+        pEvalX = pEval[0, iPoint]
+        pEvalY = pEval[1, iPoint]
+        pEvalZ = pEval[2, iPoint]
+
+        # Compute distance to the source for all Gaussian points
+        distX = pEvalX - SRC_POS[0]     # X-component
+        distY = pEvalY - SRC_POS[1]     # Y-component
+        distZ = pEvalZ - SRC_POS[2]     # Z-component
+        distance = np.sqrt(distX**2 + distY**2 + distZ**2)
+
+        # To avoid very large or small numbers
+        if distance < 1.e0:
+            distance = ONE
+        # Compute the primary field for all Gaussian points
+        # E = AA [ BB + (wavenumber^2*distance^2 -1i*wavenumber*distance-1)]
+        SQUARE_DISTANCE = distance**2
+        AA = CONST_PHY1 / (CONST_PHY2 * distance**3) * np.exp(CONST_PHY3 *
+                                                              distance)
+        BB = CONST_PHY4 * SQUARE_DISTANCE + (CONST_PHY5 * distance) + THREE
+        RR = ONE/SQUARE_DISTANCE
+
+        # Compute primary field in function of source direction
+        if SRC_DIREC == 1:
+            # X-directed
+            field[0] = AA * ((distX**2 * RR)*BB +
+                             (WAVENUMBER**2 * SQUARE_DISTANCE - IMAG_PART *
+                              WAVENUMBER * distance - ONE))
+            field[1] = AA * (distX*distY*RR)*BB
+            field[2] = AA * (distX*distZ*RR)*BB
+        elif SRC_DIREC == 2:
+            # Y-directed
+            field[0] = AA * (distX*distY*RR)*BB
+            field[1] = AA * ((distY**2 * RR)*BB +
+                             (WAVENUMBER**2 * SQUARE_DISTANCE - IMAG_PART *
+                              WAVENUMBER * distance - ONE))
+            field[2] = AA * (distY*distZ*RR)*BB
+        else:
+            # Z-directed
+            field[0] = AA * (distX*distZ*RR)*BB
+            field[1] = AA * (distZ*distY*RR)*BB
+            field[2] = AA * ((distZ**2 * RR)*BB +
+                             (WAVENUMBER**2 * SQUARE_DISTANCE - IMAG_PART *
+                              WAVENUMBER * distance - ONE))
+
+        be += (deltaSigma*weightEle[iPoint] *
+               np.multiply(np.matmul(Ni.transpose(), field), signs))
 
     # Scale vector by constant -1i*OMEGA*MU
     be = be*-CONST_PHY6
@@ -502,3 +733,17 @@ else:
     from petsc4py import PETSc
     # PETGEM module import
     from petgem.efem.fem import gauss_points_tetrahedron
+    from petgem.efem.fem import gauss_points_reference_tetrahedron
+    from petgem.efem.fem import volumetricToCartesianCoordinates
+    from petgem.efem.efem import edgeFaceVerticesInit
+    from petgem.efem.efem import computeSignsJacobLegth
+    from petgem.efem.efem import definitionHighOrderTet
+    from petgem.efem.efem import computeCoefficientsSecondOrder
+    from petgem.efem.efem import nedelecBasisSecondOrder
+    from petgem.efem.efem import computeMassMatrixSecondOrder
+    from petgem.efem.efem import computeStiffnessMatrixSecondOrder
+    from petgem.efem.efem import computeCoefficientsThirdOrder
+    from petgem.efem.efem import nedelecBasisThirdOrder
+    from petgem.efem.efem import computeMassMatrixThirdOrder
+    from petgem.efem.efem import computeStiffnessMatrixThirdOrder
+    from scipy.io import savemat

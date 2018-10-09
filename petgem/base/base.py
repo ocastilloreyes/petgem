@@ -107,6 +107,23 @@ def checkDictionaryConsistencyMaster(rank, in_dict, file_name, dir_name):
 
     PETSc.Sys.Print('  Checking parameters consistency...')
 
+    # NEDELEC_ORDER parameter
+    msg = msg1 + 'NEDELEC_ORDER' + msg2
+    assert 'NEDELEC_ORDER' in in_dict, msg
+    msg = msg3 + 'NEDELEC_ORDER' + msg4
+    nedelec_order = in_dict['NEDELEC_ORDER']
+    assert type(nedelec_order) is int, msg
+    PETSc.Sys.Print('  checkDictionaryConsistency(): NEDELEC_ORDER ' +
+                    'consistency OK.')
+
+    # CUDA parameter
+    msg = msg1 + 'CUDA' + msg2
+    assert 'CUDA' in in_dict, msg
+    msg = msg3 + 'CUDA' + msg4
+    cuda = in_dict['CUDA']
+    assert type(cuda) is int, msg
+    PETSc.Sys.Print('  checkDictionaryConsistency(): CUDA consistency OK.')
+
     # freq parameter
     msg = msg1 + 'FREQ' + msg2
     assert 'FREQ' in in_dict, msg
@@ -196,22 +213,40 @@ def checkDictionaryConsistencyMaster(rank, in_dict, file_name, dir_name):
     PETSc.Sys.Print('  checkDictionaryConsistency(): MESH_CONNECTIVITY_FILE '
                     'consistency OK.')
 
+    # elemsF_file parameter
+    msg = msg1 + 'FACES_CONNECTIVITY_FILE' + msg2
+    assert 'FACES_CONNECTIVITY_FILE' in in_dict, msg
+    msg = msg3 + 'FACES_CONNECTIVITY_FILE' + msg4
+    elemsF_file = in_dict['FACES_CONNECTIVITY_FILE']
+    assert type(elemsF_file) is str, msg
+    PETSc.Sys.Print('  checkDictionaryConsistency(): FACES_CONNECTIVITY_FILE '
+                    'consistency OK.')
+
+    # facesN_file parameter
+    msg = msg1 + 'FACES_NODES_FILE' + msg2
+    assert 'FACES_NODES_FILE' in in_dict, msg
+    msg = msg3 + 'FACES_NODES_FILE' + msg4
+    facesN_file = in_dict['FACES_NODES_FILE']
+    assert type(facesN_file) is str, msg
+    PETSc.Sys.Print('  checkDictionaryConsistency(): FACES_NODES_FILE '
+                    'consistency OK.')
+
     # elemsE_file parameter
-    msg = msg1 + 'DOFS_CONNECTIVITY_FILE' + msg2
-    assert 'DOFS_CONNECTIVITY_FILE' in in_dict, msg
-    msg = msg3 + 'DOFS_CONNECTIVITY_FILE' + msg4
-    elemsE_file = in_dict['DOFS_CONNECTIVITY_FILE']
+    msg = msg1 + 'EDGES_CONNECTIVITY_FILE' + msg2
+    assert 'EDGES_CONNECTIVITY_FILE' in in_dict, msg
+    msg = msg3 + 'EDGES_CONNECTIVITY_FILE' + msg4
+    elemsE_file = in_dict['EDGES_CONNECTIVITY_FILE']
     assert type(elemsE_file) is str, msg
-    PETSc.Sys.Print('  checkDictionaryConsistency(): DOFS_CONNECTIVITY_FILE '
+    PETSc.Sys.Print('  checkDictionaryConsistency(): EDGES_CONNECTIVITY_FILE '
                     'consistency OK.')
 
     # edgesN_file parameter
-    msg = msg1 + 'DOFS_NODES_FILE' + msg2
-    assert 'DOFS_NODES_FILE' in in_dict, msg
-    msg = msg3 + 'DOFS_NODES_FILE' + msg4
-    edgesN_file = in_dict['DOFS_NODES_FILE']
+    msg = msg1 + 'EDGES_NODES_FILE' + msg2
+    assert 'EDGES_NODES_FILE' in in_dict, msg
+    msg = msg3 + 'EDGES_NODES_FILE' + msg4
+    edgesN_file = in_dict['EDGES_NODES_FILE']
     assert type(edgesN_file) is str, msg
-    PETSc.Sys.Print('  checkDictionaryConsistency(): DOFS_NODES_FILE '
+    PETSc.Sys.Print('  checkDictionaryConsistency(): EDGES_NODES_FILE '
                     'consistency OK.')
 
     # nnz_file parameter
@@ -222,12 +257,12 @@ def checkDictionaryConsistencyMaster(rank, in_dict, file_name, dir_name):
     assert type(nnz_file) is str, msg
     PETSc.Sys.Print('  checkDictionaryConsistency(): NNZ_FILE consistency OK.')
 
-    # bEedges_file parameter
+    # boundaries_file parameter
     msg = msg1 + 'BOUNDARIES_FILE' + msg2
     assert 'BOUNDARIES_FILE' in in_dict, msg
     msg = msg3 + 'BOUNDARIES_FILE' + msg4
-    bEdges_file = in_dict['BOUNDARIES_FILE']
-    assert type(bEdges_file) is str, msg
+    boundaries_file = in_dict['BOUNDARIES_FILE']
+    assert type(boundaries_file) is str, msg
     PETSc.Sys.Print('  checkDictionaryConsistency(): BOUNDARIES_FILE '
                     'consistency OK.')
 
@@ -277,6 +312,26 @@ def checkDictionaryConsistencyMaster(rank, in_dict, file_name, dir_name):
                ' does not exist.')
         raise ValueError(msg)
 
+    # check elemsF_file path
+    success = checkFilePath(elemsF_file)
+    if success:
+        PETSc.Sys.Print('  checkDictionaryConsistency(): "' + elemsF_file +
+                        '" exists.')
+    else:
+        msg = ('  checkDictionaryConsistency(): file ' + elemsF_file +
+               ' does not exist.')
+        raise ValueError(msg)
+
+    # check facesN_file path
+    success = checkFilePath(facesN_file)
+    if success:
+        PETSc.Sys.Print('  checkDictionaryConsistency(): "' + facesN_file +
+                        '" exists.')
+    else:
+        msg = ('  checkDictionaryConsistency(): file ' + facesN_file +
+               ' does not exist.')
+        raise ValueError(msg)
+
     # check elemsE_file path
     success = checkFilePath(elemsE_file)
     if success:
@@ -297,6 +352,16 @@ def checkDictionaryConsistencyMaster(rank, in_dict, file_name, dir_name):
                ' does not exist.')
         raise ValueError(msg)
 
+    # check boundaries_file path
+    success = checkFilePath(boundaries_file)
+    if success:
+        PETSc.Sys.Print('  checkDictionaryConsistency(): "' +
+                        boundaries_file + '" exists.')
+    else:
+        msg = ('  checkDictionaryConsistency(): file ' + boundaries_file +
+               ' does not exist.')
+        raise ValueError(msg)
+
     # check receivers_file path
     success = checkFilePath(receivers_file)
     if success:
@@ -312,11 +377,12 @@ def checkDictionaryConsistencyMaster(rank, in_dict, file_name, dir_name):
                     file_name + '" are consistent.')
 
     # Create csem_modelling dictionary
-    out_model = CSEM_MODELLING(rank, freq, src_pos, src_direc, src_current,
-                               src_length, sigma_background, sigma_file,
-                               nodes_file, elemsN_file, elemsE_file,
-                               edgesN_file, nnz_file, bEdges_file,
-                               receivers_file, dir_name)
+    out_model = CSEM_MODELLING(rank, nedelec_order, cuda, freq, src_pos,
+                               src_direc, src_current, src_length,
+                               sigma_background, sigma_file, nodes_file,
+                               elemsN_file, elemsF_file, facesN_file,
+                               elemsE_file, edgesN_file, nnz_file,
+                               boundaries_file, receivers_file, dir_name)
 
     PETSc.Sys.Print('  A new CSEM_MODELLING dictionary has been '
                     'successfully created.')
@@ -335,6 +401,14 @@ def checkDictionaryConsistencySlave(rank, in_dict, file_name, dir_name):
     :return: csem modelling dictionary after test.
     :rtype: csem_modelling dictionary.
     '''
+    # nedelec_order parameter
+    nedelec_order = in_dict['NEDELEC_ORDER']
+    nedelec_order = np.int(nedelec_order)
+
+    # cuda parameter
+    cuda = in_dict['CUDA']
+    cuda = np.int(cuda)
+
     # freq parameter
     freq = in_dict['FREQ']
     freq = np.float(in_dict['FREQ'])
@@ -344,7 +418,7 @@ def checkDictionaryConsistencySlave(rank, in_dict, file_name, dir_name):
 
     # src_direc parameter
     src_direc = in_dict['SRC_DIREC']
-    src_direc = int(src_direc)
+    src_direc = np.int(src_direc)
 
     # src_current parameter
     src_current = in_dict['SRC_CURRENT']
@@ -367,27 +441,34 @@ def checkDictionaryConsistencySlave(rank, in_dict, file_name, dir_name):
     # elemsN_file parameter
     elemsN_file = in_dict['MESH_CONNECTIVITY_FILE']
 
+    # elemsF_file parameter
+    elemsF_file = in_dict['FACES_CONNECTIVITY_FILE']
+
+    # facesN_file parameter
+    facesN_file = in_dict['FACES_NODES_FILE']
+
     # elemsE_file parameter
-    elemsE_file = in_dict['DOFS_CONNECTIVITY_FILE']
+    elemsE_file = in_dict['EDGES_CONNECTIVITY_FILE']
 
     # edgesN_file parameter
-    edgesN_file = in_dict['DOFS_NODES_FILE']
+    edgesN_file = in_dict['EDGES_NODES_FILE']
 
     # nnz_file parameter
     nnz_file = in_dict['NNZ_FILE']
 
     # edgesN_file parameter
-    bEdges_file = in_dict['BOUNDARIES_FILE']
+    boundaries_file = in_dict['BOUNDARIES_FILE']
 
     # receivers_file parameter
     receivers_file = in_dict['RECEIVERS_FILE']
 
     # Create csem_modelling dictionary
-    out_model = CSEM_MODELLING(rank, freq, src_pos, src_direc, src_current,
-                               src_length, sigma_background, sigma_file,
-                               nodes_file, elemsN_file, elemsE_file,
-                               edgesN_file, nnz_file, bEdges_file,
-                               receivers_file, dir_name)
+    out_model = CSEM_MODELLING(rank, nedelec_order, cuda, freq, src_pos,
+                               src_direc, src_current, src_length,
+                               sigma_background, sigma_file, nodes_file,
+                               elemsN_file, elemsF_file, facesN_file,
+                               elemsE_file, edgesN_file, nnz_file,
+                               boundaries_file, receivers_file, dir_name)
 
     return out_model
 

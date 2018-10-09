@@ -13,7 +13,15 @@ All file paths should consider as absolute.
 Next, each key is described.
 '''
 modelling = {
-    # ----- Pyshical parameters -----
+    # ---------- Nedelec element order ----------
+    # 1 = First Nédélec order (6 DOFS per element)
+    # 2 = Second Nédélec order (20 DOFS per element)
+    # 3 = Third Nédélec order (45 DOFS per element)
+    # Type: int
+    # Optional: NO
+    'NEDELEC_ORDER': 2,
+
+    # ----- Physical parameters -----
     # Source
     # Source frequency. Type: float
     # Optional: NO
@@ -50,10 +58,10 @@ modelling = {
     'MESH_CONNECTIVITY_FILE': 'examples/DIPOLE1D/Input_model/meshConnectivity.dat',
     # Elements-edges connectivity. Type: str
     # Optional: NO
-    'DOFS_CONNECTIVITY_FILE': 'examples/DIPOLE1D/Input_model/dofs.dat',
+    'EDGES_CONNECTIVITY_FILE': 'examples/DIPOLE1D/Input_model/edges.dat',
     # Edges-nodes connectivity. Type: str
     # Optional: NO
-    'DOFS_NODES_FILE': 'examples/DIPOLE1D/Input_model/dofsNodes.dat',
+    'EDGES_NODES_FILE': 'examples/DIPOLE1D/Input_model/edgesNodes.dat',
     # Sparsity pattern for matrix allocation (PETSc)
     'NNZ_FILE': 'examples/DIPOLE1D/Input_model/nnz.dat',
     # Boundaries. Type: str

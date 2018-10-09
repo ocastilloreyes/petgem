@@ -18,7 +18,8 @@ from petgem.parallel.parallel import printMessage
 from petgem.preprocessing.preprocessing import readPreprocessingParams
 from petgem.preprocessing.preprocessing import preprocessNodes
 from petgem.preprocessing.preprocessing import preprocessingNodalConnectivity
-from petgem.preprocessing.preprocessing import preprocessingDOF
+from petgem.preprocessing.preprocessing import preprocessingEdges
+from petgem.preprocessing.preprocessing import preprocessingFaces
 from petgem.preprocessing.preprocessing import preprocessingConductivityModel
 from petgem.preprocessing.preprocessing import preprocessingDataReceivers
 from petgem.preprocessing.preprocessing import preprocessingNNZ
@@ -56,27 +57,36 @@ nNodes = preprocessNodes(preprocessing['MESH_FILE'],
 nElems = preprocessingNodalConnectivity(preprocessing['MESH_FILE'],
                                         preprocessing['OUT_DIR'], rank)
 
-# Degrees of freedom preprocessing (dofs)
-nDofs = preprocessingDOF(preprocessing['MESH_FILE'],
-                         preprocessing['OUT_DIR'], rank)
+# Edges connectivity and edge boundaries preprocessing (edges)
+nEdges, nDofs = preprocessingEdges(preprocessing['NEDELEC_ORDER'],
+                                   preprocessing['MESH_FILE'],
+                                   preprocessing['OUT_DIR'], rank)
+
+# Faces connectivity and faces boundaries preprocessing (faces)
+nFaces = preprocessingFaces(preprocessing['NEDELEC_ORDER'],
+                            preprocessing['MESH_FILE'],
+                            preprocessing['OUT_DIR'], rank)
 
 # Conductivity model
 preprocessingConductivityModel(preprocessing['MESH_FILE'],
                                preprocessing['MATERIAL_CONDUCTIVITIES'],
                                preprocessing['OUT_DIR'], rank)
 # Receiver positions
-nReceivers = preprocessingDataReceivers(preprocessing['MESH_FILE'],
+nReceivers = preprocessingDataReceivers(preprocessing['NEDELEC_ORDER'],
+                                        preprocessing['MESH_FILE'],
                                         preprocessing['RECEIVERS_FILE'],
                                         preprocessing['OUT_DIR'], rank)
 
 # Sparsity pattern for parallel matrix allocation
-preprocessingNNZ(preprocessing['MESH_FILE'], preprocessing['OUT_DIR'], rank)
+preprocessingNNZ(preprocessing['NEDELEC_ORDER'],
+                 preprocessing['MESH_FILE'],
+                 preprocessing['OUT_DIR'], rank)
 
 # ###############################################
 # ------------------ Summary --------------------
 printMessage('\nSummary', rank)
 printMessage('='*75, rank)
-printPreprocessingSummary(nNodes, nElems, nDofs, nReceivers, rank)
+printPreprocessingSummary(nElems, nNodes, nFaces, nDofs, nReceivers, rank)
 
 # ###############################################
 # ----------- Print footer (Master) -------------

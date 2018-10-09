@@ -82,7 +82,7 @@ guidelines are the following:
 PETGEM design
 -------------
 
-PETGEM use a code structure for the Nédelec FE algorithm that emphasizes
+PETGEM use a code structure for the high-order Nédelec FE algorithm that emphasizes
 good parallel scalability, which is crucial in the multi-core era.
 Furthermore, it’s modularity should simplify the process of reaching the
 best possible performance in terms of percentage of the peak amount of
@@ -188,7 +188,7 @@ The PETGEM source code is `petgem/`, which has the following contents:
      - Common classes and functions for init process.
    * - `efem/`
      - General modules and classes for describing a 3D CSEM  survey by using EFEM of
-       lowest order in tetrahedral meshes
+       high-order (:math:`p=1,2,3`) in tetrahedral meshes
    * - `mesh/`
      - Interface to import mesh files
    * - `monitoring/`
@@ -230,24 +230,34 @@ task. A glance of this file is the following:
    # name and his key names MUST NOT BE changed. All file paths should consider as absolute.
 
    preprocessing = {
+    # ---------- Nedelec element order ----------
+    # 1 = First Nédélec order (6 DOFS per element)
+    # 2 = Second Nédélec order (20 DOFS per element)
+    # 3 = Third Nédélec order (45 DOFS per element)
+    # Type: int
+    # Optional: NO
+    'NEDELEC_ORDER': 1,
+
     # ---------- Mesh file ----------
-    'MESH_FILE': 'DIPOLE1D/Input_preprocessing/DIPOLE1D.msh',
+    'MESH_FILE': 'PATH_TO_FILE',
 
     # ---------- Material conductivities ----------
     'MATERIAL_CONDUCTIVITIES': [1.0, 1./100., 1., 1./.3],
 
-    # ---------- Receivers positions file ----------
-    'RECEIVERS_FILE': 'DIPOLE1D/Input_preprocessing/RECEIVER_POSITIONS.txt',
+    # ---------- Receivers position file ----------
+    'RECEIVERS_FILE': 'PATH_TO_FILE',
 
     # ---------- Path for Output ----------
-    'OUT_DIR': 'DIPOLE1D/Input_model/',
-    }
+    'OUT_DIR': 'PATH_TO_FILE',
+   }
 
 As you can see, in the ``preprocessingParams.py`` are defined the main parameters,
-namely, mesh file path, material conductivities, receivers positions file path and the
+namely, Nédélec element order, mesh file path, material conductivities, receivers positions file path and the
 pre-processing output path.
 
 For this phase, the supported/expected formats are the following:
+
+* ``NEDELEC_ORDER``: nédélec element order for the discretization. Supported orders are :math:`p=1,2,3`
 
 * ``MESH_FILE``: path to tetrahedral mesh file in MSH ASCII format from `Gmsh <http://gmsh.info/>`__
 
@@ -272,15 +282,19 @@ following:
 
 * ``meshConnectivity.dat``: list of the node number of the n-th tetrahedral element in the mesh. The dimensions of ``meshConnectivity.dat`` are given by (number-of-elements, 4)
 
-* ``dofs.dat``: list of degrees of freedom of the n-th tetrahedral element in the mesh. Since PETGEM is based on linear Nédelec FE, the dimensions of ``dofs.dat`` are given by (number-of-elements, 6)
+* ``dofs.dat``: list of degrees of freedom of the n-th tetrahedral element in the mesh. Since PETGEM is based on high-order Nédelec FE, the dimensions of ``dofs.dat`` are given by (number-of-elements, 6) for :math:`p=1`, by (number-of-elements, 20) for :math:`p=2`, and by (number-of-elements, 45) for :math:`p=3`.
 
-* ``dofsNodes.dat``: list of the two nodes that make up each degrees-of-freedom (DOFs) in the mesh. The dimensions of ``dofsNodes.dat`` are given by (number-of-dofs, 2)
+* ``edgesNodes.dat``: list of the two nodes that make up each edge in the mesh. The dimensions of ``edgesNodes.dat`` are given by (number-of-edges, 2)
 
-* ``boundaries.dat``: list of the DOFs number that belongs on domain boundaries. The dimensions of ``boundaries.dat`` are given by (number-of-boundaries, 1)
+* ``faces.dat``: list of the four faces that make up each tetrahedral element in the mesh. The dimensions of ``faces.dat`` are given by (number-of-elements, 4)
+
+* ``facesNodes.dat``: list of the three nodes that make up each tetrahedral face in the mesh. The dimensions of ``facesNodes.dat`` are given by (number-of-faces, 3)
+
+* ``boundaries.dat``: list of the DOFs indexes that belongs on domain boundaries. The dimensions of ``boundaries.dat`` are given by (number-of-boundaries, 1)
 
 * ``conductivityModel.dat``: floating point values giving the conductivity to which the n-th tetrahedral element belongs. The dimensions of ``conductivityModel.dat`` are given by (number-of-elements, 1)
 
-* ``receivers.dat``: floating point values giving the X, Y and Z coordinates of the receivers. Additionally, this file includes information about the tetrahedral element that contains the n-th receiver, namely, its X, Y and Z coordinates of the four nodes, its list of the node number and its list of DOFs. The dimensions of ``receivers.dat`` are given by (number-of-receivers, 25)
+* ``receivers.dat``: floating point values giving the X, Y and Z coordinates of the receivers. Additionally, this file includes information about the tetrahedral element that contains the n-th receiver, namely, its X, Y and Z coordinates of the four nodes, its list of the node number and its list of DOFs. The dimensions of ``receivers.dat`` are given by (number-of-receivers, 25) for :math:`p=1`, by (number-of-receivers, 39) for :math:`p=2`, and by (number-of-receivers, 64) for :math:`p=3`.
 
 * ``nnz.dat``: list containing the number of nonzeros in the various matrix rows, namely, the sparsity pattern. According to the `PETSc <http://www.mcs.anl.gov/petsc/>`__ documentation, using the ``nnz.dat`` list to preallocate memory is especially important for efficient matrix assembly if the number of nonzeros varies considerably among the rows. The dimensions of ``nnz.dat`` are given by (number-of-DOFs, 1)
 
@@ -333,7 +347,8 @@ details about available options. A template of this file is included in
 ``examples/`` of the PETGEM source tree. Additionally, a freely
 available copy of this file is located at :ref:`Download` section.
 
-On the other hand, any 3D CSEM survey should include: physical parameters,
+On the other hand, any 3D CSEM survey should include: order for Nédélec elements
+discretizations, physical parameters,
 a mesh file, source and receivers files. These data are included in the
 ``modelParams.py`` file. Here all the files resulting from the pre-processing
 phase are included. In order to avoid a specific parser, ``modelParams.py``
@@ -344,18 +359,33 @@ A glance of ``modelParams.py`` file is the following:
 
 .. code-block:: python
 
-   # Parameters file template for 3D CSEM modelling.
-   # By definition, any 3D CSEM survey should include: physical parameters, a mesh file, source and receivers files. These data
-   # are included in the modelParams.py file. Additionally, options for PETSc solvers are defined in a petsc.opts file.
-   # In order to avoid a specific parser, modelParams.py file is imported by PETGEM as a Python dictionary. As consequence,
-   # the dictionary name and his key names MUST NOT BE changed. All file paths should consider as absolute.
+# Parameters file template for 3D CSEM modelling.
+# By definition, any 3D CSEM survey should include: physical parameters, a mesh file, source and receivers files. These data
+# are included in the modelParams.py file. Additionally, options for PETSc solvers are defined in a petsc.opts file.
+# In order to avoid a specific parser, modelParams.py file is imported by PETGEM as a Python dictionary. As consequence,
+# the dictionary name and his key names MUST NOT BE changed. All file paths should consider as absolute.
 
-   modelling = {
-    # ----- Pyshical parameters -----
+modelling = {
+    # ---------- Nedelec element order ----------
+    # 1 = First nedelec order (6 DOFS per element)
+    # 2 = Second nedelec order (20 DOFS per element)
+    # 3 = Third nedelec order (45 DOFS per element)
+    # Type: int
+    # Optional: NO
+    'NEDELEC_ORDER': 1,
+
+    # ---------- CUDA SUPPORT ----------
+    # 0 = No
+    # 1 = Yes
+    # Type: int
+    # Optional: NO
+    'CUDA': 0,
+
+    # ----- Physical parameters -----
     # Source
     # Source frequency. Type: float
     # Optional: NO
-    'FREQ': 2.0,
+    'FREQ': 1.0,
     # Source position(x, y, z). Type: float
     # Optional: NO
     'SRC_POS': [1750.0, 1750.0, -975.0],
@@ -373,7 +403,7 @@ A glance of ``modelParams.py`` file is the following:
     'SRC_LENGTH': 1.0,
     # Conductivity model. Type: str
     # Optional: NO
-    'CONDUCTIVITY_MODEL_FILE': 'DIPOLE1D/Input_model/conductivityModel.dat',
+    'CONDUCTIVITY_MODEL_FILE': 'PATH_TO_FILE',
     # Background conductivity. Type: float
     # Optional: NO
     'CONDUCTIVITY_BACKGROUND': 3.33,
@@ -382,34 +412,41 @@ A glance of ``modelParams.py`` file is the following:
     # Mesh files
     # Nodes spatial coordinates. Type: str
     # Optional: NO
-    'NODES_FILE': 'DIPOLE1D/Input_model/nodes.dat',
+    'NODES_FILE': 'PATH_TO_FILE',
     # Elements-nodes connectivity. Type: str
     # Optional: NO
-    'MESH_CONNECTIVITY_FILE': 'DIPOLE1D/Input_model/meshConnectivity.dat',
+    'MESH_CONNECTIVITY_FILE': 'PATH_TO_FILE',
+    # Elements-faces connectivity. Type: str
+    # Optional: NO
+    'FACES_CONNECTIVITY_FILE': 'PATH_TO_FILE',
+    # Faces-nodes connectivity. Type: str
+    # Optional: NO
+    'FACES_NODES_FILE': 'PATH_TO_FILE',
     # Elements-edges connectivity. Type: str
     # Optional: NO
-    'DOFS_CONNECTIVITY_FILE': 'DIPOLE1D/Input_model/dofs.dat',
+    'EDGES_CONNECTIVITY_FILE': 'PATH_TO_FILE',
     # Edges-nodes connectivity. Type: str
     # Optional: NO
-    'DOFS_NODES_FILE': 'DIPOLE1D/Input_model/dofsNodes.dat',
+    'EDGES_NODES_FILE': 'PATH_TO_FILE',
     # Sparsity pattern for matrix allocation (PETSc)
-    'NNZ_FILE': 'DIPOLE1D/Input_model/nnz.dat',
+    'NNZ_FILE': 'PATH_TO_FILE',
     # Boundaries. Type: str
     # Optional: NO
-    'BOUNDARIES_FILE': 'DIPOLE1D/Input_model/boundaries.dat',
+    'BOUNDARIES_FILE': 'PATH_TO_FILE',
 
     # ------------ Solver -----------
     # Solver options must be set in
-    # petsc.opts file
+    # petsc_solver.opts
 
     # ------------ Receivers file -----------
     # Name of the file that contains the receivers position. Type: str
     # Optional: NO
-    'RECEIVERS_FILE': 'DIPOLE1D/Input_model/receivers.dat',
-   }
+    'RECEIVERS_FILE': 'PATH_TO_FILE',
 
-The ``modelParams.py`` file is divided into 4 sections, namely, physical parameters
-(frequency, source position, source current, source length, conductivity model,
+}
+
+The ``modelParams.py`` file is divided into 5 sections, namely, Nédélec element order,
+physical parameters (frequency, source position, source current, source length, conductivity model,
 background conductivity), mesh information (file path of nodal spatial coordinates,
 mesh connectivity, DOFs connectivity, edges-nodes connectivity, sparsity
 structure for `PETSc <https://www.mcs.anl.gov/petsc/>`__
@@ -436,8 +473,8 @@ is the modelling parameters file for PETGEM.
 PETGEM solves the problem and outputs the solution to the ``Output/`` path.
 By default PETGEM will create the ``Output`` directory at same level where the
 ``modelParams.py`` file is located. The output files will be in three formats:
-`PETSc <https://www.mcs.anl.gov/petsc/>`__, Matlab and ASCII. Therefore, the
-``Output`` directory will contain three subdirectories: ``Ascii``, ``Matlab``
+`PETSc <https://www.mcs.anl.gov/petsc/>`__, MATLAB and ASCII. Therefore, the
+``Output`` directory will contain three subdirectories: ``Ascii``, ``MATLAB``
 and ``Petsc``. By default, and for each format, PETGEM save the electric
 field responses in different files:
 
@@ -464,8 +501,8 @@ the next work-flow:
 #. The problem sets up its domain, sub-domains, source, solver. This stage include the computation of the main data structures
 #. Parallel assembling of :math:`Ax=b`. See :ref:`CSEM problem` and :ref:`Edge finite element formulation` sections for a detail mathematical background of this equation system
 #. The solution is obtained in parallel by calling a ``ksp()`` `PETSc <https://www.mcs.anl.gov/petsc/>`__ object.
-#. Interpolation of electromagnetic responses & post-processing parallel stage
-#. Finally the solution can be stored by calling ``postProcessingFields()`` function. Current version support `PETSc <https://www.mcs.anl.gov/petsc/>`__, Matlab and ASCII formats.
+#. Interpolation of electromagnetic responses and post-processing parallel stage
+#. Finally the solution can be stored by calling ``postProcessingFields()`` function. Current version support `PETSc <https://www.mcs.anl.gov/petsc/>`__, MATLAB and ASCII formats
 
 Based on previous work-flow, any 3D CSEM modelling requires the following
 input files:
@@ -483,7 +520,7 @@ input files:
 Mesh formats
 ------------
 
-Current PETGEM version supports mesh files in MSH ASCII from
+Current PETGEM version supports mesh files in MSH ASCII (version 2.2) from
 `Gmsh <http://gmsh.info/>`__. Aforementioned format must be pre-processed
 using the ``run_preprocessing.py`` script. The ``run_preprocessing.py``
 script is included in the top-level directory of the PETGEM source tree.
@@ -590,7 +627,7 @@ Visualization of results
 Once a solution of a 3D CSEM survey has been obtained, it should be
 post-processed by using a visualization program. PETGEM does not do the
 visualization by itself, but it generates output files (ASCII,
-`PETSc <https://www.mcs.anl.gov/petsc/>`__ and Matlab formats are supported)
+`PETSc <https://www.mcs.anl.gov/petsc/>`__ and MATLAB formats are supported)
 with the electric responses at receivers positions. It also gives timing values
 in order to evaluate the performance.
 
@@ -658,7 +695,7 @@ which content is the following:
   * Visit http://gmsh.info/ for details about mesh scripting with Gmsh
   *
   * by Octavio Castillo-Reyes, BSC-CASE (octavio.castillo@bsc.es)
-  * Latest update: January 30th, 2018
+  * Latest update: September 19th, 2018
   *********************************************************************/
   // #################################################################
   // #                        Parameters                             #
@@ -752,6 +789,9 @@ which content is the following:
   // #################################################################
   Characteristic Length {1, 2, 3, 4, 5, 6, 7, 8, 9 , 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20} = dg;
 
+  // Mesh file format supported by PETGEM
+  Mesh.MshFileVersion = 2.2;
+
 Once the mesh have been created, the PETGEM pre-processing is invoked as
 follows:
 
@@ -769,18 +809,30 @@ task. A glance of this script is the following:
    # name and his key names MUST NOT BE changed. All file paths should consider as absolute.
 
    preprocessing = {
+    # ---------- Nedelec element order ----------
+    # 1 = First Nédélec order (6 DOFS per element)
+    # 2 = Second Nédélec order (20 DOFS per element)
+    # 3 = Third Nédélec order (45 DOFS per element)
+    # Type: int
+    # Optional: NO
+    'NEDELEC_ORDER': 1,
+
     # ---------- Mesh file ----------
-    'MESH_FILE': 'PREPROCESSING/Input_preprocessing/PREPROCESSING.msh',
+    # Type: str
+    'MESH_FILE': 'Example1/PREPROCESSING/Input_preprocessing/PREPROCESSING.msh',
 
     # ---------- Material conductivities ----------
+    # Type: float
     'MATERIAL_CONDUCTIVITIES': [1., 1./.3],
 
-    # ---------- Receivers positions file ----------
-    'RECEIVERS_FILE': 'PREPROCESSING/Input_preprocessing/RECEIVER_POSITIONS.txt',
+    # ---------- Receivers position file ----------
+    # Type: str
+    'RECEIVERS_FILE': 'Example1/PREPROCESSING/Input_preprocessing/RECEIVER_POSITIONS.txt',
 
     # ---------- Path for Output ----------
-    'OUT_DIR': 'Input_model/',
-    }
+    # Type: str
+    'OUT_DIR': 'Example1/PREPROCESSING/Input_model/',
+   }
 
 As you can see, in the ``preprocessingParams.py`` are defined the main parameters,
 namely, mesh file path, material conductivities, receivers positions file path and the
@@ -790,7 +842,7 @@ The expected output of this phase is show in `Figure 7.7`_.
 
 .. _Figure 7.7:
 .. figure:: _static/figures/output_preprocessing.png
-   :scale: 35%
+   :scale: 65%
    :alt: PETGEM output for pre-processing stage
    :align: center
 
@@ -814,11 +866,12 @@ consists in four-layers: 1000 m thick seawater (3.3 :math:`S/m`), 1000 m thick s
 (1 :math:`S/m`). The computational domain is a :math:`[0,3500]^3` m cube. For this model,
 a 2 Hz x-directed dipole source is located at :math:`z=975`, :math:`x=1750`,
 :math:`y=1750`. The receivers are placed in-line to the source position and along its
-orientation, directly above the seafloor (:math:`z = 990`).
+orientation, directly above the seafloor (:math:`z = 990`). Further, the
+Nédélec element order is p=1 (first order)
 
 Meshing
 #######
-PETGEM V1.0 is based on tetrahedral meshes of lowest order. Therefore,  `Figure 7.8`_
+PETGEM V1.0 is based on tetrahedral meshes. Therefore,  `Figure 7.8`_
 shows a 3D view of the model with its unstructured tetrahedral mesh for
 the halfspace :math:`y>1750`, with the color scale representing the electrical
 conductivity :math:`\sigma` for each layer. Mesh in `Figure 7.8`_ have been
@@ -866,61 +919,82 @@ this example follows:
   # the dictionary name and his key names MUST NOT BE changed. All file paths should consider as absolute.
 
   modelling = {
-   # ----- Pyshical parameters -----
-   # Source
-   # Source frequency. Type: float
-   # Optional: NO
-   'FREQ': 2.0,
-   # Source position(x, y, z). Type: float
-   # Optional: NO
-   'SRC_POS': [1750.0, 1750.0, -975.0],
-   # Source orientarion. Type: int
-   # 1 = X-directed source
-   # 2 = Y-directed source
-   # 3 = Z-directed source
-   # Optional: NO
-   'SRC_DIREC': 1,
-   # Source current. Type: float
-   # Optional: NO
-   'SRC_CURRENT': 1.0,
-   # Source length. Type: float
-   # Optional: NO
-   'SRC_LENGTH': 1.0,
-   # Conductivity model. Type: str
-   # Optional: NO
-   'CONDUCTIVITY_MODEL_FILE': 'DIPOLE1D/Input_model/conductivityModel.dat',
-   # Background conductivity. Type: float
-   # Optional: NO
-   'CONDUCTIVITY_BACKGROUND': 3.33,
+    # ---------- Nedelec element order ----------
+    # 1 = First nedelec order (6 DOFS per element)
+    # 2 = Second nedelec order (20 DOFS per element)
+    # 3 = Third nedelec order (45 DOFS per element)
+    # Type: int
+    # Optional: NO
+    'NEDELEC_ORDER': 1,
 
-   # ------- Mesh and conductivity model files ------
-   # Mesh files
-   # Nodes spatial coordinates. Type: str
-   # Optional: NO
-   'NODES_FILE': 'DIPOLE1D/Input_model/nodes.dat',
-   # Elements-nodes connectivity. Type: str
-   # Optional: NO
-   'MESH_CONNECTIVITY_FILE': 'DIPOLE1D/Input_model/meshConnectivity.dat',
-   # Elements-edges connectivity. Type: str
-   # Optional: NO
-   'DOFS_CONNECTIVITY_FILE': 'DIPOLE1D/Input_model/dofs.dat',
-   # Edges-nodes connectivity. Type: str
-   # Optional: NO
-   'DOFS_NODES_FILE': 'DIPOLE1D/Input_model/dofsNodes.dat',
-   # Sparsity pattern for matrix allocation (PETSc)
-   'NNZ_FILE': 'DIPOLE1D/Input_model/nnz.dat',
-   # Boundaries. Type: str
-   # Optional: NO
-   'BOUNDARIES_FILE': 'DIPOLE1D/Input_model/boundaries.dat',
+    # ---------- CUDA SUPPORT ----------
+    # 0 = No
+    # 1 = Yes
+    # Type: int
+    # Optional: NO
+    'CUDA': 0,
 
-   # ------------ Solver -----------
-   # Solver options must be set in
-   # petsc.opts file
+    # ----- Physical parameters -----
+    # Source
+    # Source frequency. Type: float
+    # Optional: NO
+    'FREQ': 2.0,
+    # Source position(x, y, z). Type: float
+    # Optional: NO
+    'SRC_POS': [1750.0, 1750.0, -975.0],
+    # Source orientarion. Type: int
+    # 1 = X-directed source
+    # 2 = Y-directed source
+    # 3 = Z-directed source
+    # Optional: NO
+    'SRC_DIREC': 1,
+    # Source current. Type: float
+    # Optional: NO
+    'SRC_CURRENT': 1.0,
+    # Source length. Type: float
+    # Optional: NO
+    'SRC_LENGTH': 1.0,
+    # Conductivity model. Type: str
+    # Optional: NO
+    'CONDUCTIVITY_MODEL_FILE': 'Example2/DIPOLE1D/Input_model/conductivityModel.dat',
+    # Background conductivity. Type: float
+    # Optional: NO
+    'CONDUCTIVITY_BACKGROUND': 3.33,
 
-   # ------------ Receivers file -----------
-   # Name of the file that contains the receivers position. Type: str
-   # Optional: NO
-   'RECEIVERS_FILE': 'DIPOLE1D/Input_model/receivers.dat',
+    # ------- Mesh and conductivity model files ------
+    # Mesh files
+    # Nodes spatial coordinates. Type: str
+    # Optional: NO
+    'NODES_FILE': 'Example2/DIPOLE1D/Input_model/nodes.dat',
+    # Elements-nodes connectivity. Type: str
+    # Optional: NO
+    'MESH_CONNECTIVITY_FILE': 'Example2/DIPOLE1D/Input_model/meshConnectivity.dat',
+    # Elements-faces connectivity. Type: str
+    # Optional: NO
+    'FACES_CONNECTIVITY_FILE': 'Example2/DIPOLE1D/Input_model/faces.dat',
+    # Faces-nodes connectivity. Type: str
+    # Optional: NO
+    'FACES_NODES_FILE': 'Example2/DIPOLE1D/Input_model/facesNodes.dat',
+    # Elements-edges connectivity. Type: str
+    # Optional: NO
+    'EDGES_CONNECTIVITY_FILE': 'Example2/DIPOLE1D/Input_model/edges.dat',
+    # Edges-nodes connectivity. Type: str
+    # Optional: NO
+    'EDGES_NODES_FILE': 'Example2/DIPOLE1D/Input_model/edgesNodes.dat',
+    # Sparsity pattern for matrix allocation (PETSc)
+    'NNZ_FILE': 'Example2/DIPOLE1D/Input_model/nnz.dat',
+    # Boundaries. Type: str
+    # Optional: NO
+    'BOUNDARIES_FILE': 'Example2/DIPOLE1D/Input_model/boundaries.dat',
+
+    # ------------ Solver -----------
+    # Solver options must be set in
+    # petsc_solver.opts
+
+    # ------------ Receivers file -----------
+    # Name of the file that contains the receivers position. Type: str
+    # Optional: NO
+    'RECEIVERS_FILE': 'Example2/DIPOLE1D/Input_model/receivers.dat',
   }
 
 Note that you may wish to change the location of the input files to
@@ -931,12 +1005,12 @@ the solver options have been configured in the ``petsc.opts`` file as follows:
 
 .. code-block:: python
 
-  # Solver options for PETSc
-  -ksp_type gmres
-  -pc_type sor
-  -ksp_rtol 1e-8
-  -ksp_converged_reason
-  -log_summary
+    # Solver options for
+    -ksp_type gmres
+    -pc_type sor
+    -ksp_rtol 1e-8
+    -ksp_converged_reason
+    -log_summary
 
 That's it, we are now ready to solve the modelling.
 
@@ -959,8 +1033,8 @@ directory of the PETGEM source tree:
 
 and outputs the solution to the output path
 (``DIPOLE1D/Output/``). The output files will be in three formats:
-`PETSc <https://www.mcs.anl.gov/petsc/>`__, Matlab and ASCII. Therefore, the
-``Output`` directory will contain three subdirectories: ``Ascii``, ``Matlab``
+`PETSc <https://www.mcs.anl.gov/petsc/>`__, MATLAB and ASCII. Therefore, the
+``Output`` directory will contain three subdirectories: ``Ascii``, ``MATLAB``
 and ``Petsc``. By default, and for each format, PETGEM save the electric
 field responses in different files:
 
@@ -975,7 +1049,7 @@ PETGEM post-processing
 Once a solution of a 3D CSEM survey has been obtained, it should be
 post-processed by using a visualization program. PETGEM does not do the
 visualization by itself, but it generates output files (ASCII,
-`PTSc <https://www.mcs.anl.gov/petsc/>`__ and Matlab formats are supported)
+`PETSc <https://www.mcs.anl.gov/petsc/>`__ and MATLAB formats are supported)
 with the electric responses at receivers positions. It also gives timing values
 in order to evaluate the performance.
 
@@ -996,7 +1070,159 @@ mesh with :math:`\approx2` millions of DOFs.
 
    Figure 7.9. Total electric field comparative for x-component between PETGEM V1.0 and DIPOLE1D.
 
-Example 3: Use of PETSc solvers
+Example 3: Use of high-order Nédélec elements
+*********************************************
+In order to show the potential of high-order Nédélec elements, here is
+considered the same model of previous example. In this case, the
+Nédélec element order is p=2 (second order).
+
+Meshing
+##########################
+As in previous example, the mesh is composed by four conductivity materials. The
+resulting `Gmsh <http://gmsh.info/>`__ script can be found in :ref:`Download`
+section. It is worth to mention that the use a Nédélec element order p=2 helps
+to reduce the number of tetrahedral elements to achieved a certain error level.
+
+Parameters file for PETGEM
+##########################
+The parameters file used for this example follows:
+
+.. code-block:: python
+
+  # Parameters file template for 3D CSEM modelling.
+  # By definition, any 3D CSEM survey should include: physical parameters, a mesh file, source and receivers files. These data
+  # are included in the modelParams.py file. Additionally, options for PETSc solvers are defined in a petsc.opts file.
+  # In order to avoid a specific parser, modelParams.py file is imported by PETGEM as a Python dictionary. As consequence,
+  # the dictionary name and his key names MUST NOT BE changed. All file paths should consider as absolute.
+
+  modelling = {
+    # ---------- Nedelec element order ----------
+    # 1 = First nedelec order (6 DOFS per element)
+    # 2 = Second nedelec order (20 DOFS per element)
+    # 3 = Third nedelec order (45 DOFS per element)
+    # Type: int
+    # Optional: NO
+    'NEDELEC_ORDER': 2,
+
+    # ---------- CUDA SUPPORT ----------
+    # 0 = No
+    # 1 = Yes
+    # Type: int
+    # Optional: NO
+    'CUDA': 0,
+
+    # ----- Physical parameters -----
+    # Source
+    # Source frequency. Type: float
+    # Optional: NO
+    'FREQ': 2.0,
+    # Source position(x, y, z). Type: float
+    # Optional: NO
+    'SRC_POS': [1750.0, 1750.0, -975.0],
+    # Source orientarion. Type: int
+    # 1 = X-directed source
+    # 2 = Y-directed source
+    # 3 = Z-directed source
+    # Optional: NO
+    'SRC_DIREC': 1,
+    # Source current. Type: float
+    # Optional: NO
+    'SRC_CURRENT': 1.0,
+    # Source length. Type: float
+    # Optional: NO
+    'SRC_LENGTH': 1.0,
+    # Conductivity model. Type: str
+    # Optional: NO
+    'CONDUCTIVITY_MODEL_FILE': 'Example2/DIPOLE1D/Input_model/conductivityModel.dat',
+    # Background conductivity. Type: float
+    # Optional: NO
+    'CONDUCTIVITY_BACKGROUND': 3.33,
+
+    # ------- Mesh and conductivity model files ------
+    # Mesh files
+    # Nodes spatial coordinates. Type: str
+    # Optional: NO
+    'NODES_FILE': 'Example2/DIPOLE1D/Input_model/nodes.dat',
+    # Elements-nodes connectivity. Type: str
+    # Optional: NO
+    'MESH_CONNECTIVITY_FILE': 'Example2/DIPOLE1D/Input_model/meshConnectivity.dat',
+    # Elements-faces connectivity. Type: str
+    # Optional: NO
+    'FACES_CONNECTIVITY_FILE': 'Example2/DIPOLE1D/Input_model/faces.dat',
+    # Faces-nodes connectivity. Type: str
+    # Optional: NO
+    'FACES_NODES_FILE': 'Example2/DIPOLE1D/Input_model/facesNodes.dat',
+    # Elements-edges connectivity. Type: str
+    # Optional: NO
+    'EDGES_CONNECTIVITY_FILE': 'Example2/DIPOLE1D/Input_model/edges.dat',
+    # Edges-nodes connectivity. Type: str
+    # Optional: NO
+    'EDGES_NODES_FILE': 'Example2/DIPOLE1D/Input_model/edgesNodes.dat',
+    # Sparsity pattern for matrix allocation (PETSc)
+    'NNZ_FILE': 'Example2/DIPOLE1D/Input_model/nnz.dat',
+    # Boundaries. Type: str
+    # Optional: NO
+    'BOUNDARIES_FILE': 'Example2/DIPOLE1D/Input_model/boundaries.dat',
+
+    # ------------ Solver -----------
+    # Solver options must be set in
+    # petsc_solver.opts
+
+    # ------------ Receivers file -----------
+    # Name of the file that contains the receivers position. Type: str
+    # Optional: NO
+    'RECEIVERS_FILE': 'Example2/DIPOLE1D/Input_model/receivers.dat',
+  }
+
+Running PETGEM
+##############
+To run the simulation, the following command should be run in the top-level
+directory of the PETGEM source tree:
+
+.. code-block:: bash
+
+  $ mpirun -n 48 python3 kernel.py -options_file DIPOLE1D/petsc.opts DIPOLE1D/modelParams.py
+
+``kernel.py`` solves the problem as follows:
+
+  #. Problem initialization
+  #. Import files
+  #. Parallel assembly system
+  #. Parallel solution system
+  #. Post-processing of electric responses
+
+and outputs the solution to the output path
+(``DIPOLE1D/Output/``). The output files will be in three formats:
+`PETSc <https://www.mcs.anl.gov/petsc/>`__, MATLAB and ASCII. Therefore, the
+``Output`` directory will contain three subdirectories: ``Ascii``, ``MATLAB``
+and ``Petsc``. By default, and for each format, PETGEM save the electric
+field responses in different files:
+
+  * ``Ep.xx``: primary electric field components
+  * ``Es.xx``: secondary electric field components
+  * ``Et.xx``: total electric field components
+
+where ``.xx`` is the file extension that depends of the format file.
+
+Nédélec order comparison
+########################
+`Figure 7.10`_ shows a comparison of the x-component of total electric field between p=1
+and p=2 against the quasi-analytical solution obtained with the
+`DIPOLE1D <http://marineemlab.ucsd.edu/~kkey/pubs/2009b.pdf>`_ tool. The total
+electric field in `Figure 7.10`_ was calculated using a
+mesh with :math:`\approx2` millions of DOFs for p=1 and a mesh with
+:math:`\approx600` thousands of DOFs.
+
+.. _Figure 7.10:
+.. figure:: _static/figures/total_field_X_model2.png
+   :scale: 40%
+   :alt: Nédélec order comparison for an in-line canonical off-shore hydrocarbon model with its unstructured tetrahedral mesh for :math:`y>150`
+   :align: center
+
+   Figure 7.10. Nédélec order comparative within PETGEM V1.0
+
+
+Example 4: Use of PETSc solvers
 *******************************
 
 In PETGEM, options for `PETSc <https://www.mcs.anl.gov/petsc/>`__ solvers/preconditioners

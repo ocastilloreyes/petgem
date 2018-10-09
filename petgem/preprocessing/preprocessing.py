@@ -32,12 +32,13 @@ def checkNumberParamsPreprocessing(init_params):
     return num_params
 
 
-def buildPreprocessing(rank, MESH_FILE, MATERIAL_CONDUCTIVITIES,
+def buildPreprocessing(rank, NEDELEC_ORDER, MESH_FILE, MATERIAL_CONDUCTIVITIES,
                        RECEIVERS_FILE, OUT_DIR):
     ''' Build a dictionary with main parameters for
     PETGEM preprocessing.
 
     :param int rank: MPI rank.
+    :param in NEDELEC_ORDER: nedelec element order.
     :param str MESH_FILE: file name of mesh.
     :param ndarray MATERIAL_CONDUCTIVITIES: conductivity values of
                                             materials in the mesh.
@@ -51,7 +52,8 @@ def buildPreprocessing(rank, MESH_FILE, MATERIAL_CONDUCTIVITIES,
         PETSc.Sys.Print('  buildPreprocessing(): Creating a ' +
                         'preprocessing dictionary.')
 
-    preprocessing = {'MESH_FILE': MESH_FILE,
+    preprocessing = {'NEDELEC_ORDER': NEDELEC_ORDER,
+                     'MESH_FILE': MESH_FILE,
                      'MATERIAL_CONDUCTIVITIES': MATERIAL_CONDUCTIVITIES,
                      'RECEIVERS_FILE': RECEIVERS_FILE,
                      'OUT_DIR': OUT_DIR
@@ -69,18 +71,20 @@ def printPreprocessingData(input_preprocessing, file_name):
     '''
 
     A = str(file_name)
-    B = str(input_preprocessing['MESH_FILE'])
-    C = str(input_preprocessing['MATERIAL_CONDUCTIVITIES'])
-    D = str(input_preprocessing['RECEIVERS_FILE'])
-    E = str(input_preprocessing['OUT_DIR'])
+    B = str(input_preprocessing['NEDELEC_ORDER'])
+    C = str(input_preprocessing['MESH_FILE'])
+    D = str(input_preprocessing['MATERIAL_CONDUCTIVITIES'])
+    E = str(input_preprocessing['RECEIVERS_FILE'])
+    F = str(input_preprocessing['OUT_DIR'])
 
     PETSc.Sys.Print('\nData for preprocessing')
     PETSc.Sys.Print('='*75)
     PETSc.Sys.Print('  Preprocessing file name:   {0:50}'.format(A))
-    PETSc.Sys.Print('  Mesh file:                 {0:50}'.format(B))
-    PETSc.Sys.Print('  Material conductivities:   {0:50}'.format(C))
-    PETSc.Sys.Print('  Receiver positions file:   {0:50}'.format(D))
-    PETSc.Sys.Print('  Out directory:             {0:50}'.format(E))
+    PETSc.Sys.Print('  Nedelec element order:     {0:50}'.format(B))
+    PETSc.Sys.Print('  Mesh file:                 {0:50}'.format(C))
+    PETSc.Sys.Print('  Material conductivities:   {0:50}'.format(D))
+    PETSc.Sys.Print('  Receiver positions file:   {0:50}'.format(E))
+    PETSc.Sys.Print('  Out directory:             {0:50}'.format(F))
 
     return
 
@@ -103,6 +107,15 @@ def checkPreprocessingConsistency(rank, in_dict, file_name):
     msg4 = (' parameter in "' + file_name + '".')
 
     PETSc.Sys.Print('  Checking preprocessing parameters consistency.')
+
+    # NEDELEC_ORDER parameter
+    msg = msg1 + 'NEDELEC_ORDER' + msg2
+    assert 'NEDELEC_ORDER' in in_dict, msg
+    msg = msg3 + 'NEDELEC_ORDER' + msg4
+    NEDELEC_ORDER = in_dict['NEDELEC_ORDER']
+    assert type(NEDELEC_ORDER) is int, msg
+    PETSc.Sys.Print('  checkPreprocessingConsistency(): NEDELEC_ORDER ' +
+                    'consistency OK.')
 
     # NODES_FILE parameter
     msg = msg1 + 'MESH_FILE' + msg2
@@ -141,7 +154,8 @@ def checkPreprocessingConsistency(rank, in_dict, file_name):
                     'OUT_DIR consistency OK.')
 
     # Create preprocessing dictionary
-    out_model = buildPreprocessing(rank, MESH_FILE, MATERIAL_CONDUCTIVITIES,
+    out_model = buildPreprocessing(rank, NEDELEC_ORDER, MESH_FILE,
+                                   MATERIAL_CONDUCTIVITIES,
                                    RECEIVERS_FILE, OUT_DIR)
 
     return out_model
@@ -213,7 +227,6 @@ def readPreprocessingParams(input_params, rank):
                                                       preprocessing_temp.
                                                       preprocessing,
                                                       PARAMS_FILE_NAME)
-
     # Print modelling content
     if rank == 0:
         printPreprocessingData(preprocessing, input_path)
@@ -321,104 +334,94 @@ def preprocessingNodalConnectivity(mesh_file, out_dir, rank):
     return nElems
 
 
-def preprocessingDOF(mesh_file, out_dir, rank):
-    ''' Preprocess degrees of freedom (DOF) and its associated data structures
-    of a given mesh in Gmsh format. Here, dofs are defined for edge
-    finite element computations.
+def preprocessingEdges(nedelec_order, mesh_file, out_dir, rank):
+    ''' Preprocess edges, edge boundaries and its associated data structures
+    of a given mesh in Gmsh format. For edge finite element of linear
+    order the edges are the dofs. For edge finite element of second order
+    the dofs are computed in runtime based on edges and faces on each
+    tetrahedral element.
 
+    :param int nedelec_order: nedelec element order.
     :param str mesh_file: mesh file name to be preprocess.
     :param str out_dir: path for output.
     :param int rank: MPI rank.
-    :return: number of DOFS.
+    :return: number of edges.
     :rtype: int
     '''
 
+    # ---------- Export Edges ----------
     if rank == 0:
-        PETSc.Sys.Print('  Degrees of freedom (dofs.dat)')
+        PETSc.Sys.Print('  Edges (edges.dat)')
 
     # Check if mesh_file exist
     success = checkFilePath(mesh_file)
 
     if rank == 0:
         if not success:
-            msg = ('  preprocessingDOF(): file ' + mesh_file +
+            msg = ('  preprocessingEdges(): file ' + mesh_file +
                    ' does not exist.')
             raise ValueError(msg)
 
     # Read connectivity
     elemsN, nElems = readGmshConnectivity(mesh_file)
 
-    # Compute dofs
-    dofs, dofsNodes = computeDofs(elemsN, nElems)
-    nDofs = dofsNodes.shape[0]
+    # Compute edges
+    elemsE, edgesNodes = computeEdges(elemsN, nElems, nedelec_order)
+    nEdges = edgesNodes.shape[0]
 
-    # Compute faces
-    elemsF, facesN = computeFaces(elemsN, nElems)
+    # Compute boundaries
+    boundaries, nDofs = computeBoundaries(elemsN, nElems, edgesNodes,
+                                          nedelec_order)
 
-    # Compute boundary faces
-    boundaryFacesN = computeBoundaryFaces(elemsF, facesN)
-
-    # Delete unnecesary arrays
-    del elemsN
-    del elemsF
-    del facesN
-
-    # Compute boundary dofs
-    boundaryDofs = computeBoundaryDofs(dofsNodes, boundaryFacesN)
-
-    # Delete unnecesary arrays
-    del boundaryFacesN
-
-    # ---------- DOFS ----------
+    # ---------- Export Edges ----------
     # Get matrix dimensions
-    size = dofs.shape
-
+    size = elemsE.shape
     # Build PETSc structures
-    matrix = createSequentialDenseMatrixWithArray(size[0], size[1], dofs)
+    matrix = createSequentialDenseMatrixWithArray(size[0], size[1], elemsE)
 
     # Delete unnecesary arrays
-    del dofs
+    del elemsE
 
     # Verify if OUT_DIR exists
     checkIfDirectoryExist(out_dir)
 
     # Build path to save the file
-    out_path = out_dir + 'dofs.dat'
+    out_path = out_dir + 'edges.dat'
 
-    # Write PETGEM nodes in PETSc format
+    # Write PETGEM edges in PETSc format
     writeParallelDenseMatrix(out_path, matrix, communicator=PETSc.COMM_SELF)
 
-    # ---------- DOFS TO NODES ----------
+    # ---------- Export Edges to nodes ----------
     if rank == 0:
-        PETSc.Sys.Print('  Dofs connectivity (dofsNodes.dat)')
+        PETSc.Sys.Print('  Edges connectivity (edgesNodes.dat)')
 
     # Get matrix dimensions
-    size = dofsNodes.shape
+    size = edgesNodes.shape
 
     # Build PETSc structures
-    matrix = createSequentialDenseMatrixWithArray(size[0], size[1], dofsNodes)
+    matrix = createSequentialDenseMatrixWithArray(size[0], size[1], edgesNodes)
 
     # Delete unnecesary arrays
-    del dofsNodes
+    del edgesNodes
 
     # Verify if OUT_DIR exists
     checkIfDirectoryExist(out_dir)
 
     # Build path to save the file
-    out_path = out_dir + 'dofsNodes.dat'
+    out_path = out_dir + 'edgesNodes.dat'
 
-    # Write PETGEM nodes in PETSc format
+    # Write PETGEM edgesNodes in PETSc format
     writeParallelDenseMatrix(out_path, matrix, communicator=PETSc.COMM_SELF)
 
-    # ---------- BOUNDARY DOFs ----------
+    # ---------- Export boundaries ----------
     if rank == 0:
         PETSc.Sys.Print('  Boundaries (boundaries.dat)')
 
     # Build PETSc structures
-    vector = createSequentialVectorWithArray(boundaryDofs)
+    vector = createSequentialVectorWithArray(boundaries)
 
     # Delete unnecesary arrays
-    del boundaryDofs
+    del boundaries
 
     # Verify if OUT_DIR exists
     checkIfDirectoryExist(out_dir)
@@ -429,13 +432,104 @@ def preprocessingDOF(mesh_file, out_dir, rank):
     # Write PETGEM nodes in PETSc format
     writePetscVector(out_path, vector, communicator=PETSc.COMM_SELF)
 
-    return nDofs
+    return nEdges, nDofs
+
+
+def preprocessingFaces(nedelec_order, mesh_file, out_dir, rank):
+    ''' Preprocess faces, face boundaries and its associated data structures
+    of a given mesh in Gmsh format.
+
+    :param int nedelec_order: nedelec element order.
+    :param str mesh_file: mesh file name to be preprocess.
+    :param str out_dir: path for output.
+    :param int rank: MPI rank.
+    :return: number of edges.
+    :rtype: int
+    '''
+
+    # Check if mesh_file exist
+    success = checkFilePath(mesh_file)
+
+    if rank == 0:
+        if not success:
+            msg = ('  preprocessingFaces(): file ' + mesh_file +
+                   ' does not exist.')
+            raise ValueError(msg)
+
+    # Read connectivity
+    elemsN, nElems = readGmshConnectivity(mesh_file)
+
+    # Compute faces
+    elemsF, facesN = computeFaces(elemsN, nElems, nedelec_order)
+
+    # Number of faces
+    size = facesN.shape
+    nFaces = size[0]
+
+    # Delete unnecesary arrays
+    del elemsN
+
+    # ---------- Export Faces connectivity ----------
+    if rank == 0:
+        PETSc.Sys.Print('  Faces connectivity (faces.dat)')
+
+    # Get matrix dimensions
+    size = elemsF.shape
+    # Build PETSc structures
+    matrix = createSequentialDenseMatrixWithArray(size[0], size[1], elemsF)
+
+    # Verify if OUT_DIR exists
+    checkIfDirectoryExist(out_dir)
+
+    # Build path to save the file
+    out_path = out_dir + 'faces.dat'
+
+    # Write PETGEM edges in PETSc format
+    writeParallelDenseMatrix(out_path, matrix, communicator=PETSc.COMM_SELF)
+
+    # ---------- Export Faces connectivity ----------
+    if rank == 0:
+        PETSc.Sys.Print('  Faces-nodes connectivity (facesN.dat)')
+
+    # Build facesN connectivity for each element
+    nNodes_face = 3
+    nFaces_element = 4
+    # Allocate matrix with an additional position to store the total number of
+    # faces in the mesh
+    facesN_tmp = np.zeros((nElems, nNodes_face*nFaces_element+1))
+
+    for iEle in np.arange(nElems):
+        facesElement = elemsF[iEle, :]
+        nodesFace = facesN[facesElement, :]
+        facesN_tmp[iEle, 0] = nFaces
+        facesN_tmp[iEle, 1:] = nodesFace.reshape(1, nNodes_face*nFaces_element)
+
+    # Get matrix dimensions
+    size = facesN_tmp.shape
+    # Build PETSc structures
+    matrix = createSequentialDenseMatrixWithArray(size[0], size[1], facesN_tmp)
+
+    # Delete unnecesary arrays
+    del elemsF
+    del facesN
+    del facesN_tmp
+
+    # Verify if OUT_DIR exists
+    checkIfDirectoryExist(out_dir)
+
+    # Build path to save the file
+    out_path = out_dir + 'facesNodes.dat'
+
+    # Write PETGEM edges in PETSc format
+    writeParallelDenseMatrix(out_path, matrix, communicator=PETSc.COMM_SELF)
+
+    return nFaces
 
 
 def preprocessingConductivityModel(mesh_file, material_conductivities,
                                    out_dir, rank):
     ''' Preprocess conductivity model associated to a given mesh in Gmsh
-    format. Here, dofs are defined for edge finite element computations.
+    format.
 
     :param str mesh_file: mesh file name to be preprocess.
     :param ndarray material_conductivities: conductivity values
@@ -495,11 +589,11 @@ def preprocessingConductivityModel(mesh_file, material_conductivities,
     return
 
 
-def preprocessingDataReceivers(mesh_file, receivers_file,
+def preprocessingDataReceivers(nedelec_order, mesh_file, receivers_file,
                                out_dir, rank):
-    ''' Preprocess conductivity model associated to a given mesh in Gmsh
-    format. Here, dofs are defined for edge finite element computations.
+    ''' Preprocess receivers and its data for a given 3D CSEM model.
 
+    :param int nedelec_order: nedelec element order.
     :param str mesh_file: mesh file name to be preprocess.
     :param str receivers_file: receiver positions file name to be preprocess.
     :param str out_dir: path for output.
@@ -551,17 +645,26 @@ def preprocessingDataReceivers(mesh_file, receivers_file,
     # Read connectivity
     elemsN, nElems = readGmshConnectivity(mesh_file)
 
-    # Compute dofs
-    dofs, _ = computeDofs(elemsN, nElems)
+    # Compute edges
+    elemsE, _ = computeEdges(elemsN, nElems, nedelec_order)
 
-    # Overwrite Delaunay structure with mesh_file connectivity
+    # Number of edges
+    numberEdges = np.max(elemsE) + np.int(1)
+
+    # Compute faces
+    elemsF, facesN = computeFaces(elemsN, nElems, nedelec_order)
+
+    # Number of faces
+    numberFaces = np.max(elemsF) + np.int(1)
+
+    # Overwrite Delaunay structure with mesh_file connectivity and points
     tri.simplices = elemsN.astype(np.int32)
 
     # Delete unnecesary arrays
     del elemsN
 
     # Find out which tetrahedral element points are in
-    recvElems = tri.find_simplex(receivers)
+    recvElems = tri.find_simplex(receivers, tol=np.spacing(1))
 
     # Determine if all receiver points were found
     idx = np.where(recvElems < 0)[0]
@@ -592,9 +695,22 @@ def preprocessingDataReceivers(mesh_file, receivers_file,
         np.savetxt(out_path, receivers, fmt='%1.8e')
 
     # Allocate space for receives in PETGEM format
-    numDimensions = 3
-    nodalOrder = 4
-    edgeOrder = 6
+    if nedelec_order == 1:  # First order edge element
+        numDimensions = 3
+        nodalOrder = 4
+        edgeOrder = 6
+    elif nedelec_order == 2:  # Second order edge element
+        numDimensions = 3
+        nodalOrder = 4
+        edgeOrder = 20
+    elif nedelec_order == 3:  # Third order edge element
+        numDimensions = 3
+        nodalOrder = 4
+        edgeOrder = 45
+    else:
+        raise ValueError('Edge element order=',
+                         nedelec_order, ' not supported.')
+
     allocate = numDimensions+nodalOrder*numDimensions+nodalOrder+edgeOrder
     tmp = np.zeros((nReceivers, allocate), dtype=np.float)
 
@@ -603,26 +719,46 @@ def preprocessingDataReceivers(mesh_file, receivers_file,
     for iReceiver in np.arange(nReceivers):
         # If there is one receiver
         if nReceivers == 1:
+            # Get index of tetrahedral element (receiver container)
+            iEle = recvElems
             # Get receiver coordinates
             coordiReceiver = receivers[0:]
             # Get element coordinates (container element)
-            coordElement = tri.points[tri.simplices[recvElems, :]]
+            coordElement = tri.points[tri.simplices[iEle, :]]
             coordElement = coordElement.flatten()
             # Get nodal indexes (container element)
-            nodesElement = tri.simplices[recvElems, :]
+            nodesElement = tri.simplices[iEle, :]
             # Get element-dofs indices (container element)
-            dofsElement = dofs[recvElems, :]
+            edgesElement = elemsE[iEle, :]
+            facesElement = elemsF[iEle, :]
+            nodesFace = facesN[facesElement, :]
+
+            dofsElement = computeElementDOFs(iEle, nodesElement, edgesElement,
+                                             facesElement, nodesFace,
+                                             numberEdges, numberFaces,
+                                             nedelec_order)
         # If there are more than one receivers
         else:
+            # Get index of tetrahedral element (receiver container)
+            iEle = recvElems[iReceiver]
             # Get receiver coordinates
             coordiReceiver = receivers[iReceiver, :]
             # Get element coordinates (container element)
-            coordElement = tri.points[tri.simplices[recvElems[iReceiver], :]]
+            coordElement = tri.points[tri.simplices[iEle, :]]
             coordElement = coordElement.flatten()
             # Get nodal indexes (container element)
-            nodesElement = tri.simplices[recvElems[iReceiver], :]
+            nodesElement = tri.simplices[iEle, :]
             # Get element-dofs indices (container element)
-            dofsElement = dofs[recvElems[iReceiver], :]
+            edgesElement = elemsE[iEle, :]
+            facesElement = elemsF[iEle, :]
+            nodesFace = facesN[facesElement, :]
+
+            # Compute element-dofs indices (container element)
+            dofsElement = computeElementDOFs(iEle, nodesElement, edgesElement,
+                                             facesElement, nodesFace,
+                                             numberEdges, numberFaces,
+                                             nedelec_order)
+
         # Insert data for iReceiver
         tmp[iReceiver, 0:3] = coordiReceiver
         tmp[iReceiver, 3:15] = coordElement
@@ -631,7 +767,7 @@ def preprocessingDataReceivers(mesh_file, receivers_file,
 
     # Delete unnecesary arrays
     del tri
-    del dofs
+    del elemsE
 
     # Get matrix dimensions
     size = tmp.shape
@@ -654,11 +790,26 @@ def preprocessingDataReceivers(mesh_file, receivers_file,
     return nReceivers
 
 
-def preprocessingNNZ(mesh_file, out_dir, rank):
+def preprocessingNNZ(nedelec_order, mesh_file, out_dir, rank):
     ''' Preprocess sparsity pattern (NNZ) for parallel matrix allocation
-    of a given mesh in Gmsh format. Here, dofs are defined for edge
-    finite element computations.
+    of a given mesh in Gmsh format.
 
+    Since PETGEM parallelism is based on PETSc, computation of the matrix
+    sparsity pattern is critical in sake of performance. Furthermore, PETGEM
+    is based on tetrahedral edge finite elements of first, second and third
+    order which produces:
+
+        * 6 DOFs per element in first order discretizations
+        * 20 DOFs per element in second order discretizations
+        * 45 DOFs per element in third order discretizations
+
+    Hence, the tetrahedral valence is equal to:
+
+        * 34 in first order discretizations
+        * 134 in second order discretizations
+        * 363 in third order discretizations
+
+    :param int nedelec_order: nedelec element order.
     :param str mesh_file: mesh file name to be preprocess.
     :param int rank: MPI rank.
     :return: None
@@ -679,18 +830,34 @@ def preprocessingNNZ(mesh_file, out_dir, rank):
     # Read connectivity
     elemsN, nElems = readGmshConnectivity(mesh_file)
 
-    # Compute dofs
-    _, dofsNodes = computeDofs(elemsN, nElems)
-    nDofs = dofsNodes.shape[0]
+    # Compute number of edges
+    _, edgesNodes = computeEdges(elemsN, nElems, nedelec_order)
+    nEdges = edgesNodes.shape[0]
 
-    # Since PETGEM parallelism is based on PETSc, computation of the matrix
-    # sparsity pattern is critical in sake of performance. Furthermore, PETGEM
-    # V1.0 is based on linear edge finite elements which produces six dofs per
-    # tetrahedral element. Hence, the tetrahedral valence is equal to 34. based
-    # on this information we build the NNZ vector.
+    # Compute number of faces
+    elemsF, facesN = computeFaces(elemsN, nElems, nedelec_order)
+    nFaces = facesN.shape[0]
 
-    # In order to avoid memory performance issues, add 40% to valence
-    valence = 50
+    if nedelec_order == 1:  # First order edge element
+        # Number of DOFs correspond to the number of edges in the mesh
+        nDofs = nEdges
+        # In order to avoid memory performance issues, add 20% to valence
+        valence = 41
+    elif nedelec_order == 2:  # Second order edge element
+        # Number of DOFs
+        nDofs = nEdges*np.int(2) + nFaces*np.int(2)
+        # In order to avoid memory performance issues, add 20% to valence
+        valence = 161
+    elif nedelec_order == 3:  # Third order edge element
+        # Number of DOFs
+        nDofs = nEdges*np.int(3) + nFaces*np.int(6) + nElems*np.int(3)
+        # In order to avoid memory performance issues, add 20% to valence
+        valence = 436
+    else:
+        raise ValueError('Edge element order=',
+                         nedelec_order, ' not supported.')
+
+    # Build nnz pattern for each row
     nnz = np.full((nDofs), valence, dtype=np.int)
 
     # Build PETSc structures
@@ -711,27 +878,30 @@ def preprocessingNNZ(mesh_file, out_dir, rank):
     return
 
 
-def printPreprocessingSummary(nNodes, nElems, nDofs, nReceivers, rank):
+def printPreprocessingSummary(nElems, nNodes, nFaces, nDofs, nReceivers, rank):
     ''' Print a summary of data preprocessed.
 
-    :param int nNodes: number of nodes in the mesh.
     :param int nElems: number of tetrahedral elements in the mesh.
+    :param int nNodes: number of nodes in the mesh.
+    :param int nFaces: number of faces in the mesh.
     :param int nDofs: number of DOFS in the mesh.
     :param int nReceivers: number of receivers.
     :param int rank: MPI rank.
     :return: None.
     '''
 
-    A = str(nNodes)
-    B = str(nElems)
-    C = str(nDofs)
-    D = str(nReceivers)
+    A = str(nElems)
+    B = str(nNodes)
+    C = str(nFaces)
+    D = str(nDofs)
+    E = str(nReceivers)
 
     if rank == 0:
-        PETSc.Sys.Print('  Number of nodes:      {0:50}'.format(A))
-        PETSc.Sys.Print('  Number of elements:   {0:50}'.format(B))
-        PETSc.Sys.Print('  Number of DOFS:       {0:50}'.format(C))
-        PETSc.Sys.Print('  Number of receivers:  {0:50}'.format(D))
+        PETSc.Sys.Print('  Number of elements:   {0:50}'.format(A))
+        PETSc.Sys.Print('  Number of nodes:      {0:50}'.format(B))
+        PETSc.Sys.Print('  Number of faces:      {0:50}'.format(C))
+        PETSc.Sys.Print('  Number of DOFS:       {0:50}'.format(D))
+        PETSc.Sys.Print('  Number of receivers:  {0:50}'.format(E))
 
     return
 
@@ -765,7 +935,10 @@ else:
     from petgem.parallel.parallel import createSequentialVectorWithArray
     from petgem.parallel.parallel import writeParallelDenseMatrix
     from petgem.parallel.parallel import writePetscVector
-    from petgem.efem.efem import computeDofs
+    from petgem.efem.efem import computeEdges
     from petgem.efem.efem import computeFaces
     from petgem.efem.efem import computeBoundaryFaces
-    from petgem.efem.efem import computeBoundaryDofs
+    from petgem.efem.efem import computeBoundaryEdges
+    from petgem.efem.efem import computeBoundaries
+    from petgem.efem.efem import computeElementDOFs
+    from scipy.io import savemat

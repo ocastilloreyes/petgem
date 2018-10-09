@@ -7,16 +7,17 @@ tetrahedral meshes.
 '''
 
 
-def setBoundaryConditions(A, b, bEdges, Istart_bEdges, Iend_bEdges, rank):
+def setBoundaryConditions(A, b, boundaries, Istart_boundaries, Iend_boundaries,
+                          rank):
     ''' Given a parallel matrix and a parallel vector, set Dirichlet boundary
     conditions.
 
     :param petsc matrix A: sparse and complex coefficients matrix in
                            petsc format
     :param petsc vector b: parallel right hand side
-    :param petsc vector bEdges: array of boundary indexes
-    :param int Istart_bEdges: init range for boundaries
-    :param int Iend_bEdges: last range for boundaries
+    :param petsc vector boundaries: array of boundary indexes
+    :param int Istart_boundaries: init range for boundaries
+    :param int Iend_boundaries: last range for boundaries
     :para int rank: MPI rank
     :return: equation system after applied Dirichlet boundary conditions
              and elapsed time
@@ -30,10 +31,10 @@ def setBoundaryConditions(A, b, bEdges, Istart_bEdges, Iend_bEdges, rank):
     Init_boundaries = getTime()
 
     # Boundaries for LHS
-    A.zeroRowsColumns(np.real(bEdges).astype(PETSc.IntType))
+    A.zeroRowsColumns(np.real(boundaries).astype(PETSc.IntType))
     # Boundaries for RHS
-    numLocalBoundaries = Iend_bEdges - Istart_bEdges
-    b.setValues(np.real(bEdges).astype(PETSc.IntType),
+    numLocalBoundaries = Iend_boundaries - Istart_boundaries
+    b.setValues(np.real(boundaries).astype(PETSc.IntType),
                 np.zeros(numLocalBoundaries, dtype=np.complex),
                 addv=PETSc.InsertMode.INSERT_VALUES)
 
@@ -92,6 +93,7 @@ def solveSystem(A, b, x, rank):
 def unitary_test():
     ''' Unitary test for solver.py script.
     '''
+
 
 if __name__ == '__main__':
     # Standard module import

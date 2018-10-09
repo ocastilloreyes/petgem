@@ -103,13 +103,13 @@ def EpReceiverComputation(model, point, numDimensions):
     SIGMA_BGROUND = np.float(model['CONDUCTIVITY_BACKGROUND'])
     SRC_POS = np.asarray(model['SRC_POS'], dtype=np.float)
     SRC_DIREC = np.int(model['SRC_DIREC'])
-    I = np.float(model['SRC_CURRENT'])
+    II = np.float(model['SRC_CURRENT'])
     dS = np.float(model['SRC_LENGTH'])
 
     # Source position as independent variables
-    X0 = np.float64(SRC_POS[0])
-    Y0 = np.float64(SRC_POS[1])
-    Z0 = np.float64(SRC_POS[2])
+    X0 = np.float(SRC_POS[0])
+    Y0 = np.float(SRC_POS[1])
+    Z0 = np.float(SRC_POS[2])
 
     # Compute constants
     # Imaginary part for complex numbers
@@ -128,37 +128,37 @@ def EpReceiverComputation(model, point, numDimensions):
     xx = point[0] - X0
     yy = point[1] - Y0
     zz = point[2] - Z0
-    r = np.float64(np.sqrt(xx**2 + yy**2 + zz**2))
+    r = np.float(np.sqrt(xx**2 + yy**2 + zz**2))
 
-    if(r < np.float64(1.0e0)):
-        r = np.float64(1.0e0)
+    if(r < np.float(1.0e0)):
+        r = np.float(1.0e0)
 
     # E = AA [ BB + (wavenumber^2 * r^2 -1i * wavenumber * r-1)]
-    AA = I * dS * \
-        (np.float64(4.0) * np.pi * SIGMA_BGROUND * r**3)**-1 * \
+    AA = II * dS * \
+        (np.float(4.0) * np.pi * SIGMA_BGROUND * r**3)**-1 * \
         np.exp((-imag_part) * WAVENUMBER * r)
     BB = -WAVENUMBER**2 * r**2 + \
-        (np.float64(3.0) * imag_part * WAVENUMBER * r) + \
-        np.float64(3.0)
+        (np.float(3.0) * imag_part * WAVENUMBER * r) + \
+        np.float(3.0)
 
     if SRC_DIREC == 1:
         # X-directed
         Ep[0] = AA * ((xx**2/r**2)*BB + (WAVENUMBER**2 * r**2 - imag_part *
-                                         WAVENUMBER * r - np.float64(1.0)))
+                                         WAVENUMBER * r - np.float(1.0)))
         Ep[1] = AA * (xx*yy/r**2)*BB
         Ep[2] = AA * (xx*zz/r**2)*BB
     elif SRC_DIREC == 2:
         # Y-directed
         Ep[0] = AA * (xx*yy/r**2)*BB
         Ep[1] = AA * ((yy**2/r**2)*BB + (WAVENUMBER**2 * r**2 - imag_part *
-                                         WAVENUMBER*r-np.float64(1.0)))
+                                         WAVENUMBER*r-np.float(1.0)))
         Ep[2] = AA * (yy*zz/r**2)*BB
     else:
         # Z-directed
         Ep[0] = AA * (xx*zz/r**2)*BB
         Ep[1] = AA * (zz*yy/r**2)*BB
         Ep[2] = AA * ((zz**2/r**2)*BB + (WAVENUMBER**2 * r**2 - imag_part *
-                                         WAVENUMBER*r-np.float64(1.0)))
+                                         WAVENUMBER*r-np.float(1.0)))
 
     return Ep
 
@@ -181,14 +181,14 @@ def EtReceiverComputation(primary_field, secondary_field, numDimensions):
 
 
 def EsReceiverComputation(field, coordEle, coordReceiver, nodesEle,
-                          edgeOrder, numDimensions):
+                          nedelec_order, numDimensions):
     ''' Compute the secondary electric field on receivers.
 
     :param ndarray field: secondary field to be interpolated
     :param ndarray coordElement: element spatial coordinates
     :param ndarray coordReceiver: receiver spatial coordinates
     :param ndarray nodesEle: nodal indices of element (element container)
-    :param int edgeOrder: order of tetrahedral edge element
+    :param int nedelec_order: order of tetrahedral edge element
     :param int numDimensions: number of dimensions
     :return: secondary electric field on receivers
     :rtype: ndarray.
@@ -197,66 +197,186 @@ def EsReceiverComputation(field, coordEle, coordReceiver, nodesEle,
     # Imaginary part for complex numbers
     imag_part = np.complex(0.0 + 1.0j)
 
-    # ----------- Edge definition for the tetrahedral elements -----------
-    # ----- Table 8.2 of Jin's book. Here is consider as an 1D-array -----
-    edgesN = np.array([0, 1, 0, 2, 0, 3, 1, 2, 3, 1, 2, 3], dtype=np.int)
+    if nedelec_order == 1:  # First order edge element
+        # ----------- Edge element of first order -----------
+        edgeOrder = 6
 
-    # ----------- Definition of arrays for vector operations -----------
-    # Signs computation
-    idx_signs1 = np.array([1, 2, 3, 2, 1, 3], dtype=np.int)
-    idx_signs2 = np.array([0, 0, 0, 1, 3, 2], dtype=np.int)
+        # ----------- Edge definition for the tetrahedral elements -----------
+        # ----- Table 8.2 of Jin's book. Here is consider as an 1D-array -----
+        edgesN = np.array([0, 1, 0, 2, 0, 3, 1, 2, 3, 1, 2, 3], dtype=np.int)
 
-    # Allocate
-    Es = np.zeros(numDimensions, dtype=np.complex)
+        # ----------- Definition of arrays for vector operations -----------
+        # Signs computation
+        idx_signs1 = np.array([1, 2, 3, 2, 1, 3], dtype=np.int)
+        idx_signs2 = np.array([0, 0, 0, 1, 3, 2], dtype=np.int)
 
-    # ----------- Compute edges's length of element -----------
-    tmp = coordEle.reshape(4, 3)
-    tmp = tmp[edgesN, :]
-    edges = tmp[1::2, :] - tmp[0::2, :]
-    lengthEle = np.sqrt(np.sum(np.square(edges), axis=1))
+        # Allocate
+        Es = np.zeros(numDimensions, dtype=np.complex)
 
-    # ----------- Compute element's volume -----------
-    CONST_VOL1 = np.float(1.0)/np.float(6.0)
-    eleVol = (((coordEle[3]-coordEle[0])*(coordEle[7]-coordEle[1]) *
-               (coordEle[11]-coordEle[2]) +
-               (coordEle[4]-coordEle[1])*(coordEle[8]-coordEle[2]) *
-               (coordEle[9]-coordEle[0]) +
-               (coordEle[6]-coordEle[0])*(coordEle[10]-coordEle[1]) *
-               (coordEle[5]-coordEle[2])) -
-              ((coordEle[5]-coordEle[2])*(coordEle[7]-coordEle[1]) *
-               (coordEle[9]-coordEle[0]) +
-               (coordEle[6]-coordEle[0])*(coordEle[4]-coordEle[1]) *
-               (coordEle[11]-coordEle[2]) +
-               (coordEle[10]-coordEle[1])*(coordEle[8]-coordEle[2]) *
-               (coordEle[3]-coordEle[0]))) * CONST_VOL1
+        # ----------- Compute edges's length of element -----------
+        tmp = coordEle.reshape(4, 3)
+        tmp = tmp[edgesN, :]
+        edges = tmp[1::2, :] - tmp[0::2, :]
+        lengthEle = np.sqrt(np.sum(np.square(edges), axis=1))
 
-    # ----------- Edge's signs -----------
-    tmp = nodesEle
-    tmp = tmp[idx_signs1] - tmp[idx_signs2]
-    signsEle = tmp / np.abs(tmp)
+        # ----------- Compute element's volume -----------
+        CONST_VOL1 = np.float(1.0)/np.float(6.0)
+        eleVol = (((coordEle[3]-coordEle[0])*(coordEle[7]-coordEle[1]) *
+                   (coordEle[11]-coordEle[2]) +
+                   (coordEle[4]-coordEle[1])*(coordEle[8]-coordEle[2]) *
+                   (coordEle[9]-coordEle[0]) +
+                   (coordEle[6]-coordEle[0])*(coordEle[10]-coordEle[1]) *
+                   (coordEle[5]-coordEle[2])) -
+                  ((coordEle[5]-coordEle[2])*(coordEle[7]-coordEle[1]) *
+                   (coordEle[9]-coordEle[0]) +
+                   (coordEle[6]-coordEle[0])*(coordEle[4]-coordEle[1]) *
+                   (coordEle[11]-coordEle[2]) +
+                   (coordEle[10]-coordEle[1])*(coordEle[8]-coordEle[2]) *
+                   (coordEle[3]-coordEle[0]))) * CONST_VOL1
 
-    # Nedelec basis computation
-    basis = nedelecBasisIterative(coordEle.reshape(4, 3),
-                                  coordReceiver, eleVol, lengthEle, edgeOrder)
+        # ----------- Edge's signs -----------
+        tmp = nodesEle
+        tmp = tmp[idx_signs1] - tmp[idx_signs2]
+        signsEle = tmp / np.abs(tmp)
 
-    rField = np.real(field)
-    iField = np.imag(field)
+        # Nedelec basis computation
+        basis = nedelecBasisIterative(coordEle.reshape(4, 3),
+                                      coordReceiver, eleVol,
+                                      lengthEle, edgeOrder)
 
-    # Compute secondary field
-    for kedge in np.arange(edgeOrder):
-        # Add contributions
-        Es[0] += (rField[kedge]*basis[kedge, 0]*signsEle[kedge]) + \
-                 (imag_part*iField[kedge]*basis[kedge, 0]*signsEle[kedge])
-        Es[1] += (rField[kedge]*basis[kedge, 1]*signsEle[kedge]) + \
-                 (imag_part*iField[kedge]*basis[kedge, 1]*signsEle[kedge])
-        Es[2] += (rField[kedge]*basis[kedge, 2]*signsEle[kedge]) + \
-                 (imag_part*iField[kedge]*basis[kedge, 2]*signsEle[kedge])
+        rField = np.real(field)
+        iField = np.imag(field)
+
+        # Compute secondary field
+        for kedge in np.arange(edgeOrder):
+            # Add contributions
+            Es[0] += (rField[kedge]*basis[kedge, 0]*signsEle[kedge]) + \
+                     (imag_part*iField[kedge]*basis[kedge, 0]*signsEle[kedge])
+            Es[1] += (rField[kedge]*basis[kedge, 1]*signsEle[kedge]) + \
+                     (imag_part*iField[kedge]*basis[kedge, 1]*signsEle[kedge])
+            Es[2] += (rField[kedge]*basis[kedge, 2]*signsEle[kedge]) + \
+                     (imag_part*iField[kedge]*basis[kedge, 2]*signsEle[kedge])
+
+    elif nedelec_order == 2:  # Second edge element
+        # ----------- Nodal order -----------
+        nodalOrder = 4
+
+        # ----------- Edge element of second order -----------
+        edgeOrder = 20
+
+        # Allocate
+        Es = np.zeros(numDimensions, dtype=np.complex)
+
+        # ----- Initialization of edges/vertices/faces numbering ------
+        [edge_vertices, face_vertices, ref_ele] = edgeFaceVerticesInit()
+
+        # Element's nodes coordinates
+        coordEle = coordEle.reshape((numDimensions, nodalOrder), order='F')
+
+        # Elemental computations (Signs, jacobian, edges length, area faces)
+        [_, _, signs, nreal,
+         jacob, DetJacob, _] = computeSignsJacobLegth(coordEle, edge_vertices,
+                                                      face_vertices,
+                                                      nedelec_order)
+        # Definition of q vectors on faces
+        [qface1, qface2,
+         qface3, qface4,
+         invjj, GR] = definitionHighOrderTet(nreal, signs, jacob,
+                                             nedelec_order)
+
+        # Computation coefficients for basis functions
+        [a1, a2, a3, a4,
+         b1, b2, b3, b4,
+         c1, c2, c3, c4,
+         D, E, F, G, H,
+         II, JJ, K] = computeCoefficientsSecondOrder(qface1, qface2, qface3,
+                                                     qface4, ref_ele,
+                                                     edge_vertices,
+                                                     face_vertices)
+        # Computation of basis functions
+        basis = nedelecBasisSecondOrder(a1, a2, a3, a4, b1, b2, b3, b4, c1,
+                                        c2, c3, c4, D, E, F, G, H, II, JJ,
+                                        K, coordEle, coordReceiver)
+        # Reshape basis array (from 3D to 2D)
+        basis = np.reshape(basis, (numDimensions, edgeOrder))
+
+        rField = np.real(field)
+        iField = np.imag(field)
+
+        # Compute secondary field
+        for kedge in np.arange(edgeOrder):
+            # Add contributions
+            Es[0] += (rField[kedge]*basis[0, kedge]*signs[kedge]) + \
+                     (imag_part*iField[kedge]*basis[0, kedge]*signs[kedge])
+            Es[1] += (rField[kedge]*basis[1, kedge]*signs[kedge]) + \
+                     (imag_part*iField[kedge]*basis[1, kedge]*signs[kedge])
+            Es[2] += (rField[kedge]*basis[2, kedge]*signs[kedge]) + \
+                     (imag_part*iField[kedge]*basis[2, kedge]*signs[kedge])
+
+    elif nedelec_order == 3:  # Third edge element
+        # ----------- Nodal order -----------
+        nodalOrder = 4
+
+        # ----------- Edge element of third order -----------
+        edgeOrder = 45
+
+        # Allocate
+        Es = np.zeros(numDimensions, dtype=np.complex)
+
+        # ----- Initialization of edges/vertices/faces numbering ------
+        [edge_vertices, face_vertices, ref_ele] = edgeFaceVerticesInit()
+
+        # Element's nodes coordinates
+        coordEle = coordEle.reshape((numDimensions, nodalOrder), order='F')
+
+        # Elemental computations (Signs, jacobian, edges length, area faces)
+        [_, _, signs, nreal,
+         jacob, _, _] = computeSignsJacobLegth(coordEle, edge_vertices,
+                                               face_vertices, nedelec_order)
+        # Definition of q vectors on faces
+        [qface1, qface2,
+         qface3, qface4,
+         _, _] = definitionHighOrderTet(nreal, signs, jacob, nedelec_order)
+
+        # Computation of coefficients
+        [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
+         b1, b2, b3, b4, b5, b6, b7, b8, b9, b10,
+         c1, c2, c3, c4, c5, c6, c7, c8, c9, c10,
+         D, E, F, G, H, II, JJ, K, L, M, N, O,
+         P, Q, R] = computeCoefficientsThirdOrder(qface1, qface2,
+                                                  qface3, qface4)
+
+        # Computation of basis functions
+        basis = nedelecBasisThirdOrder(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
+                                       b1, b2, b3, b4, b5, b6, b7, b8, b9, b10,
+                                       c1, c2, c3, c4, c5, c6, c7, c8, c9, c10,
+                                       D, E, F, G, H, II, JJ, K, L, M, N,
+                                       O, P, Q, R, coordEle, coordReceiver)
+
+        # Reshape basis array (from 3D to 2D)
+        basis = np.reshape(basis, (numDimensions, edgeOrder))
+
+        rField = np.real(field)
+        iField = np.imag(field)
+
+        # Compute secondary field
+        for kedge in np.arange(edgeOrder):
+            # Add contributions
+            Es[0] += (rField[kedge]*basis[0, kedge]*signs[kedge]) + \
+                     (imag_part*iField[kedge]*basis[0, kedge]*signs[kedge])
+            Es[1] += (rField[kedge]*basis[1, kedge]*signs[kedge]) + \
+                     (imag_part*iField[kedge]*basis[1, kedge]*signs[kedge])
+            Es[2] += (rField[kedge]*basis[2, kedge]*signs[kedge]) + \
+                     (imag_part*iField[kedge]*basis[2, kedge]*signs[kedge])
+    else:
+        raise ValueError('Edge element order=',
+                         nedelec_order, ' not supported.')
 
     return Es
 
 
 def computeFieldsReceiver(modelling, coordReceiver, coordElement,
-                          nodesElement, x_field, edgeOrder, numDimensions):
+                          nodesElement, x_field, nedelec_order, numDimensions):
     ''' Compute the CSEM modelling output: primary electric field, secondary
     electric field and total electric field on receivers position.
 
@@ -265,7 +385,7 @@ def computeFieldsReceiver(modelling, coordReceiver, coordElement,
     :param ndarray coordElement: element spatial coordinates
     :param ndarray nodesElement: nodal indices of element (element container)
     :param ndarray x_field: vector solution for receiver
-    :param int edgeOrder: order of tetrahedral edge element
+    :param int nedelec_order: order of tetrahedral edge element
     :param int numDimensions: number of dimensions
     :return: primary, secondary and total electric field
     :rtype: ndarray
@@ -275,7 +395,7 @@ def computeFieldsReceiver(modelling, coordReceiver, coordElement,
 
     # ----- Secondary field computation -----
     Es = EsReceiverComputation(x_field, coordElement, coordReceiver,
-                               nodesElement, edgeOrder, numDimensions)
+                               nodesElement, nedelec_order, numDimensions)
 
     # ----- Total field computation -----
     Et = EtReceiverComputation(Ep, Es, numDimensions)
@@ -284,8 +404,8 @@ def computeFieldsReceiver(modelling, coordReceiver, coordElement,
 
 
 def postProcessingFields(receivers, modelling, x, Iend_receivers,
-                         Istart_receivers, edgeOrder, nodalOrder,
-                         numDimensions, rank):
+                         Istart_receivers, nedelec_order, vector_type,
+                         nodalOrder, numDimensions, rank):
     ''' Compute the CSEM modelling output: primary electric field, secondary
     electric field and total electric field on receivers position.
 
@@ -294,7 +414,7 @@ def postProcessingFields(receivers, modelling, x, Iend_receivers,
     :param petsc vector x: solution vector
     :param int Iend_receivers: last range for receivers
     :param int Istart_receivers: init range for receivers
-    :param int edgeOrder: order of tetrahedral edge element
+    :param int nedelec_order: order of tetrahedral edge element
     :param int nodalOrder: order of tetrahedral nodal element
     :param int numDimensions: number of dimensions
     :param int rank: MPI rank
@@ -304,6 +424,16 @@ def postProcessingFields(receivers, modelling, x, Iend_receivers,
 
     # Start timer
     Init_postprocessing = getTime()
+
+    if nedelec_order == 1:  # First order edge element
+        edgeOrder = 6
+    elif nedelec_order == 2:  # Second edge element
+        edgeOrder = 20
+    elif nedelec_order == 3:  # Third edge element
+        edgeOrder = 45
+    else:
+        raise ValueError('Edge element order=',
+                         nedelec_order, ' not supported.')
 
     # Number of receivers
     nReceivers = receivers.getSize()[0]
@@ -315,44 +445,45 @@ def postProcessingFields(receivers, modelling, x, Iend_receivers,
                         nReceiversLocal, ' receivers')
     PETSc.Sys.syncFlush()
 
-    # Read edges-connectivity for receivers
+    # Read dofs-connectivity for receivers
     # Auxiliar arrays
     dataRecv = np.zeros(edgeOrder, dtype=np.float)
-    edgesIdxRecv = np.zeros((nReceiversLocal, edgeOrder), dtype=PETSc.IntType)
+    dofsIdxRecv = np.zeros((nReceiversLocal, edgeOrder), dtype=PETSc.IntType)
     idx = 0
     for iRecv in np.arange(Istart_receivers, Iend_receivers):
         # Get data of iRecv
         temp = np.asarray(receivers.getRow(iRecv))
-        dataRecv[:] = np.real(temp[1, 19:25])
+        dataRecv[:] = np.real(temp[1, 19:])
         # Edge-indexes for iRecv
-        edgesIdxRecv[idx, :] = (dataRecv).astype(PETSc.IntType)
+        dofsIdxRecv[idx, :] = (dataRecv).astype(PETSc.IntType)
         idx += 1
 
     # Gather global solution of x to local vector
     # Sequential vector for gather tasks
     x_local = createSequentialVector(edgeOrder*nReceiversLocal,
+                                     modelling['CUDA'],
                                      communicator=None)
 
     # Build Index set in PETSc format
-    IS_edges = PETSc.IS().createGeneral(edgesIdxRecv.flatten(),
-                                        comm=PETSc.COMM_WORLD)
+    IS_dofs = PETSc.IS().createGeneral(dofsIdxRecv.flatten(),
+                                       comm=PETSc.COMM_WORLD)
     # Build gather vector
-    gatherVector = PETSc.Scatter().create(x, IS_edges, x_local, None)
+    gatherVector = PETSc.Scatter().create(x, IS_dofs, x_local, None)
     # Ghater values
     gatherVector.scatter(x, x_local, PETSc.InsertMode.INSERT_VALUES,
                          PETSc.ScatterMode.FORWARD)
 
     # Post-processing electric fields
     # Create parallel structures
-    EpX = createParallelVector(nReceivers, communicator=None)
-    EpY = createParallelVector(nReceivers, communicator=None)
-    EpZ = createParallelVector(nReceivers, communicator=None)
-    EsX = createParallelVector(nReceivers, communicator=None)
-    EsY = createParallelVector(nReceivers, communicator=None)
-    EsZ = createParallelVector(nReceivers, communicator=None)
-    EtX = createParallelVector(nReceivers, communicator=None)
-    EtY = createParallelVector(nReceivers, communicator=None)
-    EtZ = createParallelVector(nReceivers, communicator=None)
+    EpX = createParallelVector(nReceivers, vector_type, communicator=None)
+    EpY = createParallelVector(nReceivers, vector_type, communicator=None)
+    EpZ = createParallelVector(nReceivers, vector_type, communicator=None)
+    EsX = createParallelVector(nReceivers, vector_type, communicator=None)
+    EsY = createParallelVector(nReceivers, vector_type, communicator=None)
+    EsZ = createParallelVector(nReceivers, vector_type, communicator=None)
+    EtX = createParallelVector(nReceivers, vector_type, communicator=None)
+    EtY = createParallelVector(nReceivers, vector_type, communicator=None)
+    EtZ = createParallelVector(nReceivers, vector_type, communicator=None)
     EpDense = createParallelDenseMatrix(nReceivers, numDimensions,
                                         communicator=None)
     EsDense = createParallelDenseMatrix(nReceivers, numDimensions,
@@ -385,7 +516,7 @@ def postProcessingFields(receivers, modelling, x, Iend_receivers,
                                                                  (idx *
                                                                   edgeOrder) +
                                                                  edgeOrder],
-                                                         edgeOrder,
+                                                         nedelec_order,
                                                          numDimensions)
         idx += 1
         # Set primary field components
@@ -553,6 +684,7 @@ def unitary_test():
     ''' Unitary test for post_processing.py script.
     '''
 
+
 if __name__ == '__main__':
     # Standard module import
     unitary_test()
@@ -574,4 +706,11 @@ else:
     from petgem.parallel.parallel import printMessage
     from petgem.parallel.parallel import writeDenseMatrix
     from petgem.efem.efem import nedelecBasisIterative
+    from petgem.efem.efem import edgeFaceVerticesInit
+    from petgem.efem.efem import computeSignsJacobLegth
+    from petgem.efem.efem import definitionHighOrderTet
+    from petgem.efem.efem import computeCoefficientsSecondOrder
+    from petgem.efem.efem import nedelecBasisSecondOrder
+    from petgem.efem.efem import computeCoefficientsThirdOrder
+    from petgem.efem.efem import nedelecBasisThirdOrder
     from petgem.monitoring.monitoring import getTime

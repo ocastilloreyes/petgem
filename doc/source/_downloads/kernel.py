@@ -43,10 +43,6 @@ if __name__ == '__main__':
     MASTER, rank, size = getRankSize()
 
     # ###############################################
-    # ----- Define geometry and EFEM constants  -----
-    edgeOrder, nodalOrder, numDimensions = defineEFEMConstants()
-
-    # ###############################################
     # ----------- Print header (Master) -------------
     printPetgemHeader(rank)
 
@@ -61,6 +57,10 @@ if __name__ == '__main__':
     modelling = readUserParams(input_params, rank)
 
     # ###############################################
+    # ----- Define geometry and EFEM constants  -----
+    edgeOrder, nodalOrder, numDimensions = defineEFEMConstants(modelling['NEDELEC_ORDER'])
+
+    # ###############################################
     # ---------------- Read mesh --------------------
     printMessage('\nImport files', rank)
     printMessage('='*75, rank)
@@ -72,23 +72,34 @@ if __name__ == '__main__':
     nodes = readPetscMatrix(modelling['NODES_FILE'], communicator=None)
     # elements-nodes connectivity
     printMessage('  Elements-nodes connectivity', rank)
-    elemsN = readPetscMatrix(modelling['MESH_CONNECTIVITY_FILE'], communicator=None)
+    elemsN = readPetscMatrix(modelling['MESH_CONNECTIVITY_FILE'],
+                             communicator=None)
+    # elements-faces connectivity
+    printMessage('  Elements-faces connectivity', rank)
+    elemsF = readPetscMatrix(modelling['FACES_CONNECTIVITY_FILE'],
+                             communicator=None)
+    # facesN connectivity
+    printMessage('  Faces-nodes connectivity', rank)
+    facesN = readPetscMatrix(modelling['FACES_NODES_FILE'],
+                             communicator=None)
     # elements-edges connectivity
     printMessage('  Elements-edges connectivity', rank)
-    elemsE = readPetscMatrix(modelling['DOFS_CONNECTIVITY_FILE'], communicator=None)
+    elemsE = readPetscMatrix(modelling['EDGES_CONNECTIVITY_FILE'],
+                             communicator=None)
     # edgesN connectivity
     printMessage('  Edges-nodes connectivity', rank)
-    edgesN = readPetscMatrix(modelling['DOFS_NODES_FILE'], communicator=None)
-    # Boundary-Edges
+    edgesN = readPetscMatrix(modelling['EDGES_NODES_FILE'], communicator=None)
+    # Boundaries
     printMessage('  Boundary-Edges', rank)
-    bEdges = readPetscVector(modelling['BOUNDARIES_FILE'], communicator=None)
+    boundaries = readPetscVector(modelling['BOUNDARIES_FILE'], communicator=None)
     # Sparsity pattern (NNZ) for matrix allocation
     printMessage('  Vector for matrix allocation', rank)
     Q = readPetscVector(modelling['NNZ_FILE'], communicator=None)
     nnz = (Q.getArray().real).astype(PETSc.IntType)
     # Conductivity model
     printMessage('  Conductivity model', rank)
-    elemsSigma = readPetscVector(modelling['CONDUCTIVITY_MODEL_FILE'], communicator=None)
+    elemsSigma = readPetscVector(modelling['CONDUCTIVITY_MODEL_FILE'],
+                                 communicator=None)
     # Receivers data
     printMessage('  Receivers data', rank)
     receivers = readPetscMatrix(modelling['RECEIVERS_FILE'], communicator=None)
@@ -97,25 +108,30 @@ if __name__ == '__main__':
 
     # ###############################################
     # -------------- Mesh information ---------------
-    [nElems, nEdges, nBoundaries, ndofs] = getMeshInfo(elemsN, edgesN, bEdges, rank)
+    [nElems, nFaces, nEdges, ndofs, nBoundaries] = getMeshInfo(modelling['NEDELEC_ORDER'],
+                                                         elemsN, elemsF, facesN,
+                                                         edgesN, boundaries,
+                                                         rank)
+
+
 
     # ###############################################
     # --------- Information of parallel pool --------
     printMessage('\nParallel information', rank)
     printMessage('='*75, rank)
     [Istart_elemsE, Iend_elemsE,
-     Istart_bEdges, Iend_bEdges,
-     Istart_receivers, Iend_receivers] = getRanges(elemsE, bEdges, receivers,
-                                                  size, rank)
+     Istart_boundaries, Iend_boundaries,
+     Istart_receivers, Iend_receivers] = getRanges(elemsE, boundaries,
+                                                   receivers, size, rank)
 
     # ###############################################
     # ----- Create and setup parallel structures ----
     # Left-hand side
-    A = createParallelMatrix(nEdges, nEdges, nnz, communicator=None)
+    A = createParallelMatrix(ndofs, ndofs, nnz, communicator=None)
     # Right-hand side
-    b = createParallelVector(nEdges, communicator=None)
+    b = createParallelVector(ndofs, communicator=None)
     # X vector
-    x = createParallelVector(nEdges, communicator=None)
+    x = createParallelVector(ndofs, communicator=None)
 
     # ###############################################
     # -------------- Parallel assembly --------------
@@ -125,7 +141,11 @@ if __name__ == '__main__':
     assemblerLog = startLogEvent("Assembler")
     assemblerLog.begin()
     # System assembly
-    [A, b, elapsedTimeAssembly] = parallelAssembler(modelling, A, b, nodes, elemsE, elemsN, elemsSigma, Istart_elemsE, Iend_elemsE, rank)
+    [A, b, elapsedTimeAssembly] = parallelAssembler(modelling, A, b, nodes,
+                                                    elemsE, elemsN, elemsF,
+                                                    elemsSigma, Istart_elemsE,
+                                                    Iend_elemsE, nEdges, nFaces,
+                                                    rank)
     # End log event for assembly task
     assemblerLog.end()
 
@@ -137,9 +157,9 @@ if __name__ == '__main__':
     boundariesLog = startLogEvent("Boundaries")
     boundariesLog.begin()
     # Set boundary conditions
-    [A, b, elapsedTimeBoundaries] = setBoundaryConditions(A, b, bEdges,
-                                                          Istart_bEdges,
-                                                          Iend_bEdges, rank)
+    [A, b, elapsedTimeBoundaries] = setBoundaryConditions(A, b, boundaries,
+                                                          Istart_boundaries,
+                                                          Iend_boundaries, rank)
     # End log event for setting boundary conditions task
     boundariesLog.end()
 
@@ -162,14 +182,20 @@ if __name__ == '__main__':
     # Create and start log event for assembly task
     postProcessingLog = startLogEvent("Postprocessing")
     postProcessingLog.begin()
-    elapsedTimepostProcessing = postProcessingFields(receivers, modelling, x, Iend_receivers, Istart_receivers, edgeOrder, nodalOrder, numDimensions,  rank)
+    elapsedTimepostProcessing = postProcessingFields(receivers, modelling, x,
+                                                     Iend_receivers,
+                                                     Istart_receivers,
+                                                     modelling['NEDELEC_ORDER'],
+                                                     nodalOrder,
+                                                     numDimensions,  rank)
     postProcessingLog.end()
 
     # ###############################################
     # -------------- Print elapsed times-------------
     printMessage('\nElapsed times (seconds)', rank)
     printMessage('='*75, rank)
-    printElapsedTimes(elapsedTimeAssembly, elapsedTimeSolver, elapsedTimepostProcessing, iterationNumber, rank)
+    printElapsedTimes(elapsedTimeAssembly, elapsedTimeSolver,
+                      elapsedTimepostProcessing, iterationNumber, rank)
 
     # ###############################################
     # ----------- Print footer (Master) -------------

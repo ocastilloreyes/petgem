@@ -105,6 +105,8 @@ class gmshObject:
         # Close file
         self.mshfID.close()
 
+        return
+
     def __gmshPrint__(self, msg):
         ''' Print a message related with a gmshObject.
 
@@ -122,12 +124,16 @@ class gmshObject:
         '''
         sys.stderr.write('   gmshObject: Error! -> ' + msg + '\n')
 
+        return
+
     def __destroy__(self):
         ''' Destroy a gmshObject.
 
         :return: None.
         '''
         self.mshfID.close()
+
+        return
 
     def printNumberNodes(self):
         ''' Print number of nodes of a gmshObject.
@@ -373,12 +379,16 @@ class gmshObject:
     hexahedron_125_node = np.int32(93)
 
 
-def getMeshInfo(elemsN, edgesN, bEdges, rank):
+def getMeshInfo(nedelec_order, elemsN, elemsF,
+                facesN, edgesN, boundaries, rank):
     ''' Get and print data mesh.
 
+    :param int nedelec_order: nedelec element order.
     :param matrix elemsN: elements-nodes connectivity.
+    :param matrix elemsF: elements-faces connectivity.
+    :param matrix facesN: faces-nodes connectivity.
     :param matrix edgesN: edges-nodes connectivity.
-    :param vector bEdges: boundary edges.
+    :param vector boundaries: boundaries.
     :return: number of elements, number of edges, number
              of boundaries and number of degrees of freedom
     :rtype: int
@@ -388,23 +398,42 @@ def getMeshInfo(elemsN, edgesN, bEdges, rank):
     # Number of edges
     nEdges = edgesN.getSize()[0]
     # Number of boundaries
-    nBoundaries = bEdges.getSize()
-    # Number of dofs
-    ndofs = nEdges - nBoundaries
+    nBoundaries = boundaries.getSize()
+    # Number of faces
+    Istart_facesN, Iend_facesN = facesN.getOwnershipRange()
+    tmp = (facesN.getRow(Istart_facesN)[1].real).astype(PETSc.IntType)
+    nFaces = tmp[0]
+
+    # Compute number of DOFS
+    if nedelec_order == 1:      # First order edge element
+        # Number of DOFs correspond to edges in the mesh
+        ndofs = nEdges
+    elif nedelec_order == 2:     # Second order edge element
+        # Number of dofs
+        ndofs = nEdges*2 + nFaces*2
+    elif nedelec_order == 3:    # Third order edge element
+        # Number of dofs
+        ndofs = nEdges*3 + nFaces*6 + nElems*3
+    else:
+        raise ValueError('Edge element order=',
+                         nedelec_order, ' not supported.')
+
     # Print mesh information
     if rank == 0:
         PETSc.Sys.Print('\nMesh information')
         PETSc.Sys.Print('='*75)
         PETSc.Sys.Print('  Number of elements:        {0:12}'.
                         format(str(nElems)))
+        PETSc.Sys.Print('  Number of faces:           {0:12}'.
+                        format(str(nFaces)))
         PETSc.Sys.Print('  Number of edges:           {0:12}'.
                         format(str(nEdges)))
         PETSc.Sys.Print('  Number of dofs:            {0:12}'.
                         format(str(ndofs)))
-        PETSc.Sys.Print('  Number of boundary edges:  {0:12}'.
+        PETSc.Sys.Print('  Number of boundaries:      {0:12}'.
                         format(str(nBoundaries)))
 
-    return nElems, nEdges, nBoundaries, ndofs
+    return nElems, nFaces, nEdges, ndofs, nBoundaries
 
 
 def readGmshNodes(mesh_file):
@@ -579,6 +608,7 @@ def readGmshPhysicalGroups(mesh_file):
 def unitary_test():
     ''' Unitary test for mesh.py script.
     '''
+
 
 if __name__ == '__main__':
     # Standard module import

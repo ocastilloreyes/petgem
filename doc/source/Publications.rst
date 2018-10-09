@@ -4,6 +4,8 @@ Publications
 ============
 Papers:
 
+* Castillo-Reyes, O., de la Puente, Cela, J. M. `PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements <https://doi.org/10.1016/j.cageo.2018.07.005>`_. Computers & Geosciences, vol 119: 123-136. ISSN 0098-3004. Elsevier.
+* Castillo-Reyes, O., de la Puente, Cela, J. M. `Three-Dimensional CSEM modelling on unstructured tetrahedral meshes using edge finite elements <https://link.springer.com/chapter/10.1007/978-3-319-57972-6_18>`_. In: Barrios Hernández C., Gitler I., Klapp J. (eds) High Performance Computing. CARLA 2016. Communications in Computer and Information Science, vol 697: 247-256. ISBN 978-3-319-57971-9 Springer, Cham. 2017.
 * Castillo-Reyes, O., de la Puente, Cela, J. M. `Improving edge finite element assembly for geophysical electromagnetic modelling on shared-memory architectures <https://doi.org/10.1109/UEMCON.2016.7777804>`_. 7th Annual Ubiquitous Computing, Electronics & Mobile Communication Conference – UEMCON. 2016.
 * Castillo-Reyes, O., de la Puente, J., Puzyrev, V., and Cela, J. M., `Edge-based parallel framework for the simulation of 3D CSEM surveys <http://www.bsc.es/publications/edge-based-parallel-framework-simulation-3d-csem-surveys>`_. ICE Barcelona-AAPG/SEG International Conference & Exhibition. 2016.
 * Castillo-Reyes, O., de la Puente, J., Barucq, H., Diaz, J., and Cela, J. M., `Parallel and vectorized code for CSEM surveys in geophysics: An edge-based approach <http://www.bsc.es/publications/parallel-and-vectorized-code-csem-surveys-geophysics-edge-based-approach>`_. ECCOMAS. 2016.
@@ -17,6 +19,8 @@ Papers:
 
 Conferences:
 
+* Castillo-Reyes, O. HPC geophysical electromagnetic modeling. Fifth International Congress on Multiphysics, Multiscale, and Optimization problems. University of the Basque Country. Bilbao, Spain. May 2018.
+* Castillo-Reyes, O. Python performance for HPC geophysical applications. 9th International Supercomputing Conference in Mexico – ISUM 2018. Red Mexicana de Supercómputo. Mérida, Yucatán, Mexico. March 2018.
 * Castillo-Reyes, O. Overview of numerical techniques and applications for CSEM/MT geophysical surveys. SIAM Conference on Mathematical and Computational Issues in the Geosciences. University Erlangen-Nürnberg. Erlangen, Germany. September 2017.
 * Castillo-Reyes, O. PETGEM: Parallel Edge-based Tool for Geophysical Electromagnetic Modelling. Congress on Numerical Methods in Engineering. Technical University of Valencia. Valencia, Spain. July 2017.
 * Castillo-Reyes, O. PETGEM: potential of 3D CSEM modelling using a new HPC tool for exploration geophysics. 10th International Marine Electromagnetics conference – MARELEC. University of Liverpool. Liverpool, United Kingdom. June 2017.
@@ -48,6 +52,7 @@ Work on PETGEM has received funding from the European Union's Horizon 2020 resea
 the Marie Sklodowska-Curie grant agreement No. 644202. The research leading to these results has received funding
 from the European Union's Horizon 2020 Programme (2014-2020) and from Brazilian Ministry of Science, Technology and
 Innovation through Rede Nacional de Pesquisa (RNP) under the `HPC4E Project <http://www.hpc4e.eu>`_ , grant agreement
-No. 689772.
+No. 689772. Further, this project has received funding from the European Union's Horizon 2020 research and innovation
+programme under the Marie Sklodowska-Curie grant agreement No. 777778.
 
 Octavio Castillo-Reyes expresses his gratitude to the Mexican National Council for Science and Technology (`CONACyT <http://www.conacyt.mx/>`_) for his support.

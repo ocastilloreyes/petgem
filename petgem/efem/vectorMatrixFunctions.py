@@ -30,6 +30,8 @@ def findUniqueRows(array, return_index=False, return_inverse=False):
      unique array.
     :param bool return_inverse: indices of the unique array that
      can be used to reconstruct array.
+    :return: unique rows.
+    :rtype: ndarray.
     '''
     array = np.ascontiguousarray(array)
 
@@ -55,9 +57,42 @@ def findUniqueRows(array, return_index=False, return_inverse=False):
     return out
 
 
+def crossprod(x, y):
+    ''' Compute cross product of two arrays.
+
+    :param float-array x: array1.
+    :param float-array y: array2.
+    :return: cross product.
+    :rtype: ndarray.
+    '''
+    # Cross product
+    compx = x[1]*y[2] - x[2]*y[1]
+    compy = -(x[0]*y[2] - x[2]*y[0])
+    compz = x[0]*y[1] - x[1]*y[0]
+
+    z = np.vstack((compx, compy, compz))
+
+    return z
+
+
+def is_duplicate_entry(x):
+    ''' Compute number of duplicate entries in a vector.
+
+    :param int-array x: matrix.
+    :return: number of duplicate entries.
+    :rtype: int.
+    '''
+    counts = np.bincount(x)
+    duplicate_entries = np.where(counts > 1)[0]
+    num_duplicate = duplicate_entries.size
+
+    return num_duplicate
+
+
 def unitary_test():
     ''' Unitary test for vector_matrix_functions.py script.
     '''
+
 
 if __name__ == '__main__':
     # Standard module import

@@ -1,9 +1,9 @@
-PETGEM
+petgem
 ======
 
 PETGEM is a parallel python code for 3D Controlled-Source
-Electromagnetic Method (3D CSEM) in geophysics using edge finite
-elements (Nedelec finite elements).
+Electromagnetic Method (3D CSEM) in geophysics using high-order edge finite
+elements (Nédélec finite elements).
 
 
 Requirements
@@ -29,15 +29,15 @@ Install
 
 * Following commands may require root privileges
 
-* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7 and 3.8 have been tested)
+* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7, 3.8, and 3.9 have been tested)
 
-* Uncompress the PETSc archive (in this example, using PETSc 3.8.3)::
+* Uncompress the PETSc archive (in this example, using PETSc 3.9.3)::
 
-  $ tar zxvf petsc-3.8.3.tar.gz
+  $ tar zxvf petsc-3.9.3.tar.gz
 
 * Configure and build PETSc. The configuration options depend on the calculations you want to perform (complex- or real-valued) as well as your compiler/MPI/Blas/Lapack setup. For PETGEM executions, **PETSC MUST BE BUILD FOR COMPLEX-VALUED NUMBERS**. In order to avoid incompatibilities between PETSC, petsc4py and PETGEM, we highly recommend the following configuration lines. Please, visit PETSc website for advanced configuration options. If you have a clean environment (not working MPI/Blas/Lapack), then run::
 
-  $ cd petsc-3.8.3
+  $ cd petsc-3.9.3
   $ export PETSC_DIR=$PWD
   $ export PETSC_ARCH=arch-linux2-c-debug
 
@@ -48,6 +48,12 @@ Install
 * If you want support for MUMPS, please add following options to previous configure line::
 
   $ --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
+
+* Further, to activate GPUs support, please add following options to previous configure line::
+
+  $ --with-cuda=1 --with_cuda_dir=PATH
+
+  where ``PATH`` is the directory of your CUDA libraries. 
 
 * Then, build and install PETSc::
 
@@ -79,8 +85,8 @@ publication, please acknowledge that fact by citing the project:
   elements*. Computers & Geosciences, vol 119: 123-136. ISSN 0098-3004,
   Elsevier. https://doi.org/10.1016/j.cageo.2018.07.005
 
-*  Castillo-Reyes, O., de la Puente, J., Cela, J.M. (2017).
-   *Three-Dimensional CSEM Modelling on Unstructured Tetrahedral Meshes
-   Using Edge Finite Elements*. Communications in Computer and
-   Information Science, vol 697: 247-256. ISBN 978-3-319-57971-9,
-   Springer, Cham. https://doi.org/10.1007/978-3-319-57972-6_18
+* Castillo-Reyes, O., de la Puente, J., Cela, J.M. (2017).
+  *Three-Dimensional CSEM Modelling on Unstructured Tetrahedral Meshes
+  Using Edge Finite Elements*, Communications in Computer and
+  Information Science, vol 697: 247-256. ISBN 978-3-319-57971-9
+  Springer, Cham. https://doi.org/10.1007/978-3-319-57972-6_18

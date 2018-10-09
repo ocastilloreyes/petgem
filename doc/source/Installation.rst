@@ -31,19 +31,19 @@ Install PETGEM
 
 * Following commands may require root privileges
 
-* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7 and 3.8 have been tested)
+* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7, 3.8 and 3.9 have been tested)
 
-* Uncompress the `PETSc <https://www.mcs.anl.gov/petsc/>`__ archive (in this example, using PETSc 3.8.3):
-
-  .. code-block:: bash
-
-    $ tar zxvf petsc-3.8.3.tar.gz
-
-* Configure and build `PETSc <https://www.mcs.anl.gov/petsc/>`__. The configuration options depend on the calculations you want to perform (complex- or real-valued) as well as your compiler/MPI/Blas/Lapack setup. For PETGEM executions, **PETSC MUST BE BUILD FOR COMPLEX-VALUED NUMBERS**. In order to avoid incompatibilities between PETSC, petsc4py and PETGEM, we highly recommend the following configuration lines. Please, visit PETSc website for advanced configuration options. If you have a clean environment (not working MPI/Blas/Lapack), then run:
+* Uncompress the `PETSc <https://www.mcs.anl.gov/petsc/>`__ archive (in this example, using PETSc 3.9.3):
 
   .. code-block:: bash
 
-    $ cd petsc-3.8.3
+    $ tar zxvf petsc-3.9.3.tar.gz
+
+* Configure and build `PETSc <https://www.mcs.anl.gov/petsc/>`__. The configuration options depend on the calculations you want to perform (complex- or real-valued) as well as your compiler/MPI/Blas/Lapack setup. For PETGEM executions, **PETSC MUST BE BUILD FOR COMPLEX-VALUED NUMBERS**. In order to avoid incompatibilities between PETSC, petsc4py and PETGEM, we highly recommend the following configuration lines. Please, visit `PETSc <https://www.mcs.anl.gov/petsc/>`__ website for advanced configuration options. If you have a clean environment (not working MPI/Blas/Lapack), then run:
+
+  .. code-block:: bash
+
+    $ cd petsc-3.9.3
     $ export PETSC_DIR=$PWD
     $ export PETSC_ARCH=arch-linux2-c-debug
 
@@ -58,6 +58,14 @@ Install PETGEM
   .. code-block:: bash
 
     $ --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
+
+* Further, to activate GPUs support, please add following options to previous configure line:
+
+  .. code-block:: bash
+
+    $ --with-cuda=1 --with_cuda_dir=PATH
+
+  where ``PATH`` is the directory of your CUDA libraries.
 
 * Then, build and install `PETSc <https://www.mcs.anl.gov/petsc/>`__:
 
@@ -91,7 +99,8 @@ Downloading and building PETGEM
 -------------------------------
 
 The PETGEM package is available for download at
-`Python Package Index (PyPI) <https://pypi.python.org/pypi/petgem/>`__
+`Python Package Index (PyPI) <https://pypi.python.org/pypi/petgem/>`__, at
+`GitHub <https://github.com/ocastilloreyes/petgem>`__,
 and the :ref:`Download` section of this project website.
 
 * Configure and install `PETSc <https://www.mcs.anl.gov/petsc/>`__ (see :ref:`Install` section)
@@ -111,7 +120,7 @@ and the :ref:`Download` section of this project website.
     $ tar zxvf petgem-1.1.tar.gz
     $ cd petgem-1.1
 
-* After unpacking the release tarball, the distribution is ready for building. Some environment configuration is needed to inform the location `PETSc <https://www.mcs.anl.gov/petsc/>`__. As in :ref:`Install` section, you can set the environment variables ``PETSC_DIR`` and ``PETSC_ARCH`` indicating where you have built/installed `PETSc <https://www.mcs.anl.gov/petsc/>`__:
+* After unpacking the release tarball, the distribution is ready for building. Some environment configuration is needed to inform the `PETSc <https://www.mcs.anl.gov/petsc/>`__ location. As in :ref:`Install` section, you can set the environment variables ``PETSC_DIR`` and ``PETSC_ARCH`` indicating where you have built/installed `PETSc <https://www.mcs.anl.gov/petsc/>`__:
 
   .. code-block:: bash
 

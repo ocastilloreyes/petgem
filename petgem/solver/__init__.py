@@ -1,3 +1,4 @@
-from .assembler import computeElementalContributionsMPI
+from .assembler import computeElementalContributionsMPI_FirstOrder
+from .assembler import computeElementalContributionsMPI_HighOrder
 from .solver import setBoundaryConditions
 from .solver import solveSystem

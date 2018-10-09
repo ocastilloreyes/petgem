@@ -3,7 +3,7 @@
 Features
 ===============
 
-PETGEM use a code structure for the Nédélec FE algorithm that emphasizes
+PETGEM use a code structure for the high-order Nédélec FE algorithm that emphasizes
 good parallel scalability, which is crucial in the multi-core era.
 Furthermore, it’s modularity should simplify the process of reaching the
 best possible performance in terms of percentage of the peak amount of
@@ -30,7 +30,7 @@ A more detailed explanation is the following:
 
 * Independent of problem formulation, numerical solution, and data storage: The kernel provides the independent abstractions for modeling, numerical methods, data storage and analysis.
 
-* Parallel processing support:  Based on distributed-memory parallelism (`petsc4py <https://pypi.python.org/pypi/petsc4py>`__) and static load balancing.
+* Parallel processing support:  Based on distributed-memory parallelism (`petsc4py <https://pypi.python.org/pypi/petsc4py>`__) and static load balancing.  Further, GPUs architectures are supported.
 
 * Confidence and performance monitoring: Based on an simple and automatic profiling module.
 
@@ -38,7 +38,7 @@ A more detailed explanation is the following:
 
 * Interface to mesh generator: Simple and light library to export nodal finite element meshes to edge elements data structures. Current version support `Gmsh <http://gmsh.info/>`__ meshes.
 
-* Edge FEM library: Edge-based discretisations, vector basis functions, their geometry description, and generalized integration rules provides a generic support for implementing edge-based solution algorithms.
+* Edge FEM library: High-order Edge-based discretisations, vector basis functions, their geometry description, and generalized integration rules provides a generic support for implementing edge-based solution algorithms.
 
 * Linear systems library: Support to Compressed Row Storage (CSR) format for sparse matrices and their easy and efficient parallel assembly on distributed-memory platforms.
 
@@ -80,8 +80,9 @@ Target architecture
 --------------------
 The HPC goal of the PETGEM involves using cutting-edge architectures.
 To that goal, the code is implemented in current state-of-the-art
-platforms such as Intel Xeon Platinum, Intel Haswell and Intel Xeon Phi processors, which offer
-high performance, flexibility, and power efficiency. Nevertheless,
+platforms such as Intel Xeon Platinum processors from the Skylake generation,
+Intel Haswell and Intel Xeon Phi processors, which offer
+high-performance, flexibility, and power efficiency. Nevertheless,
 PETGEM support older architectures such as SandyBridge, for the sake
 of usability and to be able to compare performance.
 

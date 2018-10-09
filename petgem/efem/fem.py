@@ -7,12 +7,12 @@ Element Method (FEM) of lowest order in tetrahedral meshes.
 
 
 def tetraXiEtaZeta2XYZ(eleNodes, XiEtaZetaPoints):
-    ''' Map a set of points in XiEtaZeta coordinates to XYZ coordinates.
+    ''' Map a set of points in XiEtaZeta coord to XYZ coord.
 
-    :param ndarray eleNodes: nodal spatial coordinates of the
+    :param ndarray eleNodes: nodal spatial coord of the
      tetrahedral element.
-    :param ndarray XiEtaZetaPoints: set of points in XiEtaZeta coordinates.
-    :return: new spatial coordinates of XiEtaZetaPoints.
+    :param ndarray XiEtaZetaPoints: set of points in XiEtaZeta coord.
+    :return: new spatial coord of XiEtaZetaPoints.
     :rtype: ndarray.
     '''
     # Get number of points
@@ -21,17 +21,17 @@ def tetraXiEtaZeta2XYZ(eleNodes, XiEtaZetaPoints):
         # Allocate
         xyzPoints = np.zeros((3), dtype=np.float64)
         # Mapping all points
-        # x-coordinates
+        # x-coord
         xyzPoints[0] = eleNodes[0][0] + \
             (eleNodes[1][0]-eleNodes[0][0])*XiEtaZetaPoints[0] + \
             (eleNodes[2][0]-eleNodes[0][0])*XiEtaZetaPoints[1] + \
             (eleNodes[3][0]-eleNodes[0][0])*XiEtaZetaPoints[2]
-        # y-coordinates
+        # y-coord
         xyzPoints[1] = eleNodes[0][1] + \
             (eleNodes[1][1]-eleNodes[0][1])*XiEtaZetaPoints[0] + \
             (eleNodes[2][1]-eleNodes[0][1])*XiEtaZetaPoints[1] + \
             (eleNodes[3][1]-eleNodes[0][1])*XiEtaZetaPoints[2]
-        # z-coordinates
+        # z-coord
         xyzPoints[2] = eleNodes[0][2] + \
             (eleNodes[1][2]-eleNodes[0][2])*XiEtaZetaPoints[0] + \
             (eleNodes[2][2]-eleNodes[0][2])*XiEtaZetaPoints[1] + \
@@ -41,17 +41,17 @@ def tetraXiEtaZeta2XYZ(eleNodes, XiEtaZetaPoints):
         # Allocate
         xyzPoints = np.zeros((nPoints, 3), dtype=np.float64)
         # Mapping all points
-        # x-coordinates
+        # x-coord
         xyzPoints[:, 0] = eleNodes[0][0] + \
             ([eleNodes[1][0]-eleNodes[0][0]])*XiEtaZetaPoints[:, 0] + \
             ([eleNodes[2][0]-eleNodes[0][0]])*XiEtaZetaPoints[:, 1] + \
             ([eleNodes[3][0]-eleNodes[0][0]])*XiEtaZetaPoints[:, 2]
-        # y-coordinates
+        # y-coord
         xyzPoints[:, 1] = eleNodes[0][1] + \
             ([eleNodes[1][1]-eleNodes[0][1]])*XiEtaZetaPoints[:, 0] + \
             ([eleNodes[2][1]-eleNodes[0][1]])*XiEtaZetaPoints[:, 1] + \
             ([eleNodes[3][1]-eleNodes[0][1]])*XiEtaZetaPoints[:, 2]
-        # z-coordinates
+        # z-coord
         xyzPoints[:, 2] = eleNodes[0][2] + \
             ([eleNodes[1][2]-eleNodes[0][2]])*XiEtaZetaPoints[:, 0] + \
             ([eleNodes[2][2]-eleNodes[0][2]])*XiEtaZetaPoints[:, 1] + \
@@ -807,9 +807,9 @@ def gauss_points_tetrahedron(polyOrder):
         return (X, W)
 
     def s31(a, w):
-        ''' First star: Compute the barycentric coordinates, which
+        ''' First star: Compute the barycentric coord, which
         contain 4 dimensions. The points are obtained by taking all
-        the unique 3 dimensional permutations from the barycentric coordinates.
+        the unique 3 dimensional permutations from the barycentric coord.
         '''
         baryc = [a, a, a, (1.0-3.0*a)]
         temp = np.array(list(itertools.permutations(baryc)), dtype=np.float64)
@@ -822,9 +822,9 @@ def gauss_points_tetrahedron(polyOrder):
         return (X, W)
 
     def s22(a, w):
-        ''' Second star: Compute the barycentric coordinates, which
+        ''' Second star: Compute the barycentric coord, which
         contain 4 dimensions. The points are obtained by taking all
-        the unique 3 dimensional permutations from the barycentric coordinates.
+        the unique 3 dimensional permutations from the barycentric coord.
         '''
         baryc = [a, a, 0.5-a, 0.5-a]
         temp = np.array(list(itertools.permutations(baryc)), dtype=np.float64)
@@ -837,9 +837,9 @@ def gauss_points_tetrahedron(polyOrder):
         return (X, W)
 
     def s211(a, b, w):
-        ''' Second star: Compute the barycentric coordinates, which
+        ''' Second star: Compute the barycentric coord, which
         contain 4 dimensions. The points are obtained by taking all
-        the unique 3 dimensional permutations from the barycentric coordinates.
+        the unique 3 dimensional permutations from the barycentric coord.
         '''
         baryc = [a, a, b, (1.0-2.0*a-b)]
         temp = np.array(list(itertools.permutations(baryc)), dtype=np.float64)
@@ -852,9 +852,9 @@ def gauss_points_tetrahedron(polyOrder):
         return (X, W)
 
     def s1111(a, b, c, w):
-        ''' Fourth star: Compute the barycentric coordinates, which
+        ''' Fourth star: Compute the barycentric coord, which
         contain 4 dimensions. The points are obtained by taking all
-        the unique 3 dimensional permutations from the barycentric coordinates.
+        the unique 3 dimensional permutations from the barycentric coord.
         '''
         baryc = [a, b, c, (1.0-a-b-c)]
         temp = np.array(list(itertools.permutations(baryc)), dtype=np.float64)
@@ -890,9 +890,461 @@ def gauss_points_tetrahedron(polyOrder):
     return (X, W)
 
 
+def gauss_points_reference_tetrahedron(npointeg, nedelec_order):
+    ''' Compute the quadrature points X,Y,Z and the weights Wi for the
+    integration over the reference tetrahedral.
+
+    :param int npointeg: number of gauss points to be computed.
+    :param int nedelec_order: nedelec element order.
+    :return: quadrature Gauss points (X, Y, Z) and Gauss weights.
+    :rtype: ndarray.
+
+    .. note:: References:\n
+       Amor-Martin, A., Garcia-Castillo, L. E., & Garcia-Doñoro, D. D.
+       (2016). Second-order Nédélec curl-conforming prismatic element
+       for computational electromagnetics. IEEE Transactions on
+       Antennas and Propagation, 64(10), 4384-4395.
+    '''
+
+    # ----- Gaussian points computation for unit tetrahedron ----
+    # Allocate
+    Wi = np.zeros(npointeg, dtype=np.float)
+    x = np.zeros(npointeg, dtype=np.float)
+    y = np.zeros(npointeg, dtype=np.float)
+    z = np.zeros(npointeg, dtype=np.float)
+
+    if npointeg == 5 and nedelec_order == 2:
+        # Compute weigths
+        Wi[0] = -2./15.
+        Wi[1] = 3./40.
+        Wi[2] = 3./40.
+        Wi[3] = 3./40.
+        Wi[4] = 3./40.
+        # Unit tetrahedron (Volume)
+        Wi = Wi*6.
+
+        # Compute coord
+        x[0] = 1./4.
+        x[1] = 1./6.
+        x[2] = 1./6.
+        x[3] = 1./6.
+        x[4] = 1./2.
+        y[0] = 1./4.
+        y[1] = 1./6.
+        y[2] = 1./6.
+        y[3] = 1./2.
+        y[4] = 1./6.
+        z[0] = 1./4.
+        z[1] = 1./6.
+        z[2] = 1./2.
+        z[3] = 1./6.
+        z[4] = 1./6.
+
+    elif npointeg == 15 and nedelec_order == 2:
+        # Compute weigths
+        a = 1./4.
+        b1 = (7.+np.sqrt(15.))/34.
+        b2 = (7.-np.sqrt(15.))/34.
+        c1 = (13.-3.*np.sqrt(15.))/34.
+        c2 = (13.+3.*np.sqrt(15.))/34.
+        d = (5.-np.sqrt(15.))/20.
+        ee = (5.+np.sqrt(15.))/20.
+
+        Wi[0] = 8./405.
+        Wi[1] = (2665.-14.*np.sqrt(15.))/226800.
+        Wi[2] = (2665.-14.*np.sqrt(15.))/226800.
+        Wi[3] = (2665.-14.*np.sqrt(15.))/226800.
+        Wi[4] = (2665.-14.*np.sqrt(15.))/226800.
+        Wi[5] = (2665.+14.*np.sqrt(15.))/226800.
+        Wi[6] = (2665.+14.*np.sqrt(15.))/226800.
+        Wi[7] = (2665.+14.*np.sqrt(15.))/226800.
+        Wi[8] = (2665.+14.*np.sqrt(15.))/226800.
+        Wi[9] = 5./567.
+        Wi[10] = 5./567.
+        Wi[11] = 5./567.
+        Wi[12] = 5./567.
+        Wi[13] = 5./567.
+        Wi[14] = 5./567.
+
+        # Unit tetrahedron (Volume)
+        Wi = Wi*6.
+
+        # Compute coord
+        x[0] = a
+        y[0] = a
+        z[0] = a
+
+        x[1] = b1
+        x[2] = b1
+        x[3] = b1
+        x[4] = c1
+        x[5] = b2
+        x[6] = b2
+        x[7] = b2
+        x[8] = c2
+        y[1] = b1
+        y[2] = b1
+        y[3] = c1
+        y[4] = b1
+        y[5] = b2
+        y[6] = b2
+        y[7] = c2
+        y[8] = b2
+        z[1] = b1
+        z[2] = c1
+        z[3] = b1
+        z[4] = b1
+        z[5] = b2
+        z[6] = c2
+        z[7] = b2
+        z[8] = b2
+
+        x[9] = d
+        x[10] = d
+        x[11] = ee
+        y[9] = d
+        y[10] = ee
+        y[11] = d
+        z[9] = ee
+        z[10] = d
+        z[11] = d
+
+        x[12] = d
+        x[13] = ee
+        x[14] = ee
+        y[12] = ee
+        y[13] = d
+        y[14] = ee
+        z[12] = ee
+        z[13] = ee
+        z[14] = d
+
+    elif npointeg == 15 and nedelec_order == 3:
+        # Compute weigths
+        W0 = 8/405
+        W1 = (2665-14*np.sqrt(15))/226800
+        W2 = (2665+14*np.sqrt(15))/226800
+        W3 = 5/567
+
+        a = 1/4
+        b1 = (7+np.sqrt(15))/34
+        b2 = (7-np.sqrt(15))/34
+        c1 = (13-3*np.sqrt(15))/34
+        c2 = (13+3*np.sqrt(15))/34
+        d = (5-np.sqrt(15))/20
+        ee = (5+np.sqrt(15))/20
+
+        Wi[0] = W0
+        Wi[1] = W1
+        Wi[2] = W1
+        Wi[3] = W1
+        Wi[4] = W1
+        Wi[5] = W2
+        Wi[6] = W2
+        Wi[7] = W2
+        Wi[8] = W2
+        Wi[9] = W3
+        Wi[10] = W3
+        Wi[11] = W3
+        Wi[12] = W3
+        Wi[13] = W3
+        Wi[14] = W3
+
+        # Compute coordinates
+        x[0] = a
+        y[0] = a
+        z[0] = a
+
+        x[1] = b1
+        x[2] = b1
+        x[3] = b1
+        x[4] = c1
+        y[1] = b1
+        y[2] = b1
+        y[3] = c1
+        y[4] = b1
+        z[1] = b1
+        z[2] = c1
+        z[3] = b1
+        z[4] = b1
+
+        x[5] = b2
+        x[6] = b2
+        x[7] = b2
+        x[8] = c2
+        y[5] = b2
+        y[6] = b2
+        y[7] = c2
+        y[8] = b2
+        z[5] = b2
+        z[6] = c2
+        z[7] = b2
+        z[8] = b2
+
+        x[9] = d
+        x[10] = d
+        x[11] = ee
+        y[9] = d
+        y[10] = ee
+        y[11] = d
+        z[9] = ee
+        z[10] = d
+        z[11] = d
+
+        x[12] = d
+        x[13] = ee
+        x[14] = ee
+        y[12] = ee
+        y[13] = d
+        y[14] = ee
+        z[12] = ee
+        z[13] = ee
+        z[14] = d
+
+    elif npointeg == 24 and nedelec_order == 3:
+        # Definition of reference element (volumetric coord)
+        x_tet_ref = np.array([0, 1, 0, 0], dtype=np.float)
+        y_tet_ref = np.array([0, 0, 1, 0], dtype=np.float)
+        z_tet_ref = np.array([0, 0, 0, 1], dtype=np.float)
+
+        # Allocate array for cartesian coord
+        cartesian_coord = np.zeros((3, npointeg), dtype=np.float)
+
+        # First group K[3,1]. 4 points
+        W1 = 0.665379170969464506e-2
+        Wi[0] = W1
+        Wi[1] = W1
+        Wi[2] = W1
+        Wi[3] = W1
+
+        L1A = 0.214602871259151684
+        L1B = 0.356191386222544953
+
+        # Volumetric coord to cartesian coord. 4 points
+        L1_1 = np.vstack((L1A, L1A, L1A, L1B))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L1_1)
+        cartesian_coord[:, 0] = tmp[:, 0]
+
+        L1_2 = np.vstack((L1A, L1A, L1B, L1A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L1_2)
+        cartesian_coord[:, 1] = tmp[:, 0]
+
+        L1_3 = np.vstack((L1A, L1B, L1A, L1A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L1_3)
+        cartesian_coord[:, 2] = tmp[:, 0]
+
+        L1_4 = np.vstack((L1B, L1A, L1A, L1A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L1_4)
+        cartesian_coord[:, 3] = tmp[:, 0]
+
+        # Second group K[3,1]. 4 points
+        W2 = 0.167953517588677620e-2
+        Wi[4] = W2
+        Wi[5] = W2
+        Wi[6] = W2
+        Wi[7] = W2
+
+        L2A = 0.406739585346113397e-1
+        L2B = 0.877978124396165982
+
+        # Volumetric coord to cartesian coord. 4 points
+        L2_1 = np.vstack((L2A, L2A, L2A, L2B))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L2_1)
+        cartesian_coord[:, 4] = tmp[:, 0]
+
+        L2_2 = np.vstack((L2A, L2A, L2B, L2A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L2_2)
+        cartesian_coord[:, 5] = tmp[:, 0]
+
+        L2_3 = np.vstack((L2A, L2B, L2A, L2A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L2_3)
+        cartesian_coord[:, 6] = tmp[:, 0]
+
+        L2_4 = np.vstack((L2B, L2A, L2A, L2A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L2_4)
+        cartesian_coord[:, 7] = tmp[:, 0]
+
+        # Third group K[3,1]. 4 points
+        W3 = 0.922619692394239843e-2
+        Wi[8] = W3
+        Wi[9] = W3
+        Wi[10] = W3
+        Wi[11] = W3
+
+        L3A = 0.322337890142275646
+        L3B = 0.329863295731730594e-1
+
+        # Volumetric coord to cartesian coord. 4 points
+        L3_1 = np.vstack((L3A, L3A, L3A, L3B))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L3_1)
+        cartesian_coord[:, 8] = tmp[:, 0]
+
+        L3_2 = np.vstack((L3A, L3A, L3B, L3A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L3_2)
+        cartesian_coord[:, 9] = tmp[:, 0]
+
+        L3_3 = np.vstack((L3A, L3B, L3A, L3A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L3_3)
+        cartesian_coord[:, 10] = tmp[:, 0]
+
+        L3_4 = np.vstack((L3B, L3A, L3A, L3A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L3_4)
+        cartesian_coord[:, 11] = tmp[:, 0]
+
+        # GroupK[2,1,1]. 12 points.
+        W4 = 0.803571428571428248e-2
+
+        for iPoint in np.arange(12, npointeg):
+            Wi[iPoint] = W4
+
+        L4A = 0.636610018750175299e-1
+        L4B = 0.269672331458315867
+        L4C = 0.603005664791649076
+
+        # Volumetric coord to cartesian coord. 12 points.
+        L4_1 = np.vstack((L4A, L4A, L4B, L4C))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_1)
+        cartesian_coord[:, 12] = tmp[:, 0]
+
+        L4_2 = np.vstack((L4A, L4A, L4C, L4B))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_2)
+        cartesian_coord[:, 13] = tmp[:, 0]
+
+        L4_3 = np.vstack((L4B, L4A, L4A, L4C))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_3)
+        cartesian_coord[:, 14] = tmp[:, 0]
+
+        L4_4 = np.vstack((L4C, L4A, L4A, L4B))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_4)
+        cartesian_coord[:, 15] = tmp[:, 0]
+
+        L4_5 = np.vstack((L4B, L4C, L4A, L4A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_5)
+        cartesian_coord[:, 16] = tmp[:, 0]
+
+        L4_6 = np.vstack((L4C, L4B, L4A, L4A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_6)
+        cartesian_coord[:, 17] = tmp[:, 0]
+
+        L4_7 = np.vstack((L4A, L4B, L4A, L4C))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_7)
+        cartesian_coord[:, 18] = tmp[:, 0]
+
+        L4_8 = np.vstack((L4A, L4C, L4A, L4B))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_8)
+        cartesian_coord[:, 19] = tmp[:, 0]
+
+        L4_9 = np.vstack((L4A, L4B, L4C, L4A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_9)
+        cartesian_coord[:, 20] = tmp[:, 0]
+
+        L4_10 = np.vstack((L4A, L4C, L4B, L4A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_10)
+        cartesian_coord[:, 21] = tmp[:, 0]
+
+        L4_11 = np.vstack((L4B, L4A, L4C, L4A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_11)
+        cartesian_coord[:, 22] = tmp[:, 0]
+
+        L4_12 = np.vstack((L4C, L4A, L4B, L4A))
+        tmp = volumetricToCartesianCoordinates(x_tet_ref, y_tet_ref,
+                                               z_tet_ref, L4_12)
+        cartesian_coord[:, 23] = tmp[:, 0]
+
+        for iPoint in np.arange(npointeg):
+            x[iPoint] = cartesian_coord[0, iPoint]
+            y[iPoint] = cartesian_coord[1, iPoint]
+            z[iPoint] = cartesian_coord[2, iPoint]
+    else:
+        disp('Number of gauss points not supported')
+
+    return Wi, x, y, z
+
+
+def volumetricToCartesianCoordinates(x, y, z, L):
+    ''' Change of volumetric coord to cartesian coord.
+
+    :param float-array x: x-coord of real element.
+    :param float-array y: y-coord of real element.
+    :param float-array z: z-coord of real element.
+    :param float-array L: xyz-coord of reference element.
+    :return: points in cartesian coord.
+    :rtype: ndarray
+    '''
+    # Number of points
+    size = L.shape
+    nPoints = size[1]
+
+    # Number of dimensions
+    nDimensions = 3
+
+    # Allocate
+    points = np.zeros((nDimensions, nPoints), dtype=np.float)
+
+    # Change of volumetric coord to cartesian coord
+    LL = np.transpose(L)
+
+    points[0, :] = np.matmul(LL, x)
+    points[1, :] = np.matmul(LL, y)
+    points[2, :] = np.matmul(LL, z)
+
+    return points
+
+
+def cartesianToVolumetricCoordinates(x, y, z, r):
+    ''' Change of cartesian coord to volumetric coord.
+
+    :param float-array x: x-coord of real element.
+    :param float-array y: y-coord of real element.
+    :param float-array z: z-coord of real element.
+    :param float-array r: xyz-coord of reference element.
+    :return: points in volumetric coord.
+    :rtype: ndarray
+    '''
+
+    # Initialization
+    matrix = np.vstack((x, y, z, np.ones(4, dtype=np.float)))
+
+    # Coord transformation
+    matrix_inv = inv(matrix)
+
+    L = np.zeros(4, dtype=np.float)
+    tmp = np.hstack((r[0], r[1], r[2], np.float(1)))
+    L[0] = np.dot(matrix_inv[0, :], tmp)
+    L[1] = np.dot(matrix_inv[1, :], tmp)
+    L[2] = np.dot(matrix_inv[2, :], tmp)
+    L[3] = np.dot(matrix_inv[3, :], tmp)
+
+    return L
+
+
 def unitary_test():
     ''' Unitary test for fem.py script.
     '''
+
 
 if __name__ == '__main__':
     # Standard module import
@@ -901,5 +1353,6 @@ else:
     # Standard module import
     import itertools
     import numpy as np
+    from scipy.linalg import inv
     # PETGEM module import
     from petgem.efem.vectorMatrixFunctions import findUniqueRows

@@ -184,7 +184,7 @@ Downloads
 Scripts
 *******
 
-* PETGEM is available for download at the project website generously hosted by PyPi. Download `here <https://pypi.python.org/pypi/petgem/>`__.
+* PETGEM is available for download at the project website generously hosted by PyPi and GitHub. Download `here <https://pypi.python.org/pypi/petgem/>`__ or `here <https://github.com/ocastilloreyes/petgem>`__.
 
 * ``kernel.py``: python script that manages the PETGEM work-flow. Download :download:`here <_downloads/kernel.py>`.
 
@@ -201,6 +201,8 @@ Examples
 
 * Example 1: Dataset for Pre-processing stage within PETGEM. Download :download:`here <_downloads/Example1.zip>`.
 
-* Example 2: Dataset for the Canonical model of an off-shore hydrocarbon reservoir. Download :download:`here <_downloads/Example2.zip>`.
+* Example 2: Dataset for the Canonical model of an off-shore hydrocarbon reservoir (Nédélec elements of first-order). Download :download:`here <_downloads/Example2.zip>`.
 
-* Example 3: Dataset for the use of PETSc solvers. Download :download:`here <_downloads/Example3.zip>`.
+* Example 3: Dataset for the Canonical model of an off-shore hydrocarbon reservoir (Nédélec elements of second-order). Download :download:`here <_downloads/Example3.zip>`.
+
+* Example 4: Dataset for the use of PETSc solvers. Download :download:`here <_downloads/Example4.zip>`.

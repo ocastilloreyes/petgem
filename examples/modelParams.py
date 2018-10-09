@@ -13,11 +13,26 @@ All file paths should consider as absolute.
 Next, each key is described.
 '''
 modelling = {
-    # ----- Pyshical parameters -----
+    # ---------- Nedelec element order ----------
+    # 1 = First nedelec order (6 DOFS per element)
+    # 2 = Second nedelec order (20 DOFS per element)
+    # 3 = Third nedelec order (45 DOFS per element)
+    # Type: int
+    # Optional: NO
+    'NEDELEC_ORDER': 2,
+
+    # ---------- CUDA SUPPORT ----------
+    # 0 = No
+    # 1 = Yes
+    # Type: int
+    # Optional: NO
+    'CUDA': 0,
+
+    # ----- Physical parameters -----
     # Source
     # Source frequency. Type: float
     # Optional: NO
-    'FREQ': 2.0,
+    'FREQ': 1.0,
     # Source position(x, y, z). Type: float
     # Optional: NO
     'SRC_POS': [1750.0, 1750.0, -975.0],
@@ -35,7 +50,7 @@ modelling = {
     'SRC_LENGTH': 1.0,
     # Conductivity model. Type: str
     # Optional: NO
-    'CONDUCTIVITY_MODEL_FILE': 'examples/DIPOLE1D/Input_model/conductivityModel.dat',
+    'CONDUCTIVITY_MODEL_FILE': 'PATH_TO_FILE',
     # Background conductivity. Type: float
     # Optional: NO
     'CONDUCTIVITY_BACKGROUND': 3.33,
@@ -44,21 +59,27 @@ modelling = {
     # Mesh files
     # Nodes spatial coordinates. Type: str
     # Optional: NO
-    'NODES_FILE': 'examples/DIPOLE1D/Input_model/nodes.dat',
+    'NODES_FILE': 'PATH_TO_FILE',
     # Elements-nodes connectivity. Type: str
     # Optional: NO
-    'MESH_CONNECTIVITY_FILE': 'examples/DIPOLE1D/Input_model/meshConnectivity.dat',
+    'MESH_CONNECTIVITY_FILE': 'PATH_TO_FILE',
+    # Elements-faces connectivity. Type: str
+    # Optional: NO
+    'FACES_CONNECTIVITY_FILE': 'PATH_TO_FILE',
+    # Faces-nodes connectivity. Type: str
+    # Optional: NO
+    'FACES_NODES_FILE': 'PATH_TO_FILE',
     # Elements-edges connectivity. Type: str
     # Optional: NO
-    'DOFS_CONNECTIVITY_FILE': 'examples/DIPOLE1D/Input_model/dofs.dat',
+    'EDGES_CONNECTIVITY_FILE': 'PATH_TO_FILE',
     # Edges-nodes connectivity. Type: str
     # Optional: NO
-    'DOFS_NODES_FILE': 'examples/DIPOLE1D/Input_model/dofsNodes.dat',
+    'EDGES_NODES_FILE': 'PATH_TO_FILE',
     # Sparsity pattern for matrix allocation (PETSc)
-    'NNZ_FILE': 'examples/DIPOLE1D/Input_model/nnz.dat',
+    'NNZ_FILE': 'PATH_TO_FILE',
     # Boundaries. Type: str
     # Optional: NO
-    'BOUNDARIES_FILE': 'examples/DIPOLE1D/Input_model/boundaries.dat',
+    'BOUNDARIES_FILE': 'PATH_TO_FILE',
 
     # ------------ Solver -----------
     # Solver options must be set in
@@ -67,5 +88,5 @@ modelling = {
     # ------------ Receivers file -----------
     # Name of the file that contains the receivers position. Type: str
     # Optional: NO
-    'RECEIVERS_FILE': 'examples/DIPOLE1D/Input_model/receivers.dat',
+    'RECEIVERS_FILE': 'PATH_TO_FILE',
 }

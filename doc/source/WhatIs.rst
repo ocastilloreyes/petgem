@@ -31,7 +31,7 @@ easiest to scale-up to very large domains or arbitrary shape. It supports
 distributed-memory paralelism through `petsc4py <https://pypi.python.org/pypi/petsc4py>`__
 package.
 
-As a result, PETGEM tool allow users to specify edge-based
+As a result, PETGEM tool allow users to specify high-order edge-based
 variational forms of H(curl) for the simulation of electromagnetic fields
 in realistic 3D CSEM surveys with accuracy, reliability and efficiency.
 

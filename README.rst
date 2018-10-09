@@ -4,9 +4,9 @@ petgem
 Overview
 ========
 
-Welcome to petgem. This code is a parallel python modelling tool for 3D
+Welcome to PETGEM. This code is a parallel python modelling tool for 3D
 Controlled-Source Electromagnetic Method (3D CSEM) in geophysics using
-edge finite elements (Nedelec finite elements).
+high-order edge finite elements (Nédélec finite elements).
 
 Dependencies
 ------------
@@ -34,7 +34,7 @@ License
 PETGEM is developed as open-source under GPLv3.0 license at Computer
 Applications in Science & Engineering of the Barcelona Supercomputing
 Center - Centro Nacional de Supercomputación. Please, see the CONDITIONS
-OF USE described in the LICENSE.rst file. 
+OF USE described in the LICENSE.rst file.
 
 
 Documentation

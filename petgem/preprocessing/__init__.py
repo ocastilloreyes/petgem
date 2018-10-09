@@ -3,7 +3,8 @@ from .preprocessing import printPreprocessingSummary
 from .preprocessing import checkNumberParamsPreprocessing
 from .preprocessing import preprocessNodes
 from .preprocessing import preprocessingNodalConnectivity
-from .preprocessing import preprocessingDOF
+from .preprocessing import preprocessingEdges
+from .preprocessing import preprocessingFaces
 from .preprocessing import preprocessingConductivityModel
 from .preprocessing import preprocessingDataReceivers
 from .preprocessing import preprocessingNNZ
