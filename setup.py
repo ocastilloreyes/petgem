@@ -20,7 +20,7 @@ def description():
     ''' Descripton of PETGEM code
     '''
     petgem_description = ('Parallel python code for electromagnetic '
-                          'modeling in geophysics')
+                          'modeling in geophysics using high-order nédélec finite elements')
 
     return petgem_description
 
@@ -58,7 +58,7 @@ if __name__ == '__main__':
     setup(name=name(),
           maintainer="Octavio Castillo Reyes",
           maintainer_email="octavio.castillo@bsc.es",
-          version='0.5',
+          version='0.6',
           long_description=long_description(),
           description=description(),
           url="https://www.bsc.es/castillo-octavio",
@@ -66,17 +66,17 @@ if __name__ == '__main__':
           license='GPLv3.0',
           packages=['petgem'],
           include_dirs=get_ext_modules(),
-          install_requires=['petsc4py', 'numpy', 'scipy', 'blessings'],
+          install_requires=['petsc4py', 'numpy', 'scipy', 'singleton_decorator', 'mpi4py', 'h5py'],
           setup_requires=['sphinx'],
           classifiers=['Development Status :: 3 - Alpha',
                        'License :: Free for non-commercial use',
                        'Intended Audience :: Science/Research',
                        'Intended Audience :: Developers',
-                       'Programming Language :: Python :: 3.5',
+                       'Programming Language :: Python :: 3.6',
                        'Topic :: Scientific/Engineering',
                        'Topic :: Software Development :: Libraries',
                        'Operating System :: POSIX :: Linux'],
-          keywords=['3D CSEM, edge finite elements, HPC, petsc, petsc4py.'],
+          keywords=['3D CSEM, high-order edge finite elements, HPC, numerical simulation'],
           platforms="Linux",
           include_package_data=True,
           )

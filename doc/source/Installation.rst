@@ -12,13 +12,16 @@ Requirements
 
 PETGEM is known to run on various flavors of Linux clusters. Its requirements are:
 
-* `PETSc <https://www.mcs.anl.gov/petsc/>`__ (builded version for **COMPLEX-VALUED NUMBERS**) for the use of direct/iterative parallel solvers.
-* `Python 3 <https://www.python.org/>`__ (versions 3.5.2 and 3.6.3 have been tested).
-* `Numpy <http://www.numpy.org/>`__ for arrays manipulation.
-* `Scipy <http://www.scipy.org/>`__ for numerical operations.
-* `Blessings <https://pypi.python.org/pypi/blessings/>`__ for terminal styling and positioning.
-* `Sphinx <http://www.sphinx-doc.org>`__ and `LaTeX <https://www.latex-project.org/>`__ (textlive) to generate documentation.
-* `Petsc4py <https://bitbucket.org/petsc/petsc4py>`__ for parallel computations on distributed-memory platforms. It allows the use of parallel direct/iterative solvers from `PETSc <http://www.mcs.anl.gov/petsc/>`__.
+* `PETSc <https://www.mcs.anl.gov/petsc/>`__ (builded version for **COMPLEX-VALUED NUMBERS**) for the use of direct/iterative parallel solvers
+* `Python 3 <https://www.python.org/>`__ (versions 3.5.2, 3.6.3 and 3.6.9 have been tested)
+* `Numpy <http://www.numpy.org/>`__ for arrays manipulation
+* `Scipy <http://www.scipy.org/>`__ for numerical operations
+* `Singleton-decorator <https://pypi.org/project/singleton-decorator/>`_
+* `Sphinx <http://www.sphinx-doc.org>`__ and `LaTeX <https://www.latex-project.org/>`__ (textlive) to generate documentation
+* `Petsc4py <https://bitbucket.org/petsc/petsc4py>`__ for parallel computations on distributed-memory platforms. It allows the use of parallel direct/iterative solvers from `PETSc <http://www.mcs.anl.gov/petsc/>`_
+* `Mpi4py <https://pypi.org/project/mpi4py/>`__ for parallel computations on distributed-memory platforms.
+* `h5py <https://pypi.org/project/h5py/>`__ for input/output tasks.
+
 
 On Linux, consult the package manager of your preference. PETGEM can be
 used without any installation by running the kernel from the top-level
@@ -31,19 +34,19 @@ Install PETGEM
 
 * Following commands may require root privileges
 
-* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7, 3.8 and 3.9 have been tested)
+* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7, 3.8, 3.9, and 3.12 have been tested)
 
-* Uncompress the `PETSc <https://www.mcs.anl.gov/petsc/>`__ archive (in this example, using PETSc 3.9.3):
+* Uncompress the `PETSc <https://www.mcs.anl.gov/petsc/>`__ archive (in this example, using PETSc 3.12.0):
 
   .. code-block:: bash
 
-    $ tar zxvf petsc-3.9.3.tar.gz
+    $ tar zxvf petsc-3.12.0.tar.gz
 
 * Configure and build `PETSc <https://www.mcs.anl.gov/petsc/>`__. The configuration options depend on the calculations you want to perform (complex- or real-valued) as well as your compiler/MPI/Blas/Lapack setup. For PETGEM executions, **PETSC MUST BE BUILD FOR COMPLEX-VALUED NUMBERS**. In order to avoid incompatibilities between PETSC, petsc4py and PETGEM, we highly recommend the following configuration lines. Please, visit `PETSc <https://www.mcs.anl.gov/petsc/>`__ website for advanced configuration options. If you have a clean environment (not working MPI/Blas/Lapack), then run:
 
   .. code-block:: bash
 
-    $ cd petsc-3.9.3
+    $ cd petsc-3.12.0
     $ export PETSC_DIR=$PWD
     $ export PETSC_ARCH=arch-linux2-c-debug
 
@@ -87,7 +90,7 @@ Install PETGEM
 
     $ pip3 install numpy
 
-* And finally, install PETGEM with its dependencies (`Scipy <http://www.scipy.org/>`__ , `Blessings <https://pypi.python.org/pypi/blessings/>`__, `Sphinx <http://www.sphinx-doc.org>`__, `Petsc4py <https://bitbucket.org/petsc/petsc4py>`__) by typing:
+* And finally, install PETGEM with its dependencies (`Scipy <http://www.scipy.org/>`__ , `Singleton-decorator <https://pypi.org/project/singleton-decorator/>`__, `Sphinx <http://www.sphinx-doc.org>`__, `Petsc4py <https://bitbucket.org/petsc/petsc4py>`__, `Mpi4py <https://pypi.org/project/mpi4py/>`__, `h5py <https://pypi.org/project/h5py/>`__) by typing:
 
   .. code-block:: bash
 
@@ -111,14 +114,14 @@ and the :ref:`Download` section of this project website.
 
     $ pip3 install numpy
 
-* Download PETGEM (PETGEM 1.1 have been tested)
+* Download PETGEM (PETGEM 0.6 have been tested)
 
 * Uncompress the PETGEM archive:
 
   .. code-block:: bash
 
-    $ tar zxvf petgem-1.1.tar.gz
-    $ cd petgem-1.1
+    $ tar zxvf petgem-0.6.tar.gz
+    $ cd petgem-0.6
 
 * After unpacking the release tarball, the distribution is ready for building. Some environment configuration is needed to inform the `PETSc <https://www.mcs.anl.gov/petsc/>`__ location. As in :ref:`Install` section, you can set the environment variables ``PETSC_DIR`` and ``PETSC_ARCH`` indicating where you have built/installed `PETSc <https://www.mcs.anl.gov/petsc/>`__:
 

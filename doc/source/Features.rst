@@ -72,7 +72,7 @@ and thus speeds up development time by orders of magnitude [1]_, [2]_,
 [3]_, [4]_.
 
 In order to meet the high computational cost of the modeling, PETGEM supports
-distributed-memory parallelism through `Petsc4py <https://bitbucket.org/petsc/petsc4py>`__  package.
+distributed-memory parallelism through `Petsc4py <https://bitbucket.org/petsc/petsc4py>`__ package.
 
 .. _Target architecture:
 

@@ -4,6 +4,7 @@ Publications
 ============
 Papers:
 
+* Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019). `Parallel 3-D marine controlled-source electromagnetic modelling using high-order tetrahedral Nédélec elements <https://doi.org/10.1093/gji/ggz285>`_. Geophysical Journal International, Volume 219, Issue 1, October 2019, Pages 39–65.
 * Castillo-Reyes, O., de la Puente, Cela, J. M. `PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements <https://doi.org/10.1016/j.cageo.2018.07.005>`_. Computers & Geosciences, vol 119: 123-136. ISSN 0098-3004. Elsevier.
 * Castillo-Reyes, O., de la Puente, Cela, J. M. `Three-Dimensional CSEM modelling on unstructured tetrahedral meshes using edge finite elements <https://link.springer.com/chapter/10.1007/978-3-319-57972-6_18>`_. In: Barrios Hernández C., Gitler I., Klapp J. (eds) High Performance Computing. CARLA 2016. Communications in Computer and Information Science, vol 697: 247-256. ISBN 978-3-319-57971-9 Springer, Cham. 2017.
 * Castillo-Reyes, O., de la Puente, Cela, J. M. `Improving edge finite element assembly for geophysical electromagnetic modelling on shared-memory architectures <https://doi.org/10.1109/UEMCON.2016.7777804>`_. 7th Annual Ubiquitous Computing, Electronics & Mobile Communication Conference – UEMCON. 2016.

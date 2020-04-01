@@ -1,7 +1,7 @@
 .. _CSEM & Edge elements formulation:
 
-CSEM forward modelling & Edge elements formulation
-==================================================
+CSEM forward modelling & High-order edge finite element method
+==============================================================
 
 The last decade has been a period of rapid growth for electromagnetic
 methods (EM) in geophysics, mostly because of their industrial adoption.
@@ -13,138 +13,16 @@ with synthetic results which we can then compare to measured data. In particular
 if the geology is structurally complex, one might need to use methods able
 to cope with such complexity in a natural way by means of, e.g., an
 unstructured mesh representing its geometry. Among the modelling methods
-for EM based upon 3D unstructured meshes, the Nédélec Edge Finite Element
-Method (EFEM) offers a good trade-off between accuracy and number of degrees
+for EM based upon 3D unstructured meshes, the high-order Nédélec Edge Finite Element
+Method (HEFEM) offers a good trade-off between accuracy and number of degrees
 of freedom, e.g. size of the problem. Furthermore, its divergence-free basis
 is very well suited for solving Maxwell’s equation. On top of that, we choose
 to support tetrahedral meshes, as these are the easiest to use for very large
-domains or complex geometries. We present the numerical formulation and
-results of 3D CSEM forward modelling (FM) using EFEM of high-order on
-unstructured tetrahedral meshes.
+domains or complex geometries.
 
-.. _CSEM problem:
+We refer to the following papers for a complete discussion of
+marine 3-D CSEM modelling and its problem statement within PETGEM:
 
-CSEM problem
-------------
-3D CSEM FM is typically solved in frequency domain, which involves
-the numerical solution of Maxwell’s equations in stationary regimes for
-heterogeneous anisotropic electrically conductive domains. Furthermore,
-CSEM surveys generally work with low frequency electromagnetic fields
-(:math:`\sim` 1 Hz to :math:`\sim` 3 Hz) because the electric conductivity of the geological
-structures is much larger than their dielectric permittivity. As a
-consequence, in an unbound domain :math:`\Gamma`, the electric field
-can be obtained by solving Maxwell’s equations in their diffusive form
+* Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019). `Parallel 3-D marine controlled-source electromagnetic modelling using high-order tetrahedral Nédélec elements <https://doi.org/10.1093/gji/ggz285>`_. Geophysical Journal International, Volume 219, Issue 1, October 2019, Pages 39–65.
 
-.. math::
-   \nabla \times \mathbf{E} &= i\omega \mu_{0}\mathbf H,  \\
-	 \nabla \times \mathbf{H} &= \mathbf J_{s} + \tilde{\sigma}\mathbf E,
-   :label: maxwellDiffusive
-
-where the harmonic time dependence :math:`e^{-i \omega t}` is omitted,
-with :math:`\omega` is the angular frequency, :math:`\mu_{0}` the free
-space magnetic permeability, :math:`\mathbf J_{s}` the distribution of
-source current, :math:`\tilde{\sigma}\mathbf E` the induced current in
-the conductive Earth and :math:`\tilde{\sigma}` the electrical conductivity
-which is assumed isotropic for simplicity.
-
-In numerical approximations of EM fields there are two main drawbacks.
-The first one is the inevitable spatial singularity at the source. The
-second is the grid refinement requirements in order to capture the rapid
-change of the primary field [1]_. In order to mitigate these issues,
-PETGEM used a secondary field approach where the total electric
-field :math:`\mathbf E` is obtained as
-
-.. math::
-   \mathbf E &= \mathbf E_{p} + \mathbf E_{s}, \\
-   \tilde{\sigma} &=  \tilde{\sigma_{s}} + \Delta \tilde{\sigma},
-   :label: total_electric_field
-
-where subscripts :math:`p` and :math:`s` represent a primary field and
-secondary field respectively. For a general layered Earth model,
-:math:`\mathbf E_{p}` can be computed semi-analytically by using Hankel
-transform filters. Based on this decomposition and following the work by
-[3]_ the equation system to solve :math:`\mathbf E_{s}` is
-
-.. math::
-   \nabla \times \nabla \times \mathbf E_{s} + i \omega \mu \tilde{\sigma} \mathbf E_{s} = -i \omega \mu \Delta \sigma \mathbf E_{p},
-   :label: electric_field_weak_form1
-
-where the electrical conductivity :math:`\sigma` is a function of position
-that is allowed to vary in 3D, whereas the vacuum permeability :math:`\mu`
-is set to the free space value :math:`\mu_{0}`. Homogeneous Dirichlet
-boundary conditions, :math:`\mathbf E_{s} = 0` on :math:`\partial\Gamma`,
-are applied. The range of applicability of this conditions can be determined
-based on the skin depth of the electric field [4]_.
-
-.. _Edge finite element formulation:
-
-Edge finite element formulation
--------------------------------
-For the computation of :math:`\mathbf E_{s}`, PETGEM implemented the
-high-order Nédélec EFEM which uses vector basis functions defined on the edges,
-faces and volume of the corresponding elements. Its basis functions are divergence-free but
-not curl-free [2]_. Thus, EFEM naturally ensures tangential continuity and
-allows normal discontinuity of :math:`\mathbf E_{s}` at material interfaces.
-PETGEM used unstructured tetrahedral meshes because of their ability to
-represent complex geological structures such as bathymetry or reservoirs as
-well as the local refinement capability in order to improve the solution
-accuracy. `Figure 4.1`_ shows the tetrahedral Nédélec elements (first-, second-, and third-order)
-together with their node and edge indexing.
-
-.. _Figure 4.1:
-.. figure:: _static/figures/edgeElement.jpg
-   :scale: 25%
-   :alt: Tetrahedral Nédélec edge element with node/edge/face indexing.
-   :align: center
-
-   Figure 4.1. Reference tetrahedral element showing numeration of DOFs for each order :math:`p`. For :math:`p=1` there are 6 DOFs (1 per edge). For :math:`p=2` there are 20 DOFs (2 per edge and 2 per face). Finally, for :math:`p=3` there are 45 DOFs (3 per edge, 6 per face and 3 per element's volume).
-
-In PETGEM workflow, the tangential component of the secondary electric
-field is assigned to the edges in the mesh. Therefore, all components of the
-electric field at a point :math:`\mathbf x` located inside a tetrahedral
-element :math:`e` can be obtained as follows
-
-.. math::
-   \mathbf E^{e}(\mathbf x) = \sum_{i=1}^{ndofs} \mathbf N^{e}_{i}(\mathbf x) E^{e}_{i},
-   :label: field_components_edge_element
-
-where :math:`\mathbf N^{e}_{i}` are the vector basis functions and :math:`E^{e}_{i}` their degrees of freedom.
-For instance, considering the node and edge indexing in `Figure 4.1`_, the vector basis
-functions for :math:`p=1` (first-order) can be expressed as follows
-
-.. math::
-   \mathbf N^{e}_{i} &= (\lambda^{e}_{i1} \nabla \lambda^{e}_{i2} - \lambda^{e}_{i2} \nabla \lambda^{e}_{i1}) \ell^{e}_{i},
-   :label: nedelec_basis
-
-where subscripts :math:`i1` and :math:`i2` are the first and second nodes
-linked to the :math:`i`-th edge, :math:`\lambda^{e}_{i}` are the linear
-nodal basis functions, and :math:`\ell^{e}_{i}` is the length of the
-:math:`i`-th edge of the element :math:`e`. A systematic approach for obtaining
-mixed-order curl-conforming basis functions may be seen in [4]_, [5]_.
-
-By substituting equation :eq:`field_components_edge_element` into
-:eq:`electric_field_weak_form1`, and using Galerkin's approach, the weak
-form of the original differential equation becomes
-
-.. math::
-   Q_{i} = \int_{\Omega} \mathbf N_{i} \cdot [ \nabla \times \nabla \times \mathbf E_{s} -i \omega \mu \tilde{\sigma} \mathbf E_{s} + i \omega \mu \Delta \tilde{\sigma} \mathbf E_{p} ] dV,
-   :label: electric_field_weak_form2
-
-The compact discretized form of :eq:`electric_field_weak_form2` is
-obtained after applying the Green's theorem
-
-.. math::
-   [K^{e}_{jk} + i \omega \tilde{\sigma}_{e} M^{e}_{jk}] \cdot  \{ E_{sk} \} = - i \omega \mu \Delta \tilde{\sigma}_{e} R^{e}_k,
-   :label: system_eq_edge_electric
-
-where :math:`K^{e}` and :math:`M^{e}` are the elemental stiffness
-and mass matrices which can be calculated analytically
-or numerically [2]_, and :math:`R^{e}_k` is the right hand
-side which requires numerical integration.
-
-.. [1] Cai, H., Xiong, B., Han, M. and Zhdanov, M. (2014). 3D controlled-source electromagnetic modeling in anisotropic medium using edge-based finite element method. Computers & Geosciences, 73, 164–176.
-.. [2] Jin, J. (2002). The Finite Element Method in Electromagnetics. Wiley, New York, second edn.
-.. [3] Newman, G.A. and Alumbaugh, D.L. (2002). Three-dimensional induction logging problems, Part 2: A finite difference solution. Geophysics, 67(2), 484–491.
-.. [4] Puzyrev, V., Koldan, J., de la Puente, J., Houzeaux, G., Vázquez, M. and Cela, J.M. (2013). A parallel finite-element method for three-dimensional controlled-source electromagnetic forward modelling. Geophysical Journal International, ggt027.
-.. [5] Garcia-Castillo, L.E., Salazar-Palma, M., 2000. Second-order Nédélec tetrahedral element for computational electromagnetics. International Journal of Numerical Modelling: Electronic Networks, Devices and Fields (John Wiley & Sons, Inc.) 13, 261–287.
-.. [6] Garcia-Castillo, L.E., Ruiz-Genovés, A.J., Gómez-Revuelto, I., Salazar-Palma, M., Sarkar, T.K., 2002. Third-order Nédélec curl-conforming finite element. IEEE Transactions on Magnetics 38, 2370–2372.
+* Castillo-Reyes, O., de la Puente, Cela, J. M. `PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements <https://doi.org/10.1016/j.cageo.2018.07.005>`_. Computers & Geosciences, vol 119: 123-136. ISSN 0098-3004. Elsevier.

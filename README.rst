@@ -13,19 +13,23 @@ Dependencies
 
 -  A matching version of PETSc\_
 
--  Python\_ (versions 3.5.2 and 3.6.3 have been tested).
+-  Python\_ (versions 3.5.2, 3.6.3, and 3.6.9 have been tested).
 
 -  A recent NumPy\_ release.
 
 -  A recent Scipy\_ release.
 
-- A recent Blessings\_ release.
+- A recent Singleton-decorator\_ release.
 
 - A recent Sphinx\_ release.
 
 - A recent texlive\_ release.
 
 - A recent Petsc4py\_ release.
+
+- A recent Mpi4py\_ release.
+
+- A recent h5py\_ release.
 
 
 License

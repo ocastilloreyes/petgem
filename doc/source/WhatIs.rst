@@ -13,16 +13,15 @@ tools provide us with synthetic results which we can then compare to real data.
 In particular, if the geology is structurally complex, one might need to use
 methods able to cope with such complexity in a natural way by means of, e.g.,
 an unstructured mesh representing its geometry. Among the modelling methods
-for EM based upon 3D unstructured meshes, the Nédélec Finite Elements (FE),
+for EM based upon 3D unstructured meshes, the High-order Nédélec Finite Elements (FE),
 a type of Edge Finite Elements, offer a good trade-off between accuracy and number
 of degrees of freedom, i.e. size of the problem.
 
 In the multi-core and many-core era, parallelization is a crucial issue.
-Nédélec FE offer good scalability potential. Its low DOF number after
-primary/secondary field decomposition make them potentially fast, which is
+Nédélec FE offer good scalability potential. Its low DOF number make them potentially fast, which is
 crucial in the future goal of solving inverse problems which might
-involve over 100,000 realizations. However, the state of the art shows a
-relative scarcity of robust edge-based codes to simulate these problems.
+involve over 100,000 realizations (e.g. within a inversion routine). However, the state of the art shows a
+relative scarcity of robust high-order edge-based codes to simulate these problems.
 
 On top of that, **Parallel Edge-based Tool for Geophysical Electromagnetic
 Modelling** (PETGEM) is a `Python <https://www.python.org/>`_ tool

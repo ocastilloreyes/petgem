@@ -190,19 +190,13 @@ Scripts
 
 * ``petsc.opts``: options file for `PETSc <http://www.mcs.anl.gov/petsc/>`__ solvers/preconditioners. Download :download:`here <_downloads/petsc.opts>`.
 
-* ``run_preprocessing.py``: python script that provides functions for the PETGEM pre-processing phase. Download :download:`here <_downloads/run_preprocessing.py>`.
-
-* ``preprocessingParams.py``: file that defines parameters for the PETGEM pre-processing task. Download :download:`here <_downloads/preprocessingParams.py>`.
-
-* ``modelParams.py``: file that defines physical parameters of the 3D CSEM survey. Download :download:`here <_downloads/modelParams.py>`.
+* ``params.yaml``: file that defines physical parameters of the 3D CSEM survey. Download :download:`here <_downloads/params.yaml>`.
 
 Examples
 ********
 
-* Example 1: Dataset for Pre-processing stage within PETGEM. Download :download:`here <_downloads/Example1.zip>`.
+* Example 1: Dataset for the Canonical model of an off-shore hydrocarbon reservoir (Nédélec elements of first-order). Download :download:`here <_downloads/Example1.zip>`.
 
-* Example 2: Dataset for the Canonical model of an off-shore hydrocarbon reservoir (Nédélec elements of first-order). Download :download:`here <_downloads/Example2.zip>`.
+* Example 2: Dataset for the Canonical model of an off-shore hydrocarbon reservoir (Nédélec elements of second-order). Download :download:`here <_downloads/Example2.zip>`.
 
-* Example 3: Dataset for the Canonical model of an off-shore hydrocarbon reservoir (Nédélec elements of second-order). Download :download:`here <_downloads/Example3.zip>`.
-
-* Example 4: Dataset for the use of PETSc solvers. Download :download:`here <_downloads/Example4.zip>`.
+* Example 3: Dataset for the use of PETSc solvers. Download :download:`here <_downloads/Example3.zip>`.
