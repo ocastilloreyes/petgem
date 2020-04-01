@@ -1,0 +1,140 @@
+.. _Documentation:
+
+Documentation
+=============
+
+**PETGEM** comes with extensive documentation that can be grouped into
+following categories:
+
+* `Installation`_
+* `Tutorial`_
+* `Manual`_
+
+.. _Installation:
+
+Installation
+------------
+**Platforms**
+
+   **PETGEM** is known to run on various flavors of Linux clusters.
+
+**Requeriments**
+
+   `Python <https://www.python.org/>`_ packages for using **PETGEM**:
+
+   * `Scipy <http://www.scipy.org/>`_ for numerical operations
+   * `petsc4py <https://bitbucket.org/petsc/petsc4py>`_ and `mpi4py <https://bitbucket.org/mpi4py/mpi4py>`_ for parallel computations and using parallel solvers from `PETSc <http://www.mcs.anl.gov/petsc/>`_.
+   * `pymetis <http://mathema.tician.de/software/pymetis>`_ for mesh partitioning using Metis.
+   * `Paraview <http://www.paraview.org/>`_ for visualization of **PETGEM** output files.
+   * `Sphinx <http://www.sphinx-doc.org>`_ and `LaTeX <https://www.latex-project.org/>`_ to generate documentation.
+
+   On Linux, consult the package manager of your preference. **PETGEM** can be
+   used without any installation by running the kernel from the top-level
+   directory of the distribution.
+
+.. _Tutorial:
+
+Tutorial
+--------
+
+The **PETGEM** tutorial contains a collection of programs which demonstrate
+various aspects of the **PETGEM** work-flow. Each such example has the
+following structure:
+
+#. Introduction. What the program does, including the mathematical model.
+#. The commented program. An extensively documented of the source code.
+#. Results. The output of the program, with comments and interpretation.
+
+The programs are in the data/examples/ directory of local **PETGEM** folder.
+
+**Basic notions**
+
+   The start point of using **PETGEM** to solve a CSEM forward modelling is
+   through its definition in a parameters file description, also referred to as
+   **input file**. In such file, the modelling is described using several
+   keywords that allow one to define physical parameters, mesh format, solvers,
+   parallel specifications, and so on. See Parameters file description in
+   `Manual`_ section for a full explanation of those keywords.
+
+   The syntax of the **input file** is very simple yet powerful. For a general
+   CSEM forward modelling, the **PETGEM** work-flow can be summarize as
+   follows:
+
+   #. The kernel (kernel.py) reads an **input file**.
+   #. Following the contents of the **input file**, a problem instance is created.
+   #. The problem sets up its domain, sub-domains, source, solver. This stage include the data structures computation related with the edges in the mesh.
+   #. Mesh partitioning using Metis and sets up parallel data structures.
+   #. Parallel assemblig of :math:`Ax=b`. See :ref:`CSEM problem` and :ref:`Edge finite element formulation` sections for a detail mathematical background of this equation system.
+   #. The solution is obtained by calling ``solve()`` function.
+   #. Interpolation & post-processing stage in order to analyse the results.
+   #. Finally the solution can be stored by calling ``save_solution()`` function. Current version support binary and `VTK <http://www.vtk.org/>`_ file formats.
+
+**Running a simulation**
+
+   This section introduces the basics of running **PETGEM** on the command
+   line. The $ represents the command prompt of the terminal. The following
+   commands should be run in the top-level directory of the **PETGEM**
+   source tree.
+
+   **PETGEM** kernel is invoked as follows:
+
+   .. code-block:: bash
+
+      $ ./kernel.py path/input_file.py
+
+   where ``path/input_file.py`` is the location of the **input file**, which
+   describes the modelling to be solved in terms **PETGEM** can understand.
+
+**Input file template**
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+
+   Include description of input file
+   
+**Visualization of results**
+
+   The ``visualization.py`` script can be used for quick visualization of the
+   **PETGEM** output files. It requires `Paraview <http://www.paraview.org/>`_.
+
+
+
+
+
+.. _Manual:
+
+Manual
+------
+
+
+Manual section
+
+.. automodule:: packages.initparams
+   :members:

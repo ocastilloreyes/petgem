@@ -1,0 +1,25 @@
+###############################################################################
+# PETGEM parameters file
+###############################################################################
+# Model parameters
+model:
+  mesh_file: examples/DIPOLE1D.msh      # Mesh file (gmsh format v2)
+  basis_order: 1                        # Vector basis order (1,2,3,4,5,6)
+  frequency: 2.0                        # Frequency
+  src_position: [1750., 1750., -975.]   # Source position (xyz)
+  src_azimuth: 0                        # Source rotation in xy plane
+  src_dip: 0                            # Source rotation in xz plane
+  src_current: 1.                       # Source current
+  src_length: 1.                        # Source length
+  sigma_horizontal: [1., 0.01, 1., 3.3333]   # Horizontal conductivity for each material
+  sigma_vertical: [1., 0.01, 1., 3.3333]     # Vertical conductivity for each material
+  receivers_file: examples/receiver_pos.h5 # Receiver positions file (xyz)
+
+# Execution parameters
+run:
+  cuda: False                           # Flag to activate/deactivate cuda support
+
+# Output parameters
+output:
+  directory: examples/out               # Directory for output (results)
+  directory_scratch: examples/tmp       # Directory for temporal files
