@@ -1,4 +1,0 @@
-# Solver options for PETSc
--ksp_type gmres
--pc_type sor
--ksp_rtol 1e-8

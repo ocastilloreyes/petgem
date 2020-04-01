@@ -1,4 +1,0 @@
-petsc4py
-numpy
-scipy
-blessings
