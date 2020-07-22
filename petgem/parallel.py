@@ -146,8 +146,7 @@ def readPetscVector(input_file, communicator=None):
     return petsc_vector
 
 
-def createParallelMatrix(dimension1, dimension2, nnz,
-                         matrix_type, communicator=None):
+def createParallelMatrix(dimension1,dimension2,nnz,matrix_type,communicator=None):
     ''' Create a parallel sparse matrix in petsc format.
     :param int dimension1: matrix dimension (rows).
     :param int dimension2: matrix dimension (columns).
@@ -261,7 +260,7 @@ def writeDenseMatrix(output_file, data, communicator=None):
     viewer(data)
 
     return
-    
+
 
 def unitary_test():
     ''' Unitary test for parallel.py script.

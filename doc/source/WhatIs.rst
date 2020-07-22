@@ -35,7 +35,7 @@ variational forms of H(curl) for the simulation of electromagnetic fields
 in realistic 3D CSEM surveys with accuracy, reliability and efficiency.
 
 PETGEM is developed as open-source under
-:download:`GPLv3 <_downloads/GPLv3_T_C.pdf>` license at Computer
+:download:`BSD-3 <_downloads/BSD-3.pdf>` license at Computer
 Applications in Science & Engineering
 (`CASE <http://www.bsc.es/computer-applications>`_)
 of the Barcelona Supercomputing Center (`BSC <http://www.bsc.es/>`_).

@@ -527,7 +527,7 @@ The parameters file used for this example follows:
   ###############################################################################
   # Model parameters
   model:
-    mesh_file: examples/case1/DIPOLE1D.msh      # Mesh file (gmsh format v2)
+    mesh_file: case1/DIPOLE1D.msh      # Mesh file (gmsh format v2)
     basis_order: 1                        # Vector basis order (1,2,3,4,5,6)
     frequency: 2.0                        # Frequency
     src_position: [1750., 1750., -975.]   # Source position (xyz)
@@ -537,7 +537,7 @@ The parameters file used for this example follows:
     src_length: 1.                        # Source length
     sigma_horizontal: [1., 0.01, 1., 3.3333]   # Horizontal conductivity for each material
     sigma_vertical: [1., 0.01, 1., 3.3333]     # Vertical conductivity for each material
-    receivers_file: exampless/case1/receiver_pos.h5 # Receiver positions file (xyz)
+    receivers_file: case1/receiver_pos.h5 # Receiver positions file (xyz)
 
   # Execution parameters
   run:
@@ -545,8 +545,8 @@ The parameters file used for this example follows:
 
   # Output parameters
   output:
-    directory: examples/case1/out               # Directory for output (results)
-    directory_scratch: examples/case1/tmp       # Directory for temporal files
+    directory: case1/out               # Directory for output (results)
+    directory_scratch: case1/tmp       # Directory for temporal files
 
 Note that you may wish to change the location of the input files to
 somewhere on your drive. The solver options have been configured in the ``petsc.opts`` file as follows:
@@ -569,7 +569,7 @@ directory of the PETGEM source tree:
 
 .. code-block:: bash
 
-  $ mpirun -n 16 python3 kernel.py -options_file examples/case1/petsc.opts example1/case1/params.yaml
+  $ mpirun -n 16 python3 kernel.py -options_file case1/petsc.opts case1/params.yaml
 
 ``kernel.py`` solves the problem as follows:
 
@@ -581,7 +581,7 @@ directory of the PETGEM source tree:
 #. Post-processing of electric responses
 
 and outputs the solution to the output path
-(``examples/case1/out/``). The output file will be in hdf5 format.
+(``case1/out/``). The output file will be in hdf5 format.
 
 PETGEM post-processing
 ######################
@@ -632,8 +632,8 @@ The parameters file used for this example follows:
   ###############################################################################
   # Model parameters
   model:
-    mesh_file: examples/case1/DIPOLE1D.msh      # Mesh file (gmsh format v2)
-    basis_order: 1                        # Vector basis order (1,2,3,4,5,6)
+    mesh_file: case2/DIPOLE1D.msh      # Mesh file (gmsh format v2)
+    basis_order: 2                        # Vector basis order (1,2,3,4,5,6)
     frequency: 2.0                        # Frequency
     src_position: [1750., 1750., -975.]   # Source position (xyz)
     src_azimuth: 0                        # Source rotation in xy plane
@@ -642,7 +642,7 @@ The parameters file used for this example follows:
     src_length: 1.                        # Source length
     sigma_horizontal: [1., 0.01, 1., 3.3333]   # Horizontal conductivity for each material
     sigma_vertical: [1., 0.01, 1., 3.3333]     # Vertical conductivity for each material
-    receivers_file: exampless/case1/receiver_pos.h5 # Receiver positions file (xyz)
+    receivers_file: case2/receiver_pos.h5 # Receiver positions file (xyz)
 
   # Execution parameters
   run:
@@ -650,8 +650,8 @@ The parameters file used for this example follows:
 
   # Output parameters
   output:
-    directory: examples/case1/out               # Directory for output (results)
-    directory_scratch: examples/case1/tmp       # Directory for temporal files
+    directory: case2/out               # Directory for output (results)
+    directory_scratch: case2/tmp       # Directory for temporal files
 
 Running PETGEM
 ##############
@@ -660,7 +660,7 @@ directory of the PETGEM source tree:
 
 .. code-block:: bash
 
-  $ mpirun -n 48 python3 kernel.py -options_file examples/case1/petsc.opts examples/case1/params.yaml
+  $ mpirun -n 48 python3 kernel.py -options_file case2/petsc.opts case2/params.yaml
 
 ``kernel.py`` solves the problem as follows:
 
@@ -672,7 +672,7 @@ directory of the PETGEM source tree:
 #. Post-processing of electric responses
 
 and outputs the solution to the output path
-(``examples/case1/out``). The output files will be in hdf5 format.
+(``case2/out``). The output files will be in hdf5 format.
 
 Nédélec order comparison
 ########################

@@ -323,18 +323,17 @@ class Preprocessing():
         tri.vertices = elemsN.astype(np.int32)
 
         # Find out which tetrahedral element points are in
-        recvElems = tri.find_simplex(receivers, tol=np.spacing(1))
+        recvElems = tri.find_simplex(receivers, bruteforce=True, tol=1.e-12)
 
         # Find out which tetrahedral element source point is in
-        srcElem = tri.find_simplex(model.src_position, tol=np.spacing(1))
+        srcElem = tri.find_simplex(model.src_position, bruteforce=True, tol=1.e-12)
 
         # Determine if all receiver points were found
         idx = np.where(np.logical_or(recvElems>nElems, recvElems<0))[0]
 
         # If idx is not empty, there are receivers outside the domain
         if idx.size != 0:
-            Print.master('        Some receivers were not located ' +
-                                  'and will not be taken into account ')
+            Print.master('        The following receivers were not located and will not be taken into account ' + str(idx))
             # Update number of receivers
             nReceivers = nReceivers - len(idx)
 
@@ -347,6 +346,11 @@ class Preprocessing():
 
             # Remove idx from recvElems
             recvElems = np.delete(recvElems, idx, axis=0)
+
+        # If srcElem is empty, source not located
+        if srcElem == 0:
+            Print.master('        Source no located in the computational domain. Please, improve the mesh quality')
+            exit(-1)
 
         # Compute number of dofs per element
         num_dof_in_element = np.int(model.basis_order*(model.basis_order+2)*(model.basis_order+3)/2)

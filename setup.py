@@ -56,14 +56,14 @@ if __name__ == '__main__':
     import os
     # PETGEM setup
     setup(name=name(),
-          maintainer="Octavio Castillo Reyes",
+          maintainer="Octavio Castillo-Reyes",
           maintainer_email="octavio.castillo@bsc.es",
-          version='0.6',
+          version='0.7',
           long_description=long_description(),
           description=description(),
           url="https://www.bsc.es/castillo-octavio",
           download_url="http://petgem.bsc.es",
-          license='GPLv3.0',
+          license='BSD-3',
           packages=['petgem'],
           include_dirs=get_ext_modules(),
           install_requires=['petsc4py', 'numpy', 'scipy', 'singleton_decorator', 'mpi4py', 'h5py'],

@@ -35,7 +35,7 @@ Dependencies
 License
 -------
 
-PETGEM is developed as open-source under GPLv3.0 license at Computer
+PETGEM is developed as open-source under BSD-3 license at Computer
 Applications in Science & Engineering of the Barcelona Supercomputing
 Center - Centro Nacional de Supercomputación. Please, see the CONDITIONS
 OF USE described in the LICENSE.rst file.
