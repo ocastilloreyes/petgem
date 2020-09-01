@@ -104,7 +104,6 @@ def computeJacobian(eleNodes):
     :return: jacobian matrix and its inverse.
     :rtype: ndarray
     '''
-
     # Allocate
     jacobian = np.zeros((3, 3), dtype=np.float)
 
@@ -238,7 +237,6 @@ def computeElementalMatrices(edge_orientation, face_orientation, jacobian, invja
        embedded high order shape functions for the exact sequence elements of
        all shapes. Computers & Mathematics with applications, 70(4), 353-458.
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -334,7 +332,6 @@ def shape3DETet(X, Nord, NoriE, NoriF):
        embedded high order shape functions for the exact sequence elements of
        all shapes. Computers & Mathematics with applications, 70(4), 353-458.
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -469,8 +466,7 @@ def shape3DETet(X, Nord, NoriE, NoriF):
 
 
 def AncEE(S, DS, Nord, Idec, N):
-    '''This function computes compute edge Hcurl ancillary functions and
-    their curls
+    '''This function computes compute edge Hcurl ancillary functions and their curls
 
     :param ndarray S: affine coordinates associated to edge
     :param ndarray DS: derivatives of S in R^N
@@ -484,7 +480,6 @@ def AncEE(S, DS, Nord, Idec, N):
        Idec: = FALSE  s0+s1 != 1
              = TRUE   s0+s1  = 1
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -531,7 +526,6 @@ def AncETri(S, DS, Nord, Idec, N):
     :return: triangle Hcurl ancillary functions and curls of triangle Hcurl ancillary functions
     :rtype: ndarray
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -582,7 +576,6 @@ def HomLegendre(S, Nord):
     :return: polynomial values
     :rtype: ndarray
     '''
-
     # Simply the definition of homogenized polynomials
     HomP = PolyLegendre(S[1], S[0]+S[1], Nord)
 
@@ -683,7 +676,6 @@ def PolyIJacobi(X, T, Nord, Minalpha, Idec):
     :param bool Idec = decision flag to compute (= FALSE polynomials with x and t derivatives, = TRUE  polynomials with x derivatives only)
     :return: polynomial values, derivatives in x (Jacobi polynomials), derivatives in t
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -747,7 +739,6 @@ def PolyJacobi(X, T, Nord, Minalpha):
     :return: polynomial values
     :rtype: ndarray
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -802,7 +793,6 @@ def OrientE(S, DS, Nori, N):
     :return: global transformation of edges and global transformation of gradients of edges
     :rtype: ndarray
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -837,7 +827,6 @@ def OrientTri(S, DS, Nori, N):
     :return: global transformation of faces and global transformation of gradients of faces
     :rtype: ndarray
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -898,7 +887,6 @@ def ProjectTetE(Lam, DLam):
        embedded high order shape functions for the exact sequence elements of
        all shapes. Computers & Mathematics with applications, 70(4), 353-458.
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -967,7 +955,6 @@ def ProjectTetF(Lam, DLam):
     :return: projection of affine coordinates on faces, projection of gradients of affine coordinates on faces
     :rtype: ndarray
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -1624,7 +1611,6 @@ def computeSourceVectorRotation(model):
     :return: weigths for source rotation
     :rtype: ndarray.
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -1817,7 +1803,6 @@ def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, po
     :param int Nord: polynomial order of nedelec basis functions
     :param ndarray points: spatial points at which basis functions will be computed
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -1865,8 +1850,7 @@ def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, po
 
 
 def unitary_test():
-    '''Unitary test for hvfem.py script.
-    '''
+    '''Unitary test for hvfem.py script. '''
 
 
 if __name__ == '__main__':
