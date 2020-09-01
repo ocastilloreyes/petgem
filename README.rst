@@ -78,3 +78,8 @@ License
 `petgem` is developed as open-source under BSD-3 license at Computer Applications
 in Science & Engineering of the Barcelona Supercomputing Center - Centro Nacional
 de Supercomputación. Please, see the CONDITIONS OF USE described in the LICENSE.rst file.
+
+
+.. image:: https://api.codacy.com/project/badge/Grade/f01954bb3a444bdd868d8d2cda189a70
+   :alt: Codacy Badge
+   :target: https://app.codacy.com/manual/ocastilloreyes/petgem?utm_source=github.com&utm_medium=referral&utm_content=ocastilloreyes/petgem&utm_campaign=Badge_Grade_Settings
