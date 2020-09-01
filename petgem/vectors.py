@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-''' Define standard vector and matrix functions. '''
+'''Define standard vector and matrix functions. '''
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -13,7 +13,7 @@ import numpy as np
 # ################     FUNCTIONS DEFINITION     #################
 # ###############################################################
 def deleteDuplicateRows(matrix):
-    ''' Delete duplicate rows in a matrix.
+    '''Delete duplicate rows in a matrix.
     :param ndarray matrix: input matrix to be processed.
     :return: matrix without duplicate rows
     :rtype: ndarray
@@ -29,7 +29,7 @@ def deleteDuplicateRows(matrix):
 
 
 def findUniqueRows(array, return_index=False, return_inverse=False):
-    ''' Find unique rows of a two-dimensional numpy array.
+    '''Find unique rows of a two-dimensional numpy array.
     :param ndarray: array to be processed.
     :param bool return_index: the indices of array that result in the
      unique array.
@@ -63,7 +63,7 @@ def findUniqueRows(array, return_index=False, return_inverse=False):
 
 
 def is_duplicate_entry(x):
-    ''' Compute number of duplicate entries in a vector.
+    '''Compute number of duplicate entries in a vector.
 
     :param int-array x: matrix.
     :return: number of duplicate entries.
@@ -132,7 +132,7 @@ def invConnectivity(M, nP):
 
 
 def unitary_test():
-    ''' Unitary test for vectors.py script.
+    '''Unitary test for vectors.py script.
     '''
 
 

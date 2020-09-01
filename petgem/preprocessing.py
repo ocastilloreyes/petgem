@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-''' Define data preprocessing operations for **PETGEM**.
-'''
+'''Define data preprocessing operations for **PETGEM**.'''
 
 
 # ---------------------------------------------------------------
@@ -31,15 +30,15 @@ from .hvfem import computeConnectivityDOFS
 # ###############################################################
 @measure_all_class_methods
 class Preprocessing():
-    ''' Class for preprocessing.
-    '''
+    '''Class for preprocessing.'''
+
     def __init__(self):
-        ''' Initialization of a preprocessing class.
+        '''Initialization of a preprocessing class.
         '''
         return
 
     def run(self, setup):
-        ''' Run a preprocessing task
+        '''Run a preprocessing task
 
         :param obj setup: inputSetup object.
         :return: None
@@ -510,7 +509,7 @@ class Preprocessing():
 # ###############################################################
 
 def unitary_test():
-    ''' Unitary test for parallel.py script.'''
+    '''Unitary test for parallel.py script.'''
 
 # ###############################################################
 # ################             MAIN             #################

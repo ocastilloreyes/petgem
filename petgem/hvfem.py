@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-''' Define functions for high-order vector finite element method.
-'''
+'''Define functions for high-order vector finite element method.'''
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -14,8 +13,7 @@ from .common import Print
 # ################     FUNCTIONS DEFINITION     #################
 # ###############################################################
 def computeConnectivityDOFS(elemsE, elemsF, Nord):
-    ''' This function computes the degrees of freedom connectivity for a given
-    list of edges, faces and elements.
+    '''This function computes the degrees of freedom connectivity for a given list of edges, faces and elements.
 
     :param ndarray elemsE: elements-edge connectivity with dimensions = (6,number_elements)
     :param ndarray elemsF: element/faces connectivity with dimensions = (4,number_elements)
@@ -101,7 +99,7 @@ def computeConnectivityDOFS(elemsE, elemsF, Nord):
 
 
 def computeJacobian(eleNodes):
-    ''' This function computes the jacobian and its inverse.
+    '''This function computes the jacobian and its inverse.
     :param ndarray eleNodes: spatial coordinates of the nodes with dimensions = (4,3)
     :return: jacobian matrix and its inverse.
     :rtype: ndarray
@@ -122,7 +120,7 @@ def computeJacobian(eleNodes):
 
 
 def computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,globalEdgesInFace):
-    ''' This function computes the orientation for the computation of
+    '''This function computes the orientation for the computation of
     hierarchical basis functions of high-order (High-order nédélec basis functions)
 
     :param ndarray edgesEle:list of element's edges
@@ -224,7 +222,7 @@ def computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,globalEdgesInFace)
 
 
 def computeElementalMatrices(edge_orientation, face_orientation, jacobian, invjacob, Nord, sigmaEle):
-    ''' This function computes the elemental mass matrix and stiffness matrix based on
+    '''This function computes the elemental mass matrix and stiffness matrix based on
     high-order vector finite element.
     :param ndarray edges_orientation: orientation for edges
     :param ndarray faces_orientation: orientation for faces
@@ -321,7 +319,7 @@ def computeElementalMatrices(edge_orientation, face_orientation, jacobian, invja
 
 
 def shape3DETet(X, Nord, NoriE, NoriF):
-    ''' This function computes values of 3D tetrahedron element H(curl) shape
+    '''This function computes values of 3D tetrahedron element H(curl) shape
     functions and their derivatives
 
     :param ndarray X: master tetrahedron coordinates from (0,1)^3
@@ -471,7 +469,7 @@ def shape3DETet(X, Nord, NoriE, NoriF):
 
 
 def AncEE(S, DS, Nord, Idec, N):
-    ''' This function computes compute edge Hcurl ancillary functions and
+    '''This function computes compute edge Hcurl ancillary functions and
     their curls
 
     :param ndarray S: affine coordinates associated to edge
@@ -522,7 +520,7 @@ def AncEE(S, DS, Nord, Idec, N):
 
 
 def AncETri(S, DS, Nord, Idec, N):
-    ''' This function computes compute triangle face Hcurl ancillary
+    '''This function computes compute triangle face Hcurl ancillary
     functions and their curls
 
     :param ndarray S: (s0,s1,s2) affine coordinates associated to triangle face
@@ -577,7 +575,7 @@ def AncETri(S, DS, Nord, Idec, N):
 
 
 def HomLegendre(S, Nord):
-    ''' This function returns values of homogenized Legendre polynomials
+    '''This function returns values of homogenized Legendre polynomials
 
     :param ndarray S: affine(like) coordinates
     :param int Nord: polynomial order
@@ -592,7 +590,7 @@ def HomLegendre(S, Nord):
 
 
 def HomIJacobi(S, DS, Nord, Minalpha, Idec, N):
-    ''' This function returns values of integrated homogenized Jacobi polynomials and their gradients. Result is half of a  matrix with each row  associated to a fixed alpha. Alpha grows by 2 in each row.
+    '''This function returns values of integrated homogenized Jacobi polynomials and their gradients. Result is half of a  matrix with each row  associated to a fixed alpha. Alpha grows by 2 in each row.
 
     :param ndarray S: (s0,s1) affine(like) coordinates
     :param ndarray DS: gradients of S in R^N
@@ -636,7 +634,7 @@ def HomIJacobi(S, DS, Nord, Minalpha, Idec, N):
 
 
 def PolyLegendre(X, T, Nord):
-    ''' This function returns values of shifted scaled Legendre polynomials
+    '''This function returns values of shifted scaled Legendre polynomials
 
     :param ndarray X: coordinate from [0,1]
     :param float T: scaling parameter
@@ -674,7 +672,7 @@ def PolyLegendre(X, T, Nord):
 
 
 def PolyIJacobi(X, T, Nord, Minalpha, Idec):
-    ''' This function computes values of integrated shifted scaled Jacobi polynomials
+    '''This function computes values of integrated shifted scaled Jacobi polynomials
     and their derivatives starting with p=1. Result is 'half' of a  matrix
     with each row  associated to a fixed alpha. Alpha grows by 2 in each row.
 
@@ -740,7 +738,7 @@ def PolyIJacobi(X, T, Nord, Minalpha, Idec):
 
 
 def PolyJacobi(X, T, Nord, Minalpha):
-    ''' This function computes values of shifted scaled Jacobi polynomials P**alpha-i. Result is a half of a  matrix with each row associated to a fixed alpha. Alpha grows by 2 in each row.
+    '''This function computes values of shifted scaled Jacobi polynomials P**alpha-i. Result is a half of a  matrix with each row associated to a fixed alpha. Alpha grows by 2 in each row.
 
     :param ndarray X: coordinate from [0,1]
     :param float T: scaling parameter
@@ -796,7 +794,7 @@ def PolyJacobi(X, T, Nord, Minalpha):
 
 
 def OrientE(S, DS, Nori, N):
-    ''' This function computes the local to global transformations of edges
+    '''This function computes the local to global transformations of edges
     :param ndarray S: projection of affine coordinates on edges
     :param ndarray DS: projection of gradients of affine coordinates on edges
     :param ndarray Nori: edge orientation
@@ -830,7 +828,7 @@ def OrientE(S, DS, Nori, N):
 
 
 def OrientTri(S, DS, Nori, N):
-    ''' This function computes the local to global transformations of edges
+    '''This function computes the local to global transformations of edges
 
     :param ndarray S: projection of affine coordinates on faces
     :param ndarray DS: projection of gradients of affine coordinates on faces
@@ -887,7 +885,7 @@ def OrientTri(S, DS, Nori, N):
 
 
 def ProjectTetE(Lam, DLam):
-    ''' This function projection of tetrahedral edges in concordance with
+    '''This function projection of tetrahedral edges in concordance with
     numbering of topological entities (vertices, edges, faces)
 
     :param ndarray Lam: affine coordinates
@@ -962,7 +960,7 @@ def ProjectTetE(Lam, DLam):
 
 
 def ProjectTetF(Lam, DLam):
-    ''' This function projection of tetrahedral faces in concordance with numbering of topological entities (vertices, edges, faces)
+    '''This function projection of tetrahedral faces in concordance with numbering of topological entities (vertices, edges, faces)
 
     :param ndarray Lam: affine coordinates
     :param ndarray DLam: gradients of affine coordinates
@@ -1028,7 +1026,7 @@ def ProjectTetF(Lam, DLam):
 
 
 def AffineTetrahedron(X):
-    ''' This function computes affine coordinates and their gradients.
+    '''This function computes affine coordinates and their gradients.
     :param ndarray X: point coordinates
     :return: affine coordinates and gradients of affine coordinates
     :rtype: ndarray
@@ -1063,7 +1061,7 @@ def AffineTetrahedron(X):
 
 
 def compute3DGaussPoints(Nord):
-    ''' This function computes gauss points for high-order nédélec elements
+    '''This function computes gauss points for high-order nédélec elements
 
     :param int Nord: polynomial order of nedelec basis functions
     :return: coordinates of gauss points and its weights
@@ -1621,7 +1619,7 @@ def compute3DGaussPoints(Nord):
 
 
 def computeSourceVectorRotation(model):
-    ''' This function compute the weigths vector for source rotation in the xyz plane
+    '''This function compute the weigths vector for source rotation in the xyz plane
     :param object model: object model with source data.
     :return: weigths for source rotation
     :rtype: ndarray.
@@ -1664,7 +1662,7 @@ def computeSourceVectorRotation(model):
 
 
 def tetrahedronXYZToXiEtaZeta(eleNodes, points):
-    ''' This function computes the reference tetrahedron coordinates from
+    '''This function computes the reference tetrahedron coordinates from
     xyz global tetrahedron coordinates.
 
     :param ndarray eleNodes: spatial coordinates of the nodes with dimensions = (4,3)
@@ -1811,7 +1809,7 @@ def tetrahedronXYZToXiEtaZeta(eleNodes, points):
 
 
 def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, points):
-    ''' This function computes the basis function for a given element
+    '''This function computes the basis function for a given element
     :param ndarray edges_orientation: orientation for edges
     :param ndarray faces_orientation: orientation for faces
     :param ndarray jacobian: jacobian matrix
@@ -1867,7 +1865,7 @@ def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, po
 
 
 def unitary_test():
-    ''' Unitary test for hvfem.py script.
+    '''Unitary test for hvfem.py script.
     '''
 
 

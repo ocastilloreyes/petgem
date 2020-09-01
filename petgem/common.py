@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-''' Define common operations for **PETGEM**.'''
+'''Define common operations for **PETGEM**.'''
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -28,7 +28,7 @@ from .parallel import MPIEnvironment
 # Class Print definition
 # ---------------------------------------------------------------
 class Print(object):
-    ''' This class provides methods for pretty print.
+    '''This class provides methods for pretty print.
     :param object str: string to be printed.
     :return: None.
     :rtype: None.
@@ -56,13 +56,12 @@ class Print(object):
 
     # Constructor
     def __init__(self, text, color_code=None):
-        ''' Constructor
-        '''
         self._log(text, color_code)
+        '''Constructor'''
 
     # Logging method
     def _log(self, text, color_code=None):
-        ''' This function configures and prints a text.
+        '''This function configures and prints a text.
         :param str text: text to be printed.
         :param int color_code: text color code.
         :return: None.
@@ -79,7 +78,7 @@ class Print(object):
 
     @classmethod
     def header(self):
-        ''' This functions prints the header.
+        '''This functions prints the header.
 
         :param: None.
         :return: None.
@@ -109,7 +108,7 @@ class Print(object):
 
     @classmethod
     def master(self, text, color_code=None):
-        ''' If the caller is the master process, this method prints a message.
+        '''If the caller is the master process, this method prints a message.
         :param: None.
         :return: None.
         :rtype: None.
@@ -123,7 +122,7 @@ class Print(object):
 # Class InputParameters definition
 # ---------------------------------------------------------------
 class InputParameters(object):
-    ''' This class provides a methods to import a yaml parameter file.
+    '''This class provides a methods to import a yaml parameter file.
 
     :param dict object: user params yaml file.
     :return: user parameters as object view.
@@ -131,7 +130,7 @@ class InputParameters(object):
     '''
 
     def __init__(self, params, parEnv):
-        ''' Class constructor.
+        '''Class constructor.
 
         :param str params: yaml parameters file.
         :param object parEnv: parallel environment object.
@@ -189,7 +188,7 @@ class InputParameters(object):
 # Class dictionary to object definition
 # ---------------------------------------------------------------
 class Dictionary2Object(object):
-    ''' Turns a dictionary into a class '''
+    '''Turns a dictionary into a class'''
     #----------------------------------------------------------------------
     def __init__(self, dictionary):
         '''Constructor'''
@@ -253,8 +252,6 @@ class Timers():
                 self._out = open(out_filename, 'w')
                 self._header = True
 
-        pass
-
     # Get an specific timer
     def __getitem__(self, key):
         return self._elems.setdefault(key, Timer())
@@ -303,8 +300,7 @@ class Timers():
 # ---------------------------------------------------------------
 
 def measure_time(f = None, group = None, split = False):
-    ''' This function implement a decorator for obtaining the decorated method
-        execution time.
+    '''This function implement a decorator for obtaining the decorated method execution time.
 
     :param function f: the decorated function
     :param str group: the group name
@@ -344,8 +340,7 @@ def measure_time(f = None, group = None, split = False):
     return inner_function
 
 def measure_all_class_methods(Cls):
-    ''' This function implement a decorator for obtaining execution times for
-        each method implemented on the decorated class.
+    '''This function implement a decorator for obtaining execution times for each method implemented on the decorated class.
 
     :param class f: the decorated class
     :return: a class wrap
@@ -376,8 +371,7 @@ def measure_all_class_methods(Cls):
 # ###############################################################
 
 def unitary_test():
-    ''' Unitary test for common.py script.
-    '''
+    '''Unitary test for common.py script.'''
     # TODO
 
 # ###############################################################
