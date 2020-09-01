@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-'''Define common operations for **PETGEM**.'''
+"""Define common operations for **PETGEM**."""
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -28,11 +28,13 @@ from .parallel import MPIEnvironment
 # Class Print definition
 # ---------------------------------------------------------------
 class Print(object):
-    '''This class provides methods for pretty print.
+    """This class provides methods for pretty print.
+
     :param object str: string to be printed.
     :return: None.
     :rtype: None.
-    '''
+    """
+
     # Options for Gauss points computation (switch case)
     _options = {
         1: Fore.BLACK,
@@ -55,16 +57,17 @@ class Print(object):
 
     # Constructor
     def __init__(self, text, color_code=None):
+        """Constructor."""
         self._log(text, color_code)
-        '''Constructor'''
 
     # Logging method
     def _log(self, text, color_code=None):
-        '''This function configures and prints a text.
+        """Configure and prints a text.
+
         :param str text: text to be printed.
         :param int color_code: text color code.
         :return: None.
-        '''
+        """
         # Verify if color_code is None, then use black color
         if color_code is None:
             color_code = int(16)
@@ -76,12 +79,12 @@ class Print(object):
 
     @classmethod
     def header(self):
-        '''This functions prints the header.
+        """Print the header.
 
         :param: None.
         :return: None.
         :rtype: None.
-        '''
+        """
         # Specific color code for printing the header
         color_code = 5
 
@@ -102,14 +105,14 @@ class Print(object):
 
         return
 
-
     @classmethod
     def master(self, text, color_code=None):
-        '''If the caller is the master process, this method prints a message.
+        """If the caller is the master process, this method prints a message.
+
         :param: None.
         :return: None.
         :rtype: None.
-        '''
+        """
         if( MPIEnvironment().rank == 0 ):
             self._log(self, text, color_code)
 
@@ -119,20 +122,21 @@ class Print(object):
 # Class InputParameters definition
 # ---------------------------------------------------------------
 class InputParameters(object):
-    '''This class provides a methods to import a yaml parameter file.
+    """This class provides a methods to import a yaml parameter file.
 
     :param dict object: user params yaml file.
     :return: user parameters as object view.
     :rtype: object.
-    '''
+    """
+
     def __init__(self, params, parEnv):
-        '''Class constructor.
+        """Class constructor.
 
         :param str params: yaml parameters file.
         :param object parEnv: parallel environment object.
         :return: InputParameters object.
         :rtype: object
-        '''
+        """
         # ---------------------------------------------------------------
         # Read the input parameters file
         # ---------------------------------------------------------------
@@ -178,15 +182,14 @@ class InputParameters(object):
         return
 
 
-
 # ---------------------------------------------------------------
 # Class dictionary to object definition
 # ---------------------------------------------------------------
 class Dictionary2Object(object):
-    '''Turns a dictionary into a class'''
-    #----------------------------------------------------------------------
+    """Turns a dictionary into a class."""
+
     def __init__(self, dictionary):
-        '''Constructor'''
+        """Constructor."""
         for key in dictionary:
             setattr(self, key, dictionary[key])
 
@@ -195,27 +198,32 @@ class Dictionary2Object(object):
 # Class Timer definition
 # ---------------------------------------------------------------
 class Timer():
+    """Definition of timer class."""
 
     # Attributes
     elapsed = None
 
     # Initializing
     def __init__(self, elapsed = 0):
+        """Constructor."""
         self._start = 0
         self.elapsed = elapsed
 
     # Start timer
     def start(self):
+        """Start timer."""
         self._start = time.time()
 
     # Stop timer
     def stop(self):
+        """Stop timer."""
         if(self._start > 0):
             self.elapsed += time.time() - self._start
             self._start = 0
 
     # Reset timer
     def reset(self):
+        """Reset timer."""
         self.elapsed = 0
 
 # ---------------------------------------------------------------
@@ -223,9 +231,11 @@ class Timer():
 # ---------------------------------------------------------------
 @singleton
 class Timers():
+    """Defintion of timers class."""
 
     # Initializing
     def __init__(self, opath = None):
+        """Constructor."""
         # Create private dict for storing the timers
         self._elems = {}
 
@@ -249,14 +259,17 @@ class Timers():
 
     # Get an specific timer
     def __getitem__(self, key):
+        """Get item name for timer.""""
         return self._elems.setdefault(key, Timer())
 
     # Set a specific
     def __setitem__(self, key, value):
+        """Set item name for timer.""""
         self._elems[key] = Timer(value)
 
     # Write report
     def _write(self):
+        """Write timer.""""
         # Obtain the MPI environment
         parEnv = MPIEnvironment()
 
@@ -275,9 +288,9 @@ class Timers():
             self._out.write("  |  %-6s  |" % parEnv.num_proc + "".join('%20.3f  | ' % t for t in time) + "\n")
             self._out.close()
 
-
     # Deleting
     def __del__(self):
+        """Delete timers."""
         rank = MPIEnvironment().rank
         # For each stored element
         for key, value in self._elems.items():
@@ -293,16 +306,15 @@ class Timers():
 # ---------------------------------------------------------------
 # Decorators for code instrumentation
 # ---------------------------------------------------------------
-
 def measure_time(f = None, group = None, split = False):
-    '''This function implement a decorator for obtaining the decorated method execution time.
+    """Implement a decorator for obtaining the decorated method execution time.
 
     :param function f: the decorated function
     :param str group: the group name
     :param bool split: decides if all blocks in a group contribute to the same timer
     :return: a function wrap
     :rtype: function
-    '''
+    """
     def inner_function(function):
         @wraps(function)
         def wrapper(*args, **kwargs):
@@ -334,13 +346,14 @@ def measure_time(f = None, group = None, split = False):
         return inner_function(f)
     return inner_function
 
+
 def measure_all_class_methods(Cls):
-    '''This function implement a decorator for obtaining execution times for each method implemented on the decorated class.
+    """Implement a decorator for obtaining execution times for each method implemented on the decorated class.
 
     :param class f: the decorated class
     :return: a class wrap
     :rtype: class
-    '''
+    """
     class DecoratedClass(object):
 
         def __init__(self,*args,**kwargs):
@@ -365,7 +378,7 @@ def measure_all_class_methods(Cls):
 # ###############################################################
 
 def unitary_test():
-    '''Unitary test for common.py script.'''
+    """Unitary test for common.py script."""
     # TODO
 
 # ###############################################################
