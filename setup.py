@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-''' setup.py is the main PETGEM setup script, it is based on python
-setup-module.
-'''
+''' setup.py is the main PETGEM setup script, it is based on python setup-module. '''
 
 
 def name():
@@ -38,7 +36,6 @@ def long_description():
 
 def get_ext_modules():
     ''' Get paths of extension modules.
-
     :param: None
     :return: numpy path include
     '''

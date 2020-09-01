@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-''' Define standard vector and matrix functions.
-'''
+''' Define standard vector and matrix functions. '''
 
 # ---------------------------------------------------------------
 # Load python modules

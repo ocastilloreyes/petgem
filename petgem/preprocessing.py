@@ -273,9 +273,6 @@ class Preprocessing():
         # Read element's tag
         elemsS, nElems = readGmshPhysicalGroups(model.mesh_file)
 
-        # Number of materials
-        nMaterials = elemsS.max()
-
         # Build conductivity arrays
         conductivityModel = np.zeros((nElems, 2), dtype=np.float)
         for i in np.arange(nElems):
@@ -515,8 +512,7 @@ class Preprocessing():
 # ###############################################################
 
 def unitary_test():
-    ''' Unitary test for parallel.py script.
-    '''
+    ''' Unitary test for parallel.py script.'''
 
 # ###############################################################
 # ################             MAIN             #################

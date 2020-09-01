@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-''' Define common operations for **PETGEM**.
-'''
+''' Define common operations for **PETGEM**.'''
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -66,7 +65,6 @@ class Print(object):
     # Logging method
     def _log(self, text, color_code=None):
         ''' This function configures and prints a text.
-
         :param str text: text to be printed.
         :param int color_code: text color code.
         :return: None.
@@ -114,7 +112,6 @@ class Print(object):
     @classmethod
     def master(self, text, color_code=None):
         ''' If the caller is the master process, this method prints a message.
-
         :param: None.
         :return: None.
         :rtype: None.
@@ -194,9 +191,7 @@ class InputParameters(object):
 # Class dictionary to object definition
 # ---------------------------------------------------------------
 class Dictionary2Object(object):
-    '''
-    Turns a dictionary into a class
-    '''
+    ''' Turns a dictionary into a class '''
     #----------------------------------------------------------------------
     def __init__(self, dictionary):
         '''Constructor'''

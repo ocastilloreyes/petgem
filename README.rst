@@ -15,7 +15,7 @@
 Python code for the scalable solution of electromagnetic diffusion fields on tetrahedral
 meshes, as these are the easiest to scale-up to very large domains or
 arbitrary shape. It supports distributed-memory parallelism through
-petsc4py package. PETGEM allow users to specify high-order edge-based variational
+petsc4py package. `petgem` allow users to specify high-order edge-based variational
 forms of H(curl) for the simulation of electromagnetic fields in realistic
 3D CSEM surveys with accuracy, reliability and efficiency.
 

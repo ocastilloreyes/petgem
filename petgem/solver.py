@@ -16,7 +16,7 @@ import shutil
 # ---------------------------------------------------------------
 # Load petgem modules (BSC)
 # ---------------------------------------------------------------
-from .common import Print, Timers, measure_all_class_methods, measure_time
+from .common import Print, Timers, measure_all_class_methods
 from .parallel import readPetscMatrix, readPetscVector, createParallelMatrix, createParallelVector
 from .parallel import MPIEnvironment, createSequentialVector, createParallelVector, createParallelDenseMatrix
 from .parallel import writePetscVector
@@ -28,8 +28,7 @@ from .hvfem import tetrahedronXYZToXiEtaZeta, computeBasisFunctions
 # ###############################################################
 @measure_all_class_methods
 class Solver():
-    ''' Class for solver.
-    '''
+    ''' Class for solver. '''
     def __init__(self):
         ''' Initialization of a solver class.
         '''
@@ -37,7 +36,7 @@ class Solver():
 
 
     def setup(self, inputSetup):
-        ''' Setup of a solver class.
+        ''' Setup of a solver class
 
         :param object inputSetup: user input setup.
         '''
@@ -50,7 +49,6 @@ class Solver():
 
         # Parameters shortcut (for code legibility)
         model = inputSetup.model
-        run = inputSetup.run
         output = inputSetup.output
 
         Print.master('     Importing files')
@@ -340,6 +338,7 @@ class Solver():
         ksp.solve(self.b, self.x)
         iterationNumber = ksp.getIterationNumber()
         ksp.destroy()
+        Print.master('     Number of solver iterations: ', iterationNumber)
         Timers()["Solver"].stop()
 
         return
@@ -429,7 +428,7 @@ class Solver():
             coordEle = np.reshape(coordEle, (num_nodes_per_element, num_dimensions))
 
             # Get faces indexes for i
-            facesEle = receiver_data[16:20].astype(np.int)
+            #facesEle = receiver_data[16:20].astype(np.int)
 
             # Get edges indexes for faces in i
             edgesFace = receiver_data[20:32].astype(np.int)
@@ -581,8 +580,7 @@ class Solver():
 
 
 def unitary_test():
-    ''' Unitary test for hvfem.py script.
-    '''
+    ''' Unitary test for hvfem.py script. '''
 
 
 if __name__ == '__main__':

@@ -17,13 +17,13 @@ from .vectors import deleteDuplicateRows
 
 
 class gmshObject:
-    ''' Class for mesh of type Gmsh. This class provides methods
-    to parse .msh files to python format.
+    ''' Class for mesh of type Gmsh. This class provides methods to parse .msh files to python format.
+
     '''
     import numpy as np
 
     def __init__(self, mshfilename):
-        ''' Init a gmshObject.
+        ''' Init a gmshObject
         :param str mshFile: mesh file to be initialized.
         :return: gmshObject initialized.
         '''
@@ -144,6 +144,7 @@ class gmshObject:
 
     def printNumberNodes(self):
         ''' Print number of nodes of a gmshObject.
+
         :return: None.
         '''
         print('   Mesh has ' + str(self.nNodes) + ' nodes')
@@ -152,6 +153,7 @@ class gmshObject:
 
     def printNumberElements(self):
         ''' Print number of elements of a gmshObject.
+
         :return: None.
         '''
         print('   Mesh has ' + str(self.nElems) + ' elements')
@@ -269,7 +271,7 @@ class gmshObject:
                 eletype = np.int32(current_line[1])
                 ntags = np.int32(current_line[2])
                 physgrp = np.int32(current_line[3])
-                partition = np.int32(current_line[4])
+                #partition = np.int32(current_line[4])
 
                 if ntags >= 2:
                     physgrp = np.int32(current_line[3])
@@ -792,14 +794,8 @@ def computeBoundaries(dof_connectivity, dof_edges, dof_faces, bEdges, bFaces, No
     return indx_inner_dofs, indx_boundary_dofs
 
 
-
-
-
-
-
 def unitary_test():
-    ''' Unitary test for mesh.py script.
-    '''
+    ''' Unitary test for mesh.py script. '''
 
 
 if __name__ == '__main__':

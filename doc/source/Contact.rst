@@ -36,5 +36,5 @@ View map
       }
     </script>
     <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB-MoDdzu66Sc3EpO2aXpKHZ4cjgsl-2oA&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDD5WVjZgm82OKuirq0oB2TvNE4REKNngU&callback=initMap">
     </script>

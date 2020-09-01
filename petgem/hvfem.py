@@ -103,8 +103,7 @@ def computeConnectivityDOFS(elemsE, elemsF, Nord):
 
 
 def computeJacobian(eleNodes):
-    ''' This functin computes the jacobian and its inverse.
-
+    ''' This function computes the jacobian and its inverse.
     :param ndarray eleNodes: spatial coordinates of the nodes with dimensions = (4,3)
     :return: jacobian matrix and its inverse.
     :rtype: ndarray
@@ -229,7 +228,6 @@ def computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,globalEdgesInFace)
 def computeElementalMatrices(edge_orientation, face_orientation, jacobian, invjacob, Nord, sigmaEle):
     ''' This function computes the elemental mass matrix and stiffness matrix based on
     high-order vector finite element.
-
     :param ndarray edges_orientation: orientation for edges
     :param ndarray faces_orientation: orientation for faces
     :param ndarray jacobian: jacobian matrix
@@ -596,9 +594,7 @@ def HomLegendre(S, Nord):
 
 
 def HomIJacobi(S, DS, Nord, Minalpha, Idec, N):
-    ''' This function returns values of integrated homogenized Jacobi polynomials and
-    their gradients. Result is half of a  matrix with each row  associated
-    to a fixed alpha. Alpha grows by 2 in each row.
+    ''' This function returns values of integrated homogenized Jacobi polynomials and their gradients. Result is half of a  matrix with each row  associated to a fixed alpha. Alpha grows by 2 in each row.
 
     :param ndarray S: (s0,s1) affine(like) coordinates
     :param ndarray DS: gradients of S in R^N
@@ -805,7 +801,6 @@ def PolyJacobi(X, T, Nord, Minalpha):
 
 def OrientE(S, DS, Nori, N):
     ''' This function computes the local to global transformations of edges
-
     :param ndarray S: projection of affine coordinates on edges
     :param ndarray DS: projection of gradients of affine coordinates on edges
     :param ndarray Nori: edge orientation
@@ -971,8 +966,7 @@ def ProjectTetE(Lam, DLam):
 
 
 def ProjectTetF(Lam, DLam):
-    ''' This function projection of tetrahedral faces in concordance with
-    numbering of topological entities (vertices, edges, faces)
+    ''' This function projection of tetrahedral faces in concordance with numbering of topological entities (vertices, edges, faces)
 
     :param ndarray Lam: affine coordinates
     :param ndarray DLam: gradients of affine coordinates
@@ -1039,7 +1033,6 @@ def ProjectTetF(Lam, DLam):
 
 def AffineTetrahedron(X):
     ''' This function computes affine coordinates and their gradients.
-
     :param ndarray X: point coordinates
     :return: affine coordinates and gradients of affine coordinates
     :rtype: ndarray
@@ -1049,7 +1042,6 @@ def AffineTetrahedron(X):
        embedded high order shape functions for the exact sequence elements of
        all shapes. Computers & Mathematics with applications, 70(4), 353-458.
     '''
-
     # ---------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------
@@ -1633,9 +1625,7 @@ def compute3DGaussPoints(Nord):
 
 
 def computeSourceVectorRotation(model):
-    ''' This function compute the weigths vector for source rotation in the
-    xyz plane
-
+    ''' This function compute the weigths vector for source rotation in the xyz plane
     :param object model: object model with source data.
     :return: weigths for source rotation
     :rtype: ndarray.
@@ -1826,7 +1816,6 @@ def tetrahedronXYZToXiEtaZeta(eleNodes, points):
 
 def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, points):
     ''' This function computes the basis function for a given element
-
     :param ndarray edges_orientation: orientation for edges
     :param ndarray faces_orientation: orientation for faces
     :param ndarray jacobian: jacobian matrix

@@ -7,7 +7,6 @@
 # ---------------------------------------------------------------
 # Load python modules
 # ---------------------------------------------------------------
-import numpy as np
 from mpi4py import MPI
 from singleton_decorator import singleton
 from petsc4py import PETSc
@@ -62,8 +61,8 @@ def createSequentialDenseMatrixWithArray(dimension1, dimension2, data):
 
 
 def writeParallelDenseMatrix(output_file, data, communicator=None):
-    ''' Write a Petsc parallel dense matrix which format is defined by two
-    files: output_file.dat and output_file.info.
+    ''' Write a Petsc parallel dense matrix which format is defined by two files: output_file.dat and output_file.info.
+
     :param str output_file: file name to be saved.
     :param petsc matrix data: dense matrix to be saved.
     :param str communicator: mpi communicator.
@@ -79,7 +78,7 @@ def writeParallelDenseMatrix(output_file, data, communicator=None):
 
 
 def createSequentialVectorWithArray(data):
-    ''' Given an input array, create a sequential vector in petsc format.
+    ''' Given an input array, create a sequential vector in petsc format
     :param ndarray data: data to be exported.
     :return: parallel matrix.
     :rtype: petsc parallel and dense matrix.
@@ -129,8 +128,8 @@ def readPetscMatrix(input_file, communicator=None):
 
 
 def readPetscVector(input_file, communicator=None):
-    ''' Read a Petsc vector which format is defined by two files:
-    input_file.dat and input_file.info.
+    ''' Read a Petsc vector which format is defined by two files: input_file.dat and input_file.info
+
     :param str input_file: file name to be readed.
     :param str communicator: mpi communicator.
     :return: petsc_vector.
@@ -224,7 +223,8 @@ def createSequentialVector(size, vector_type, communicator=None):
 
 
 def createParallelDenseMatrix(dimension1, dimension2, communicator=None):
-    ''' Create a parallel dense matrix in petsc format.
+    ''' Create a parallel dense matrix in petsc format
+    
     :param int dimension1: matrix dimension (rows).
     :param int dimension2: matrix dimension (columns).
     :param str communicator: mpi communicator.
