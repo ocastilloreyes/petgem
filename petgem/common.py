@@ -28,9 +28,7 @@ from .parallel import MPIEnvironment
 # Class Print definition
 # ---------------------------------------------------------------
 class Print(object):
-
     ''' This class provides methods for pretty print.
-
     :param object str: string to be printed.
     :return: None.
     :rtype: None.
