@@ -33,7 +33,6 @@ class Print(object):
     :return: None.
     :rtype: None.
     '''
-
     # Options for Gauss points computation (switch case)
     _options = {
         1: Fore.BLACK,
@@ -66,7 +65,6 @@ class Print(object):
         :param int color_code: text color code.
         :return: None.
         '''
-
         # Verify if color_code is None, then use black color
         if color_code is None:
             color_code = int(16)
@@ -84,7 +82,6 @@ class Print(object):
         :return: None.
         :rtype: None.
         '''
-
         # Specific color code for printing the header
         color_code = 5
 
@@ -128,7 +125,6 @@ class InputParameters(object):
     :return: user parameters as object view.
     :rtype: object.
     '''
-
     def __init__(self, params, parEnv):
         '''Class constructor.
 
@@ -137,7 +133,6 @@ class InputParameters(object):
         :return: InputParameters object.
         :rtype: object
         '''
-
         # ---------------------------------------------------------------
         # Read the input parameters file
         # ---------------------------------------------------------------
@@ -346,7 +341,6 @@ def measure_all_class_methods(Cls):
     :return: a class wrap
     :rtype: class
     '''
-
     class DecoratedClass(object):
 
         def __init__(self,*args,**kwargs):
