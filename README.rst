@@ -7,9 +7,9 @@
 .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
    :target: http://petgem.bsc.es/
    :alt: Documentation Status
-.. image:: https://img.shields.io/codacy/grade/a15b80f75cd64be3bca73da30f191a83/master.svg
-   :target: https://www.codacy.com/app/ocastilloreyes/petgem
-   :alt: Codacy
+.. image:: https://api.codacy.com/project/badge/Grade/ab1f111749544d7a8c0104d91f2997ab
+   :target: https://app.codacy.com/manual/ocastilloreyes/petgem?utm_source=github.com&utm_medium=referral&utm_content=ocastilloreyes/petgem&utm_campaign=Badge_Grade_Settings
+   :alt: Codacy Badge
 
 `petgem` (Parallel Edge-based Tool for Geophysical Electromagnetic Modelling) is a
 Python code for the scalable solution of electromagnetic diffusion fields on tetrahedral
@@ -78,12 +78,3 @@ License
 `petgem` is developed as open-source under BSD-3 license at Computer Applications
 in Science & Engineering of the Barcelona Supercomputing Center - Centro Nacional
 de Supercomputación. Please, see the CONDITIONS OF USE described in the LICENSE.rst file.
-
-
-.. image:: https://api.codacy.com/project/badge/Grade/f01954bb3a444bdd868d8d2cda189a70
-   :alt: Codacy Badge
-   :target: https://app.codacy.com/manual/ocastilloreyes/petgem?utm_source=github.com&utm_medium=referral&utm_content=ocastilloreyes/petgem&utm_campaign=Badge_Grade_Settings
-
-.. image:: https://api.codacy.com/project/badge/Grade/ab1f111749544d7a8c0104d91f2997ab
-   :alt: Codacy Badge
-   :target: https://app.codacy.com/manual/ocastilloreyes/petgem?utm_source=github.com&utm_medium=referral&utm_content=ocastilloreyes/petgem&utm_campaign=Badge_Grade_Settings
