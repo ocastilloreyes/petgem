@@ -83,3 +83,7 @@ de Supercomputación. Please, see the CONDITIONS OF USE described in the LICENSE
 .. image:: https://api.codacy.com/project/badge/Grade/f01954bb3a444bdd868d8d2cda189a70
    :alt: Codacy Badge
    :target: https://app.codacy.com/manual/ocastilloreyes/petgem?utm_source=github.com&utm_medium=referral&utm_content=ocastilloreyes/petgem&utm_campaign=Badge_Grade_Settings
+
+.. image:: https://api.codacy.com/project/badge/Grade/ab1f111749544d7a8c0104d91f2997ab
+   :alt: Codacy Badge
+   :target: https://app.codacy.com/manual/ocastilloreyes/petgem?utm_source=github.com&utm_medium=referral&utm_content=ocastilloreyes/petgem&utm_campaign=Badge_Grade_Settings
