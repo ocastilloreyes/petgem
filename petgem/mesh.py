@@ -20,10 +20,10 @@ class gmshObject:
     ''' Class for mesh of type Gmsh. This class provides methods to parse .msh files to python format.
 
     '''
-    import numpy as np
 
     def __init__(self, mshfilename):
         ''' Init a gmshObject
+
         :param str mshFile: mesh file to be initialized.
         :return: gmshObject initialized.
         '''
@@ -85,11 +85,11 @@ class gmshObject:
                 current_line = np.array(line.split(), dtype=np.int32)
 
                 # Get properties from header section
-                eletag = current_line[0]
-                eletype = current_line[1]
+                #eletag = current_line[0]
+                #eletype = current_line[1]
                 ntags = current_line[2]
                 physgrp = 0
-                partition = 0
+                #partition = 0
 
                 if ntags >= 2:
                     physgrp = current_line[3]
@@ -103,7 +103,7 @@ class gmshObject:
                                                                  )
                         self.nodes_in_groups[physgrp][nodelist] = 1
                         self.physical_groups.append(physgrp)
-                        pass
+
                 else:
                     self.__gmshError__(self.mshfilename + '.msh file has < 2 '
                                        'tags at line ' + str(linenumber))
@@ -545,6 +545,7 @@ def readGmshPhysicalGroups(mesh_file):
 
 def computeEdges(elemsN, nElems):
     ''' Compute edges of a 3D tetrahedral mesh.
+
     :param ndarray elemsN: elements-nodes connectivity.
     :param int nElems: number of tetrahedral elements in the mesh.
     :return: edges connectivity and edgesNodes connectivity.

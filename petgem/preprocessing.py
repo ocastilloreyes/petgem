@@ -8,7 +8,6 @@
 # ---------------------------------------------------------------
 # Load python modules
 # ---------------------------------------------------------------
-import os
 import numpy as np
 import h5py
 from scipy.spatial import Delaunay
@@ -17,7 +16,7 @@ from petsc4py import PETSc
 # ---------------------------------------------------------------
 # Load petgem modules (BSC)
 # ---------------------------------------------------------------
-from .common import Print, Timers, measure_all_class_methods, measure_time
+from .common import Print, Timers, measure_all_class_methods
 from .parallel import MPIEnvironment, createSequentialDenseMatrixWithArray
 from .parallel import writeParallelDenseMatrix, createSequentialVectorWithArray
 from .parallel import writePetscVector
@@ -54,7 +53,6 @@ class Preprocessing():
 
         # Parameters shortcut (for code legibility)
         model = setup.model
-        run = setup.run
         output = setup.output
 
         # Obtain the MPI environment
@@ -64,7 +62,7 @@ class Preprocessing():
         # Import mesh file (gmsh format)
         # ---------------------------------------------------------------
         # Read nodes
-        nodes, nNodes = readGmshNodes(model.mesh_file)
+        nodes, _ = readGmshNodes(model.mesh_file)
 
         # Read connectivity
         elemsN, nElems = readGmshConnectivity(model.mesh_file)
@@ -226,7 +224,7 @@ class Preprocessing():
         Print.master('     DOFs connectivity')
 
         # Compute degrees of freedom connectivity
-        dofs, dof_edges, dof_faces, dof_volume, total_num_dofs = computeConnectivityDOFS(elemsE,elemsF,model.basis_order)
+        dofs, dof_edges, dof_faces, _, total_num_dofs = computeConnectivityDOFS(elemsE,elemsF,model.basis_order)
 
         # Get matrix dimensions
         size = dofs.shape
@@ -253,7 +251,7 @@ class Preprocessing():
         bEdges = computeBoundaryEdges(edgesNodes, bFacesN)
 
         # Compute dofs on boundaries
-        indx_inner_dofs, indx_boundary_dofs = computeBoundaries(dofs, dof_edges, dof_faces, bEdges, bFaces, model.basis_order);
+        _, indx_boundary_dofs = computeBoundaries(dofs, dof_edges, dof_faces, bEdges, bFaces, model.basis_order);
 
         # Build PETSc structures
         vector = createSequentialVectorWithArray(indx_boundary_dofs)

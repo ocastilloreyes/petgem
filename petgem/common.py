@@ -10,7 +10,6 @@ import time
 import yaml
 import sys
 import os
-import pprint
 import numpy as np
 from functools import wraps
 from colorama import Fore
@@ -29,6 +28,7 @@ from .parallel import MPIEnvironment
 # Class Print definition
 # ---------------------------------------------------------------
 class Print(object):
+
     ''' This class provides methods for pretty print.
 
     :param object str: string to be printed.
@@ -211,7 +211,6 @@ class Timer():
     def __init__(self, elapsed = 0):
         self._start = 0
         self.elapsed = elapsed
-        pass
 
     # Start timer
     def start(self):

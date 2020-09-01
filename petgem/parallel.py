@@ -224,7 +224,6 @@ def createSequentialVector(size, vector_type, communicator=None):
 
 def createParallelDenseMatrix(dimension1, dimension2, communicator=None):
     ''' Create a parallel dense matrix in petsc format
-    
     :param int dimension1: matrix dimension (rows).
     :param int dimension2: matrix dimension (columns).
     :param str communicator: mpi communicator.

@@ -7,7 +7,6 @@
 # ---------------------------------------------------------------
 # Load python modules
 # ---------------------------------------------------------------
-import sys
 import numpy as np
 from petsc4py import PETSc
 import h5py
@@ -18,7 +17,7 @@ import shutil
 # ---------------------------------------------------------------
 from .common import Print, Timers, measure_all_class_methods
 from .parallel import readPetscMatrix, readPetscVector, createParallelMatrix, createParallelVector
-from .parallel import MPIEnvironment, createSequentialVector, createParallelVector, createParallelDenseMatrix
+from .parallel import MPIEnvironment, createSequentialVector
 from .parallel import writePetscVector
 from .hvfem import computeJacobian, computeElementOrientation, computeElementalMatrices, computeSourceVectorRotation
 from .hvfem import tetrahedronXYZToXiEtaZeta, computeBasisFunctions
@@ -48,7 +47,6 @@ class Solver():
         Timers()["Setup"].start()
 
         # Parameters shortcut (for code legibility)
-        model = inputSetup.model
         output = inputSetup.output
 
         Print.master('     Importing files')
@@ -152,7 +150,7 @@ class Solver():
         num_nodes_per_element = 4
         num_edges_per_element = 6
         num_faces_per_element = 4
-        num_nodes_per_face    = 3
+        #num_nodes_per_face    = 3
         num_edges_per_face    = 3
         num_nodes_per_edge    = 2
         num_dimensions        = 3
@@ -242,7 +240,7 @@ class Solver():
             coordEle = np.reshape(coordEle, (num_nodes_per_element, num_dimensions))
 
             # Get faces indexes for srcElem
-            facesEle = source_data[16:20].astype(np.int)
+            #facesEle = source_data[16:20].astype(np.int)
 
             # Get edges indexes for faces in srcElem
             edgesFace = source_data[20:32].astype(np.int)
@@ -445,7 +443,7 @@ class Solver():
             coordReceiver = receiver_data[50:53]
 
             # Get dofs for i
-            dofsSource = receiver_data[53::].astype(PETSc.IntType)
+            #dofsSource = receiver_data[53::].astype(PETSc.IntType)
 
             # Compute jacobian for i
             _, invjacobian = computeJacobian(coordEle)
@@ -565,8 +563,8 @@ class Solver():
             fileID = h5py.File(output_file, 'w')
 
             # Create coordinates dataset
-            dset = fileID.create_dataset('electric_fields', data=data_fields)
-            dset = fileID.create_dataset('receiver_coordinates', data=data_coordinates)
+            _ = fileID.create_dataset('electric_fields', data=data_fields)
+            _ = fileID.create_dataset('receiver_coordinates', data=data_coordinates)
 
             # Close file
             fileID.close()

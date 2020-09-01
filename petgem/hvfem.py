@@ -7,9 +7,7 @@
 # ---------------------------------------------------------------
 # Load python modules
 # ---------------------------------------------------------------
-import sys
 import numpy as np
-from .common import Print
 from .common import Print
 
 # ###############################################################
@@ -547,10 +545,10 @@ def AncETri(S, DS, Nord, Idec, N):
 
     # Local parameters
     minI = 0
-    maxI = Nord-2
+    #maxI = Nord-2
     minJ = 1
     maxJ = Nord-1
-    minIJ = minI+minJ
+    #minIJ = minI+minJ
     maxIJ = Nord-1
     minalpha = 2*minI+1
     Ncurl = 2*N-3
@@ -742,9 +740,7 @@ def PolyIJacobi(X, T, Nord, Minalpha, Idec):
 
 
 def PolyJacobi(X, T, Nord, Minalpha):
-    ''' This function computes values of shifted scaled Jacobi polynomials
-    P**alpha-i. Result is a half of a  matrix with each row
-    associated to a fixed alpha. Alpha grows by 2 in each row.
+    ''' This function computes values of shifted scaled Jacobi polynomials P**alpha-i. Result is a half of a  matrix with each row associated to a fixed alpha. Alpha grows by 2 in each row.
 
     :param ndarray X: coordinate from [0,1]
     :param float T: scaling parameter
