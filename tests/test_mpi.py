@@ -5,7 +5,8 @@ import sys
 sys.path.append('../')
 from petgem.parallel import MPIEnvironment
 
-def test_mpi():
+def test_mpi_environment():
+    """Test mpi configuration."""
     # Obtain the MPI environment
     parEnv = MPIEnvironment()
 
