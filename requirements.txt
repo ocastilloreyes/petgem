@@ -1,0 +1,6 @@
+petsc4py
+numpy
+scipy
+singleton_decorator
+mpi4py
+h5py
