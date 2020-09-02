@@ -4,3 +4,4 @@ scipy
 singleton_decorator
 mpi4py
 h5py
+pytest
