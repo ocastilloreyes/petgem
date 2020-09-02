@@ -22,5 +22,8 @@ install:
   - export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
   # Ensure Numpy is installed:
   - pip3 install numpy
-  # And finally, install petgem with its dependencies (Scipy , Singleton-decorator, Sphinx, Petsc4py, Mpi4py, h5py) by typing:
-  - pip3 install petgem
+  # Install petgem by git repo
+  - git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
+  - cd petgem
+  - python3 setup.py build
+  - sudo python3 setup.py install
