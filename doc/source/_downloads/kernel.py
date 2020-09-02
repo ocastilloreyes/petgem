@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-''' **PETGEM** kernel for 3D CSEM forward modelling using higg order
-vector elements.
-'''
+"""**PETGEM** kernel for 3D CSEM forward modelling using higg order vector elements."""
 
 if __name__ == '__main__':
     # ---------------------------------------------------------------
@@ -11,7 +9,6 @@ if __name__ == '__main__':
     # ---------------------------------------------------------------
     import sys
     import petsc4py
-    import numpy as np
     # ---------------------------------------------------------------
     # PETSc init
     # ---------------------------------------------------------------
@@ -19,7 +16,6 @@ if __name__ == '__main__':
     # ---------------------------------------------------------------
     # Load python modules
     # ---------------------------------------------------------------
-    from petsc4py import PETSc
     # ---------------------------------------------------------------
     # Load petgem modules (BSC)
     # ---------------------------------------------------------------

@@ -54,6 +54,12 @@ the Marie Sklodowska-Curie grant agreement No. 644202. The research leading to t
 from the European Union's Horizon 2020 Programme (2014-2020) and from Brazilian Ministry of Science, Technology and
 Innovation through Rede Nacional de Pesquisa (RNP) under the `HPC4E Project <http://www.hpc4e.eu>`_ , grant agreement
 No. 689772. Further, this project has received funding from the European Union's Horizon 2020 research and innovation
-programme under the Marie Sklodowska-Curie grant agreement No. 777778.
+programme under the Marie Sklodowska-Curie grant agreement No. 777778. Moreover, the development of PETGEM has received
+funding from the European Union’s Horizon 2020 programme, grant agreement N◦828947, and from the Mexican Department of
+Energy, CONACYT-SENER Hidrocarburos grant agreement N◦B-S-69926. Finally, this project has been 65% cofinanced by the
+European Regional Development Fund (ERDF) through the Interreg V-A Spain-France-Andorra program
+(POCTEFA2014-2020). POCTEFA aims to reinforce the economic and social integration of the French-Spanish-Andorran
+border. Its support is focused on developing economic, social and environmental cross-border activities through joint
+strategies favouring sustainable territorial development
 
 Octavio Castillo-Reyes expresses his gratitude to the Mexican National Council for Science and Technology (`CONACyT <http://www.conacyt.mx/>`_) for his support.

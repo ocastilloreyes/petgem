@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-'''Define functions for mesh handling.'''
+"""Define functions for mesh handling."""
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -16,17 +16,17 @@ from .vectors import deleteDuplicateRows
 
 
 class gmshObject:
-    '''Class for mesh of type Gmsh. This class provides methods to parse .msh files to python format.
+    """Class for mesh of type Gmsh.
 
-    '''
+    This class provides methods to parse .msh files to python format.
+    """
 
     def __init__(self, mshfilename):
-        '''Init a gmshObject
+        """Init a gmshObject.
 
         :param str mshFile: mesh file to be initialized.
         :return: gmshObject initialized.
-        '''
-
+        """
         # Read mesh file
         self.mshfilename = mshfilename
         self.mshfID = open(mshfilename, 'r')
@@ -117,84 +117,89 @@ class gmshObject:
         return
 
     def __gmshPrint__(self, msg):
-        '''Print a message related with a gmshObject.
+        """Print a message related with a gmshObject.
+
         :param str msg: message to be printed.
-        '''
+        """
         print(msg)
 
         return
 
     def __gmshError__(self, msg):
-        '''Print error message in a gmshObject and exit.
+        """Print error message in a gmshObject and exit.
+
         :param str msg: message to be printed.
         :return: None.
-        '''
+        """
         sys.stderr.write('   gmshObject: Error! -> ' + msg + '\n')
 
         return
 
     def __destroy__(self):
-        '''Destroy a gmshObject.
+        """Destroy a gmshObject.
+
         :return: None.
-        '''
+        """
         self.mshfID.close()
 
         return
 
     def printNumberNodes(self):
-        '''Print number of nodes of a gmshObject.
+        """Print number of nodes of a gmshObject.
 
         :return: None.
-        '''
+        """
         print('   Mesh has ' + str(self.nNodes) + ' nodes')
 
         return
 
     def printNumberElements(self):
-        '''Print number of elements of a gmshObject.
+        """Print number of elements of a gmshObject.
 
         :return: None.
-        '''
+        """
         print('   Mesh has ' + str(self.nElems) + ' elements')
 
         return
 
     def printNumberPhysicalGroups(self):
-        '''Print number of physical groups of a gmshObject.
+        """Print number of physical groups of a gmshObject.
+
         :return: None.
-        '''
+        """
         print('   Mesh has ' + str(self.number_physical_groups) +
               ' physical groups')
 
         return
 
     def addElementsRule(self, condition, action):
-        '''Add (append) an user rule to list of elements in the gmshObject.
+        """Add (append) an user rule to list of elements in the gmshObject.
+
         :param str condition: function or condition to be added.
         :param str action: action to be executed.
         :return: None.
-        '''
+        """
         self.elements_rules.append((condition, action))
         pass
 
     def addNodesRule(self, condition, action):
-        '''Add (append) an user rule to list of nodes in the gmshObject.
+        """Add (append) an user rule to list of nodes in the gmshObject.
+
         :param str condition: function or condition to be added.
         :param str action: action to be executed.
         :return: None.
-        '''
+        """
         self.nodes_rules.append((condition, action))
         pass
 
     def cleanRules(self):
-        '''Clean rules in the gmshObject. '''
+        """Clean rules in the gmshObject."""
         self.nodes_rules = []
         self.elements_rules = []
         pass
 
     def gmshParser(self):
-        '''Parser nodesRules and nodesElements in an gmshObject.'''
-
+        """Parser nodesRules and nodesElements in an gmshObject."""
         # Open Gmsh file
         self.mshfID = open(self.mshfilename, 'r')
 
@@ -381,11 +386,12 @@ class gmshObject:
 
 
 def readGmshNodes(mesh_file):
-    '''Read a mesh nodes from a Gmsh file.
+    """Read a mesh nodes from a Gmsh file.
+
     :param str mesh_file: mesh file to be readed.
     :return: nodes coordinates and number of nodes.
     :rtype: ndarray, int.
-    '''
+    """
     # Create a gmshObject
     inputMesh = gmshObject(mesh_file)
 
@@ -398,25 +404,27 @@ def readGmshNodes(mesh_file):
     # Define condition for nodes elemsN, nElems
 
     def isNode(tag, x, y, z, physgroups):
-        '''Determine if a point is node.
+        """Determine if a point is node.
+
         :param int tag: node ID.
         :param float x: x coordinate of tag.
         :param float y: y coordinate of tag.
         :param float z: z coordinate of tag.
         :param int physgroups: physgroup of tag.
-        '''
+        """
         return True
 
     # Define action for nodes
     def getNode(tag, x, y, z):
-        '''Get coordinates of a node point.
+        """Get coordinates of a node point.
+
         :param int tag: node ID.
         :param float x: x coordinate of tag.
         :param float y: y coordinate of tag.
         :param float z: z coordinate of tag.
         :return: nodal coordinates.
         :rtype: ndarray
-        '''
+        """
         nodes[tag, :] = [x, y, z]
 
     # Add nodes rule (composed by a condition and an action)
@@ -433,11 +441,12 @@ def readGmshNodes(mesh_file):
 
 
 def readGmshConnectivity(mesh_file):
-    '''Read a mesh connectivity from a Gmsh file.
+    """Read a mesh connectivity from a Gmsh file.
+
     :param str mesh_file: mesh file to be readed.
     :return: mesh connectivity (elemsN) and number of elements.
     :rtype: ndarray, int.
-    '''
+    """
     # Create a gmshObject
     inputMesh = gmshObject(mesh_file)
 
@@ -449,26 +458,28 @@ def readGmshConnectivity(mesh_file):
 
     # Define condition for elements
     def isTetrahedralElement(eletag, eletype, physgrp, nodes):
-        '''Determine if an element is of linear tetrahedral type.
+        """Determine if an element is of linear tetrahedral type.
+
         :param int eletag: element ID.
         :param int eletype: element type (defined by Gmsh).
         :param int physgrp: physgroup of eletag.
         :param ndarray nodes: nodal indexes of eletag.
         :return: element type
         :rtype: int
-        '''
+        """
         return eletype == inputMesh.tetrahedron_4_node
 
     # Define action for nodes
     def getElement(eletag, eletype, physgrp, nodes):
-        '''Get element connectivity.
+        """Get element connectivity.
+
         :param int eletag: element ID.
         :param int eletype: element type (defined by Gmsh).
         :param int physgrp: physgroup of eletag.
         :param ndarray nodes: nodal indexes of eletag.
         :return: element connectivity
         :rtype: ndarray
-        '''
+        """
         elemsN[eletag, :] = nodes
 
     # Add nodes rule (composed by a condition and an action)
@@ -487,11 +498,12 @@ def readGmshConnectivity(mesh_file):
 
 
 def readGmshPhysicalGroups(mesh_file):
-    '''Read conductivity model from a mesh in Gmsh format.
+    """Read conductivity model from a mesh in Gmsh format.
+
     :param str mesh_file: mesh file to be readed.
     :return: conductivity model (elemsS) and number of elements.
     :rtype: ndarray, int.
-    '''
+    """
     # Create a gmshObject
     inputMesh = gmshObject(mesh_file)
 
@@ -503,26 +515,28 @@ def readGmshPhysicalGroups(mesh_file):
 
     # Define condition for elements
     def isTetrahedralElement(eletag, eletype, physgrp, nodes):
-        '''Determine if an element is of linear tetrahedral type.
+        """Determine if an element is of linear tetrahedral type.
+
         :param int eletag: element ID.
         :param int eletype: element type (defined by Gmsh).
         :param int physgrp: physgroup of eletag.
         :param ndarray nodes: nodal indexes of eletag.
         :return: element type
         :rtype: int
-        '''
+        """
         return eletype == inputMesh.tetrahedron_4_node
 
     # Define action for physical groups
     def getPhysicalGroup(eletag, eletype, physgrp, nodes):
-        '''Get element connectivity.
+        """Get element connectivity.
+
         :param int eletag: element ID.
         :param int eletype: element type (defined by Gmsh).
         :param int physgrp: physgroup of eletag.
         :param ndarray nodes: nodal indexes of eletag.
         :return: element connectivity
         :rtype: ndarray
-        '''
+        """
         elemsS[eletag] = physgrp
 
     # Add nodes rule (composed by a condition and an action)
@@ -541,14 +555,13 @@ def readGmshPhysicalGroups(mesh_file):
 
 
 def computeEdges(elemsN, nElems):
-    '''Compute edges of a 3D tetrahedral mesh.
+    """Compute edges of a 3D tetrahedral mesh.
 
     :param ndarray elemsN: elements-nodes connectivity.
     :param int nElems: number of tetrahedral elements in the mesh.
     :return: edges connectivity and edgesNodes connectivity.
     :rtype: ndarray
-    '''
-
+    """
     # Extracts sets of edges
     edges1 = elemsN[:, [0, 1]]
     edges2 = elemsN[:, [1, 2]]
@@ -580,7 +593,8 @@ def computeEdges(elemsN, nElems):
 
 
 def computeFaces(elemsN, nElems):
-    '''Compute the element\'s faces of a 3D tetrahedral mesh.
+    r"""Compute the element\'s faces of a 3D tetrahedral mesh.
+
     :param ndarray matrix: elements-nodes connectivity.
     :param int nElems: number of elements in the mesh.
     :return: element/faces connectivity.
@@ -590,8 +604,7 @@ def computeFaces(elemsN, nElems):
        Rognes, Marie E., Robert Cndarray. Kirby, and Anders Logg. "Efficient
        assembly of H(div) and H(curl) conforming finite elements."
        SIAM Journal on Scientific Computing 31.6 (2009): 4130-4151.
-    '''
-
+    """
     # Extracts sets of faces for each nedelec element order
     faces1 = elemsN[:, [0, 1, 2]]
     faces2 = elemsN[:, [0, 1, 3]]
@@ -616,13 +629,13 @@ def computeFaces(elemsN, nElems):
 
 
 def computeBoundaryFaces(elemsF, facesN):
-    '''Compute boundary faces of a tetrahedral mesh.
+    """Compute boundary faces of a tetrahedral mesh.
+
     :param ndarray elemsF: elements-face connectivity.
     :param ndarray facesN: faces-nodes connectivity.
     :return: nodal-connectivity and indexes of boundary-faces.
     :rtype: ndarray
-    '''
-
+    """
     # Sort indexes and add 1 position in order to use indexes as Matlab
     A0 = np.sort(elemsF[:, 0]) + 1
     I0 = np.argsort(elemsF[:, 0]) + 1
@@ -691,13 +704,13 @@ def computeBoundaryFaces(elemsF, facesN):
 
 
 def computeBoundaryEdges(edgesN, bfacesN):
-    '''Compute boundary edges of a tetrahedral mesh.
+    """Compute boundary edges of a tetrahedral mesh.
+
     :param ndarray edgesN: edges-nodes connectivity.
     :param ndarray bfacesN: boundary-faces-nodes connectivity.
     :return: boundary-edges connectivity.
     :rtype: ndarray
-    '''
-
+    """
     # Extracts sets of edges-nodes (add 1 to indexes - Matlab indexing)
     edges1 = (bfacesN[[0, 1], :] + 1).transpose()
     edges2 = (bfacesN[[1, 2], :] + 1).transpose()
@@ -748,7 +761,7 @@ def computeBoundaryEdges(edgesN, bfacesN):
 
 
 def computeBoundaries(dof_connectivity, dof_edges, dof_faces, bEdges, bFaces, Nord):
-    '''This function computes the indexes of dofs boundaries and internal dofs.
+    """Compute the indexes of dofs boundaries and internal dofs.
 
     :param ndarray dof_connectivity: local/global dofs list for elements
     :param ndarray dof_edges: dofs index on edges
@@ -758,8 +771,7 @@ def computeBoundaries(dof_connectivity, dof_edges, dof_faces, bEdges, bFaces, No
     :param int Nord: polynomial order of nedelec basis functions
     :return: indexes of internal dofs and indexes of boundary dofs
     :rtype: ndarray
-    '''
-
+    """
     # Number of boundaries on edges
     nBoundaryEdges = len(bEdges)
     num_dof_in_edge = Nord
@@ -793,7 +805,7 @@ def computeBoundaries(dof_connectivity, dof_edges, dof_faces, bEdges, bFaces, No
 
 
 def unitary_test():
-    '''Unitary test for mesh.py script. '''
+    """Unitary test for mesh.py script."""
 
 
 if __name__ == '__main__':

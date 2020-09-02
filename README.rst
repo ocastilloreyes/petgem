@@ -1,3 +1,5 @@
+.. class:: center
+
 .. image:: https://github.com/ocastilloreyes/petgem/blob/master/doc/source/_static/figures/petgem_logo.png
    :target: https://github.com/ocastilloreyes/petgem
    :alt: petgem logo
@@ -10,7 +12,6 @@
 .. image:: https://img.shields.io/codacy/grade/9c6d8dad560a4558a9e87dd757db9693
    :target: https://www.codacy.com/app/ocastilloreyes/petgem
    :alt: Codacy grade
-
 
 
 `petgem` (Parallel Edge-based Tool for Geophysical Electromagnetic Modelling) is a

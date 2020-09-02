@@ -259,17 +259,17 @@ class Timers():
 
     # Get an specific timer
     def __getitem__(self, key):
-        """Get item name for timer.""""
+        """Get item name for timer."""
         return self._elems.setdefault(key, Timer())
 
     # Set a specific
     def __setitem__(self, key, value):
-        """Set item name for timer.""""
+        """Set item name for timer."""
         self._elems[key] = Timer(value)
 
     # Write report
     def _write(self):
-        """Write timer.""""
+        """Write timer."""
         # Obtain the MPI environment
         parEnv = MPIEnvironment()
 

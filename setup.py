@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-'''setup.py is the main PETGEM setup script, it is based on python setup-module.'''
+"""setup.py is the main PETGEM setup script, it is based on python setup-module."""
 
 
 def name():
-    '''Set name for petgem package.
+    """Set name for petgem package.
 
     :param: None
     :return: petgem name
     :rtype: string
-    '''
+    """
     return 'petgem'
 
 
 def description():
-    '''Descripton of PETGEM code
-    '''
+    """Descripton of PETGEM code."""
     petgem_description = ('Parallel python code for electromagnetic '
                           'modeling in geophysics using high-order nédélec finite elements')
 
@@ -24,21 +23,22 @@ def description():
 
 
 def long_description():
-    '''Read long description of petgem of DESCRIPTION.rst file.
+    """Read long description of petgem of DESCRIPTION.rst file.
 
     :param: None
     :return: petgem description
     :rtype: string
-    '''
+    """
     with open(os.path.join('DESCRIPTION.rst')) as f:
         return f.read()
 
 
 def get_ext_modules():
-    '''Get paths of extension modules.
+    """Get paths of extension modules.
+
     :param: None
     :return: numpy path include
-    '''
+    """
     try:
         import numpy
         numpy_includes = [numpy.get_include()]

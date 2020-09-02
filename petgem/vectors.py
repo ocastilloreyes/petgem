@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-'''Define standard vector and matrix functions. '''
+"""Define standard vector and matrix functions."""
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -13,11 +13,12 @@ import numpy as np
 # ################     FUNCTIONS DEFINITION     #################
 # ###############################################################
 def deleteDuplicateRows(matrix):
-    '''Delete duplicate rows in a matrix.
+    """Delete duplicate rows in a matrix.
+
     :param ndarray matrix: input matrix to be processed.
     :return: matrix without duplicate rows
     :rtype: ndarray
-    '''
+    """
     temp = np.copy(matrix)
     temp.sort(axis=1)
 
@@ -29,7 +30,8 @@ def deleteDuplicateRows(matrix):
 
 
 def findUniqueRows(array, return_index=False, return_inverse=False):
-    '''Find unique rows of a two-dimensional numpy array.
+    """Find unique rows of a two-dimensional numpy array.
+
     :param ndarray: array to be processed.
     :param bool return_index: the indices of array that result in the
      unique array.
@@ -37,7 +39,7 @@ def findUniqueRows(array, return_index=False, return_inverse=False):
      can be used to reconstruct array.
     :return: unique rows.
     :rtype: ndarray.
-    '''
+    """
     array = np.ascontiguousarray(array)
 
     # View the rows as a 1D structured array.
@@ -63,12 +65,12 @@ def findUniqueRows(array, return_index=False, return_inverse=False):
 
 
 def is_duplicate_entry(x):
-    '''Compute number of duplicate entries in a vector.
+    """Compute number of duplicate entries in a vector.
 
     :param int-array x: matrix.
     :return: number of duplicate entries.
     :rtype: int.
-    '''
+    """
     counts = np.bincount(x)
     duplicate_entries = np.where(counts > 1)[0]
     num_duplicate = duplicate_entries.size
@@ -77,7 +79,7 @@ def is_duplicate_entry(x):
 
 
 def invConnectivity(M, nP):
-    '''This function computes the opposite connectivity matrix of M.
+    """Compute the opposite connectivity matrix of M.
 
     :param ndarray M: connectivity matrix with dimensions = (nElems,eleOrder)
     :param int nP: number of nodes/edges/faces in matrix M.
@@ -98,8 +100,7 @@ def invConnectivity(M, nP):
 
         If M represents a element/faces connectivity, the function computes
         a faces/elements connectivity.
-    '''
-
+    """
     # Get matrix dimensions
     size = M.shape
 
@@ -132,8 +133,7 @@ def invConnectivity(M, nP):
 
 
 def unitary_test():
-    '''Unitary test for vectors.py script.
-    '''
+    """Unitary test for vectors.py script."""
 
 
 if __name__ == '__main__':

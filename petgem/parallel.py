@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-'''Define classes and functions for parallel computations within **PETGEM**.'''
+"""Define classes and functions for parallel computations within **PETGEM**."""
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -16,14 +16,15 @@ from petsc4py import PETSc
 
 @singleton
 class MPIEnvironment():
+    """MPI class definition."""
+
     def __init__(self):
-        '''Class for initialization of an MPI environment.
+        """Class for initialization of an MPI environment.
 
         :param: None.
         :return: class for MPI environment.
         :rtype: mpi_env class.
-        '''
-
+        """
         # Store the MPI environment
         self.MPI = MPI
 
@@ -42,14 +43,14 @@ class MPIEnvironment():
 # ###############################################################
 
 def createSequentialDenseMatrixWithArray(dimension1, dimension2, data):
-    '''Given an input array, create a sequential dense matrix in petsc format.
+    """Given an input array, create a sequential dense matrix in petsc format.
+
     :param int dimension1: matrix dimension (rows).
     :param int dimension2: matrix dimension (columns).
     :param ndarray data: data to be exported.
     :return: parallel matrix.
     :rtype: petsc parallel and dense matrix.
-    '''
-
+    """
     parallel_matrix = PETSc.Mat().createDense([dimension1, dimension2],
                                               array=data, comm=PETSc.COMM_SELF)
 
@@ -60,13 +61,13 @@ def createSequentialDenseMatrixWithArray(dimension1, dimension2, data):
 
 
 def writeParallelDenseMatrix(output_file, data, communicator=None):
-    '''Write a Petsc parallel dense matrix which format is defined by two files: output_file.dat and output_file.info.
+    """Write a Petsc parallel dense matrix which format is defined by two files: output_file.dat and output_file.info.
 
     :param str output_file: file name to be saved.
     :param petsc matrix data: dense matrix to be saved.
     :param str communicator: mpi communicator.
     :return: None.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_WORLD
 
@@ -77,12 +78,12 @@ def writeParallelDenseMatrix(output_file, data, communicator=None):
 
 
 def createSequentialVectorWithArray(data):
-    '''Given an input array, create a sequential vector in petsc format
+    """Given an input array, create a sequential vector in petsc format.
+
     :param ndarray data: data to be exported.
     :return: parallel matrix.
     :rtype: petsc parallel and dense matrix.
-    '''
-
+    """
     parallel_vector = PETSc.Vec().createWithArray(data, comm=PETSc.COMM_SELF)
 
     parallel_vector.setUp()
@@ -91,13 +92,13 @@ def createSequentialVectorWithArray(data):
 
 
 def writePetscVector(output_file, data, communicator=None):
-    '''Write a Petsc vector which format is defined by two files:
-    output_file.dat and output_file.info.
+    """Write a Petsc vector which format is defined by two files: output_file.dat and output_file.info.
+
     :param str output_file: file name to be saved.
     :param petsc vector data: array to be saved.
     :param str communicator: mpi communicator.
     :return: None.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_WORLD
 
@@ -109,13 +110,13 @@ def writePetscVector(output_file, data, communicator=None):
 
 
 def readPetscMatrix(input_file, communicator=None):
-    '''Read a Petsc matrix which format is defined by two files:
-    input_file.dat and input_file.info
+    """Read a Petsc matrix which format is defined by two files: input_file.dat and input_file.info.
+
     :param str input_file: file name to be readed.
     :param str communicator: mpi communicator.
     :return: petsc_matrix.
     :rtype: petsc sparse matrix.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_WORLD
 
@@ -127,13 +128,13 @@ def readPetscMatrix(input_file, communicator=None):
 
 
 def readPetscVector(input_file, communicator=None):
-    '''Read a Petsc vector which format is defined by two files: input_file.dat and input_file.info
+    """Read a Petsc vector which format is defined by two files: input_file.dat and input_file.info.
 
     :param str input_file: file name to be readed.
     :param str communicator: mpi communicator.
     :return: petsc_vector.
     :rtype: petsc vector.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_WORLD
 
@@ -145,7 +146,8 @@ def readPetscVector(input_file, communicator=None):
 
 
 def createParallelMatrix(dimension1,dimension2,nnz,matrix_type,communicator=None):
-    '''Create a parallel sparse matrix in petsc format.
+    """Create a parallel sparse matrix in petsc format.
+
     :param int dimension1: matrix dimension (rows).
     :param int dimension2: matrix dimension (columns).
     :param int nnz: not zero pattern for allocation.
@@ -153,7 +155,7 @@ def createParallelMatrix(dimension1,dimension2,nnz,matrix_type,communicator=None
     :param str communicator: mpi communicator.
     :return: parallel matrix.
     :rtype: petsc AIJ parallel matrix.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_WORLD
 
@@ -174,13 +176,14 @@ def createParallelMatrix(dimension1,dimension2,nnz,matrix_type,communicator=None
 
 
 def createParallelVector(size, vector_type, communicator=None):
-    '''Create a parallel vector in petsc format.
+    """Create a parallel vector in petsc format.
+
     :param int size: vector size.
     :param int vector_type: vector type for parallel computations.
     :param str communicator: mpi communicator.
     :return: parallel vector.
     :rtype: petsc parallel vector.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_WORLD
 
@@ -199,13 +202,14 @@ def createParallelVector(size, vector_type, communicator=None):
 
 
 def createSequentialVector(size, vector_type, communicator=None):
-    '''Create a sequential vector in petsc format.
+    """Create a sequential vector in petsc format.
+
     :param int size: vector size.
     :param int vector_type: vector type for parallel computations.
     :param str communicator: mpi communicator.
     :return: sequential vector.
     :rtype: petsc sequential vector.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_SELF
 
@@ -222,13 +226,14 @@ def createSequentialVector(size, vector_type, communicator=None):
 
 
 def createParallelDenseMatrix(dimension1, dimension2, communicator=None):
-    '''Create a parallel dense matrix in petsc format
+    """Create a parallel dense matrix in petsc format.
+
     :param int dimension1: matrix dimension (rows).
     :param int dimension2: matrix dimension (columns).
     :param str communicator: mpi communicator.
     :return: parallel matrix.
     :rtype: petsc parallel and dense matrix.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_WORLD
 
@@ -241,13 +246,13 @@ def createParallelDenseMatrix(dimension1, dimension2, communicator=None):
 
 
 def writeDenseMatrix(output_file, data, communicator=None):
-    '''Write a Petsc dense matrix which format is defined by two files:
-    output_file.dat and output_file.info.
+    """Write a Petsc dense matrix which format is defined by two files: output_file.dat and output_file.info.
+
     :param str output_file: file name to be saved.
     :param petsc matrix data: dense matrix to be saved.
     :param str communicator: mpi communicator.
     :return: None.
-    '''
+    """
     if communicator is None:
         communicator = PETSc.COMM_WORLD
 
@@ -261,9 +266,7 @@ def writeDenseMatrix(output_file, data, communicator=None):
 
 
 def unitary_test():
-    '''Unitary test for parallel.py script.
-    '''
-
+    """Unitary test for parallel.py script."""
 # ###############################################################
 # ################             MAIN             #################
 # ###############################################################
