@@ -25,14 +25,17 @@ install:
   # Install petgem requirements
   - pip install -r requirements.txt
   # Install petgem by git repo
-  - python3 setup.py build
+  #- python3 setup.py build
   #- sudo python3 setup.py install --install-dir=$PWD
-  - sudo easy_install . --install-dir $PWD
+  #- sudo easy_install . --install-dir $PWD
   #easy_install . --install-dir /usr/lib/python2.7/dist-packages
   #- pip install petgem
 
 script:
   - python -c 'import numpy; print(numpy.version.version)'
+  - cd doc; make html; cd ..
+  - mpirun -n 2 py.test test/test_mpi.py
+  - mpirun -n 2 py.test test/test_petsc.py
 
 after_success:
   - sbt coveralls
