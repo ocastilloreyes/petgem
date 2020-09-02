@@ -4,29 +4,29 @@ python:
   - "3.6"
 
 install:
-  # We do this conditionally because it saves us some downloading if the version is the same.
-  - sudo apt-get update
-  - sudo apt-get install gfortran python3-setuptools
-  # Get petsc
-  - git clone -b maint https://gitlab.com/petsc/petsc.git petsc
-  # Set petsc enviroment
-  - cd petsc
-  - export PETSC_DIR=$PWD
-  - export PETSC_ARCH=arch-linux2-c-debug
-  # Then, build and install PETSc:
-  - ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
-  - make $PETSC_DIR $PETSC_ARCH all
-  # Uncomment next two lines to activate petsc tests
-  #- make $PETSC_DIR $PETSC_ARCH test
-  #- make $PETSC_DIR $PETSC_ARCH streams
-  # Ensure mpicc compiler wrapper is on your search path:
-  - export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
-  - cd ..
-  # Install petgem requirements
-  - pip install -r requirements.txt
-  # Install petgem by git repo
-  - git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
-  - cd petgem
+  # # We do this conditionally because it saves us some downloading if the version is the same.
+  # - sudo apt-get update
+  # - sudo apt-get install gfortran python3-setuptools
+  # # Get petsc
+  # - git clone -b maint https://gitlab.com/petsc/petsc.git petsc
+  # # Set petsc enviroment
+  # - cd petsc
+  # - export PETSC_DIR=$PWD
+  # - export PETSC_ARCH=arch-linux2-c-debug
+  # # Then, build and install PETSc:
+  # - ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
+  # - make $PETSC_DIR $PETSC_ARCH all
+  # # Uncomment next two lines to activate petsc tests
+  # #- make $PETSC_DIR $PETSC_ARCH test
+  # #- make $PETSC_DIR $PETSC_ARCH streams
+  # # Ensure mpicc compiler wrapper is on your search path:
+  # - export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+  # - cd ..
+  # # Install petgem requirements
+  # - pip install -r requirements.txt
+  # # Install petgem by git repo
+  # - git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
+  # - cd petgem
   - python3 setup.py build
   - sudo python3 setup.py install
 

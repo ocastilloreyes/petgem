@@ -207,7 +207,7 @@ class gmshObject:
         line = self.mshfID.readline()
         while(line.find('$Nodes') < 0):
             line = self.mshfID.readline()
-            pass
+            
         # This line should contain number of nodes (nNodes)
         line = self.mshfID.readline()
         # Verify that nNodes in file is still the nNodes in memory
