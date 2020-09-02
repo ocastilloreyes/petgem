@@ -196,7 +196,7 @@ class gmshObject:
         """Clean rules in the gmshObject."""
         self.nodes_rules = []
         self.elements_rules = []
-        pass
+
 
     def gmshParser(self):
         """Parser nodesRules and nodesElements in an gmshObject."""

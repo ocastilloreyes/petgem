@@ -1,15 +1,24 @@
 language: python
 
-install:
-  # We do this conditionally because it saves us some downloading if the
-  #   # version is the same.
-  - sudo apt-get update
-  # Install and create virtual env
-  - sudo apt-get install python3-virtualenv
-  - virtualenv -p python ~/petgem
-  - source ~/petgem/bin/activate
-  # Install compilers and libraries
-  - sudo apt-get install gfortran
+before_script:
+  - pip install numpy
+
+script:
+  - python -c 'import numpy; print numpy.version.version'
+
+
+# language: python
+#
+# install:
+#   # We do this conditionally because it saves us some downloading if the
+#   #   # version is the same.
+#   - sudo apt-get update
+#   # Install and create virtual env
+#   - sudo apt-get install python3-virtualenv
+#   - virtualenv -p python ~/petgem
+#   - source ~/petgem/bin/activate
+#   # Install compilers and libraries
+#   - sudo apt-get install gfortran
 #   # Get petsc
 #   - git clone -b maint https://gitlab.com/petsc/petsc.git petsc
 #   # Set petsc enviroment
