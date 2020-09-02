@@ -4,6 +4,10 @@ install:
   # We do this conditionally because it saves us some downloading if the
   #   # version is the same.
   - sudo apt-get update
+  # Install and create virtual env
+  - sudo apt-get install python3-virtualenv
+  - virtualenv -p python ~/petgem
+  - source ~/petgem/bin/activate
   # Install compilers and libraries
   - sudo apt-get install gfortran
   # Get petsc
@@ -21,11 +25,11 @@ install:
   # Ensure mpicc compiler wrapper is on your search path:
   - export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
   # Ensure Numpy is installed:
-  - pip3 install numpy
+  - pip3 install -U numpy
   # Ensure setuptools is installed:
-  - sudo apt-get install python3-setuptools
+  - sudo apt-get install -U python3-setuptools
   # Ensure pytest is installed:
-  - pip3 install pytest
+  - pip3 install -U pytest
   # Install petgem by git repo
   - git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
   - cd petgem
