@@ -207,7 +207,7 @@ class gmshObject:
         line = self.mshfID.readline()
         while(line.find('$Nodes') < 0):
             line = self.mshfID.readline()
-            
+
         # This line should contain number of nodes (nNodes)
         line = self.mshfID.readline()
         # Verify that nNodes in file is still the nNodes in memory
@@ -241,7 +241,6 @@ class gmshObject:
                 for condition, action in self.nodes_rules:
                     if condition(tag, x, y, z, physgroups):
                         action(tag, x, y, z)
-                    pass
 
         # Read another 2 lines after nodes section is done
         # Read $EndNodes line
@@ -283,13 +282,10 @@ class gmshObject:
                     for condition, action in self.elements_rules:
                         if condition(eletag, eletype, physgrp, nodes):
                             action(eletag, eletype, physgrp, nodes)
-                        pass
                 else:
                     self.__gmshError__(self.mshfilename + '.msh file has < ' +
                                        '2 tags element with tag ' +
                                        str(eletag))
-
-        pass
 
     # Element definitions in Gmsh
     # 2-node line.
