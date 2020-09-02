@@ -497,42 +497,42 @@ class Solver():
         receiver_coordinatesZ.assemblyEnd()
 
         # Write intermediate results
-        out_path = output.directory_scratch + '/tmp_fieldsX.dat'
+        out_path = output.directory_scratch + '/fieldsX.dat'
         writePetscVector(out_path, receiver_fieldX, communicator=None)
 
-        out_path = output.directory_scratch + '/tmp_fieldsY.dat'
+        out_path = output.directory_scratch + '/fieldsY.dat'
         writePetscVector(out_path, receiver_fieldY, communicator=None)
 
-        out_path = output.directory_scratch + '/tmp_fieldsZ.dat'
+        out_path = output.directory_scratch + '/fieldsZ.dat'
         writePetscVector(out_path, receiver_fieldZ, communicator=None)
 
-        out_path = output.directory_scratch + '/tmp_receiver_coordinatesX.dat'
+        out_path = output.directory_scratch + '/receiver_coordinatesX.dat'
         writePetscVector(out_path, receiver_coordinatesX, communicator=None)
 
-        out_path = output.directory_scratch + '/tmp_receiver_coordinatesY.dat'
+        out_path = output.directory_scratch + '/receiver_coordinatesY.dat'
         writePetscVector(out_path, receiver_coordinatesY, communicator=None)
 
-        out_path = output.directory_scratch + '/tmp_receiver_coordinatesZ.dat'
+        out_path = output.directory_scratch + '/receiver_coordinatesZ.dat'
         writePetscVector(out_path, receiver_coordinatesZ, communicator=None)
 
         # Write final solution
         if MPIEnvironment().rank == 0:
-            input_file = output.directory_scratch + '/tmp_fieldsX.dat'
+            input_file = output.directory_scratch + '/fieldsX.dat'
             electric_fieldsX = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
-            input_file = output.directory_scratch + '/tmp_fieldsY.dat'
+            input_file = output.directory_scratch + '/fieldsY.dat'
             electric_fieldsY = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
-            input_file = output.directory_scratch + '/tmp_fieldsZ.dat'
+            input_file = output.directory_scratch + '/fieldsZ.dat'
             electric_fieldsZ = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
-            input_file = output.directory_scratch + '/tmp_receiver_coordinatesX.dat'
+            input_file = output.directory_scratch + '/receiver_coordinatesX.dat'
             recv_coordX = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
-            input_file = output.directory_scratch + '/tmp_receiver_coordinatesY.dat'
+            input_file = output.directory_scratch + '/receiver_coordinatesY.dat'
             recv_coordY = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
-            input_file = output.directory_scratch + '/tmp_receiver_coordinatesZ.dat'
+            input_file = output.directory_scratch + '/receiver_coordinatesZ.dat'
             recv_coordZ = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
             # Allocate

@@ -143,7 +143,7 @@ class InputParameters(object):
         with open(params, 'r') as f:
             # The FullLoader parameter handles the conversion from YAML
             # scalar values to Python the dictionary format
-            inputs = yaml.load(f, Loader=yaml.FullLoader)
+            inputs = yaml.safe_load(f)
 
         # Store the datasets as a dict  object
         self.model = Dictionary2Object(inputs['model'])

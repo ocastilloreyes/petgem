@@ -1,7 +1,7 @@
 petgem
 ======
 
-PETGEM is a parallel python code for 3D Controlled-Source
+petgem is a parallel python code for 3D Controlled-Source
 Electromagnetic Method (3D CSEM) in geophysics using high-order edge finite
 elements (Nédélec finite elements).
 
@@ -9,7 +9,7 @@ elements (Nédélec finite elements).
 Requirements
 ------------
 
-PETGEM is known to run on various flavors of Linux clusters. Its requirements are:
+petgem is known to run on various flavors of Linux clusters. Its requirements are:
 
 * `PETSc <https://www.mcs.anl.gov/petsc/>`__ (builded version for **COMPLEX-VALUED NUMBERS**) for the use of direct/iterative parallel solvers
 * `Python 3 <https://www.python.org/>`__ (versions 3.5.2, 3.6.3 and 3.6.9 have been tested)
@@ -21,7 +21,7 @@ PETGEM is known to run on various flavors of Linux clusters. Its requirements ar
 * `Mpi4py <https://pypi.org/project/mpi4py/>`__ for parallel computations on distributed-memory platforms.
 * `h5py <https://pypi.org/project/h5py/>`__ for input/output tasks.
 
-On Linux, consult the package manager of your preference. PETGEM can be
+On Linux, consult the package manager of your preference. petgem can be
 used without any installation by running the kernel from the top-level
 directory of the distribution.
 
@@ -37,7 +37,7 @@ Install
 
   $ tar zxvf petsc-3.12.0.tar.gz
 
-* Configure and build PETSc. The configuration options depend on the calculations you want to perform (complex- or real-valued) as well as your compiler/MPI/Blas/Lapack setup. For PETGEM executions, **PETSC MUST BE BUILD FOR COMPLEX-VALUED NUMBERS**. In order to avoid incompatibilities between PETSC, petsc4py and PETGEM, we highly recommend the following configuration lines. Please, visit PETSc website for advanced configuration options. If you have a clean environment (not working MPI/Blas/Lapack), then run::
+* Configure and build PETSc. The configuration options depend on the calculations you want to perform (complex- or real-valued) as well as your compiler/MPI/Blas/Lapack setup. For petgem executions, **PETSC MUST BE BUILD FOR COMPLEX-VALUED NUMBERS**. In order to avoid incompatibilities between PETSC, petsc4py and petgem, we highly recommend the following configuration lines. Please, visit PETSc website for advanced configuration options. If you have a clean environment (not working MPI/Blas/Lapack), then run::
 
   $ cd petsc-3.12.0
   $ export PETSC_DIR=$PWD
@@ -71,7 +71,7 @@ Install
 
   $ pip3 install numpy
 
-* And finally, install PETGEM with its dependencies (`Scipy <http://www.scipy.org/>`_ , `Blessings <https://pypi.python.org/pypi/blessings/>`__, `Sphinx <http://www.sphinx-doc.org>`__, `Petsc4py <https://bitbucket.org/petsc/petsc4py>`__) by typing::
+* And finally, install petgem with its dependencies (`Scipy <http://www.scipy.org/>`_ , `Blessings <https://pypi.python.org/pypi/blessings/>`__, `Sphinx <http://www.sphinx-doc.org>`__, `Petsc4py <https://bitbucket.org/petsc/petsc4py>`__) by typing::
 
   $ pip3 install petgem
 
@@ -79,7 +79,7 @@ Install
 Citations
 ---------
 
-If PETGEM been significant to a project that leads to an academic
+If petgem been significant to a project that leads to an academic
 publication, please acknowledge that fact by citing the project:
 
 * Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J. M. (2019).
@@ -88,7 +88,7 @@ publication, please acknowledge that fact by citing the project:
   vol 219: 39-65. ISSN 0956-540X. https://doi.org/10.1093/gji/ggz285
 
 * Castillo-Reyes, O., de la Puente, J., Cela, J. M. (2018).
-  *PETGEM: A parallel code for 3D CSEM forward modeling using edge finite
+  *petgem: A parallel code for 3D CSEM forward modeling using edge finite
   elements*. Computers & Geosciences, vol 119: 123-136. ISSN 0098-3004,
   Elsevier. https://doi.org/10.1016/j.cageo.2018.07.005
 

@@ -180,7 +180,7 @@ class gmshObject:
         :return: None.
         """
         self.elements_rules.append((condition, action))
-        pass
+
 
     def addNodesRule(self, condition, action):
         """Add (append) an user rule to list of nodes in the gmshObject.

@@ -13,9 +13,9 @@
    :target: https://www.codacy.com/app/ocastilloreyes/petgem
    :alt: Codacy grade
 
-
-`petgem` (Parallel Edge-based Tool for Geophysical Electromagnetic Modelling) is a
-Python code for the scalable solution of electromagnetic diffusion fields on tetrahedral
+Parallel Edge-based Tool for Geophysical Electromagnetic Modelling
+------------------------------------------------------------------
+`petgem` is a Python code for the scalable solution of electromagnetic diffusion fields on tetrahedral
 meshes, as these are the easiest to scale-up to very large domains or
 arbitrary shape. It supports distributed-memory parallelism through
 petsc4py package. `petgem` allow users to specify high-order edge-based variational

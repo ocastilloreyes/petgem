@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-"""setup.py is the main PETGEM setup script, it is based on python setup-module."""
+"""setup.py is the main petgem setup script, it is based on python setup-module."""
 
 
 def name():
@@ -15,7 +15,7 @@ def name():
 
 
 def description():
-    """Descripton of PETGEM code."""
+    """Descripton of petgem code."""
     petgem_description = ('Parallel python code for electromagnetic '
                           'modeling in geophysics using high-order nédélec finite elements')
 
@@ -51,7 +51,7 @@ def get_ext_modules():
 if __name__ == '__main__':
     from setuptools import setup
     import os
-    # PETGEM setup
+    # petgem setup
     setup(name=name(),
           maintainer="Octavio Castillo-Reyes",
           maintainer_email="octavio.castillo@bsc.es",
