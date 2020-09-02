@@ -7,31 +7,31 @@ install:
   # Install compilers and libraries
   - sudo apt-get install gfortran
   # Get petsc
-  #- git clone -b maint https://gitlab.com/petsc/petsc.git petsc
+  - git clone -b maint https://gitlab.com/petsc/petsc.git petsc
   # Set petsc enviroment
-  #- cd petsc
-  #- export PETSC_DIR=$PWD
-  #- export PETSC_ARCH=arch-linux2-c-debug
+  - cd petsc
+  - export PETSC_DIR=$PWD
+  - export PETSC_ARCH=arch-linux2-c-debug
   # Then, build and install PETSc:
-  #- ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
-  #- make $PETSC_DIR $PETSC_ARCH all
+  - ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
+  - make $PETSC_DIR $PETSC_ARCH all
   # Uncomment next two lines to activate petsc tests
   #- make $PETSC_DIR $PETSC_ARCH test
   #- make $PETSC_DIR $PETSC_ARCH streams
   # Ensure mpicc compiler wrapper is on your search path:
-  #- export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+  - export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
   # Ensure Numpy is installed:
   - pip3 install numpy
   # Ensure setuptools is installed:
-  #- pip3 install -U setuptools
+  - pip3 install setuptools
   # Install petgem by git repo
-  #- git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
-  #- cd petgem
-  #- python3 setup.py build
-  #- sudo python3 setup.py install
+  - git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
+  - cd petgem
+  - python3 setup.py build
+  - sudo python3 setup.py install
 
-#script:
-#  - cd doc; make html; cd ..
+script:
+  - cd doc; make html; cd ..
 
-#after_success:
-#  - sbt coveralls
+after_success:
+  - sbt coveralls

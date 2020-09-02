@@ -34,6 +34,8 @@ class MPIEnvironment():
         self.rank = self.comm.Get_rank()
         # Size of the group associated with a communicator
         self.num_proc = self.comm.Get_size()
+        # Machine name
+        self.machine_name = self.MPI.Get_processor_name()
 
         return
 
