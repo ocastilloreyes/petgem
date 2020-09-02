@@ -6,54 +6,21 @@ install:
   - sudo apt-get update
   # Install compilers and libraries
   - sudo apt-get install gfortran
-  # Get and install petsc  
+  # Get petsc
   - git clone -b maint https://gitlab.com/petsc/petsc.git petsc
+  # Set petsc enviroment
   - cd petsc
   - export PETSC_DIR=$PWD
   - export PETSC_ARCH=arch-linux2-c-debug
+  # Then, build and install PETSc:
   - ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
   - make $PETSC_DIR $PETSC_ARCH all
-  - make $PETSC_DIR $PETSC_ARCH test
-  - make $PETSC_DIR $PETSC_ARCH streams
-
-
-
-#   # We do this conditionally because it saves us some downloading if the
-#   # version is the same.
-#   - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-#   - bash miniconda.sh -b -p $HOME/miniconda
-#   - export PATH="$HOME/miniconda/bin:$PATH"
-#   - hash -r
-#   - conda config --set always_yes yes --set changeps1 no
-#   - conda update --all
-#   # Useful for debugging any issues with conda
-#   - conda info -a
-#
-#   # Install and activate environment, install packages
-#   - conda create -q -n tenv -c conda-forge python=$PYTHON $DFLTS $SOFT numpy pytest pytest-cov pytest-console-scripts
-#   - source activate tenv
-#   - conda install -c conda-forge empymod>=2.0 $PCKG
-#   - pip install setuptools_scm coveralls pytest-flake8
-#   - python setup.py install
-#   - if [ "$CHCKLNKS" = true ]; then pip install -r requirements-dev.txt; fi
-#
-# script:  # No pytest for linkcheck-run.
-#   - if [ "$CHCKLNKS" = true ]; then
-#         cd docs; make html -b linkcheck;
-#     else
-#         pytest --cov=emg3d --flake8;
-#     fi
-#
-# after_success:
-#   - if [ "$CHCKLNKS" == "" ]; then coveralls; fi
-#
-# deploy:
-#   provider: pypi
-#   user: "__token__"
-#   password:
-#     secure: NfAeFdL0r5E4+ReJsfedJY/n45GAJ/plgIhqkKIF3Nhi0UMdmJdKTMtHLiTjdbGpDMiVU1Mu9/LSXb1bj7J43RSCT9p8P2HEzr7vuMyXtCHYsyUcvvHb6YvxbdSstIPrQuTfVqQmIwkknrkom3I2rOXeCqbbaSkXLHft7GLW2WS+nYrDhNjYSpXllYvd5X4GWd6ZrmAS2OS19A5Fg3N81UWUfaEmvW4mkDgAfM+wdw6Ldb0+M1XML43/nZvA4ThDLP0SQQ3sgA9rFsFBYMI7k4hrdUozZnlDI2HQ8bkNZzImaomaW+AIVGS+42yi/f71Pi84C0RNFJH1w7o3NuPKKRfDJctNUvRtoKwIgdJem7mRlXlzRFeQ7naWah2crNXg5MRikpsRzkdxjjVQUImvno4fgafzrRxYSxa25NvNGEbuUuZ4K8NFnqdk7wCyeGGTcWRHzhsXuWzbwnAs2JqGiLYDKwSKdHf6QxyIlTnIoqfb2r0m7BcfnHmzwDAYxubEPo9XuWbY8e1locjWg80C15qKL4E3im5xodJW0I9ZDugrovk09d9qTfJexFUyaUBu9b89VDLIJImSICBKbXxaidwtOBpM84/fhhgjJGGr6zTPsSPZT9WJQ4dZYbBEHELParYUmbAoGgTC0JOLr/DM0DcZ9SwUqEd3DwsGP/k+ZmA=
-#   on:
-#     branch: master
-#     tags: true
-#     condition: '$DEPLOY_PYPI = "true"'
-#   distributions: "sdist bdist_wheel"
+  # Uncomment next two lines to activate petsc tests
+  #- make $PETSC_DIR $PETSC_ARCH test
+  #- make $PETSC_DIR $PETSC_ARCH streams
+  # Ensure mpicc compiler wrapper is on your search path:
+  - export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+  # Ensure Numpy is installed:
+  - pip3 install numpy
+  # And finally, install petgem with its dependencies (Scipy , Singleton-decorator, Sphinx, Petsc4py, Mpi4py, h5py) by typing:
+  - pip3 install petgem
