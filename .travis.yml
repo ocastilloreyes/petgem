@@ -23,7 +23,7 @@ install:
   # Ensure Numpy is installed:
   - pip3 install numpy
   # Ensure setuptools is installed:
-  - pip3 install setuptools
+  - pip3 install -U setuptools
   # Install petgem by git repo
   #- git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
   #- cd petgem
