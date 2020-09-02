@@ -26,7 +26,9 @@ install:
   - pip install -r requirements.txt
   # Install petgem by git repo
   - python3 setup.py build
-  - sudo python3 setup.py install --install-dir=$PWD
+  #- sudo python3 setup.py install --install-dir=$PWD
+  - sudo easy_install . --install-dir $PWD
+  #easy_install . --install-dir /usr/lib/python2.7/dist-packages
   #- pip install petgem
 
 script:
