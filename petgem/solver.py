@@ -328,7 +328,7 @@ class Solver():
         ksp.solve(self.b, self.x)
         iterationNumber = ksp.getIterationNumber()
         ksp.destroy()
-        Print.master('     Number of solver iterations: ', iterationNumber)
+        Print.master('     Number of solver iterations: ' + str(iterationNumber))
         Timers()["Solver"].stop()
 
         return

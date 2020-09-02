@@ -1,0 +1,2 @@
+  |  # proc  |   Preprocessing.run  |        Preprocessing  |         Solver.setup  |                Setup  |      Solver.assembly  |             Assembly  |         Solver.solve  |        SetBoundaries  |               Solver  |   Solver.postprocess  |       Postprocessing  | 
+  |  1       |               1.720  |                1.720  |                0.079  |                0.079  |               83.523  |               83.523  |                0.348  |                0.004  |                0.344  |                0.157  |                0.156  | 

@@ -23,9 +23,9 @@ install:
   # Ensure Numpy is installed:
   - pip3 install numpy
   # Ensure setuptools is installed:
-  - pip3 install setuptools
-  # Ensure pytest is installed:
   - sudo apt-get install python-setuptools
+  # Ensure pytest is installed:
+  - pip3 install pytest
   # Install petgem by git repo
   - git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
   - cd petgem
@@ -35,6 +35,8 @@ install:
 script:
   - cd doc; make html; cd ..
   - mpirun -n 2 py.test test/test_mpi.py
+  - mpirun -n 2 py.test test/test_petsc.py
+  - mpirun -n 2 py.test test/test_petgem.py
 
 after_success:
   - sbt coveralls

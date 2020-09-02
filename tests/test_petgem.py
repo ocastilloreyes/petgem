@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
-# Author:  Octavio Castillo Reyes
-# Contact: octavio.castillo@bsc.es
-"""**PETGEM** kernel for 3D CSEM forward modelling using higg order vector elements."""
+# ---------------------------------------------------------------
+# Load python modules
+# ---------------------------------------------------------------
+import sys
+sys.path.append('../')
+import petsc4py
+import shutil
 
-if __name__ == '__main__':
-    # ---------------------------------------------------------------
-    # Load python modules
-    # ---------------------------------------------------------------
-    import sys
-    import petsc4py
+def test_petgem():
     # ---------------------------------------------------------------
     # PETSc init
     # ---------------------------------------------------------------
@@ -31,7 +29,7 @@ if __name__ == '__main__':
     parEnv = MPIEnvironment()
 
     # Import parameters file
-    inputSetup = InputParameters(sys.argv[3], parEnv)
+    inputSetup = InputParameters('tests/data/params.yaml', parEnv)
 
     # Initialize timers
     Timers(inputSetup.output.directory)
@@ -73,6 +71,9 @@ if __name__ == '__main__':
 
     # Compute electromagnetic responses
     csem_solver.postprocess(inputSetup)
+
+    # Remove output directory
+    shutil.rmtree(output.directory)
 
     # ---------------------------------------------------------------
     # End of PETGEM kernel

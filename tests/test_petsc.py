@@ -36,7 +36,7 @@ def test_petsc_environment():
         info = ksp.getIterationNumber()
 
     # Print solver iteration number
-    print('Nomber of solver iterations: ', info)
+    print('Number of solver iterations: ', info)
 
     # Destroy ksp object and petsc objects
     ksp.destroy()
