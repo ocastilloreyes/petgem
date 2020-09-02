@@ -9,7 +9,10 @@
 .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
    :target: http://petgem.bsc.es/
    :alt: Documentation Status
-.. image:: https://img.shields.io/codacy/grade/9c6d8dad560a4558a9e87dd757db9693
+.. image:: https://travis-ci.org/ocastilloreyes/petgem.svg?branch=master
+   :target: https://travis-ci.org/ocastilloreyes/petgem
+   :alt: Travis-CI
+.. image:: https://img.shields.io/codacy/grade/9c6d8dad560a4558a9e87dd757db9693/master.svg
    :target: https://www.codacy.com/app/ocastilloreyes/petgem
    :alt: Codacy grade
 
