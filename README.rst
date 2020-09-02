@@ -12,6 +12,9 @@
 .. image:: https://travis-ci.org/ocastilloreyes/petgem.svg?branch=master
    :target: https://travis-ci.org/ocastilloreyes/petgem
    :alt: Travis-CI
+.. image:: https://badge.fury.io/py/petgem.svg
+   :target: https://badge.fury.io/py/petgem
+   :alt: Pypi-petgem
 .. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
    :alt: Coveralls

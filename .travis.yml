@@ -25,7 +25,7 @@ install:
   # Ensure setuptools is installed:
   - pip3 install setuptools
   # Ensure pytest is installed:
-  - pip3 install pytest
+  - sudo apt-get install python-setuptools
   # Install petgem by git repo
   - git clone https://github.com/ocastilloreyes/petgem.git --branch 0.7
   - cd petgem
@@ -34,7 +34,7 @@ install:
 
 script:
   - cd doc; make html; cd ..
-  - pytest
+  - mpirun -n 2 py.test test/test_mpi.py
 
 after_success:
   - sbt coveralls
