@@ -4,7 +4,7 @@ before_script:
   - pip install numpy
 
 script:
-  - python -c 'import numpy; print numpy.version.version'
+  - python -c 'import numpy; print(numpy.version.version)'
 
 
 # language: python
