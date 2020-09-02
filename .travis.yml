@@ -23,7 +23,7 @@ install:
   # Ensure Numpy is installed:
   - pip3 install numpy
   # Ensure setuptools is installed:
-  - sudo apt-get install python-setuptools
+  - sudo apt-get install python3-setuptools
   # Ensure pytest is installed:
   - pip3 install pytest
   # Install petgem by git repo

@@ -73,7 +73,7 @@ def test_petgem():
     csem_solver.postprocess(inputSetup)
 
     # Remove output directory
-    shutil.rmtree(output.directory)
+    shutil.rmtree(inputSetup.output.directory)
 
     # ---------------------------------------------------------------
     # End of PETGEM kernel
