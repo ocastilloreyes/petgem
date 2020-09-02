@@ -12,16 +12,19 @@
 .. image:: https://travis-ci.org/ocastilloreyes/petgem.svg?branch=master
    :target: https://travis-ci.org/ocastilloreyes/petgem
    :alt: Travis-CI
+.. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
+   :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
+   :alt: Coveralls
 .. image:: https://img.shields.io/codacy/grade/9c6d8dad560a4558a9e87dd757db9693/master.svg
    :target: https://www.codacy.com/app/ocastilloreyes/petgem
    :alt: Codacy grade
 
 Parallel Edge-based Tool for Geophysical Electromagnetic Modelling
 ------------------------------------------------------------------
-`petgem` is a Python code for the scalable solution of electromagnetic diffusion fields on tetrahedral
+**petgem** is a Python code for the scalable solution of electromagnetic diffusion fields on tetrahedral
 meshes, as these are the easiest to scale-up to very large domains or
 arbitrary shape. It supports distributed-memory parallelism through
-petsc4py package. `petgem` allow users to specify high-order edge-based variational
+petsc4py package. **petgem** allow users to specify high-order edge-based variational
 forms of H(curl) for the simulation of electromagnetic fields in realistic
 3D CSEM surveys with accuracy, reliability and efficiency.
 
@@ -63,7 +66,7 @@ Dependencies
 
 Citation
 --------
-If you publish results for which you used `petgem`, please give credit by citing
+If you publish results for which you used **petgem**, please give credit by citing
 `Castillo-Reyes, O. et al. (2019) <https://doi.org/10.1093/gji/ggz285>`_:
 
   Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019).
@@ -81,6 +84,6 @@ and `Castillo-Reyes, O. et al. (2018) <https://doi.org/10.1016/j.cageo.2018.07.0
 
 License
 -------
-`petgem` is developed as open-source under BSD-3 license at Computer Applications
+**petgem** is developed as open-source under BSD-3 license at Computer Applications
 in Science & Engineering of the Barcelona Supercomputing Center - Centro Nacional
 de Supercomputación. Please, see the CONDITIONS OF USE described in the LICENSE.rst file.
