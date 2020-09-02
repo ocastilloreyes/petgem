@@ -14,8 +14,7 @@ install:
   - export PETSC_DIR=$PWD
   - export PETSC_ARCH=arch-linux2-c-debug
   # Then, build and install PETSc:
-  #- ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
-  - ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --with-scalar-type=complex --download-cmake
+  - ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
   - make $PETSC_DIR $PETSC_ARCH all
   # Uncomment next two lines to activate petsc tests
   #- make $PETSC_DIR $PETSC_ARCH test
