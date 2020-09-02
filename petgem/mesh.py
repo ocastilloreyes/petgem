@@ -190,7 +190,7 @@ class gmshObject:
         :return: None.
         """
         self.nodes_rules.append((condition, action))
-        pass
+
 
     def cleanRules(self):
         """Clean rules in the gmshObject."""
