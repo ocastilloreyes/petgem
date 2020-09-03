@@ -24,8 +24,7 @@ install:
   #- export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
   #- cd ..
   # Install petgem requirements
-  - pip install sphinx
-  #- pip install numpy scipy singleton_decorator pytest
+  - pip install numpy scipy singleton_decorator pytest sphinx mpi4py petsc4py h5py
   # Install petgem by git repo
   #- python3 setup.py build
   #- sudo python3 setup.py install --install-dir=$PWD
@@ -42,8 +41,8 @@ script:
   #- mpirun -n 2 py.test test/test_mpi.py
   #- mpirun -n 2 py.test test/test_petsc.py
 
-#after_success:
-#  - sbt coveralls
+after_success:
+  - sbt coveralls
 
 
 
