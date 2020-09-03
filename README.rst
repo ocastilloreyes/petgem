@@ -17,7 +17,7 @@
 .. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
    :alt: Coveralls
-.. image:: https://app.codacy.com/project/badge/Grade/e0a637595c6e4b0caca914913cf74777/master.svg
+.. image:: https://app.codacy.com/project/badge/Grade/e0a637595c6e4b0caca914913cf74777
    :target: https://www.codacy.com/app/ocastilloreyes/petgem
    :alt: Codacy-grade
 .. image:: https://img.shields.io/static/v1?label=Ubuntu&logo=Ubuntu&logoColor=white&message=support&color=success
