@@ -2,7 +2,6 @@
 # Load python modules
 # ---------------------------------------------------------------
 import sys
-#sys.path.append('../')
 from petgem.parallel import MPIEnvironment
 
 def test_mpi_environment():

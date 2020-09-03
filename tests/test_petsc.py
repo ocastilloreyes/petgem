@@ -1,5 +1,4 @@
 import sys
-sys.path.append('../')
 from petgem.parallel import readPetscMatrix, readPetscVector
 from petgem.parallel import MPIEnvironment
 import petsc4py
