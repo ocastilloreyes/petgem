@@ -8,7 +8,6 @@ import numpy as np
 from petgem.mesh import readGmshNodes, readGmshConnectivity, computeEdges, computeFaces
 from petgem.mesh import computeBoundaryFaces, computeBoundaryEdges
 from petgem.vectors import invConnectivity
-from petgem.hvfem import computeConnectivityDOFS
 
 def test_mesh_functions():
     """Test mesh functions."""
@@ -55,11 +54,6 @@ def test_mesh_functions():
         elif kFace == 3:  # Face 4
             facesE[facesEle[kFace],:] = [edgesEle[2], edgesEle[5], edgesEle[3]]
 
-    # Compute dofs connectivity
-
-    # Compute degrees of freedom connectivity
-    _, dof_edges, dof_faces, _, total_num_dofs = computeConnectivityDOFS(elemsE,elemsF,basis_order)
-
     # Compute boundary faces
     bFacesN, _ = computeBoundaryFaces(elemsF, facesN)
 
@@ -73,4 +67,5 @@ def test_mesh_functions():
     assert nFaces == 20039, "Wrong number of faces"
     assert nEdges == 12748, "Wrong number of edges"
     assert nbEdges == 3399, "Wrong number of boundary edges"
-    assert total_num_dofs == 65574, "Wrong number of dofs"
+
+test_mesh_functions()
