@@ -30,7 +30,7 @@ script:
   - cd doc
   - make html
   - cd ..
-  - mpirun -n 2 py.test test/test_mpi.py
+  - mpirun -n 2 py.test tests/test_mpi.py
   #- mpirun -n 2 py.test test/test_petsc.py
 
 after_success:
