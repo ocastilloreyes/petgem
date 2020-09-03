@@ -2,7 +2,6 @@
 # Load python modules
 # ---------------------------------------------------------------
 import sys
-sys.path.append('../')
 import petsc4py
 import shutil
 
