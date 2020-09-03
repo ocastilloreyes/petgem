@@ -24,7 +24,9 @@ install:
   #- cd ..
   # Install petgem requirements
   #- pip install numpy scipy singleton_decorator pytest sphinx coveralls mpi4py petsc4py h5py
+  - export PYTHONPATH=$PYTHONPATH:$(pwd)
   - pip install numpy scipy singleton_decorator pytest sphinx coveralls
+
 
 script:
   # Make documentation
