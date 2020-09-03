@@ -23,7 +23,7 @@ install:
   #- export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
   #- cd ..
   # Ensure PYTHONPATH is on your search path:
-  #- export PYTHONPATH=$PYTHONPATH:$(pwd)
+  - export PYTHONPATH=$PYTHONPATH:$(pwd)
   # Install petgem requirements
   #- pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls mpi4py petsc4py h5py
   - pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls
