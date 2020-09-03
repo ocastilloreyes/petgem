@@ -7,31 +7,24 @@ install:
   # We do this conditionally because it saves us some downloading if the version is the same.
   - sudo apt-get update
   - sudo apt-get install gfortran python3-setuptools
-
   # Get petsc
-  #- git clone -b maint https://gitlab.com/petsc/petsc.git petsc
+  - git clone -b maint https://gitlab.com/petsc/petsc.git petsc
   # Set petsc enviroment
-  #- cd petsc
-  #- export PETSC_DIR=$PWD
-  #- export PETSC_ARCH=arch-linux2-c-debug
+  - cd petsc
+  - export PETSC_DIR=$PWD
+  - export PETSC_ARCH=arch-linux2-c-debug
   # Then, build and install PETSc:
-  #- ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
-  #- make $PETSC_DIR $PETSC_ARCH all
+  - ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
+  - make $PETSC_DIR $PETSC_ARCH all
   # Uncomment next two lines to activate petsc tests
   #- make $PETSC_DIR $PETSC_ARCH test
   #- make $PETSC_DIR $PETSC_ARCH streams
   # Ensure mpicc compiler wrapper is on your search path:
-  #- export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
-  #- cd ..
+  - export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+  - cd ..
   # Install petgem requirements
   - pip install numpy scipy singleton_decorator pytest sphinx mpi4py petsc4py h5py
-  # Install petgem by git repo
-  #- python3 setup.py build
-  #- sudo python3 setup.py install --install-dir=$PWD
-  #- sudo easy_install . --install-dir $PWD
-  #easy_install . --install-dir /usr/lib/python2.7/dist-packages
-  #- pip install petgem
-
+  
 script:
   # Make documentation
   - cd doc
