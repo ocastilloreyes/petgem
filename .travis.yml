@@ -8,31 +8,40 @@ install:
   - sudo apt-get update
   - sudo apt-get install gfortran python3-setuptools
   # Get petsc
-  - git clone -b maint https://gitlab.com/petsc/petsc.git petsc
+  #- git clone -b maint https://gitlab.com/petsc/petsc.git petsc
   # Set petsc enviroment
-  - cd petsc
-  - export PETSC_DIR=$PWD
-  - export PETSC_ARCH=arch-linux2-c-debug
+  #- cd petsc
+  #- export PETSC_DIR=$PWD
+  #- export PETSC_ARCH=arch-linux2-c-debug
   # Then, build and install PETSc:
-  - ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
-  - make $PETSC_DIR $PETSC_ARCH all
+  #- ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran  --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-parmetis --download-metis --download-ptscotch --download-cmake
+  #- make $PETSC_DIR $PETSC_ARCH all
   # Uncomment next two lines to activate petsc tests
   #- make $PETSC_DIR $PETSC_ARCH test
   #- make $PETSC_DIR $PETSC_ARCH streams
   # Ensure mpicc compiler wrapper is on your search path:
-  - export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
-  - cd ..
+  #- export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+  #- cd ..
   # Ensure PYTHONPATH is on your search path:
-  - export PYTHONPATH=$PYTHONPATH:$(pwd)
+  #- export PYTHONPATH=$PYTHONPATH:$(pwd)
   # Install petgem requirements
-  - pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls mpi4py petsc4py h5py
+  #- pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls mpi4py petsc4py h5py
+
+before_script:
+  - py.test tests/tests.py --cov=example2
 
 script:
-  # Make documentation
-  - cd doc
-  - make html
-  - cd ..
-  - pytest --cov=./tests/
-
+  - py.test tests.py --doctest-modules --pep8 coveralls -v --cov coveralls --cov-report term-missing
 after_success:
   - coveralls
+
+
+#script:
+  # Make documentation
+  #- cd doc
+  #- make html
+  #- cd ..
+  #- pytest --cov=./tests/
+
+#after_success:
+#  - coveralls
