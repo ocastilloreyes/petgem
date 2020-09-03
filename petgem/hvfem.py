@@ -582,16 +582,15 @@ def HomLegendre(S, Nord):
 
 def HomIJacobi(S, DS, Nord, Minalpha, Idec, N):
     """Compute values of integrated homogenized Jacobi polynomials and their gradients.
-
     Result is half of a  matrix with each row  associated to a fixed alpha.
     Alpha grows by 2 in each row.
 
     :param ndarray S: (s0,s1) affine(like) coordinates
-    :param ndarray DS: gradients of S in R^N
+    :param ndarray DS: gradients of S in R(N)
     :param int Nord: max polynomial order
     :param int Minalpha: first row value of alpha (integer)
     :param bool Idec: decision flag to compute
-    :return polynomial values and derivatives in x (Jacobi polynomials)
+    :return: polynomial values and derivatives in x (Jacobi polynomials)
     :rtype: ndarray
     """
     # ---------------------------------------------------------------
@@ -674,8 +673,8 @@ def PolyIJacobi(X, T, Nord, Minalpha, Idec):
     :param ndarray X: coordinate from [0,1]
     :param ndarray T: scaling parameter
     :param int Nord: max polynomial order
-    :param int Minalpha: = first row value of alpha
-    :param bool Idec = decision flag to compute (= FALSE polynomials with x and t derivatives, = TRUE  polynomials with x derivatives only)
+    :param int Minalpha: first row value of alpha
+    :param bool Idec: decision flag to compute (= FALSE polynomials with x and t derivatives, = TRUE  polynomials with x derivatives only)
     :return: polynomial values, derivatives in x (Jacobi polynomials), derivatives in t
     """
     # ---------------------------------------------------------------

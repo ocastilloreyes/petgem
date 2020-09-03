@@ -33,9 +33,11 @@ install:
   #- pip install petgem
 
 script:
-  - ls
-  - python -c 'import numpy; print(numpy.version.version)'
-  - cd doc; make html; cd ..
+  # Make documentation
+  - cd doc
+  - make html
+  - cd ..
+  
   #- mpirun -n 2 py.test test/test_mpi.py
   #- mpirun -n 2 py.test test/test_petsc.py
 
