@@ -31,7 +31,12 @@ def test_mesh_functions():
     nFaces = facesN.shape[0]
 
     # Verify mesh data
-    assert nElems == 9453, "Wrong number of elements"
-    assert nNodes == 2163, "Wrong number of nodes"
-    assert nFaces == 20039, "Wrong number of faces"
-    assert nEdges == 12748, "Wrong number of edges"
+
+    try:
+        nElems == 9453
+        nNodes == 2163
+        nFaces == 20039
+        nEdges == 12748
+        raise mesh_error
+    except mesh_error:
+        print("Data mesh is not consistent.")

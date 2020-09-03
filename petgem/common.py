@@ -28,13 +28,14 @@ from .parallel import MPIEnvironment
 # Class Print definition
 # ---------------------------------------------------------------
 class Print(object):
-    """This class provides methods for pretty print.
+    """
+    This class provides methods for pretty print.
 
     :param object str: string to be printed.
     :return: None.
     :rtype: None.
-    """
 
+    """
     # Options for Gauss points computation (switch case)
     _options = {
         1: Fore.BLACK,
@@ -62,11 +63,13 @@ class Print(object):
 
     # Logging method
     def _log(self, text, color_code=None):
-        """Configure and prints a text.
+        """
+        Configure and prints a text.
 
         :param str text: text to be printed.
         :param int color_code: text color code.
         :return: None.
+
         """
         # Verify if color_code is None, then use black color
         if color_code is None:
@@ -107,11 +110,13 @@ class Print(object):
 
     @classmethod
     def master(self, text, color_code=None):
-        """If the caller is the master process, this method prints a message.
+        """
+        If the caller is the master process, this method prints a message.
 
         :param: None.
         :return: None.
         :rtype: None.
+
         """
         if( MPIEnvironment().rank == 0 ):
             self._log(self, text, color_code)
@@ -122,7 +127,8 @@ class Print(object):
 # Class InputParameters definition
 # ---------------------------------------------------------------
 class InputParameters(object):
-    """This class provides a methods to import a yaml parameter file.
+    """
+    Method import a yaml parameter file.
 
     :param dict object: user params yaml file.
     :return: user parameters as object view.
@@ -198,7 +204,10 @@ class Dictionary2Object(object):
 # Class Timer definition
 # ---------------------------------------------------------------
 class Timer():
-    """Definition of timer class."""
+    """
+    Definition of timer class.
+
+    """
 
     # Attributes
     elapsed = None
@@ -231,7 +240,10 @@ class Timer():
 # ---------------------------------------------------------------
 @singleton
 class Timers():
-    """Defintion of timers class."""
+    """
+    Defintion of timers class.
+
+    """
 
     # Initializing
     def __init__(self, opath = None):
@@ -350,7 +362,8 @@ def measure_time(f = None, group = None, split = False):
 
 
 def measure_all_class_methods(Cls):
-    """"Implement a decorator to measure execution time for each method.
+    """"
+    Implement a decorator to measure execution time for each method.
 
     Args:
         f: the decorated function
