@@ -14,7 +14,7 @@
 .. image:: https://img.shields.io/pypi/v/petgem
    :target: https://pypi.org/project/petgem/
    :alt: Pypi-petgem
-.. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.png?branch=master
+.. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
    :alt: Coveralls
 .. image:: https://img.shields.io/codacy/grade/e0a637595c6e4b0caca914913cf74777/master.svg
