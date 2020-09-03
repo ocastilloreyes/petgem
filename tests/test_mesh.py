@@ -6,8 +6,7 @@ import pytest
 import sys
 import numpy as np
 from petgem.mesh import readGmshNodes, readGmshConnectivity, computeEdges, computeFaces
-from petgem.mesh import computeBoundaryFaces, computeBoundaryEdges, computeBoundaries
-from petgem.mesh import readGmshPhysicalGroups
+from petgem.mesh import computeBoundaryFaces, computeBoundaryEdges
 from petgem.vectors import invConnectivity
 from petgem.hvfem import computeConnectivityDOFS
 
@@ -19,6 +18,7 @@ def test_mesh_functions():
     basis_order = 2
     # Read nodes
     nodes, _ = readGmshNodes(mesh_filename)
+    nNodes = nodes.shape[0]
 
     # Read connectivity
     elemsN, nElems = readGmshConnectivity(mesh_filename)
@@ -58,16 +58,19 @@ def test_mesh_functions():
     # Compute dofs connectivity
 
     # Compute degrees of freedom connectivity
-    dofs, dof_edges, dof_faces, _, total_num_dofs = computeConnectivityDOFS(elemsE,elemsF,basis_order)
+    _, dof_edges, dof_faces, _, total_num_dofs = computeConnectivityDOFS(elemsE,elemsF,basis_order)
 
     # Compute boundary faces
-    bFacesN, bFaces = computeBoundaryFaces(elemsF, facesN)
+    bFacesN, _ = computeBoundaryFaces(elemsF, facesN)
 
     # Compute boundary edges
     bEdges = computeBoundaryEdges(edgesNodes, bFacesN)
+    nbEdges = len(bEdges)
 
     # Verify mesh data
     assert nElems == 9453, "Wrong number of elements"
+    assert nNodes == 2163, "Wrong number of nodes"
     assert nFaces == 20039, "Wrong number of faces"
     assert nEdges == 12748, "Wrong number of edges"
+    assert nbEdges == 3399, "Wrong number of boundary edges"
     assert total_num_dofs == 65574, "Wrong number of dofs"
