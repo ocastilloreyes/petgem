@@ -350,12 +350,15 @@ def measure_time(f = None, group = None, split = False):
 
 
 def measure_all_class_methods(Cls):
-    """Implement a decorator for obtaining execution times for each method implemented on the decorated class.
+    """"Implement a decorator to measure execution time for each method.
 
-    :param class f: the decorated class
-    :return: a class wrap
-    :rtype: class
+    Args:
+        f: the decorated function
+    Returns:
+        a function wrap
+
     """
+
     class DecoratedClass(object):
 
         def __init__(self,*args,**kwargs):
