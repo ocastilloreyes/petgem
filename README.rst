@@ -24,6 +24,9 @@
 .. image:: https://img.shields.io/static/v1?label=Ubuntu&logo=Ubuntu&logoColor=white&message=support&color=success
    :target: https://ubuntu.com/
    :alt: Ubuntu support
+.. image:: https://img.shields.io/github/v/release/ocastilloreyes/petgem
+  :target: https://github.com/ocastilloreyes/petgem/releases
+  :alt: GitHub release (latest by date)
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
    :target: https://opensource.org/licenses/BSD-3-Clause
    :alt: petgem-license
