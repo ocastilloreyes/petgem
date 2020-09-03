@@ -12,7 +12,7 @@ import numpy as np
 def test_mesh_functions():
     """Test mesh functions."""
 
-    print(ok)
+    print('ok')
     # # Setup mesh file name
     # mesh_filename = 'tests/data/test_mesh.msh'
     #
