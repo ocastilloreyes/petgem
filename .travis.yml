@@ -24,20 +24,19 @@ install:
   #- cd ..
   # Install petgem requirements
   #- pip install numpy scipy singleton_decorator pytest sphinx mpi4py petsc4py h5py
-  - pip install numpy scipy singleton_decorator pytest sphinx
+  - pip install numpy scipy singleton_decorator pytest sphinx coveralls
 
 script:
   # Make documentation
   - cd doc
   - make html
   - cd ..
-  - sbt clean coverage test
 
   #- mpirun -n 2 py.test test/test_mpi.py
   #- mpirun -n 2 py.test test/test_petsc.py
 
 after_success:
-  - sbt coveralls
+  - coveralls
 
 
 
