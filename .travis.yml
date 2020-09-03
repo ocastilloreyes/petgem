@@ -28,9 +28,6 @@ install:
   #- pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls mpi4py petsc4py h5py
   - pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls
 
-script:
-
-
 after_success:
   - coveralls
 
@@ -41,6 +38,6 @@ script:
   - make html
   - cd ..
   - pytest --cov=tests/
-  
+
 #after_success:
 #  - coveralls
