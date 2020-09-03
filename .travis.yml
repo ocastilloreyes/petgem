@@ -29,19 +29,18 @@ install:
   - pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls
 
 script:
-  - pytest --cov=tests/
 
 
 after_success:
   - coveralls
 
 
-#script:
+script:
   # Make documentation
-  #- cd doc
-  #- make html
-  #- cd ..
-  #- pytest --cov=./tests/
-
+  - cd doc
+  - make html
+  - cd ..
+  - pytest --cov=tests/
+  
 #after_success:
 #  - coveralls
