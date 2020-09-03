@@ -307,7 +307,8 @@ class Timers():
 # Decorators for code instrumentation
 # ---------------------------------------------------------------
 def measure_time(f = None, group = None, split = False):
-    """Implement a decorator for obtaining the decorated method execution time.
+    """
+    Implement a decorator for obtaining the decorated method execution time.
 
     :param function f: the decorated function
     :param str group: the group name
