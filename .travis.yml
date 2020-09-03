@@ -6,7 +6,8 @@ python:
 install:
   # We do this conditionally because it saves us some downloading if the version is the same.
   - sudo apt-get update
-  - sudo apt-get install gfortran python3-setuptools python3-sphinx
+  - sudo apt-get install gfortran python3-setuptools
+  - sudo apt-get install sphinx-doc
   # Get petsc
   #- git clone -b maint https://gitlab.com/petsc/petsc.git petsc
   # Set petsc enviroment
