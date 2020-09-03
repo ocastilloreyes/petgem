@@ -28,7 +28,7 @@ install:
   #- pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls mpi4py petsc4py h5py
 
 before_script:
-  - py.test tests/tests.py --cov=example2
+  - py.test --cov=example2 tests/tests.py 
 
 script:
   - py.test tests.py --doctest-modules --pep8 coveralls -v --cov coveralls --cov-report term-missing
