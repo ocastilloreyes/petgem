@@ -30,12 +30,6 @@ def test_mesh_functions():
     elemsF, facesN = computeFaces(elemsN, nElems)
     nFaces = facesN.shape[0]
 
-    # Verify mesh data
-    try:
-        fid = open(PAR['MODEL']['materialblock_file'])
-    except ValueError:
-        print('cannot open materialfile: ', PAR['MODEL']['materialblock_file'])
-
     try:
         nElems == 9453
     except mesh_error:
