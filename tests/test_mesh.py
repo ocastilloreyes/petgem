@@ -5,7 +5,7 @@
 import pytest
 import sys
 import numpy as np
-#from petgem.mesh import readGmshNodes, readGmshConnectivity, computeEdges, computeFaces
+from petgem.mesh import readGmshNodes, readGmshConnectivity, computeEdges, computeFaces
 #from petgem.mesh import computeBoundaryFaces, computeBoundaryEdges
 
 
