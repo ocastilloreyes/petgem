@@ -362,8 +362,7 @@ def measure_time(f = None, group = None, split = False):
 
 
 def measure_all_class_methods(Cls):
-    """"
-    Implement a decorator to measure execution time for each method.
+    """"Implement a decorator to measure execution time for each method.
 
     Args:
         f: the decorated function
