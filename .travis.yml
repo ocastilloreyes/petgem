@@ -23,7 +23,7 @@ install:
   #- export PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
   #- cd ..
   # Install petgem requirements
-  - pip install numpy
+  - pip install numpy scipy singleton_decorator pytest
   # Install petgem by git repo
   #- python3 setup.py build
   #- sudo python3 setup.py install --install-dir=$PWD
