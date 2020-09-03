@@ -307,14 +307,15 @@ class Timers():
 # Decorators for code instrumentation
 # ---------------------------------------------------------------
 def measure_time(f = None, group = None, split = False):
-    """
-    Implement a decorator for obtaining the decorated method execution time.
+    """"Implement method to measure execution time.
 
-    :param function f: the decorated function
-    :param str group: the group name
-    :param bool split: decides if all blocks in a group contribute to the same timer
-    :return: a function wrap
-    :rtype: function
+    Args:
+        f: the decorated function
+        group: the group name
+        split: decides if all blocks in a group contribute to the same timer
+    Returns:
+        a function wrap
+
     """
     def inner_function(function):
         @wraps(function)
