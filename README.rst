@@ -18,13 +18,12 @@
 .. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
    :alt: Coveralls
-.. image:: https://img.shields.io/codacy/grade/9c6d8dad560a4558a9e87dd757db9693/master.svg
+.. image:: https://img.shields.io/codacy/grade/e0a637595c6e4b0caca914913cf74777/master.svg
    :target: https://www.codacy.com/app/ocastilloreyes/petgem
    :alt: Codacy-grade
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
    :target: https://opensource.org/licenses/BSD-3-Clause
    :alt: petgem-license
-
 
 Parallel Edge-based Tool for Geophysical Electromagnetic Modelling
 ------------------------------------------------------------------
