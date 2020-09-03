@@ -12,8 +12,8 @@
 .. image:: https://travis-ci.org/ocastilloreyes/petgem.svg?branch=master
    :target: https://travis-ci.org/ocastilloreyes/petgem
    :alt: Travis-CI
-.. image:: https://badge.fury.io/py/petgem.svg
-   :target: https://badge.fury.io/py/petgem
+.. image:: https://img.shields.io/pypi/v/petgem
+   :target: https://pypi.org/project/petgem/
    :alt: Pypi-petgem
 .. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
@@ -24,6 +24,12 @@
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
    :target: https://opensource.org/licenses/BSD-3-Clause
    :alt: petgem-license
+
+
+
+
+
+
 
 Parallel Edge-based Tool for Geophysical Electromagnetic Modelling
 ------------------------------------------------------------------
