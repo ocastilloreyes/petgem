@@ -11,24 +11,29 @@
 .. image:: https://travis-ci.org/ocastilloreyes/petgem.svg?branch=master
    :target: https://travis-ci.org/ocastilloreyes/petgem
    :alt: Travis-CI
-.. image:: https://img.shields.io/pypi/v/petgem
-   :target: https://pypi.org/project/petgem/
-   :alt: Pypi-petgem
 .. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
    :alt: Coveralls
-.. image:: https://app.codacy.com/project/badge/Grade/3aa9e3a7e91d46bca312244647fdbac1
+.. image:: https://app.codacy.com/project/badge/Grade/283b8199432f4daa8526783d6630377d    
    :target: https://www.codacy.com/app/ocastilloreyes/petgem
    :alt: Codacy-grade
+.. image:: https://img.shields.io/pypi/v/petgem
+   :target: https://pypi.org/project/petgem/
+   :alt: Pypi-petgem
+.. image:: https://img.shields.io/github/v/release/ocastilloreyes/petgem
+   :target: https://github.com/ocastilloreyes/petgem/releases
+   :alt: GitHub release (latest by date)
 .. image:: https://img.shields.io/static/v1?label=Ubuntu&logo=Ubuntu&logoColor=white&message=support&color=success
    :target: https://ubuntu.com/
    :alt: Ubuntu support
-.. image:: https://img.shields.io/github/v/release/ocastilloreyes/petgem
-  :target: https://github.com/ocastilloreyes/petgem/releases
-  :alt: GitHub release (latest by date)
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
    :target: https://opensource.org/licenses/BSD-3-Clause
    :alt: petgem-license
+
+
+
+
+
 
 Parallel Edge-based Tool for Geophysical Electromagnetic Modelling
 ------------------------------------------------------------------

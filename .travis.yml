@@ -35,16 +35,13 @@ install:
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   # Install petgem requirements
   - pip install numpy scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls mpi4py petsc4py h5py
-  #- pip install pyyaml
 
 script:
-  #- python -c "import yaml"
   # Make documentation
   - cd doc
   - make html
   - cd ..
   - pytest --cov=tests/
-
 
 after_success:
   - coveralls

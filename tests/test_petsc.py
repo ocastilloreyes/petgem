@@ -34,12 +34,6 @@ def test_petsc_environment():
     ksp.setFromOptions()
     ksp.solve(b, x)
 
-    if ksp.getConvergedReason() > 0:
-        info = 0
-    
-    # Print solver iteration number
-    print('Number of solver iterations: ', info)
-
     # Destroy ksp object and petsc objects
     ksp.destroy()
     A.destroy()
