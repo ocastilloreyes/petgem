@@ -11,7 +11,7 @@
 .. image:: https://travis-ci.org/ocastilloreyes/petgem.svg?branch=master
    :target: https://travis-ci.org/ocastilloreyes/petgem
    :alt: Travis-CI
-.. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
+.. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
    :alt: Coveralls
 .. image:: https://app.codacy.com/project/badge/Grade/283b8199432f4daa8526783d6630377d
