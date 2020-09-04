@@ -28,20 +28,9 @@ def test_mesh_functions():
     elemsF, facesN = computeFaces(elemsN, nElems)
     nFaces = facesN.shape[0]
 
-    try:
-        nElems == 9453
-
-    try:
-        nNodes == 2163
-
-    try:
-        nFaces == 20039
-
-    try:
-        nEdges == 12748
-
-    try:
-        np.allclose(elemsE[0,:], np.array([10591,10600,10831,10832,10601,11465], dtype=np.int))
-
-    try:
-        np.allclose(elemsF[0,:], np.array([17369, 17370, 17400, 17977]))
+    assert nElems == 9453
+    assert nNodes == 2163
+    assert nFaces == 20039
+    assert nEdges == 12748
+    assert np.allclose(elemsE[0,:], np.array([10591,10600,10831,10832,10601,11465], dtype=np.int))
+    assert np.allclose(elemsF[0,:], np.array([17369, 17370, 17400, 17977]))
