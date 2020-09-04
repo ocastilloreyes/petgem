@@ -4,6 +4,7 @@
    :alt: petgem logo
 
 ----
+
 .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
    :target: http://petgem.bsc.es/
    :alt: Documentation Status
@@ -28,6 +29,7 @@
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
    :target: https://opensource.org/licenses/BSD-3-Clause
    :alt: petgem-license
+
 
 Parallel Edge-based Tool for Geophysical Electromagnetic Modelling
 ------------------------------------------------------------------
