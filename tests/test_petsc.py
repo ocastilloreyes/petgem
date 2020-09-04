@@ -36,9 +36,7 @@ def test_petsc_environment():
 
     if ksp.getConvergedReason() > 0:
         info = 0
-    else:
-        info = ksp.getIterationNumber()
-
+    
     # Print solver iteration number
     print('Number of solver iterations: ', info)
 
