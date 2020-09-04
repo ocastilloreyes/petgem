@@ -28,13 +28,13 @@ if __name__ == '__main__':
     # Load system setup (both parameters and dataset configuration)
     # ---------------------------------------------------------------
     # Obtain the MPI environment
-    parEnv = MPIEnvironment()
+    par_env = MPIEnvironment()
 
     # Import parameters file
-    inputSetup = InputParameters(sys.argv[3], parEnv)
+    input_setup = InputParameters(sys.argv[3], par_env)
 
     # Initialize timers
-    Timers(inputSetup.output.directory)
+    Timers(input_setup.output.directory)
 
     # ---------------------------------------------------------------
     # Print header
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     preprocessing = Preprocessing()
 
     # Run preprocessing
-    preprocessing.run(inputSetup)
+    preprocessing.run(input_setup)
 
     # ---------------------------------------------------------------
     # Initialize and execute the solver
@@ -63,16 +63,16 @@ if __name__ == '__main__':
     csem_solver = Solver()
 
     # Setup solver (import files from preprocessing stage)
-    csem_solver.setup(inputSetup)
+    csem_solver.setup(input_setup)
 
     # Assembly linear system
-    csem_solver.assembly(inputSetup)
+    csem_solver.assembly(input_setup)
 
     # Set dirichlet boundary conditions
     csem_solver.solve()
 
     # Compute electromagnetic responses
-    csem_solver.postprocess(inputSetup)
+    csem_solver.postprocess(input_setup)
 
     # ---------------------------------------------------------------
     # End of PETGEM kernel

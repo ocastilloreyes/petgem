@@ -166,9 +166,9 @@ class InputParameters(object):
 
         #input(type(self.run.cuda))
 
-        if self.run.cuda == False:
+        if self.run.cuda is False:
             self.run.cuda = False
-        elif self.run.cuda == True:
+        elif self.run.cuda is True:
             self.run.cuda = True
         else:
             Print.master('     Cuda option not supported')
@@ -179,7 +179,7 @@ class InputParameters(object):
         # ---------------------------------------------------------------
         if(parEnv.rank == 0):
             if not os.path.exists(self.output.directory):
-                 os.mkdir(self.output.directory)
+                os.mkdir(self.output.directory)
 
             # Create temporal directory
             if not os.path.exists(self.output.directory_scratch):
@@ -376,6 +376,7 @@ def measure_all_class_methods(Cls):
         def __init__(self,*args,**kwargs):
             self.oInstance = Cls(*args,**kwargs)
             self.className = self.oInstance.__class__.__name__
+
         def __getattribute__(self,s):
             try:
                 x = super(DecoratedClass, self).__getattribute__(s)
@@ -397,6 +398,7 @@ def measure_all_class_methods(Cls):
 def unitary_test():
     """Unitary test for common.py script."""
     # TODO
+
 
 # ###############################################################
 # ################             MAIN             #################

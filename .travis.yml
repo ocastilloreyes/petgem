@@ -31,11 +31,10 @@ before_install:
   - cd ..
 
 install:
-
   # Ensure PYTHONPATH is on your search path:
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   # Install petgem requirements
-  - pip install numpy scipy singleton_decorator sphinx pytest pytest-cov coveralls mpi4py petsc4py h5py
+  - pip install numpy scipy singleton_decorator sphinx pytest pyyaml pytest-cov coveralls mpi4py petsc4py h5py
 
 script:
   # Make documentation

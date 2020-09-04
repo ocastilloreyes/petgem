@@ -193,7 +193,7 @@ class Solver():
             # Get dofs indexes for i
             dofsEle = (self.dofs.getRow(i)[1].real).astype(PETSc.IntType)
 
-             # Add local contributions to global matrix
+            # Add local contributions to global matrix
             self.A.setValues(dofsEle, dofsEle, Ae, addv=PETSc.InsertMode.ADD_VALUES)
 
 

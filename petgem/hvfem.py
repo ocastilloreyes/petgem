@@ -406,11 +406,11 @@ def shape3DETet(X, Nord, NoriE, NoriF):
                 # Construct the shape functions
                 ETri, CurlETri = AncETri(GLampF[abc], GDLampF[0:N,abc], nordF, IdecF, N)
                 for k in np.arange(minIJ, maxIJ+1):
-                    for l in np.arange(minI, k-minJ+1):
-                        p = k-l
+                    for r in np.arange(minI, k-minJ+1):
+                        p = k-r
                         m += 2
-                        ShapE[0:N, m-1] = ETri[0:N, l, p-1]
-                        CurlE[0:N, m-1] = CurlETri[0:N, l, p-1]
+                        ShapE[0:N, m-1] = ETri[0:N, r, p-1]
+                        CurlE[0:N, m-1] = CurlETri[0:N, r, p-1]
 
     # BUBBLE FUNCTIONS
     # Local parameters
@@ -443,14 +443,14 @@ def shape3DETet(X, Nord, NoriE, NoriF):
 
             for j in np.arange(minIJK, maxIJK+1):
                 for k in np.arange(minIJ, j-minK+1):
-                    for l in np.arange(minI, k-minJ+1):
-                        p = k-l
+                    for r in np.arange(minI, k-minJ+1):
+                        p = k-r
                         q = j-k
                         m += 3
 
-                        ShapE[0:N, m-1] = ETri[0:N,l,p-1]*homLbet[k-1,q-1]
-                        DhomLbetxETri = np.cross(DhomLbet[0:N,k-1,q-1], ETri[0:N,l,p-1])
-                        CurlE[0:N, m-1] = homLbet[k-1,q-1]*CurlETri[0:N,l,p-1] + DhomLbetxETri
+                        ShapE[0:N, m-1] = ETri[0:N,r,p-1]*homLbet[k-1,q-1]
+                        DhomLbetxETri = np.cross(DhomLbet[0:N,k-1,q-1], ETri[0:N,r,p-1])
+                        CurlE[0:N, m-1] = homLbet[k-1,q-1]*CurlETri[0:N,r,p-1] + DhomLbetxETri
 
     # Get total degrees of freedom
     # First order  = 6

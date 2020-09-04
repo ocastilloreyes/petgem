@@ -3,10 +3,9 @@
 # Contact: octavio.castillo@bsc.es
 
 import pytest
-import sys
 import numpy as np
 from petgem.mesh import readGmshNodes, readGmshConnectivity, computeEdges, computeFaces
-from petgem.mesh import computeBoundaryFaces, computeBoundaryEdges
+from petgem.mesh import computeBoundaryEdges
 
 
 def test_mesh_functions():
@@ -18,7 +17,7 @@ def test_mesh_functions():
     # Read nodes
     nodes, _ = readGmshNodes(mesh_filename)
     nNodes = nodes.shape[0]
-    
+
     # Read connectivity
     elemsN, nElems = readGmshConnectivity(mesh_filename)
 
@@ -49,3 +48,13 @@ def test_mesh_functions():
         nEdges == 12748
     except:
         print("Number of edges is not consistent.")
+
+    try:
+        np.allclose(elemsE[0,:], np.array([10591,10600,10831,10832,10601,11465], dtype=np.int))
+    except:
+        print("Edges connectivity is not consistent.")
+
+    try:
+        np.allclose(elemsF[0,:], np.array([17369, 17370, 17400, 17977]))
+    except:
+        print("Faces connectivity is not consistent.")
