@@ -1,5 +1,5 @@
 **petgem**
-======
+==========
 
 **petgem** is a parallel python code for 3D Controlled-Source
 Electromagnetic Method (3D CSEM) in geophysics using high-order edge finite

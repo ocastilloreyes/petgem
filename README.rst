@@ -4,7 +4,6 @@
    :alt: petgem logo
 
 ----
-
 .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
    :target: http://petgem.bsc.es/
    :alt: Documentation Status
@@ -14,7 +13,7 @@
 .. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=master
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
    :alt: Coveralls
-.. image:: https://app.codacy.com/project/badge/Grade/283b8199432f4daa8526783d6630377d    
+.. image:: https://app.codacy.com/project/badge/Grade/283b8199432f4daa8526783d6630377d
    :target: https://www.codacy.com/app/ocastilloreyes/petgem
    :alt: Codacy-grade
 .. image:: https://img.shields.io/pypi/v/petgem
@@ -29,11 +28,6 @@
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
    :target: https://opensource.org/licenses/BSD-3-Clause
    :alt: petgem-license
-
-
-
-
-
 
 Parallel Edge-based Tool for Geophysical Electromagnetic Modelling
 ------------------------------------------------------------------
