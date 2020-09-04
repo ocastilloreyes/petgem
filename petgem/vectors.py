@@ -127,7 +127,7 @@ def invConnectivity(M, nP):
         nn[iele] += np.int(1)
 
     # Delete zeros of matrix N
-    N = np.delete(N, np.arange(np.max(nn)-1, valence+1), axis=1)
+    N = np.delete(N, np.arange(np.max(nn)-1, valence), axis=1)
 
     return N
 
