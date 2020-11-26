@@ -253,7 +253,7 @@ class Solver():
             dofsSource = source_data[50::].astype(PETSc.IntType)
 
             # Compute jacobian for srcElem
-            _, invjacobian = computeJacobian(coordEle)
+            jacobian, invjacobian = computeJacobian(coordEle)
 
             # Compute global orientation for srcElem
             edge_orientation, face_orientation = computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,edgesFace)
@@ -262,7 +262,7 @@ class Solver():
             XiEtaZeta = tetrahedronXYZToXiEtaZeta(coordEle, model.src_position)
 
             # Compute basis for srcElem
-            basis = computeBasisFunctions(edge_orientation, face_orientation, invjacobian, model.basis_order, XiEtaZeta)
+            basis, _ = computeBasisFunctions(edge_orientation, face_orientation, jacobian, invjacobian, model.basis_order, XiEtaZeta)
 
             # Compute integral
             src_contribution = np.matmul(field, basis[:,:,0])
@@ -352,6 +352,9 @@ class Solver():
         run = inputSetup.run
         output = inputSetup.output
 
+        # Constant parameter
+        omega = model.frequency*2.*np.pi
+
         # Ranges over receivers
         Istart_receivers, Iend_receivers = self.receivers.getOwnershipRange()
 
@@ -399,9 +402,15 @@ class Solver():
         # ---------------------------------------------------------------
         # Allocate parallel arrays for output
         # ---------------------------------------------------------------
-        receiver_fieldX = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        receiver_fieldY = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        receiver_fieldZ = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
+        # Electric field (E-field)
+        receiver_fieldEx = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
+        receiver_fieldEy = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
+        receiver_fieldEz = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
+        # Magnetic field (H-field)
+        receiver_fieldHx = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
+        receiver_fieldHy = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
+        receiver_fieldHz = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
+        # Receiver coordinates
         receiver_coordinatesX = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
         receiver_coordinatesY = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
         receiver_coordinatesZ = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
@@ -439,7 +448,7 @@ class Solver():
             #dofsSource = receiver_data[53::].astype(PETSc.IntType)
 
             # Compute jacobian for i
-            _, invjacobian = computeJacobian(coordEle)
+            jacobian, invjacobian = computeJacobian(coordEle)
 
             # Compute global orientation for i
             edge_orientation, face_orientation = computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,edgesFace)
@@ -448,7 +457,7 @@ class Solver():
             XiEtaZeta = tetrahedronXYZToXiEtaZeta(coordEle, coordReceiver)
 
             # Compute basis for i
-            basis = computeBasisFunctions(edge_orientation, face_orientation, invjacobian, model.basis_order, XiEtaZeta)
+            basis, curl_basis = computeBasisFunctions(edge_orientation, face_orientation, jacobian, invjacobian, model.basis_order, XiEtaZeta)
 
             # Get element fields
             local_field = x_local[k*num_dof_in_element : (k * num_dof_in_element) + num_dof_in_element]
@@ -457,6 +466,9 @@ class Solver():
             Ex = 0.
             Ey = 0.
             Ez = 0.
+            Hx = 0.
+            Hy = 0.
+            Hz = 0.
 
             # Interpolate electric field
             for j in np.arange(num_dof_in_element):
@@ -467,13 +479,28 @@ class Solver():
                 Ey += Rfield*basis[1,j] + np.sqrt(-1. + 0.j)*Ifield*basis[1,j]
                 Ez += Rfield*basis[2,j] + np.sqrt(-1. + 0.j)*Ifield*basis[2,j]
 
+                # Hxyz[i] = Hxyz[i] + real_part*curl_basis + imag_part*curl_basis
+                Hx += Rfield*curl_basis[0,j] + np.sqrt(-1. + 0.j)*Ifield*curl_basis[0,j]
+                Hy += Rfield*curl_basis[1,j] + np.sqrt(-1. + 0.j)*Ifield*curl_basis[1,j]
+                Hz += Rfield*curl_basis[2,j] + np.sqrt(-1. + 0.j)*Ifield*curl_basis[2,j]
+
             # Increase counter over local vector (x_local)
             k += 1
 
-            # Set total field components for i
-            receiver_fieldX.setValue(i, Ex, addv=PETSc.InsertMode.INSERT_VALUES)
-            receiver_fieldY.setValue(i, Ey, addv=PETSc.InsertMode.INSERT_VALUES)
-            receiver_fieldZ.setValue(i, Ez, addv=PETSc.InsertMode.INSERT_VALUES)
+            # Set total electric field components for i
+            receiver_fieldEx.setValue(i, Ex, addv=PETSc.InsertMode.INSERT_VALUES)
+            receiver_fieldEy.setValue(i, Ey, addv=PETSc.InsertMode.INSERT_VALUES)
+            receiver_fieldEz.setValue(i, Ez, addv=PETSc.InsertMode.INSERT_VALUES)
+
+            # Following Maxwell equations, apply constant factor to magnetic field
+            Hx = (Hx/omega)*np.sqrt(-1. + 0.j)
+            Hy = (Hy/omega)*np.sqrt(-1. + 0.j)
+            Hz = (Hz/omega)*np.sqrt(-1. + 0.j)
+
+            # Set total magnetic field components for i
+            receiver_fieldHx.setValue(i, Hx, addv=PETSc.InsertMode.INSERT_VALUES)
+            receiver_fieldHy.setValue(i, Hy, addv=PETSc.InsertMode.INSERT_VALUES)
+            receiver_fieldHz.setValue(i, Hz, addv=PETSc.InsertMode.INSERT_VALUES)
 
             # Set coordinates for i
             receiver_coordinatesX.setValue(i, coordReceiver[0], addv=PETSc.InsertMode.INSERT_VALUES)
@@ -481,30 +508,45 @@ class Solver():
             receiver_coordinatesZ.setValue(i, coordReceiver[2], addv=PETSc.InsertMode.INSERT_VALUES)
 
         # Start global assembly
-        receiver_fieldX.assemblyBegin()
-        receiver_fieldY.assemblyBegin()
-        receiver_fieldZ.assemblyBegin()
+        receiver_fieldEx.assemblyBegin()
+        receiver_fieldEy.assemblyBegin()
+        receiver_fieldEz.assemblyBegin()
+        receiver_fieldHx.assemblyBegin()
+        receiver_fieldHy.assemblyBegin()
+        receiver_fieldHz.assemblyBegin()
         receiver_coordinatesX.assemblyBegin()
         receiver_coordinatesY.assemblyBegin()
         receiver_coordinatesZ.assemblyBegin()
 
         # End global assembly
-        receiver_fieldX.assemblyEnd()
-        receiver_fieldY.assemblyEnd()
-        receiver_fieldZ.assemblyEnd()
+        receiver_fieldEx.assemblyEnd()
+        receiver_fieldEy.assemblyEnd()
+        receiver_fieldEz.assemblyEnd()
+        receiver_fieldHx.assemblyEnd()
+        receiver_fieldHy.assemblyEnd()
+        receiver_fieldHz.assemblyEnd()
         receiver_coordinatesX.assemblyEnd()
         receiver_coordinatesY.assemblyEnd()
         receiver_coordinatesZ.assemblyEnd()
 
         # Write intermediate results
-        out_path = output.directory_scratch + '/fieldsX.dat'
-        writePetscVector(out_path, receiver_fieldX, communicator=None)
+        out_path = output.directory_scratch + '/fieldsEx.dat'
+        writePetscVector(out_path, receiver_fieldEx, communicator=None)
 
-        out_path = output.directory_scratch + '/fieldsY.dat'
-        writePetscVector(out_path, receiver_fieldY, communicator=None)
+        out_path = output.directory_scratch + '/fieldsEy.dat'
+        writePetscVector(out_path, receiver_fieldEy, communicator=None)
 
-        out_path = output.directory_scratch + '/fieldsZ.dat'
-        writePetscVector(out_path, receiver_fieldZ, communicator=None)
+        out_path = output.directory_scratch + '/fieldsEz.dat'
+        writePetscVector(out_path, receiver_fieldEz, communicator=None)
+
+        out_path = output.directory_scratch + '/fieldsHx.dat'
+        writePetscVector(out_path, receiver_fieldHx, communicator=None)
+
+        out_path = output.directory_scratch + '/fieldsHy.dat'
+        writePetscVector(out_path, receiver_fieldHy, communicator=None)
+
+        out_path = output.directory_scratch + '/fieldsHz.dat'
+        writePetscVector(out_path, receiver_fieldHz, communicator=None)
 
         out_path = output.directory_scratch + '/receiver_coordinatesX.dat'
         writePetscVector(out_path, receiver_coordinatesX, communicator=None)
@@ -517,14 +559,23 @@ class Solver():
 
         # Write final solution
         if MPIEnvironment().rank == 0:
-            input_file = output.directory_scratch + '/fieldsX.dat'
+            input_file = output.directory_scratch + '/fieldsEx.dat'
             electric_fieldsX = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
-            input_file = output.directory_scratch + '/fieldsY.dat'
+            input_file = output.directory_scratch + '/fieldsEy.dat'
             electric_fieldsY = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
-            input_file = output.directory_scratch + '/fieldsZ.dat'
+            input_file = output.directory_scratch + '/fieldsEz.dat'
             electric_fieldsZ = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
+
+            input_file = output.directory_scratch + '/fieldsHx.dat'
+            magnetic_fieldsX = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
+
+            input_file = output.directory_scratch + '/fieldsHy.dat'
+            magnetic_fieldsY = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
+
+            input_file = output.directory_scratch + '/fieldsHz.dat'
+            magnetic_fieldsZ = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
             input_file = output.directory_scratch + '/receiver_coordinatesX.dat'
             recv_coordX = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
@@ -536,7 +587,7 @@ class Solver():
             recv_coordZ = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
 
             # Allocate
-            data_fields = np.zeros((total_num_receivers, 3), dtype=np.complex)
+            data_fields = np.zeros((total_num_receivers, 6), dtype=np.complex)
             data_coordinates = np.zeros((total_num_receivers, 3), dtype=np.float)
 
             # Loop over receivers
@@ -546,17 +597,22 @@ class Solver():
                 data_fields[i, 1] = electric_fieldsY.getValue(i)
                 data_fields[i, 2] = electric_fieldsZ.getValue(i)
 
+                # Get magnetic field components
+                data_fields[i, 3] = magnetic_fieldsX.getValue(i)
+                data_fields[i, 4] = magnetic_fieldsY.getValue(i)
+                data_fields[i, 5] = magnetic_fieldsZ.getValue(i)
+
                 # Get coordinates
                 data_coordinates[i, 0] = recv_coordX.getValue(i).real
                 data_coordinates[i, 1] = recv_coordY.getValue(i).real
                 data_coordinates[i, 2] = recv_coordZ.getValue(i).real
 
             # Write final output
-            output_file = output.directory + '/electric_fields.h5'
+            output_file = output.directory + '/fields.h5'
             fileID = h5py.File(output_file, 'w')
 
             # Create coordinates dataset
-            _ = fileID.create_dataset('electric_fields', data=data_fields)
+            _ = fileID.create_dataset('fields', data=data_fields)
             _ = fileID.create_dataset('receiver_coordinates', data=data_coordinates)
 
             # Close file

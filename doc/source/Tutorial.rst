@@ -46,7 +46,7 @@ input files:
 
 #. A mesh file (current version supports Gmsh meshes)
 #. A conductivity model associated with the materials defined in the mesh file
-#. A list of receivers positions in hdf5 format for the electric responses post-processing
+#. A list of receivers positions in hdf5 format for the electromagnetic responses post-processing
 #. A ``params.yaml`` file where are defined the 3D CSEM parameters
 #. A ``petsc.opts`` file where are defined options for `PETSc <https://www.mcs.anl.gov/petsc/>`_ solvers
 #. A ``kernel.py`` script which manage the pre-processing and modelling tasks respectively
@@ -136,5 +136,5 @@ Visualization of results
 Once a solution of a 3D CSEM survey has been obtained, it should be
 post-processed by using a visualization program. PETGEM does not do the
 visualization by itself, but it generates output file (hdf5 format is supported)
-with the electric responses at receivers positions. It also gives timing values
+with the electromagnetic responses (Ex, Ey, Ez, Hx, Hy, Hz) at receivers positions. It also gives timing values
 in order to evaluate the performance.

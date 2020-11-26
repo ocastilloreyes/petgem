@@ -58,7 +58,7 @@ Dependencies
 
 -  A matching version of PETSc\_
 
--  Python\_ (versions 3.5.2, 3.6.3, 3.6.9, 3.12.0 have been tested).
+-  Python\_ (versions 3.5.2, 3.6.3, 3.6.9, 3.12.0, 3.14.0 have been tested).
 
 -  A recent NumPy\_ release.
 

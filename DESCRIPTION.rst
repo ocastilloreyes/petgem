@@ -31,15 +31,15 @@ Install
 
 * Following commands may require root privileges
 
-* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7, 3.8, 3.9, and 3.12 have been tested)
+* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7, 3.8, 3.9, 3.12, and 3.14 have been tested)
 
-* Uncompress the PETSc archive (in this example, using PETSc 3.12.0)::
+* Uncompress the PETSc archive (in this example, using PETSc 3.14.0)::
 
-  $ tar zxvf petsc-3.12.0.tar.gz
+  $ tar zxvf petsc-3.14.0.tar.gz
 
 * Configure and build PETSc. The configuration options depend on the calculations you want to perform (complex- or real-valued) as well as your compiler/MPI/Blas/Lapack setup. For **petgem** executions, **PETSC MUST BE BUILD FOR COMPLEX-VALUED NUMBERS**. In order to avoid incompatibilities between PETSC, petsc4py and **petgem**, we highly recommend the following configuration lines. Please, visit PETSc website for advanced configuration options. If you have a clean environment (not working MPI/Blas/Lapack), then run::
 
-  $ cd petsc-3.12.0
+  $ cd petsc-3.14.0
   $ export PETSC_DIR=$PWD
   $ export PETSC_ARCH=arch-linux2-c-debug
 

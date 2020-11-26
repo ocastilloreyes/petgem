@@ -238,18 +238,19 @@ is the modelling parameters file for PETGEM.
 
 PETGEM solves the problem and outputs the solution to the ``output.directory/`` path.
 The output file will be in h5py format. By default, the file structure contains a
-``electric_fields`` dataset and a ``receiver_coordinates`` dataset. In example, if the
-model has 3 receivers, ``electric_fields.h5`` would contain the three
-components (X, Y, Z) of the total electric field responses as follows (``electric_fields``):
+``fields`` dataset and a ``receiver_coordinates`` dataset. In example, if the
+model has 3 receivers, ``fields.h5`` would contain six components (Ex, Ey, Ez, Hx, Hy, Hz)
+of the total electromagnetic field responses as follows (``fields`` only for illustrative
+purposes):
 
 .. code-block:: python
 
-                 X-component	                                 Y-component    		                                   Z-component
-  -4.5574552863437594e-13+7.1233021878258324e-13j 	4.6739135897834993e-14+2.5366912793221808e-14j 	  -3.1475221375383305e-13+3.7062683392960539e-13j
-  -6.3279941549058795e-13+7.1644275969040401e-13j 	9.0092273989022595e-14+5.6392191941229304e-14j 	  -5.3662476008883527e-13+3.7808731666190081e-13j
-  -1.0010652368597410e-12+7.0402832224144669e-13j 	1.0689234928043421e-13+3.6703286553521255e-14j 	  -7.8662575609351628e-13+3.6350095199855107e-13j
+        Ex-component	           Ey-component              Ez-component                 Hx-component	           Hy-component              Hz-component
+  -4.5574e-13+7.1233e-13j 	4.6739e-14+2.5366e-14j 	  -3.1475e-13+3.7062e-13j     -4.5574e-13+7.1233e-13j 	4.6739e-14+2.5366e-14j 	  -3.1475e-13+3.7062e-13j
+  -6.3279e-13+7.1644e-13j 	9.0092e-14+5.6392e-14j 	  -5.3662e-13+3.7808e-13j     -6.3279e-13+7.1644e-13j 	9.0092e-14+5.6392e-14j 	  -5.3662e-13+3.7808e-13j
+  -1.0010e-12+7.0402e-13j 	1.0689e-13+3.6703e-14j 	  -7.8662e-13+3.6350e-13j     -1.0010e-12+7.0402e-13j 	1.0689e-13+3.6703e-14j 	  -7.8662e-13+3.6350e-13j
 
-It is worth to mention the fields will be separated by real and imaginary component. On
+It is worth to mention the fields will be separated by real and imaginary component.On
 the other hand, the receiver coordinates as follows (``receiver_coordinates``):
 
 .. code-block:: python
@@ -268,7 +269,7 @@ the next work-flow:
 #. The problem sets up its domain, sub-domains, source, solver. This stage include the computation of the main data structures
 #. Parallel assembling of :math:`Ax=b`.
 #. The solution is obtained in parallel by calling a ``ksp()`` `PETSc <https://www.mcs.anl.gov/petsc/>`__ object.
-#. Interpolation of electromagnetic responses and post-processing parallel stage
+#. Interpolation of electromagnetic (electric and magnetic) responses and post-processing parallel stage
 #. Finally the solution can be stored by calling ``solver.postprocess()`` method. Current version support `h5py <https://pypi.org/project/h5py/>`__ format.
 
 Based on previous work-flow, any 3D CSEM modelling requires the following

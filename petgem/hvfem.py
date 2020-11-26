@@ -1799,7 +1799,7 @@ def tetrahedronXYZToXiEtaZeta(eleNodes, points):
     return XiEtaZeta
 
 
-def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, points):
+def computeBasisFunctions(edge_orientation, face_orientation, jacobian, invjacob, Nord, points):
     """Compute the basis function for a given element.
 
     :param ndarray edges_orientation: orientation for edges
@@ -1808,6 +1808,8 @@ def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, po
     :param ndarray invjacob: inverse of jacobian matrix
     :param int Nord: polynomial order of nedelec basis functions
     :param ndarray points: spatial points at which basis functions will be computed
+    :return: basis functions and its curl for p-order=Nord
+    :rtype: ndarray
     """
     # ---------------------------------------------------------------
     # Initialization
@@ -1824,6 +1826,7 @@ def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, po
 
     # Allocate
     basis = np.zeros((3, num_dof_in_element, num_points), dtype=np.float)
+    curl_basis = np.zeros((3, num_dof_in_element, num_points), dtype=np.float)
 
     for i in np.arange(num_points):
         # Get point coordinates
@@ -1836,7 +1839,7 @@ def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, po
         NoriF = face_orientation
 
         # Compute basis for iPoint
-        NrdofE, ShapE, _ = shape3DETet(X, Nord_vector, NoriE, NoriF)
+        NrdofE, ShapE, CurlE = shape3DETet(X, Nord_vector, NoriE, NoriF)
 
         # Verify consistency of number of dofs for this point
         if (NrdofE != num_dof_in_element):
@@ -1849,10 +1852,16 @@ def computeBasisFunctions(edge_orientation, face_orientation, invjacob, Nord, po
         # Ni=Ni in real element
         Ni_real = np.matmul(invjacob, Niref)
 
-        # Store basis functions for i
-        basis[:,:,i] = Ni_real
+        # Curl_real = curl in real element
+        Curl_real = np.matmul(np.transpose(jacobian), CurlE[0:3,0:NrdofE]/np.linalg.det(np.transpose(jacobian)))
+        #Curl_real = np.matmul(jacobian, CurlE[0:3,0:NrdofE]/np.linalg.det(np.transpose(jacobian)))
 
-    return basis
+
+        # Store basis functions and its curl for i
+        basis[:,:,i] = Ni_real
+        curl_basis[:,:,i] = Curl_real
+
+    return basis, curl_basis
 
 
 def unitary_test():

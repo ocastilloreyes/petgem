@@ -20,6 +20,14 @@ Papers:
 
 Conferences:
 
+* Co-author.  Open-source lanscape for Three-Dimensional Controlled-Source Electromagnetic Modeling. Online AGU Fall Meeting. December 2020.
+* Castillo-Reyes, O. Control Source Electromagnetic test in the Vallès Basin (Spain) for geothermal characterization: experiment setup and numerical simulations. Online AGU Fall Meeting. December 2020.
+* Castillo-Reyes, O. Land CSEM simulations and experimental test using metallic casing in a geothermal exploration context: Vallés Basin (NE Spain) case study. Online MATHROCKS Workshop on Simulation and Inversion Methods in Geophysics. Workshop virtual organized by the Institut National de Recherche en Informatique et en Automatique – INRIA (Pau University, France) and University of the Basque Country (Spain). November 2020.
+* Castillo-Reyes, O. Electromagnetic modeling for geothermal resources exploration. PIXIL Virtual Workshop. Virtual conference organized by the Institut National de Recherche en Informatique et en Automatique – INRIA. Pau University, France. May 2020.
+* Castillo-Reyes, O. HPC with python for numerical modeling in geophysics. Workshop on mathematical and computational modelling on the Earth. LaCaN, Polytechnic University of Catalonia, Barcelona, Spain. May 2019.
+* Castillo-Reyes, O. HPC for numerical simulation in geophysics. 7° Congreso metropolitano de modelado y simulación numérica. National Autonomous University of Mexico – UNAM. CDMX, Mexico. May 2019.
+* Castillo-Reyes, O. Electromagnetic modeling using Nédélec elements of high-order and HPC. XXXIX Ibero-Latin American Congress on Computational Methods in Engineering – CILAMCE. Sorbonne Universités. Paris / Compiègne, France. November 2018.
+* Castillo-Reyes, O. HPC code development using Python. Mexican Supercomputing Network annual meeting – RedMexSu. University of Guadalajara. Guadajalara, Mexico. October 2018.
 * Castillo-Reyes, O. HPC geophysical electromagnetic modeling. Fifth International Congress on Multiphysics, Multiscale, and Optimization problems. University of the Basque Country. Bilbao, Spain. May 2018.
 * Castillo-Reyes, O. Python performance for HPC geophysical applications. 9th International Supercomputing Conference in Mexico – ISUM 2018. Red Mexicana de Supercómputo. Mérida, Yucatán, Mexico. March 2018.
 * Castillo-Reyes, O. Overview of numerical techniques and applications for CSEM/MT geophysical surveys. SIAM Conference on Mathematical and Computational Issues in the Geosciences. University Erlangen-Nürnberg. Erlangen, Germany. September 2017.
