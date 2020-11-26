@@ -8,8 +8,8 @@
 .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
    :target: http://petgem.bsc.es/
    :alt: Documentation Status
-.. image:: https://travis-ci.org/ocastilloreyes/petgem.svg?branch=master
-   :target: https://travis-ci.org/ocastilloreyes/petgem
+.. image:: https://travis-ci.com/ocastilloreyes/petgem.svg?branch=master
+   :target: https://travis-ci.com/ocastilloreyes/petgem
    :alt: Travis-CI
 .. image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg
    :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=master
