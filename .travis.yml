@@ -11,6 +11,7 @@ before_install:
   - git clone -b release https://gitlab.com/petsc/petsc.git petsc
   # Set petsc enviroment
   - cd petsc
+  - git checkout v3.14
   - export PETSC_DIR=$PWD
   - export PETSC_ARCH=arch-linux2-c-debug
   # Then, build and install PETSc:
