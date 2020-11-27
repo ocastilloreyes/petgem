@@ -34,16 +34,16 @@ before_install:
 install:
   # Ensure PYTHONPATH is on your search path:
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
-  # Install python binding
+  # Install petgem requirements
+  - pip install numpy scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls mpi4py h5py
+  # Install python binding for petsc
   - cd petsc/src/binding/petsc4py
   - python setup.py build
   - sudo python setup.py install
   - cd ..
   - rm -rf petsc4py
   - cd ../../../
-  # Install petgem requirements
-  - pip install numpy scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls mpi4py h5py
-
+  
 script:
   # Make documentation
   - cd doc
