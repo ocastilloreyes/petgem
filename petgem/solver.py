@@ -353,7 +353,9 @@ class Solver():
         output = inputSetup.output
 
         # Constant parameter
-        omega = model.frequency*2.*np.pi
+        omega                 = model.frequency*2.*np.pi
+        mu                    = 4.*np.pi*1e-7
+        Const                 = np.sqrt(-1. + 0.j)*omega*mu
 
         # Ranges over receivers
         Istart_receivers, Iend_receivers = self.receivers.getOwnershipRange()
@@ -493,9 +495,9 @@ class Solver():
             receiver_fieldEz.setValue(i, Ez, addv=PETSc.InsertMode.INSERT_VALUES)
 
             # Following Maxwell equations, apply constant factor to magnetic field
-            Hx = (Hx/omega)*np.sqrt(-1. + 0.j)
-            Hy = (Hy/omega)*np.sqrt(-1. + 0.j)
-            Hz = (Hz/omega)*np.sqrt(-1. + 0.j)
+            Hx = Hx/Const
+            Hy = Hy/Const
+            Hz = Hz/Const
 
             # Set total magnetic field components for i
             receiver_fieldHx.setValue(i, Hx, addv=PETSc.InsertMode.INSERT_VALUES)
