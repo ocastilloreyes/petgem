@@ -8,7 +8,7 @@ main aspects of the PETGEM work-flow. Each example has the
 following structure:
 
 #. ``Readme.txt``. Short description about what the example does.
-#. ``params.yaml``. Physical parameters for the 3D CSEM survey.
+#. ``params.yaml``. Physical parameters for the 3D CSEM/MT survey.
 #. ``petsc.opts``. Parameters for `PETSc <https://www.mcs.anl.gov/petsc/>`_ solvers.
 #. Data for modeling (mesh, conductivity model and receivers list)
 
@@ -21,7 +21,7 @@ Basic notions
 -------------
 The use of PETGEM can be summarized in three steps: pre-processing, modelling and
 post-processing. The pre-processing and modelling phases requires parameter files
-where the physical conditions of the 3D CSEM model are defined. In the
+where the physical conditions of the 3D CSEM/MT model are defined. In the
 ``params.yaml`` the 3D CSEM survey is described using several keywords
 that allow one to define the main physical parameters and necessary file
 locations. In sake of simplicity and in order to avoid a specific parser, the
@@ -31,7 +31,7 @@ dictionary names and his key names MUST NOT BE changed. See Preprocessing
 parameters file description and Modelling parameters file description
 in :ref:`Manual` section for a full explanation of those keywords.
 
-For a general 3D CSEM survey, the PETGEM work-flow can be summarize as follows:
+For a general 3D CSEM/MT survey, the PETGEM work-flow can be summarize as follows:
 
 #. Following the contents of the ``params.yaml`` file, a set of data are preprocessed (mesh, conductivity model and receivers positions) by the ``kernel.py``
 #. A problem instance is created
@@ -41,13 +41,13 @@ For a general 3D CSEM survey, the PETGEM work-flow can be summarize as follows:
 #. Interpolation of electromagnetic responses & post-processing parallel stage
 #. Finally the solution can be stored by calling ``postprocess()`` method. Current version support hdf5.
 
-Based on previous work-flow, any 3D CSEM modelling requires the following
+Based on previous work-flow, any 3D CSEM/MT modelling requires the following
 input files:
 
 #. A mesh file (current version supports Gmsh meshes)
-#. A conductivity model associated with the materials defined in the mesh file
+#. A conductivity/resistivity model associated with the materials defined in the mesh file
 #. A list of receivers positions in hdf5 format for the electromagnetic responses post-processing
-#. A ``params.yaml`` file where are defined the 3D CSEM parameters
+#. A ``params.yaml`` file where are defined the 3D CSEM/MT parameters
 #. A ``petsc.opts`` file where are defined options for `PETSc <https://www.mcs.anl.gov/petsc/>`_ solvers
 #. A ``kernel.py`` script which manage the pre-processing and modelling tasks respectively
 
@@ -83,7 +83,7 @@ See :ref:`Model parameters file` section for more details about
 Model parameters file
 ---------------------
 
-By definition, any 3D CSEM survey should include: physical parameters, a mesh
+By definition, any 3D CSEM/MT survey should include: physical parameters, a mesh
 file, source and receivers files. These data are included in the
 ``params.yanl`` file. Additionally, options for
 `PETSc <https://www.mcs.anl.gov/petsc/>`_ solvers are defined in a
@@ -102,26 +102,41 @@ A glance of ``params.yaml`` file is the following:
     ###############################################################################
     # Model parameters
     model:
-      mesh_file: examples/DIPOLE1D.msh      # Mesh file (gmsh format v2)
-      basis_order: 1                        # Vector basis order (1,2,3,4,5,6)
-      frequency: 2.0                        # Frequency
-      src_position: [1750., 1750., -975.]   # Source position (xyz)
-      src_azimuth: 0                        # Source rotation in xy plane
-      src_dip: 0                            # Source rotation in xz plane
-      src_current: 1.                       # Source current
-      src_length: 1.                        # Source length
-      sigma_horizontal: [1., 0.01, 1., 3.3333]   # Horizontal conductivity for each material
-      sigma_vertical: [1., 0.01, 1., 3.3333]     # Vertical conductivity for each material
-      receivers_file: examples/receiver_pos.h5 # Receiver positions file (xyz)
+      mode: csem    # Modeling mode: csem or mt
+      csem:
+        sigma:
+          #file: 'my_file.h5'                # Conductivity model file
+          horizontal: [1., 0.01, 1., 3.3333]  # Horizontal conductivity
+          vertical: [1., 0.01, 1., 3.3333]    # Vertical conductivity
+        source:
+          frequency: 2.                     # Frequency (Hz)
+          position: [1750., 1750., -975.]   # Source position (xyz)
+          azimuth: 0.                       # Source rotation in xy plane (in degrees)
+          dip: 0.                           # Source rotation in xz plane (in degrees)
+          current: 1.                       # Source current (Am)
+          length: 1.                        # Source length  (m)
+      mt:
+        sigma:
+          file: 'my_file.h5'                # Conductivity model file
+          #horizontal: [1.e-10, 0.01]       # Horizontal conductivity
+          #vertical: [1.e-10, 0.01]         # Vertical conductivity
+        frequency: 4.                      # Frequency (Hz)
+        polarization: 'xy'                 # Polarization mode for mt (xyz)
+
+      # Common parameters for all models
+      mesh: examples/case_CSEM/DIPOLE1D.msh   # Mesh file (gmsh format v2)
+      receivers: examples/case_CSEM/receiver_pos.h5 # Receiver positions file (xyz)
 
     # Execution parameters
     run:
-      cuda: False                           # Flag to activate/deactivate cuda support
+      nord: 1       # Vector basis order (1,2,3,4,5,6)
+      cuda: False   # Cuda support (True or False)
 
     # Output parameters
     output:
-      directory: examples/out               # Directory for output (results)
-      directory_scratch: examples/tmp       # Directory for temporal files
+      vtk: True                               # Postprocess vtk file (EM fields, conductivity)
+      directory: examples/case_CSEM/out           # Directory for output (results)
+      directory_scratch: examples/case_CSEM/tmp   # Directory for temporal files
 
 A template of this file is included in ``examples/``
 of the PETGEM source tree. Additionally, a freely available copy of this file
@@ -133,8 +148,9 @@ a deep description about this file.
 
 Visualization of results
 ------------------------
-Once a solution of a 3D CSEM survey has been obtained, it should be
+Once a solution of a 3D CSEM/MT survey has been obtained, it should be
 post-processed by using a visualization program. PETGEM does not do the
 visualization by itself, but it generates output file (hdf5 format is supported)
-with the electromagnetic responses (Ex, Ey, Ez, Hx, Hy, Hz) at receivers positions. It also gives timing values
+with the electromagnetic responses (Ex, Ey, Ez, Hx, Hy, Hz) for CSEM and the
+apparent resistivities and phases for MT. It also gives timing values
 in order to evaluate the performance.

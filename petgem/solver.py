@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-"""Define functions a 3D CSEM solver using high-order vector finite element method (HEFEM)."""
+"""Define functions a 3D CSEM/MT solver using high-order vector finite element method (HEFEM)."""
 
 # ---------------------------------------------------------------
 # Load python modules
@@ -10,6 +10,7 @@ import numpy as np
 from petsc4py import PETSc
 import h5py
 import shutil
+from mpi4py import MPI
 
 # ---------------------------------------------------------------
 # Load petgem modules (BSC)
@@ -20,6 +21,10 @@ from .parallel import MPIEnvironment, createSequentialVector
 from .parallel import writePetscVector
 from .hvfem import computeJacobian, computeElementOrientation, computeElementalMatrices, computeSourceVectorRotation
 from .hvfem import tetrahedronXYZToXiEtaZeta, computeBasisFunctions
+from .hvfem import getNormalVector, get2DJacobDet, compute2DGaussPoints
+from .hvfem import transform2Dto3DInReferenceElement, getRealFromReference, computeBasisFunctionsReferenceElement
+from .hvfem import getFaceByLocalNodes, getNeumannBCface
+from .mt1d import eval_MT1D
 
 # ###############################################################
 # ################     CLASSES DEFINITION      ##################
@@ -45,60 +50,79 @@ class Solver():
         Timers()["Setup"].start()
 
         # Parameters shortcut (for code legibility)
+        model = inputSetup.model
         output = inputSetup.output
+        out_dir = output.get('directory_scratch')
 
         Print.master('     Importing files')
+
+        # ---------------------------------------------------------------
+        # Obtain the MPI environment
+        # ---------------------------------------------------------------
+        parEnv = MPIEnvironment()
 
         # ---------------------------------------------------------------
         # Import files
         # ---------------------------------------------------------------
         # Read nodes coordinates
-        input_file = output.directory_scratch + '/nodes.dat'
+        input_file = out_dir + '/nodes.dat'
         self.nodes = readPetscMatrix(input_file, communicator=None)
 
         # elements-nodes connectivity
-        input_file = output.directory_scratch + '/meshConnectivity.dat'
+        input_file = out_dir  + '/meshConnectivity.dat'
         self.elemsN = readPetscMatrix(input_file, communicator=None)
 
         # elements-edges connectivity
-        input_file = output.directory_scratch + '/edges.dat'
+        input_file = out_dir + '/edges.dat'
         self.elemsE = readPetscMatrix(input_file, communicator=None)
 
         # edges-nodes connectivity
-        input_file = output.directory_scratch + '/edgesNodes.dat'
+        input_file = out_dir + '/edgesNodes.dat'
         self.edgesNodes = readPetscMatrix(input_file, communicator=None)
 
         # elements-faces connectivity
-        input_file = output.directory_scratch + '/faces.dat'
+        input_file = out_dir + '/faces.dat'
         self.elemsF = readPetscMatrix(input_file, communicator=None)
 
         # faces-edges connectivity
-        input_file = output.directory_scratch + '/facesEdges.dat'
+        input_file = out_dir + '/facesEdges.dat'
         self.facesEdges = readPetscMatrix(input_file, communicator=None)
 
         # Dofs connectivity
-        input_file = output.directory_scratch + '/dofs.dat'
+        input_file = out_dir + '/dofs.dat'
         self.dofs = readPetscMatrix(input_file, communicator=None)
 
-        # Boundaries
-        input_file = output.directory_scratch + '/boundaries.dat'
-        self.boundaries = readPetscVector(input_file, communicator=None)
-
         # Conductivity model
-        input_file = output.directory_scratch + '/conductivityModel.dat'
+        input_file = out_dir + '/conductivityModel.dat'
         self.sigmaModel = readPetscMatrix(input_file, communicator=None)
 
-        # Receivers
-        input_file = output.directory_scratch + '/receivers.dat'
-        self.receivers = readPetscMatrix(input_file, communicator=None)
+        # # Receivers
+        # input_file = out_dir + '/receivers.dat'
+        # self.receivers = readPetscMatrix(input_file, communicator=None)
 
         # Sparsity pattern (NNZ) for matrix allocation
-        input_file = output.directory_scratch + '/nnz.dat'
+        input_file = out_dir + '/nnz.dat'
         tmp = readPetscVector(input_file, communicator=None)
         self.nnz = (tmp.getArray().real).astype(PETSc.IntType)
 
         # Number of dofs (length of nnz correspond to the total number of dofs)
         self.total_num_dofs = tmp.getSizes()[1]     # Get global sizes
+
+        # Depending on modeling mode, load data for source, boundary faces or boundary dofs
+        if (model.get('mode') == 'csem'):
+            # Boundary dofs for csem mode
+            input_file = out_dir + '/boundaries.dat'
+            self.boundaries = readPetscVector(input_file, communicator=None)
+            # Load source data (master task)
+            if parEnv.rank == 0:
+                # Read source file
+                input_file = out_dir + '/source.dat'
+                self.source_data = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
+
+        elif (model.get('mode') == 'mt'):
+            # Boundary faces for mt mode
+            input_file = out_dir + '/boundaryElements.dat'
+            self.boundaries = readPetscMatrix(input_file, communicator=None)
 
         # Stop timer
         Timers()["Setup"].stop()
@@ -107,7 +131,7 @@ class Solver():
 
 
     def assembly(self, inputSetup):
-        """Assembly a linear system for 3D CSEM based on HEFEM.
+        """Assembly a linear system for 3D CSEM/MT based on HEFEM.
 
         :param object inputSetup: user input setup.
         """
@@ -125,34 +149,46 @@ class Solver():
         Print.master('     Assembling linear system')
 
         # ---------------------------------------------------------------
-        # Get ranges
+        # Obtain the MPI environment
+        # ---------------------------------------------------------------
+        parEnv = MPIEnvironment()
+
+        # ---------------------------------------------------------------
+        # Define constants
+        # ---------------------------------------------------------------
+        num_nodes_per_element = 4
+        num_edges_per_element = 6
+        num_faces_per_element = 4
+        num_nodes_per_face    = 3
+        num_edges_per_face    = 3
+        num_nodes_per_edge    = 2
+        num_dimensions        = 3
+        basis_order           = run.get('nord')
+        num_polarizations     = run.get('num_polarizations')
+        num_dof_in_element    = np.int(basis_order*(basis_order+2)*(basis_order+3)/2)
+        if (model.get('mode') == 'csem'):
+            mode = 'csem'
+            data_model = model.get(mode)        # Get data model
+            frequency         = data_model.get('source').get('frequency')
+        elif (model.get('mode') == 'mt'):
+            mode = 'mt'
+            data_model = model.get(mode)        # Get data model
+            frequency         = data_model.get('frequency')
+        omega                 = frequency*2.*np.pi
+        mu                    = 4.*np.pi*1e-7
+        Const                 = np.sqrt(-1. + 0.j)*omega*mu
+
+        # ---------------------------------------------------------------
+        # Get global ranges
         # ---------------------------------------------------------------
         # Ranges over elements
         Istart_elemsE, Iend_elemsE = self.elemsE.getOwnershipRange()
 
         # ---------------------------------------------------------------
-        # Allocate parallel arrays
-        # ---------------------------------------------------------------
-        # Left-hand side
-        self.A = createParallelMatrix(self.total_num_dofs, self.total_num_dofs, self.nnz, run.cuda, communicator=None)
-        # Right-hand side
-        self.b = createParallelVector(self.total_num_dofs, run.cuda, communicator=None)
-        # X vector
-        self.x = createParallelVector(self.total_num_dofs, run.cuda, communicator=None)
-
-        # ---------------------------------------------------------------
         # Assembly linear system (Left-Hand Side - LHS)
         # ---------------------------------------------------------------
-        num_nodes_per_element = 4
-        num_edges_per_element = 6
-        num_faces_per_element = 4
-        #num_nodes_per_face    = 3
-        num_edges_per_face    = 3
-        num_nodes_per_edge    = 2
-        num_dimensions        = 3
-        omega                 = model.frequency*2.*np.pi
-        mu                    = 4.*np.pi*1e-7
-        Const                 = np.sqrt(-1. + 0.j)*omega*mu
+        # Left-hand side
+        self.A = createParallelMatrix(self.total_num_dofs, self.total_num_dofs, self.nnz, run.get('cuda'), communicator=None)
 
         # Compute contributions for all local elements
         for i in np.arange(Istart_elemsE, Iend_elemsE):
@@ -184,7 +220,7 @@ class Solver():
             edge_orientation, face_orientation = computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,edgesFace)
 
             # Compute elemental matrices (stiffness and mass matrices)
-            M, K = computeElementalMatrices(edge_orientation, face_orientation, jacobian, invjacobian, model.basis_order, sigmaEle)
+            M, K = computeElementalMatrices(edge_orientation, face_orientation, jacobian, invjacobian, basis_order, sigmaEle)
 
             # Compute elemental matrix
             Ae = K - Const*M
@@ -196,7 +232,6 @@ class Solver():
             # Add local contributions to global matrix
             self.A.setValues(dofsEle, dofsEle, Ae, addv=PETSc.InsertMode.ADD_VALUES)
 
-
         # Start global LHS assembly
         self.A.assemblyBegin()
         # End global LHS assembly
@@ -205,78 +240,286 @@ class Solver():
         # ---------------------------------------------------------------
         # Assembly linear system (Right-Hand Side RHS)
         # ---------------------------------------------------------------
-        # Compute matrices for source rotation
-        sourceRotationVector = computeSourceVectorRotation(model)
+        self.b = []
+        self.x = []
+        for i in np.arange(num_polarizations):
+            self.b.append(createParallelVector(self.total_num_dofs, run.get('cuda'), communicator=None))
+            self.x.append(createParallelVector(self.total_num_dofs, run.get('cuda'), communicator=None))
 
-        # Total electric field formulation. Set dipole definition
-        # x-directed dipole
-        Dx = np.array([model.src_current*model.src_length*1., 0., 0.], dtype=np.float)
-        # y-directed dipole
-        Dy = np.array([0., model.src_current*model.src_length*1., 0.], dtype=np.float)
-        # % z-directed dipole
-        Dz = np.array([0., 0., model.src_current*model.src_length*1.], dtype=np.float)
+        # Assembly RHS for csem mode
+        if (mode == 'csem'):
+            # Get source parameters
+            position = np.asarray(data_model.get('source').get('position'), dtype=np.float)
+            azimuth  = data_model.get('source').get('azimuth')
+            dip      = data_model.get('source').get('dip')
+            current  = data_model.get('source').get('current')
+            length   = data_model.get('source').get('length')
+            # Compute matrices for source rotation
+            sourceRotationVector = computeSourceVectorRotation(azimuth, dip)
 
-        # Rotate source and setup electric field
-        field = sourceRotationVector[0]*Dx + sourceRotationVector[1]*Dy + sourceRotationVector[2]*Dz
+            # Total electric field formulation. Set dipole definition
+            # x-directed dipole
+            Dx = np.array([current*length*1., 0., 0.], dtype=np.float)
+            # y-directed dipole
+            Dy = np.array([0., current*length*1., 0.], dtype=np.float)
+            # z-directed dipole
+            Dz = np.array([0., 0., current*length*1.], dtype=np.float)
 
-        # Add source (only master)
-        if MPIEnvironment().rank == 0:
-            # Read source file
-            input_file = output.directory_scratch + '/source.dat'
-            source_data = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
+            # Rotate source and setup electric field
+            field = sourceRotationVector[0]*Dx + sourceRotationVector[1]*Dy + sourceRotationVector[2]*Dz
 
-            # Get source data
-            source_data = source_data.getArray().real
+            # Insert source (only master)
+            if parEnv.rank == 0:
+                # Get source data
+                source_data = self.source_data.getArray().real
 
-            # Get indexes of nodes for srcElem
-            nodesEle = source_data[0:4].astype(np.int)
+                # Get indexes of nodes for srcElem
+                nodesEle = source_data[0:4].astype(np.int)
 
-            # Get nodes coordinates for srcElem
-            coordEle = source_data[4:16]
-            coordEle = np.reshape(coordEle, (num_nodes_per_element, num_dimensions))
+                # Get nodes coordinates for srcElem
+                coordEle = source_data[4:16]
+                coordEle = np.reshape(coordEle, (num_nodes_per_element, num_dimensions))
 
-            # Get faces indexes for srcElem
-            #facesEle = source_data[16:20].astype(np.int)
+                # Get faces indexes for srcElem
+                #facesEle = source_data[16:20].astype(np.int)
 
-            # Get edges indexes for faces in srcElem
-            edgesFace = source_data[20:32].astype(np.int)
-            edgesFace = np.reshape(edgesFace, (num_faces_per_element, num_edges_per_face))
+                # Get edges indexes for faces in srcElem
+                edgesFace = source_data[20:32].astype(np.int)
+                edgesFace = np.reshape(edgesFace, (num_faces_per_element, num_edges_per_face))
 
-            # Get indexes of edges for srcElem
-            edgesEle = source_data[32:38].astype(np.int)
+                # Get indexes of edges for srcElem
+                edgesEle = source_data[32:38].astype(np.int)
 
-            # Get node indexes for edges in srcElem
-            edgesNodesEle = source_data[38:50].astype(np.int)
-            edgesNodesEle = np.reshape(edgesNodesEle, (num_edges_per_element, num_nodes_per_edge))
+                # Get node indexes for edges in srcElem
+                edgesNodesEle = source_data[38:50].astype(np.int)
+                edgesNodesEle = np.reshape(edgesNodesEle, (num_edges_per_element, num_nodes_per_edge))
 
-            # Get dofs for srcElem
-            dofsSource = source_data[50::].astype(PETSc.IntType)
+                # Get dofs for srcElem
+                dofsSource = source_data[50::].astype(PETSc.IntType)
 
-            # Compute jacobian for srcElem
-            jacobian, invjacobian = computeJacobian(coordEle)
+                # Compute jacobian for srcElem
+                jacobian, invjacobian = computeJacobian(coordEle)
 
-            # Compute global orientation for srcElem
-            edge_orientation, face_orientation = computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,edgesFace)
+                # Compute global orientation for srcElem
+                edge_orientation, face_orientation = computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,edgesFace)
 
-            # Transform xyz source position to XiEtaZeta coordinates (reference tetrahedral element)
-            XiEtaZeta = tetrahedronXYZToXiEtaZeta(coordEle, model.src_position)
+                # Transform xyz source position to XiEtaZeta coordinates (reference tetrahedral element)
+                XiEtaZeta = tetrahedronXYZToXiEtaZeta(coordEle, position)
 
-            # Compute basis for srcElem
-            basis, _ = computeBasisFunctions(edge_orientation, face_orientation, jacobian, invjacobian, model.basis_order, XiEtaZeta)
+                # Compute basis for srcElem
+                basis, _ = computeBasisFunctions(edge_orientation, face_orientation, jacobian, invjacobian, basis_order, XiEtaZeta)
 
-            # Compute integral
-            src_contribution = np.matmul(field, basis[:,:,0])
+                # Compute integral
+                rhs_contribution = np.matmul(field, basis[:,:,0])
 
-            # Multiplication by constant value
-            src_contribution = src_contribution * Const
+                # Multiplication by constant value
+                rhs_contribution = rhs_contribution * Const
 
-            # Add local contributions to global matrix
-            self.b.setValues(dofsSource, src_contribution, addv=PETSc.InsertMode.ADD_VALUES)
+                # Add local contributions to global matrix
+                self.b[0].setValues(dofsSource, rhs_contribution, addv=PETSc.InsertMode.ADD_VALUES)
 
-        # Start global RHS assembly
-        self.b.assemblyBegin()
-        # End global RHS assembly
-        self.b.assemblyEnd()
+        elif (mode == 'mt'):
+            # Ranges over boundary faces or boundary elements
+            Istart_boundaryF, Iend_boundaryF = self.boundaries.getOwnershipRange()
+
+            # Compute the two-dimensional gauss points.
+            gauss_order = np.int(2)*basis_order
+            gaussPoints2D, Wi = compute2DGaussPoints(gauss_order)
+            ngaussP = gaussPoints2D.shape[0]
+
+            # Allocate array for interpolation points
+            num_local_boundaries = self.boundaries.getLocalSize()
+            interpolationPoints = np.zeros([num_local_boundaries[0], ngaussP], dtype=np.float)
+            centroid_z_face4 = []
+            sigma_face4 = []
+            indx_local_face = np.int(0)     # Initialize index of local boundary face
+
+            # Compute local contributions for each boundary face
+            for i in np.arange(Istart_boundaryF, Iend_boundaryF):
+                boundary_data = self.boundaries.getRow(i)[1].real
+
+                # Get face plane for boundary element
+                faceType = boundary_data[50].astype(np.int)
+
+                # Get nodes coordinates for boundary element
+                coordEle = boundary_data[4:16]
+                coordEle = np.reshape(coordEle, (num_nodes_per_element, num_dimensions))
+
+                # Get faces indexes for boundary element
+                facesEle = boundary_data[16:20].astype(np.int)
+
+                # Get global face index
+                faceGlobalIndex = boundary_data[51].astype(np.int)
+
+                # Get sigma for element with boundary face
+                sigmaBoundaryElement = boundary_data[52].astype(np.float)
+
+                # Get local index of boundary face
+                faceLocalIndex = np.where(facesEle==faceGlobalIndex)[0][0]
+
+                for j in np.arange(ngaussP):
+                    # Transform 2D gauss points to 3D in the reference element.
+                    gaussPoint3D = transform2Dto3DInReferenceElement(gaussPoints2D[j,:], faceLocalIndex)
+
+                    # This is the real point where the excitation is evaluated.
+                    realPoint = getRealFromReference(gaussPoint3D, coordEle)
+
+                    # Save z-component of gauss point
+                    interpolationPoints[indx_local_face, j] = realPoint[2]
+
+                # Save centroid only for face 3
+                if faceType == 3:
+                    nodesInFace = getFaceByLocalNodes(faceLocalIndex)
+                    centroid_face4 = np.sum(coordEle[nodesInFace], axis=0)/3.
+                    centroid_z_face4.append(centroid_face4[2])
+                    sigma_face4.append(sigmaBoundaryElement)
+
+                # Increment index of local boundary face
+                indx_local_face += np.int(1)
+
+            # List to numpy arrays
+            centroid_z_face4 = np.asarray(centroid_z_face4, dtype=np.float)
+            sigma_face4 = np.asarray(sigma_face4, dtype=np.float)
+
+            # Compute the max/min z-coordinate in the domain
+            coord_z = []
+            for i in np.arange(Istart_elemsE, Iend_elemsE):
+                # Get indexes of nodes for i
+                nodesEle = (self.elemsN.getRow(i)[1].real).astype(PETSc.IntType)
+
+                # Get coordinates of i
+                coordEle = self.nodes.getRow(i)[1].real
+                coordEle = np.reshape(coordEle, (num_nodes_per_element, num_dimensions))
+
+                coord_z.append(coordEle[:,2])
+
+            # Get local max/min
+            coord_z = np.asarray(coord_z, dtype=np.float)
+            coord_z = coord_z.flatten()
+            z_max_local = np.max(coord_z)
+            z_min_local = np.min(coord_z)
+
+            # Get global max/min
+            za = parEnv.comm.allreduce(z_max_local, op=MPI.MAX)
+            zb = parEnv.comm.allreduce(z_min_local, op=MPI.MIN)
+
+            u = eval_MT1D(za, zb, np.float(1), np.float(0), sigma_face4, centroid_z_face4,
+                          omega, mu, np.int(1e6), np.int(1), interpolationPoints)
+
+            # For each polarization mode
+            for i in np.arange(num_polarizations):
+                # Get polarization mode
+                tmp = data_model.get('polarization')
+                if (tmp[i] == 'x'):
+                    polarization_mode = np.int(1)
+                elif (tmp[i] == 'y'):
+                    polarization_mode = np.int(2)
+                else:
+                    Print.master('     MT polarization mode not supported.')
+                    exit(-1)
+
+                # Compute local contributions for each boundary face
+                indx_local_face = np.int(0)     # Initialize index of local boundary face
+                for j in np.arange(Istart_boundaryF, Iend_boundaryF):
+                    boundary_data = self.boundaries.getRow(j)[1].real
+
+                    # Get indexes of nodes for boundary element
+                    nodesEle = boundary_data[0:4].astype(np.int)
+
+                    # Get nodes coordinates for boundary element
+                    coordEle = boundary_data[4:16]
+                    coordEle = np.reshape(coordEle, (num_nodes_per_element, num_dimensions))
+
+                    # Get faces indexes for boundary element
+                    facesEle = boundary_data[16:20].astype(np.int)
+
+                    # Get edges indexes for boundary element
+                    edgesFace = boundary_data[20:32].astype(np.int)
+                    edgesFace = np.reshape(edgesFace, (num_faces_per_element, num_edges_per_face))
+
+                    # Get indexes of edges for boundary element
+                    edgesEle = boundary_data[32:38].astype(np.int)
+
+                    # Get node indexes for edges in boundary element
+                    edgesNodesEle = boundary_data[38:50].astype(np.int)
+                    edgesNodesEle = np.reshape(edgesNodesEle, (num_edges_per_element, num_nodes_per_edge))
+
+                    # Get face plane for boundary element
+                    faceType = boundary_data[50].astype(np.int)
+
+                    # Get global face index
+                    faceGlobalIndex = boundary_data[51].astype(np.int)
+
+                    # Get sigma for element with boundary face
+                    #sigmaBoundaryElement = boundary_data[52].astype(np.int)
+
+                    # Get dofs for boundary element
+                    dofsBoundaryElement = boundary_data[53::].astype(PETSc.IntType)
+
+                    # Compute jacobian for boundary element
+                    _, invjacobian = computeJacobian(coordEle)
+
+                    # Compute global orientation for boundary element
+                    edge_orientation, face_orientation = computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,edgesFace)
+
+                    # Get local index of boundary face
+                    faceLocalIndex = np.where(facesEle==faceGlobalIndex)[0][0]
+
+                    # Compute normal
+                    normalVector = getNormalVector(faceLocalIndex, invjacobian)
+
+                    # Compute normal unit vector
+                    normalUnitVector = normalVector/np.linalg.norm(normalVector)
+
+                    # Compute 2D Jacobian
+                    detJacob2D = get2DJacobDet(coordEle, faceLocalIndex)
+
+                    # Allocate array for local contribution
+                    rhs_contribution = np.zeros(num_dof_in_element, dtype=np.complex)
+
+                    # Get excitation for boundary face
+                    ex, ey, ez = getNeumannBCface(faceType, polarization_mode, u)
+
+                    for k in np.arange(ngaussP):
+                        # Transform 2D gauss points to 3D in the reference element.
+                        gaussPoint3D = transform2Dto3DInReferenceElement(gaussPoints2D[k,:], faceLocalIndex)
+
+                        # 3D basis functions evaluated on reference element
+                        allBasesEvaluated = computeBasisFunctionsReferenceElement(edge_orientation, face_orientation, basis_order, gaussPoint3D)
+
+                        # Same mapping as in mass matrix.
+                        allBasesReal = np.matmul(invjacobian,allBasesEvaluated[:,:,0])
+
+                        # Add excitation field
+                        ex_g = ex[indx_local_face, k]
+                        ey_g = ey[indx_local_face, k]
+                        ez_g = ez[indx_local_face, k]
+                        excitation_value = np.array([ex_g, ey_g, ez_g], dtype=np.complex)
+
+                        # Allocate
+                        integrandTangential = np.zeros(num_dof_in_element, dtype=np.complex)
+
+                        for l in np.arange(num_dof_in_element):
+                            iBaseTangential = np.cross(np.cross(normalUnitVector, allBasesReal[:,l]), normalUnitVector)
+                            integrandTangential[l] = np.dot(iBaseTangential, excitation_value)
+
+                        rhs_contribution += Wi[k]*integrandTangential*detJacob2D
+
+                    # Multiplication by constant value
+                    rhs_contribution = rhs_contribution * Const
+
+                    # Add local contributions to global matrix
+                    self.b[i].setValues(dofsBoundaryElement, rhs_contribution, addv=PETSc.InsertMode.ADD_VALUES)
+
+                    # Increment index of local boundary face
+                    indx_local_face += np.int(1)
+
+        # Global assembly for each RHS
+        for i in np.arange(num_polarizations):
+            # Start global RHS assembly
+            self.b[i].assemblyBegin()
+            # End global RHS assembly
+            self.b[i].assemblyEnd()
 
         # Stop timer
         Timers()["Assembly"].stop()
@@ -284,351 +527,82 @@ class Solver():
         return
 
 
-    def solve(self):
-        """Solver for a linear system generated by the HEFEM for a 3D CSEM problem."""
-        # ---------------------------------------------------------------
-        # Initialization
-        # ---------------------------------------------------------------
-        # Start timer
-        Timers()["SetBoundaries"].start()
-
-        Print.master('     Solving linear system')
-
-        # ---------------------------------------------------------------
-        # Set dirichlet boundary conditions
-        # ---------------------------------------------------------------
-        # Ranges over boundaries
-        Istart_boundaries, Iend_boundaries = self.boundaries.getOwnershipRange()
-        # Boundaries for LHS
-        self.A.zeroRowsColumns(np.real(self.boundaries).astype(PETSc.IntType))
-        # Boundaries for RHS
-        numLocalBoundaries = Iend_boundaries - Istart_boundaries
-        self.b.setValues(np.real(self.boundaries).astype(PETSc.IntType),
-                         np.zeros(numLocalBoundaries, dtype=np.complex),
-                         addv=PETSc.InsertMode.INSERT_VALUES)
-
-        # Start global system assembly
-        self.A.assemblyBegin()
-        self.b.assemblyBegin()
-        # End global system assembly
-        self.A.assemblyEnd()
-        self.b.assemblyEnd()
-
-        # Stop timer
-        Timers()["SetBoundaries"].stop()
-
-        # ---------------------------------------------------------------
-        # Solve system
-        # ---------------------------------------------------------------
-        Timers()["Solver"].start()
-        # Create KSP: linear equation solver
-        ksp = PETSc.KSP().create(comm=PETSc.COMM_WORLD)
-        ksp.setOperators(self.A)
-        ksp.setFromOptions()
-        ksp.solve(self.b, self.x)
-        iterationNumber = ksp.getIterationNumber()
-        ksp.destroy()
-        Print.master('     Number of solver iterations: ' + str(iterationNumber))
-        Timers()["Solver"].stop()
-
-        return
-
-
-    def postprocess(self, inputSetup):
-        """Interpolate a given electric field for a vector of receivers.
+    def run(self, inputSetup):
+        """Run solver for linear systems generated by the HEFEM for a 3D CSEM/MT problem.
 
         :param object inputSetup: user input setup.
         """
         # ---------------------------------------------------------------
         # Initialization
         # ---------------------------------------------------------------
-        # Start timer
-        Timers()["Postprocessing"].start()
-
-        Print.master('     Postprocessing solution')
-
         # Parameters shortcut (for code legibility)
         model = inputSetup.model
-        run = inputSetup.run
+        run   = inputSetup.run
         output = inputSetup.output
+        out_dir = output.get('directory_scratch')
 
-        # Constant parameter
-        omega                 = model.frequency*2.*np.pi
-        mu                    = 4.*np.pi*1e-7
-        Const                 = np.sqrt(-1. + 0.j)*omega*mu
-
-        # Ranges over receivers
-        Istart_receivers, Iend_receivers = self.receivers.getOwnershipRange()
-
-        # Number of receivers
-        total_num_receivers = self.receivers.getSize()[0]
-        local_num_receivers = Iend_receivers-Istart_receivers
-
+        # ---------------------------------------------------------------
         # Define constants
-        num_nodes_per_element = 4
-        num_faces_per_element = 4
-        num_edges_per_face    = 3
-        num_edges_per_element = 6
-        num_nodes_per_edge    = 2
-        num_dimensions        = 3
+        # ---------------------------------------------------------------
+        num_polarizations     = run.get('num_polarizations')
+        if (model.get('mode') == 'csem'):
+            mode = 'csem'
+        elif (model.get('mode') == 'mt'):
+            mode = 'mt'
 
-        # Compute number of dofs per element
-        num_dof_in_element = np.int(model.basis_order*(model.basis_order+2)*(model.basis_order+3)/2)
+        Print.master('     Solving linear system')
+
+        if (mode == 'csem'):
+            # Start timer
+            Timers()["SetBoundaries"].start()
+
+            # ---------------------------------------------------------------
+            # Set dirichlet boundary conditions
+            # ---------------------------------------------------------------
+            # Ranges over boundaries
+            Istart_boundaries, Iend_boundaries = self.boundaries.getOwnershipRange()
+            # Boundaries for LHS
+            self.A.zeroRowsColumns(np.real(self.boundaries).astype(PETSc.IntType))
+            # Boundaries for RHS
+            numLocalBoundaries = Iend_boundaries - Istart_boundaries
+            self.b[0].setValues(np.real(self.boundaries).astype(PETSc.IntType),
+                                np.zeros(numLocalBoundaries, dtype=np.complex),
+                                addv=PETSc.InsertMode.INSERT_VALUES)
+
+            # Start global system assembly
+            self.A.assemblyBegin()
+            self.b[0].assemblyBegin()
+            # End global system assembly
+            self.A.assemblyEnd()
+            self.b[0].assemblyEnd()
+
+            # Stop timer
+            Timers()["SetBoundaries"].stop()
 
         # ---------------------------------------------------------------
-        # Get dofs-connectivity for receivers
+        # Solve system
         # ---------------------------------------------------------------
-        # Auxiliar arrays
-        dofsIdxRecv = np.zeros((local_num_receivers, num_dof_in_element), dtype=PETSc.IntType)
+        Timers()["Solver"].start()
 
-        j = 0
-        for i in np.arange(Istart_receivers, Iend_receivers):
-            # Get dofs for receiver
-            tmp = (self.receivers.getRow(i)[1].real).astype(PETSc.IntType)
-            tmp = tmp[53::]
-            dofsIdxRecv[j, :] = tmp
-            j += 1
+        for i in np.arange(num_polarizations):
+            # Create KSP: linear equation solver
+            ksp = PETSc.KSP().create(comm=PETSc.COMM_WORLD)
+            ksp.setOperators(self.A)
+            ksp.setFromOptions()
+            ksp.solve(self.b[i], self.x[i])
+            ksp.destroy()
 
-        # Gather global solution of x to local vector
-        # Sequential vector for gather tasks
-        x_local = createSequentialVector(local_num_receivers*num_dof_in_element, run.cuda, communicator=None)
+            # Write vector solution
+            out_path = out_dir + '/x' + str(i) + '.dat'
+            writePetscVector(out_path, self.x[i], communicator=None)
 
-        # Build Index set in PETSc format
-        IS_dofs = PETSc.IS().createGeneral(dofsIdxRecv.flatten(), comm=PETSc.COMM_WORLD)
+        Timers()["Solver"].stop()
 
-        # Build gather vector
-        gatherVector = PETSc.Scatter().create(self.x, IS_dofs, x_local, None)
-        # Ghater values
-        gatherVector.scatter(self.x, x_local, PETSc.InsertMode.INSERT_VALUES, PETSc.ScatterMode.FORWARD)
-
-        # ---------------------------------------------------------------
-        # Allocate parallel arrays for output
-        # ---------------------------------------------------------------
-        # Electric field (E-field)
-        receiver_fieldEx = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        receiver_fieldEy = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        receiver_fieldEz = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        # Magnetic field (H-field)
-        receiver_fieldHx = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        receiver_fieldHy = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        receiver_fieldHz = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        # Receiver coordinates
-        receiver_coordinatesX = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        receiver_coordinatesY = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-        receiver_coordinatesZ = createParallelVector(total_num_receivers, run.cuda ,communicator=None)
-
-        k = 0
-        for i in np.arange(Istart_receivers, Iend_receivers):
-            # Get receiver data
-            receiver_data = self.receivers.getRow(i)[1].real
-
-            # Get indexes of nodes for i
-            nodesEle = receiver_data[0:4].astype(np.int)
-
-            # Get nodes coordinates for i
-            coordEle = receiver_data[4:16]
-            coordEle = np.reshape(coordEle, (num_nodes_per_element, num_dimensions))
-
-            # Get faces indexes for i
-            #facesEle = receiver_data[16:20].astype(np.int)
-
-            # Get edges indexes for faces in i
-            edgesFace = receiver_data[20:32].astype(np.int)
-            edgesFace = np.reshape(edgesFace, (num_faces_per_element, num_edges_per_face))
-
-            # Get indexes of edges for i
-            edgesEle = receiver_data[32:38].astype(np.int)
-
-            # Get node indexes for edges in i
-            edgesNodesEle = receiver_data[38:50].astype(np.int)
-            edgesNodesEle = np.reshape(edgesNodesEle, (num_edges_per_element, num_nodes_per_edge))
-
-            # Get receiver coordinates
-            coordReceiver = receiver_data[50:53]
-
-            # Get dofs for i
-            #dofsSource = receiver_data[53::].astype(PETSc.IntType)
-
-            # Compute jacobian for i
-            jacobian, invjacobian = computeJacobian(coordEle)
-
-            # Compute global orientation for i
-            edge_orientation, face_orientation = computeElementOrientation(edgesEle,nodesEle,edgesNodesEle,edgesFace)
-
-            # Transform xyz source position to XiEtaZeta coordinates (reference tetrahedral element)
-            XiEtaZeta = tetrahedronXYZToXiEtaZeta(coordEle, coordReceiver)
-
-            # Compute basis for i
-            basis, curl_basis = computeBasisFunctions(edge_orientation, face_orientation, jacobian, invjacobian, model.basis_order, XiEtaZeta)
-
-            # Get element fields
-            local_field = x_local[k*num_dof_in_element : (k * num_dof_in_element) + num_dof_in_element]
-
-            # Initialize variables
-            Ex = 0.
-            Ey = 0.
-            Ez = 0.
-            Hx = 0.
-            Hy = 0.
-            Hz = 0.
-
-            # Interpolate electric field
-            for j in np.arange(num_dof_in_element):
-                Rfield = np.real(local_field[j]) # Real part
-                Ifield = np.imag(local_field[j]) # Imaginary part
-                # Exyz[i] = Exyz[i] + real_part*basis + imag_part*basis
-                Ex += Rfield*basis[0,j] + np.sqrt(-1. + 0.j)*Ifield*basis[0,j]
-                Ey += Rfield*basis[1,j] + np.sqrt(-1. + 0.j)*Ifield*basis[1,j]
-                Ez += Rfield*basis[2,j] + np.sqrt(-1. + 0.j)*Ifield*basis[2,j]
-
-                # Hxyz[i] = Hxyz[i] + real_part*curl_basis + imag_part*curl_basis
-                Hx += Rfield*curl_basis[0,j] + np.sqrt(-1. + 0.j)*Ifield*curl_basis[0,j]
-                Hy += Rfield*curl_basis[1,j] + np.sqrt(-1. + 0.j)*Ifield*curl_basis[1,j]
-                Hz += Rfield*curl_basis[2,j] + np.sqrt(-1. + 0.j)*Ifield*curl_basis[2,j]
-
-            # Increase counter over local vector (x_local)
-            k += 1
-
-            # Set total electric field components for i
-            receiver_fieldEx.setValue(i, Ex, addv=PETSc.InsertMode.INSERT_VALUES)
-            receiver_fieldEy.setValue(i, Ey, addv=PETSc.InsertMode.INSERT_VALUES)
-            receiver_fieldEz.setValue(i, Ez, addv=PETSc.InsertMode.INSERT_VALUES)
-
-            # Following Maxwell equations, apply constant factor to magnetic field
-            Hx = Hx/Const
-            Hy = Hy/Const
-            Hz = Hz/Const
-
-            # Set total magnetic field components for i
-            receiver_fieldHx.setValue(i, Hx, addv=PETSc.InsertMode.INSERT_VALUES)
-            receiver_fieldHy.setValue(i, Hy, addv=PETSc.InsertMode.INSERT_VALUES)
-            receiver_fieldHz.setValue(i, Hz, addv=PETSc.InsertMode.INSERT_VALUES)
-
-            # Set coordinates for i
-            receiver_coordinatesX.setValue(i, coordReceiver[0], addv=PETSc.InsertMode.INSERT_VALUES)
-            receiver_coordinatesY.setValue(i, coordReceiver[1], addv=PETSc.InsertMode.INSERT_VALUES)
-            receiver_coordinatesZ.setValue(i, coordReceiver[2], addv=PETSc.InsertMode.INSERT_VALUES)
-
-        # Start global assembly
-        receiver_fieldEx.assemblyBegin()
-        receiver_fieldEy.assemblyBegin()
-        receiver_fieldEz.assemblyBegin()
-        receiver_fieldHx.assemblyBegin()
-        receiver_fieldHy.assemblyBegin()
-        receiver_fieldHz.assemblyBegin()
-        receiver_coordinatesX.assemblyBegin()
-        receiver_coordinatesY.assemblyBegin()
-        receiver_coordinatesZ.assemblyBegin()
-
-        # End global assembly
-        receiver_fieldEx.assemblyEnd()
-        receiver_fieldEy.assemblyEnd()
-        receiver_fieldEz.assemblyEnd()
-        receiver_fieldHx.assemblyEnd()
-        receiver_fieldHy.assemblyEnd()
-        receiver_fieldHz.assemblyEnd()
-        receiver_coordinatesX.assemblyEnd()
-        receiver_coordinatesY.assemblyEnd()
-        receiver_coordinatesZ.assemblyEnd()
-
-        # Write intermediate results
-        out_path = output.directory_scratch + '/fieldsEx.dat'
-        writePetscVector(out_path, receiver_fieldEx, communicator=None)
-
-        out_path = output.directory_scratch + '/fieldsEy.dat'
-        writePetscVector(out_path, receiver_fieldEy, communicator=None)
-
-        out_path = output.directory_scratch + '/fieldsEz.dat'
-        writePetscVector(out_path, receiver_fieldEz, communicator=None)
-
-        out_path = output.directory_scratch + '/fieldsHx.dat'
-        writePetscVector(out_path, receiver_fieldHx, communicator=None)
-
-        out_path = output.directory_scratch + '/fieldsHy.dat'
-        writePetscVector(out_path, receiver_fieldHy, communicator=None)
-
-        out_path = output.directory_scratch + '/fieldsHz.dat'
-        writePetscVector(out_path, receiver_fieldHz, communicator=None)
-
-        out_path = output.directory_scratch + '/receiver_coordinatesX.dat'
-        writePetscVector(out_path, receiver_coordinatesX, communicator=None)
-
-        out_path = output.directory_scratch + '/receiver_coordinatesY.dat'
-        writePetscVector(out_path, receiver_coordinatesY, communicator=None)
-
-        out_path = output.directory_scratch + '/receiver_coordinatesZ.dat'
-        writePetscVector(out_path, receiver_coordinatesZ, communicator=None)
-
-        # Write final solution
-        if MPIEnvironment().rank == 0:
-            input_file = output.directory_scratch + '/fieldsEx.dat'
-            electric_fieldsX = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            input_file = output.directory_scratch + '/fieldsEy.dat'
-            electric_fieldsY = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            input_file = output.directory_scratch + '/fieldsEz.dat'
-            electric_fieldsZ = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            input_file = output.directory_scratch + '/fieldsHx.dat'
-            magnetic_fieldsX = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            input_file = output.directory_scratch + '/fieldsHy.dat'
-            magnetic_fieldsY = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            input_file = output.directory_scratch + '/fieldsHz.dat'
-            magnetic_fieldsZ = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            input_file = output.directory_scratch + '/receiver_coordinatesX.dat'
-            recv_coordX = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            input_file = output.directory_scratch + '/receiver_coordinatesY.dat'
-            recv_coordY = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            input_file = output.directory_scratch + '/receiver_coordinatesZ.dat'
-            recv_coordZ = readPetscVector(input_file, communicator=PETSc.COMM_SELF)
-
-            # Allocate
-            data_fields = np.zeros((total_num_receivers, 6), dtype=np.complex)
-            data_coordinates = np.zeros((total_num_receivers, 3), dtype=np.float)
-
-            # Loop over receivers
-            for i in np.arange(total_num_receivers):
-                # Get electric field components
-                data_fields[i, 0] = electric_fieldsX.getValue(i)
-                data_fields[i, 1] = electric_fieldsY.getValue(i)
-                data_fields[i, 2] = electric_fieldsZ.getValue(i)
-
-                # Get magnetic field components
-                data_fields[i, 3] = magnetic_fieldsX.getValue(i)
-                data_fields[i, 4] = magnetic_fieldsY.getValue(i)
-                data_fields[i, 5] = magnetic_fieldsZ.getValue(i)
-
-                # Get coordinates
-                data_coordinates[i, 0] = recv_coordX.getValue(i).real
-                data_coordinates[i, 1] = recv_coordY.getValue(i).real
-                data_coordinates[i, 2] = recv_coordZ.getValue(i).real
-
-            # Write final output
-            output_file = output.directory + '/fields.h5'
-            fileID = h5py.File(output_file, 'w')
-
-            # Create coordinates dataset
-            _ = fileID.create_dataset('fields', data=data_fields)
-            _ = fileID.create_dataset('receiver_coordinates', data=data_coordinates)
-
-            # Close file
-            fileID.close()
-
-            # Remove temporal directory
-            shutil.rmtree(output.directory_scratch)
-
-        # Stop timer
-        Timers()["Postprocessing"].stop()
+        return
 
 
 def unitary_test():
-    """Unitary test for hvfem.py script."""
+    """Unitary test for solver.py script."""
 
 
 if __name__ == '__main__':

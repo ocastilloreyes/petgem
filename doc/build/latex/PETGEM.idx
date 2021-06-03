@@ -1,0 +1,82 @@
+\indexentry{kernel (module)@\spxentry{kernel}\spxextra{module}|hyperpage}{32}
+\indexentry{petgem.common (module)@\spxentry{petgem.common}\spxextra{module}|hyperpage}{32}
+\indexentry{InputParameters (class in petgem.common)@\spxentry{InputParameters}\spxextra{class in petgem.common}|hyperpage}{32}
+\indexentry{Print (class in petgem.common)@\spxentry{Print}\spxextra{class in petgem.common}|hyperpage}{32}
+\indexentry{header() (petgem.common.Print class method)@\spxentry{header()}\spxextra{petgem.common.Print class method}|hyperpage}{32}
+\indexentry{master() (petgem.common.Print class method)@\spxentry{master()}\spxextra{petgem.common.Print class method}|hyperpage}{32}
+\indexentry{Timer (class in petgem.common)@\spxentry{Timer}\spxextra{class in petgem.common}|hyperpage}{33}
+\indexentry{elapsed (petgem.common.Timer attribute)@\spxentry{elapsed}\spxextra{petgem.common.Timer attribute}|hyperpage}{33}
+\indexentry{reset() (petgem.common.Timer method)@\spxentry{reset()}\spxextra{petgem.common.Timer method}|hyperpage}{33}
+\indexentry{start() (petgem.common.Timer method)@\spxentry{start()}\spxextra{petgem.common.Timer method}|hyperpage}{33}
+\indexentry{stop() (petgem.common.Timer method)@\spxentry{stop()}\spxextra{petgem.common.Timer method}|hyperpage}{33}
+\indexentry{measure\_all\_class\_methods() (in module petgem.common)@\spxentry{measure\_all\_class\_methods()}\spxextra{in module petgem.common}|hyperpage}{33}
+\indexentry{measure\_time() (in module petgem.common)@\spxentry{measure\_time()}\spxextra{in module petgem.common}|hyperpage}{33}
+\indexentry{unitary\_test() (in module petgem.common)@\spxentry{unitary\_test()}\spxextra{in module petgem.common}|hyperpage}{33}
+\indexentry{petgem.preprocessing (module)@\spxentry{petgem.preprocessing}\spxextra{module}|hyperpage}{33}
+\indexentry{unitary\_test() (in module petgem.preprocessing)@\spxentry{unitary\_test()}\spxextra{in module petgem.preprocessing}|hyperpage}{33}
+\indexentry{petgem.mesh (module)@\spxentry{petgem.mesh}\spxextra{module}|hyperpage}{33}
+\indexentry{computeBoundaries() (in module petgem.mesh)@\spxentry{computeBoundaries()}\spxextra{in module petgem.mesh}|hyperpage}{33}
+\indexentry{computeBoundaryEdges() (in module petgem.mesh)@\spxentry{computeBoundaryEdges()}\spxextra{in module petgem.mesh}|hyperpage}{34}
+\indexentry{computeBoundaryElements() (in module petgem.mesh)@\spxentry{computeBoundaryElements()}\spxextra{in module petgem.mesh}|hyperpage}{34}
+\indexentry{computeBoundaryFaces() (in module petgem.mesh)@\spxentry{computeBoundaryFaces()}\spxextra{in module petgem.mesh}|hyperpage}{34}
+\indexentry{computeEdges() (in module petgem.mesh)@\spxentry{computeEdges()}\spxextra{in module petgem.mesh}|hyperpage}{34}
+\indexentry{computeFacePlane() (in module petgem.mesh)@\spxentry{computeFacePlane()}\spxextra{in module petgem.mesh}|hyperpage}{34}
+\indexentry{computeFaces() (in module petgem.mesh)@\spxentry{computeFaces()}\spxextra{in module petgem.mesh}|hyperpage}{35}
+\indexentry{computeFacesEdges() (in module petgem.mesh)@\spxentry{computeFacesEdges()}\spxextra{in module petgem.mesh}|hyperpage}{35}
+\indexentry{unitary\_test() (in module petgem.mesh)@\spxentry{unitary\_test()}\spxextra{in module petgem.mesh}|hyperpage}{35}
+\indexentry{petgem.hvfem (module)@\spxentry{petgem.hvfem}\spxextra{module}|hyperpage}{35}
+\indexentry{AffineTetrahedron() (in module petgem.hvfem)@\spxentry{AffineTetrahedron()}\spxextra{in module petgem.hvfem}|hyperpage}{35}
+\indexentry{AncEE() (in module petgem.hvfem)@\spxentry{AncEE()}\spxextra{in module petgem.hvfem}|hyperpage}{36}
+\indexentry{AncETri() (in module petgem.hvfem)@\spxentry{AncETri()}\spxextra{in module petgem.hvfem}|hyperpage}{36}
+\indexentry{HomIJacobi() (in module petgem.hvfem)@\spxentry{HomIJacobi()}\spxextra{in module petgem.hvfem}|hyperpage}{36}
+\indexentry{HomLegendre() (in module petgem.hvfem)@\spxentry{HomLegendre()}\spxextra{in module petgem.hvfem}|hyperpage}{37}
+\indexentry{OrientE() (in module petgem.hvfem)@\spxentry{OrientE()}\spxextra{in module petgem.hvfem}|hyperpage}{37}
+\indexentry{OrientTri() (in module petgem.hvfem)@\spxentry{OrientTri()}\spxextra{in module petgem.hvfem}|hyperpage}{37}
+\indexentry{PolyIJacobi() (in module petgem.hvfem)@\spxentry{PolyIJacobi()}\spxextra{in module petgem.hvfem}|hyperpage}{37}
+\indexentry{PolyJacobi() (in module petgem.hvfem)@\spxentry{PolyJacobi()}\spxextra{in module petgem.hvfem}|hyperpage}{37}
+\indexentry{PolyLegendre() (in module petgem.hvfem)@\spxentry{PolyLegendre()}\spxextra{in module petgem.hvfem}|hyperpage}{38}
+\indexentry{ProjectTetE() (in module petgem.hvfem)@\spxentry{ProjectTetE()}\spxextra{in module petgem.hvfem}|hyperpage}{38}
+\indexentry{ProjectTetF() (in module petgem.hvfem)@\spxentry{ProjectTetF()}\spxextra{in module petgem.hvfem}|hyperpage}{38}
+\indexentry{compute2DGaussPoints() (in module petgem.hvfem)@\spxentry{compute2DGaussPoints()}\spxextra{in module petgem.hvfem}|hyperpage}{38}
+\indexentry{compute3DGaussPoints() (in module petgem.hvfem)@\spxentry{compute3DGaussPoints()}\spxextra{in module petgem.hvfem}|hyperpage}{39}
+\indexentry{computeBasisFunctions() (in module petgem.hvfem)@\spxentry{computeBasisFunctions()}\spxextra{in module petgem.hvfem}|hyperpage}{39}
+\indexentry{computeBasisFunctionsReferenceElement() (in module petgem.hvfem)@\spxentry{computeBasisFunctionsReferenceElement()}\spxextra{in module petgem.hvfem}|hyperpage}{39}
+\indexentry{computeConnectivityDOFS() (in module petgem.hvfem)@\spxentry{computeConnectivityDOFS()}\spxextra{in module petgem.hvfem}|hyperpage}{39}
+\indexentry{computeElementOrientation() (in module petgem.hvfem)@\spxentry{computeElementOrientation()}\spxextra{in module petgem.hvfem}|hyperpage}{40}
+\indexentry{computeElementalMatrices() (in module petgem.hvfem)@\spxentry{computeElementalMatrices()}\spxextra{in module petgem.hvfem}|hyperpage}{40}
+\indexentry{computeJacobian() (in module petgem.hvfem)@\spxentry{computeJacobian()}\spxextra{in module petgem.hvfem}|hyperpage}{40}
+\indexentry{computeSourceVectorRotation() (in module petgem.hvfem)@\spxentry{computeSourceVectorRotation()}\spxextra{in module petgem.hvfem}|hyperpage}{40}
+\indexentry{get2DJacobDet() (in module petgem.hvfem)@\spxentry{get2DJacobDet()}\spxextra{in module petgem.hvfem}|hyperpage}{41}
+\indexentry{getFaceByLocalNodes() (in module petgem.hvfem)@\spxentry{getFaceByLocalNodes()}\spxextra{in module petgem.hvfem}|hyperpage}{41}
+\indexentry{getNeumannBCface() (in module petgem.hvfem)@\spxentry{getNeumannBCface()}\spxextra{in module petgem.hvfem}|hyperpage}{41}
+\indexentry{getNormalVector() (in module petgem.hvfem)@\spxentry{getNormalVector()}\spxextra{in module petgem.hvfem}|hyperpage}{41}
+\indexentry{getRealFromReference() (in module petgem.hvfem)@\spxentry{getRealFromReference()}\spxextra{in module petgem.hvfem}|hyperpage}{41}
+\indexentry{shape3DETet() (in module petgem.hvfem)@\spxentry{shape3DETet()}\spxextra{in module petgem.hvfem}|hyperpage}{42}
+\indexentry{tetrahedronXYZToXiEtaZeta() (in module petgem.hvfem)@\spxentry{tetrahedronXYZToXiEtaZeta()}\spxextra{in module petgem.hvfem}|hyperpage}{42}
+\indexentry{transform2Dto3DInReferenceElement() (in module petgem.hvfem)@\spxentry{transform2Dto3DInReferenceElement()}\spxextra{in module petgem.hvfem}|hyperpage}{42}
+\indexentry{unitary\_test() (in module petgem.hvfem)@\spxentry{unitary\_test()}\spxextra{in module petgem.hvfem}|hyperpage}{42}
+\indexentry{petgem.vectors (module)@\spxentry{petgem.vectors}\spxextra{module}|hyperpage}{42}
+\indexentry{deleteDuplicateRows() (in module petgem.vectors)@\spxentry{deleteDuplicateRows()}\spxextra{in module petgem.vectors}|hyperpage}{42}
+\indexentry{findUniqueRows() (in module petgem.vectors)@\spxentry{findUniqueRows()}\spxextra{in module petgem.vectors}|hyperpage}{43}
+\indexentry{invConnectivity() (in module petgem.vectors)@\spxentry{invConnectivity()}\spxextra{in module petgem.vectors}|hyperpage}{43}
+\indexentry{is\_duplicate\_entry() (in module petgem.vectors)@\spxentry{is\_duplicate\_entry()}\spxextra{in module petgem.vectors}|hyperpage}{43}
+\indexentry{unitary\_test() (in module petgem.vectors)@\spxentry{unitary\_test()}\spxextra{in module petgem.vectors}|hyperpage}{43}
+\indexentry{petgem.solver (module)@\spxentry{petgem.solver}\spxextra{module}|hyperpage}{43}
+\indexentry{unitary\_test() (in module petgem.solver)@\spxentry{unitary\_test()}\spxextra{in module petgem.solver}|hyperpage}{43}
+\indexentry{petgem.parallel (module)@\spxentry{petgem.parallel}\spxextra{module}|hyperpage}{44}
+\indexentry{createParallelDenseMatrix() (in module petgem.parallel)@\spxentry{createParallelDenseMatrix()}\spxextra{in module petgem.parallel}|hyperpage}{44}
+\indexentry{createParallelMatrix() (in module petgem.parallel)@\spxentry{createParallelMatrix()}\spxextra{in module petgem.parallel}|hyperpage}{44}
+\indexentry{createParallelVector() (in module petgem.parallel)@\spxentry{createParallelVector()}\spxextra{in module petgem.parallel}|hyperpage}{44}
+\indexentry{createSequentialDenseMatrixWithArray() (in module petgem.parallel)@\spxentry{createSequentialDenseMatrixWithArray()}\spxextra{in module petgem.parallel}|hyperpage}{44}
+\indexentry{createSequentialVector() (in module petgem.parallel)@\spxentry{createSequentialVector()}\spxextra{in module petgem.parallel}|hyperpage}{45}
+\indexentry{createSequentialVectorWithArray() (in module petgem.parallel)@\spxentry{createSequentialVectorWithArray()}\spxextra{in module petgem.parallel}|hyperpage}{45}
+\indexentry{readPetscMatrix() (in module petgem.parallel)@\spxentry{readPetscMatrix()}\spxextra{in module petgem.parallel}|hyperpage}{45}
+\indexentry{readPetscVector() (in module petgem.parallel)@\spxentry{readPetscVector()}\spxextra{in module petgem.parallel}|hyperpage}{45}
+\indexentry{unitary\_test() (in module petgem.parallel)@\spxentry{unitary\_test()}\spxextra{in module petgem.parallel}|hyperpage}{45}
+\indexentry{writeDenseMatrix() (in module petgem.parallel)@\spxentry{writeDenseMatrix()}\spxextra{in module petgem.parallel}|hyperpage}{45}
+\indexentry{writeParallelDenseMatrix() (in module petgem.parallel)@\spxentry{writeParallelDenseMatrix()}\spxextra{in module petgem.parallel}|hyperpage}{46}
+\indexentry{writePetscVector() (in module petgem.parallel)@\spxentry{writePetscVector()}\spxextra{in module petgem.parallel}|hyperpage}{46}
+\indexentry{petgem.postprocessing (module)@\spxentry{petgem.postprocessing}\spxextra{module}|hyperpage}{46}
+\indexentry{computeImpedance() (in module petgem.postprocessing)@\spxentry{computeImpedance()}\spxextra{in module petgem.postprocessing}|hyperpage}{46}
+\indexentry{fieldInterpolator() (in module petgem.postprocessing)@\spxentry{fieldInterpolator()}\spxextra{in module petgem.postprocessing}|hyperpage}{46}
+\indexentry{unitary\_test() (in module petgem.postprocessing)@\spxentry{unitary\_test()}\spxextra{in module petgem.postprocessing}|hyperpage}{47}

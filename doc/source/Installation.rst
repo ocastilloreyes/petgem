@@ -34,19 +34,19 @@ Install PETGEM
 
 * Following commands may require root privileges
 
-* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7, 3.8, 3.9, and 3.12 have been tested)
+* Download `PETSc <https://www.mcs.anl.gov/petsc/>`__ (PETSc 3.7, 3.8, 3.9, 3.12, 3.14, and 3.17 have been tested)
 
-* Uncompress the `PETSc <https://www.mcs.anl.gov/petsc/>`__ archive (in this example, using PETSc 3.12.0):
+* Uncompress the `PETSc <https://www.mcs.anl.gov/petsc/>`__ archive (in this example, using PETSc 3.17.0):
 
   .. code-block:: bash
 
-    $ tar zxvf petsc-3.12.0.tar.gz
+    $ tar zxvf petsc-3.17.0.tar.gz
 
 * Configure and build `PETSc <https://www.mcs.anl.gov/petsc/>`__. The configuration options depend on the calculations you want to perform (complex- or real-valued) as well as your compiler/MPI/Blas/Lapack setup. For PETGEM executions, **PETSC MUST BE BUILD FOR COMPLEX-VALUED NUMBERS**. In order to avoid incompatibilities between PETSC, petsc4py and PETGEM, we highly recommend the following configuration lines. Please, visit `PETSc <https://www.mcs.anl.gov/petsc/>`__ website for advanced configuration options. If you have a clean environment (not working MPI/Blas/Lapack), then run:
 
   .. code-block:: bash
 
-    $ cd petsc-3.12.0
+    $ cd petsc-3.17.0
     $ export PETSC_DIR=$PWD
     $ export PETSC_ARCH=arch-linux2-c-debug
 
@@ -114,14 +114,14 @@ and the :ref:`Download` section of this project website.
 
     $ pip3 install numpy
 
-* Download PETGEM (PETGEM 0.6 have been tested)
+* Download PETGEM (PETGEM 1.0.0 have been tested)
 
 * Uncompress the PETGEM archive:
 
   .. code-block:: bash
 
-    $ tar zxvf petgem-0.6.tar.gz
-    $ cd petgem-0.6
+    $ tar zxvf petgem-1.0.0.tar.gz
+    $ cd petgem-1.0.0
 
 * After unpacking the release tarball, the distribution is ready for building. Some environment configuration is needed to inform the `PETSc <https://www.mcs.anl.gov/petsc/>`__ location. As in :ref:`Install` section, you can set the environment variables ``PETSC_DIR`` and ``PETSC_ARCH`` indicating where you have built/installed `PETSc <https://www.mcs.anl.gov/petsc/>`__:
 

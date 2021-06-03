@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Author:  Octavio Castillo Reyes
 # Contact: octavio.castillo@bsc.es
-"""**PETGEM** kernel for 3D CSEM forward modelling using higg order vector elements."""
+"""**PETGEM** kernel for 3D CSEM/MT forward modelling using high order vector elements."""
 
 if __name__ == '__main__':
     # ---------------------------------------------------------------
@@ -23,6 +23,7 @@ if __name__ == '__main__':
     from petgem.parallel import MPIEnvironment
     from petgem.preprocessing import Preprocessing
     from petgem.solver import Solver
+    from petgem.postprocessing import Postprocessing
 
     # ---------------------------------------------------------------
     # Load system setup (both parameters and dataset configuration)
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     input_setup = InputParameters(sys.argv[3], par_env)
 
     # Initialize timers
-    Timers(input_setup.output.directory)
+    Timers(input_setup.output['directory'])
 
     # ---------------------------------------------------------------
     # Print header
@@ -42,7 +43,7 @@ if __name__ == '__main__':
     Print.header()
 
     # ---------------------------------------------------------------
-    # Initialize preprocessing and timers
+    # Preprocessing
     # ---------------------------------------------------------------
     Print.master(' ')
     Print.master('  Data preprocessing')
@@ -54,25 +55,37 @@ if __name__ == '__main__':
     preprocessing.run(input_setup)
 
     # ---------------------------------------------------------------
-    # Initialize and execute the solver
+    # Solver
     # ---------------------------------------------------------------
     Print.master(' ')
     Print.master('  Run modelling')
 
     # Create a solver instance
-    csem_solver = Solver()
+    solver = Solver()
 
     # Setup solver (import files from preprocessing stage)
-    csem_solver.setup(input_setup)
+    solver.setup(input_setup)
 
     # Assembly linear system
-    csem_solver.assembly(input_setup)
+    solver.assembly(input_setup)
 
-    # Set dirichlet boundary conditions
-    csem_solver.solve()
+    # Run solver (Ax=b)
+    solver.run(input_setup)
 
-    # Compute electromagnetic responses
-    csem_solver.postprocess(input_setup)
+    # Destroy solver
+    del solver
+
+    # ---------------------------------------------------------------
+    # Postprocessing
+    # ---------------------------------------------------------------
+    Print.master(' ')
+    Print.master('  Data postprocessing')
+
+    # Create a postprocessing instance
+    postprocessing = Postprocessing()
+
+    # Run postprocessing
+    postprocessing.run(input_setup)
 
     # ---------------------------------------------------------------
     # End of PETGEM kernel

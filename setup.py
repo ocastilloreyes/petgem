@@ -47,6 +47,19 @@ def get_ext_modules():
 
     return numpy_includes
 
+def get_version():
+    """Get petgem version.
+
+    :param: None
+    :return: numpy path include
+    """
+    version_file = open('petgem/VERSION')
+    code_version = version_file.read().strip()
+    version_file.close()
+
+    return code_version
+
+
 
 if __name__ == '__main__':
     from setuptools import setup
@@ -55,7 +68,7 @@ if __name__ == '__main__':
     setup(name=name(),
           maintainer="Octavio Castillo-Reyes",
           maintainer_email="octavio.castillo@bsc.es",
-          version='0.9',
+          version=get_version,
           long_description=long_description(),
           description=description(),
           url="https://www.bsc.es/castillo-octavio",
@@ -63,7 +76,7 @@ if __name__ == '__main__':
           license='BSD-3',
           packages=['petgem'],
           include_dirs=get_ext_modules(),
-          install_requires=['petsc4py', 'numpy', 'scipy', 'singleton_decorator', 'mpi4py', 'h5py'],
+          install_requires=['petsc4py', 'numpy', 'scipy', 'singleton_decorator', 'mpi4py', 'h5py', 'meshio'],
           setup_requires=['sphinx'],
           classifiers=['Development Status :: 3 - Alpha',
                        'License :: Free for non-commercial use',
@@ -73,7 +86,7 @@ if __name__ == '__main__':
                        'Topic :: Scientific/Engineering',
                        'Topic :: Software Development :: Libraries',
                        'Operating System :: POSIX :: Linux'],
-          keywords=['3D CSEM, high-order edge finite elements, HPC, numerical simulation'],
+          keywords=['3D CSEM/MT, high-order edge finite elements, HPC, numerical simulation'],
           platforms="Linux",
           include_package_data=True,
           )

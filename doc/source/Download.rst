@@ -28,11 +28,16 @@ Scripts
 
 * ``params.yaml``: file that defines physical parameters of the 3D CSEM survey. Download :download:`here <_downloads/params.yaml>`.
 
-Examples
-********
+CSEM examples
+*************
 
 * Example 1: Dataset for the Canonical model of an off-shore hydrocarbon reservoir (Nédélec elements of first-order). Download :download:`here <_downloads/case1.zip>`.
 
 * Example 2: Dataset for the Canonical model of an off-shore hydrocarbon reservoir (Nédélec elements of second-order). Download :download:`here <_downloads/case2.zip>`.
 
 * Example 3: Dataset for the use of PETSc solvers. Download :download:`here <_downloads/case3.zip>`.
+
+MT examples
+***********
+
+* Example 1: Dataset for the 3D trapezoidal hill model (Nédélec elements of second-order). Download :download:`here <_downloads/case4.zip>`.

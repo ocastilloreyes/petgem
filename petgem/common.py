@@ -101,8 +101,8 @@ class Print(object):
             self._log(self, '%%%' + ' '*69 + '%%%', color_code)
             self._log(self, '%%%   (c) Octavio Castillo-Reyes' +
                        ' '*40 + '%%%', color_code)
-            self._log(self, '%%%   Barcelona Supercomputing Center, 2020' +
-                       ' '*29 + '%%%', color_code)
+            self._log(self, '%%%   Barcelona Supercomputing Center (BSC-CNS), 2021' +
+                       ' '*19 + '%%%', color_code)
             self._log(self, '%%%' + ' '*69 + '%%%', color_code)
             self._log(self, '%'*75, color_code)
 
@@ -127,8 +127,7 @@ class Print(object):
 # Class InputParameters definition
 # ---------------------------------------------------------------
 class InputParameters(object):
-    """
-    Method import a yaml parameter file.
+    """Method to import a yaml parameter file.
 
     :param dict object: user params yaml file.
     :return: user parameters as object view.
@@ -148,56 +147,218 @@ class InputParameters(object):
         # ---------------------------------------------------------------
         with open(params, 'r') as f:
             # The FullLoader parameter handles the conversion from YAML
-            # scalar values to Python the dictionary format
+            # scalar values to the Python dictionary format
             inputs = yaml.safe_load(f)
 
-        # Store the datasets as a dict  object
-        self.model = Dictionary2Object(inputs['model'])
-        self.model.src_position = np.asarray(self.model.src_position, dtype=np.float)
-        self.run = Dictionary2Object(inputs['run'])
-        self.output = Dictionary2Object(inputs['output'])
+        # Get set of parameters
+        self.model = inputs['model']
+        self.run = inputs['run']
+        self.output = inputs['output']
 
         # ---------------------------------------------------------------
-        # Validations
+        # Check modeling mode
         # ---------------------------------------------------------------
-        if self.model.basis_order < 1 or self.model.basis_order > 6:
-            Print.master('     Vector finite element basis order not supported')
+        if not ('mode' in self.model.keys()):
+            Print.master('     Modeling mode not provided. Please, verify the parameter file consistency.')
             exit(-1)
-
-        #input(type(self.run.cuda))
-
-        if self.run.cuda is False:
-            self.run.cuda = False
-        elif self.run.cuda is True:
-            self.run.cuda = True
         else:
-            Print.master('     Cuda option not supported')
+            if not ((self.model.get('mode') == 'csem') or (self.model.get('mode') == 'mt')):
+                Print.master('     Modeling mode not supported.')
+                exit(-1)
+
+        # ---------------------------------------------------------------
+        # Check parameters consistency for csem mode
+        # ---------------------------------------------------------------
+        if (self.model.get('mode') == 'csem'):
+            if not ('csem' in self.model.keys()):
+                Print.master('     csem parameters not provided. Please, verify the parameter file consistency.')
+                exit(-1)
+            else:
+                # Check consistency of csem params
+                conductivity_from_file, num_polarizations = self.__verify_CSEM_params__(self.model)
+
+        # ---------------------------------------------------------------
+        # Check parameters consistency for mt mode
+        # ---------------------------------------------------------------
+        elif (self.model.get('mode') == 'mt'):
+            if not ('mt' in self.model.keys()):
+                Print.master('     mt parameters not provided. Please, verify the parameter file consistency.')
+                exit(-1)
+            else:
+                # Check consistency of mt params
+                conductivity_from_file, num_polarizations = self.__verify_MT_params__(self.model)
+
+        # Update number of models, interpolation strategy and
+        # polarization modes
+        self.run.update({'conductivity_from_file': conductivity_from_file})
+        self.run.update({'num_polarizations': num_polarizations})
+
+        # ---------------------------------------------------------------
+        # Check consistency of common parameters
+        # ---------------------------------------------------------------
+        # Mesh
+        if not ('mesh' in self.model.keys()):
+            Print.master('     mesh parameter not provided. Please, verify the parameter file consistency.')
             exit(-1)
 
-        # ---------------------------------------------------------------
-        # Create output directory
-        # ---------------------------------------------------------------
-        if(parEnv.rank == 0):
-            if not os.path.exists(self.output.directory):
-                os.mkdir(self.output.directory)
+        # Receivers
+        if not ('receivers' in self.model.keys()):
+            Print.master('     receivers parameter not provided. Please, verify the parameter file consistency.')
+            exit(-1)
 
-            # Create temporal directory
-            if not os.path.exists(self.output.directory_scratch):
-                os.mkdir(self.output.directory_scratch)
+        # Basis order
+        if not ('nord' in self.run.keys()):
+            Print.master('     nord parameter not provided. Please, verify the parameter file consistency.')
+            exit(-1)
+        else:
+            if ((self.run.get('nord') < 1) or (self.run.get('nord') > 6)):
+                Print.master('     Vector finite element basis order not supported. Please, select a valid order (1,2,3,4,5,6).')
+                exit(-1)
+
+        # Cuda support
+        if not ('cuda' in self.run.keys()):
+            self.run.update({'cuda': False})
+        else:
+            if not ((self.run.get('cuda') is False) or (self.run.get('cuda') is True)):
+                Print.master('     cuda option not supported. Please, select a valid order (True/False).')
+                exit(-1)
+
+        # Output
+        if not ('vtk' in self.output.keys()):
+            self.output.update({'vtk': False})
+
+        if not ('directory' in self.output.keys()):
+            Print.master('     output directory parameter not provided. Please, verify the parameter file consistency.')
+            exit(-1)
+        else:
+            if(parEnv.rank == 0):
+                if not os.path.exists(self.output.get('directory')):
+                    os.mkdir(self.output.get('directory'))
+        # If not scratch directory, use output directory
+        if not ('directory_scratch' in self.output.keys()):
+            self.output.update({'directory_scratch': self.output.get('directory')})
+            self.output.update({'remove_scratch': False})
+        else:
+            if(parEnv.rank == 0):
+                if not os.path.exists(self.output.get('directory_scratch')):
+                    os.mkdir(self.output.get('directory_scratch'))
+                self.output.update({'remove_scratch': True})
 
         return
 
+    def __verify_CSEM_params__(self, data):
+        """Verify consistency of CSEM parameters
 
-# ---------------------------------------------------------------
-# Class dictionary to object definition
-# ---------------------------------------------------------------
-class Dictionary2Object(object):
-    """Turns a dictionary into a class."""
+        :param dict data: csem dictionary
+        :return: input conductivity model from file or array.
+        :rtype: bool
+        """
+        # Get csem parameters
+        csem_params = data.get('csem')
+        # One "polarization mode" per csem model
+        num_polarizations = np.int(1)
 
-    def __init__(self, dictionary):
-        """Constructor."""
-        for key in dictionary:
-            setattr(self, key, dictionary[key])
+        # Check consistency for csem modeling
+        # Check sigma consistency
+        if not ('sigma' in csem_params.keys()):
+            Print.master('     csem parameters not provided. Please, verify the parameter file consistency.')
+            exit(-1)
+        else:
+            # Get sigma parameters
+            i_sigma = csem_params.get('sigma')
+            # Conductivity file
+            if ('file' in i_sigma.keys()):
+                # No vectors conductivity
+                if (('horizontal' in i_sigma.keys()) or ('vertical' in i_sigma.keys())):
+                    Print.master('     sigma parameters invalid. Please, verify the parameter file consistency.')
+                    exit(-1)
+                else:
+                    conductivity_from_file = True
+            # Vector conductivity
+            elif (('horizontal' in i_sigma.keys()) and ('vertical' in i_sigma.keys())):
+                # No file conductivity
+                if ('file' in i_sigma.keys()):
+                    Print.master('     sigma parameters invalid. Please, verify the parameter file consistency.')
+                    exit(-1)
+                else:
+                    conductivity_from_file = False
+            else:
+                Print.master('     sigma parameters invalid. Please, verify the parameter file consistency.')
+                exit(-1)
+
+            # Check source consistency
+            if not ('source' in csem_params.keys()):
+                Print.master('     source parameters not provided. Please, verify the parameter file consistency.')
+                exit(-1)
+            else:
+                # Get source parameters
+                i_source = csem_params.get('source')
+                # Check number of source parameters
+                if not (len(i_source) == 6):
+                    Print.master('     number of source parameters is not consistent. Please, verify the parameter file consistency.')
+                    exit(-1)
+                else:
+                    base_params = ['frequency', 'position', 'azimuth', 'dip', 'current', 'length']
+                    for i in np.arange(6):
+                        if not (base_params[i] in i_source.keys()):
+                            m = '     ' + base_params[i] + ' parameter not provided. Please, verify the parameter file consistency.'
+                            Print.master(m)
+                            exit(-1)
+
+        return conductivity_from_file, num_polarizations
+
+
+    def __verify_MT_params__(self, data):
+        """Verify consistency of MT parameters
+
+        :param dict data: mt dictionary
+        :return: input conductivity model from file or array.
+        :rtype: bool
+        """
+        # Get mt parameters
+        mt_params = data.get('mt')
+
+        # Check consistency for all mt models
+        # Get model parameters
+        # Check sigma consistency
+        if not ('sigma' in mt_params.keys()):
+            Print.master('     mt parameters not provided. Please, verify the parameter file consistency.')
+            exit(-1)
+        else:
+            # Get sigma parameters
+            i_sigma = mt_params.get('sigma')
+            # Conductivity file
+            if ('file' in i_sigma.keys()):
+                # No vectors conductivity
+                if (('horizontal' in i_sigma.keys()) or ('vertical' in i_sigma.keys())):
+                    Print.master('     sigma parameters invalid. Please, verify the parameter file consistency.')
+                    exit(-1)
+                else:
+                    conductivity_from_file = True
+            # Vector conductivity
+            elif (('horizontal' in i_sigma.keys()) and ('vertical' in i_sigma.keys())):
+                # No file conductivity
+                if ('file' in i_sigma.keys()):
+                    Print.master('     sigma parameters invalid. Please, verify the parameter file consistency.')
+                    exit(-1)
+                else:
+                    conductivity_from_file = False
+            else:
+                Print.master('     sigma parameters invalid. Please, verify the parameter file consistency.')
+                exit(-1)
+
+        # Check frequency and polarization parameters
+        base_params = ['frequency', 'polarization']
+        for i in np.arange(2):
+            if not (base_params[i] in mt_params.keys()):
+                m = '     ' + base_params[i] + ' parameter not provided for model. Please, verify the parameter file consistency.'
+                Print.master(m)
+                exit(-1)
+
+        # Determine number of polarization modes
+        num_polarizations = len(mt_params.get('polarization'))
+
+        return conductivity_from_file, num_polarizations
 
 
 # ---------------------------------------------------------------

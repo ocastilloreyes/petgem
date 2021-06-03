@@ -1,0 +1,77 @@
+\babel@toc {english}{}
+\contentsline {chapter}{\numberline {1}What is PETGEM?}{1}{chapter.1}
+\contentsline {chapter}{\numberline {2}Features}{3}{chapter.2}
+\contentsline {section}{\numberline {2.1}Software stack}{3}{section.2.1}
+\contentsline {section}{\numberline {2.2}Programming language}{4}{section.2.2}
+\contentsline {section}{\numberline {2.3}Target architecture}{4}{section.2.3}
+\contentsline {chapter}{\numberline {3}CSEM/MT forward modeling \& High-order edge finite element method}{5}{chapter.3}
+\contentsline {chapter}{\numberline {4}Installation}{7}{chapter.4}
+\contentsline {section}{\numberline {4.1}Requirements}{7}{section.4.1}
+\contentsline {section}{\numberline {4.2}Install PETGEM}{7}{section.4.2}
+\contentsline {section}{\numberline {4.3}Downloading and building PETGEM}{8}{section.4.3}
+\contentsline {section}{\numberline {4.4}Build documentation}{9}{section.4.4}
+\contentsline {chapter}{\numberline {5}Tutorial}{11}{chapter.5}
+\contentsline {section}{\numberline {5.1}Basic notions}{11}{section.5.1}
+\contentsline {section}{\numberline {5.2}Running a simulation}{12}{section.5.2}
+\contentsline {section}{\numberline {5.3}Model parameters file}{12}{section.5.3}
+\contentsline {section}{\numberline {5.4}Visualization of results}{13}{section.5.4}
+\contentsline {chapter}{\numberline {6}Manual}{15}{chapter.6}
+\contentsline {section}{\numberline {6.1}How generate documentation}{16}{section.6.1}
+\contentsline {section}{\numberline {6.2}Coding style}{16}{section.6.2}
+\contentsline {section}{\numberline {6.3}PETGEM design}{17}{section.6.3}
+\contentsline {subsection}{\numberline {6.3.1}PETGEM directory structure}{17}{subsection.6.3.1}
+\contentsline {section}{\numberline {6.4}Running a simulation}{18}{section.6.4}
+\contentsline {section}{\numberline {6.5}Mesh formats}{21}{section.6.5}
+\contentsline {section}{\numberline {6.6}Available solvers}{21}{section.6.6}
+\contentsline {section}{\numberline {6.7}Simulations in parallel}{22}{section.6.7}
+\contentsline {section}{\numberline {6.8}Visualization of results}{22}{section.6.8}
+\contentsline {section}{\numberline {6.9}CSEM example}{22}{section.6.9}
+\contentsline {subsection}{\numberline {6.9.1}Example 1: Canonical model of an off-shore hydrocarbon reservoir}{24}{subsection.6.9.1}
+\contentsline {subsubsection}{Model}{24}{subsubsection*.40}
+\contentsline {subsubsection}{Meshing}{24}{subsubsection*.41}
+\contentsline {subsubsection}{Parameters file for PETGEM}{24}{subsubsection*.42}
+\contentsline {subsubsection}{Running PETGEM}{25}{subsubsection*.43}
+\contentsline {subsubsection}{PETGEM post-processing}{26}{subsubsection*.44}
+\contentsline {subsection}{\numberline {6.9.2}Example 2: Use of high-order N\IeC {\'e}d\IeC {\'e}lec elements}{26}{subsection.6.9.2}
+\contentsline {subsubsection}{Meshing}{26}{subsubsection*.45}
+\contentsline {subsubsection}{Parameters file for PETGEM}{27}{subsubsection*.46}
+\contentsline {subsubsection}{Running PETGEM}{27}{subsubsection*.47}
+\contentsline {subsubsection}{N\IeC {\'e}d\IeC {\'e}lec order comparison}{28}{subsubsection*.48}
+\contentsline {subsection}{\numberline {6.9.3}Example 3: Use of PETSc solvers}{28}{subsection.6.9.3}
+\contentsline {section}{\numberline {6.10}MT example}{29}{section.6.10}
+\contentsline {subsection}{\numberline {6.10.1}Example 4: 3D trapezoidal hill model}{29}{subsection.6.10.1}
+\contentsline {subsubsection}{Model}{29}{subsubsection*.49}
+\contentsline {subsubsection}{Parameters file for PETGEM}{30}{subsubsection*.50}
+\contentsline {subsubsection}{Running PETGEM}{31}{subsubsection*.51}
+\contentsline {subsubsection}{PETGEM post-processing}{31}{subsubsection*.52}
+\contentsline {section}{\numberline {6.11}Code documentation}{31}{section.6.11}
+\contentsline {subsection}{\numberline {6.11.1}kernel}{32}{subsection.6.11.1}
+\contentsline {subsubsection}{kernel.py}{32}{subsubsection*.53}
+\contentsline {subsection}{\numberline {6.11.2}Common scripts}{32}{subsection.6.11.2}
+\contentsline {subsubsection}{common.py}{32}{subsubsection*.54}
+\contentsline {subsection}{\numberline {6.11.3}Pre-processing}{33}{subsection.6.11.3}
+\contentsline {subsubsection}{preprocessing.py}{33}{subsubsection*.67}
+\contentsline {subsection}{\numberline {6.11.4}Mesh scripts}{33}{subsection.6.11.4}
+\contentsline {subsubsection}{mesh.py}{33}{subsubsection*.69}
+\contentsline {subsection}{\numberline {6.11.5}HEFEM scripts}{35}{subsection.6.11.5}
+\contentsline {subsubsection}{hvfem.py}{35}{subsubsection*.79}
+\contentsline {subsubsection}{vectors.py}{42}{subsubsection*.110}
+\contentsline {subsection}{\numberline {6.11.6}Solver}{43}{subsection.6.11.6}
+\contentsline {subsubsection}{solver.py}{43}{subsubsection*.116}
+\contentsline {subsection}{\numberline {6.11.7}Parallel}{44}{subsection.6.11.7}
+\contentsline {subsubsection}{parallel.py}{44}{subsubsection*.118}
+\contentsline {subsection}{\numberline {6.11.8}Post-processing}{46}{subsection.6.11.8}
+\contentsline {subsubsection}{preprocessing.py}{46}{subsubsection*.131}
+\contentsline {chapter}{\numberline {7}Publications}{49}{chapter.7}
+\contentsline {chapter}{\numberline {8}Support}{53}{chapter.8}
+\contentsline {chapter}{\numberline {9}Download}{55}{chapter.9}
+\contentsline {section}{\numberline {9.1}Conditions of use}{55}{section.9.1}
+\contentsline {section}{\numberline {9.2}Downloads}{55}{section.9.2}
+\contentsline {subsection}{\numberline {9.2.1}Scripts}{55}{subsection.9.2.1}
+\contentsline {subsection}{\numberline {9.2.2}CSEM examples}{55}{subsection.9.2.2}
+\contentsline {subsection}{\numberline {9.2.3}MT examples}{55}{subsection.9.2.3}
+\contentsline {chapter}{\numberline {10}Contact}{57}{chapter.10}
+\contentsline {chapter}{\numberline {11}View map}{59}{chapter.11}
+\contentsline {chapter}{\numberline {12}Indices and tables}{61}{chapter.12}
+\contentsline {chapter}{Python Module Index}{63}{section*.135}
+\contentsline {chapter}{Index}{65}{section*.136}

@@ -11,7 +11,7 @@ PETGEM documentation
 
    WhatIs
    Features
-   CSEMEdges
+   Mathbackground
    Installation
    Tutorial
    Manual

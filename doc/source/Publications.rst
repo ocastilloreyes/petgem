@@ -4,6 +4,7 @@ Publications
 ============
 Papers:
 
+* Castillo-Reyes, O., Queralt, P., Marcuello, A., Ledo, J. (2021). `Land CSEM Simulations and Experimental Test Using Metallic Casing in a Geothermal Exploration Context: Vall\`es Basin (NE Spain) Case Study <https://doi.org/10.1109/TGRS.2021.3069042>`_. IEEE Transactions on Geoscience and Remote Sensing.
 * Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019). `Parallel 3-D marine controlled-source electromagnetic modelling using high-order tetrahedral Nédélec elements <https://doi.org/10.1093/gji/ggz285>`_. Geophysical Journal International, Volume 219, Issue 1, October 2019, Pages 39–65.
 * Castillo-Reyes, O., de la Puente, Cela, J. M. `PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements <https://doi.org/10.1016/j.cageo.2018.07.005>`_. Computers & Geosciences, vol 119: 123-136. ISSN 0098-3004. Elsevier.
 * Castillo-Reyes, O., de la Puente, Cela, J. M. `Three-Dimensional CSEM modelling on unstructured tetrahedral meshes using edge finite elements <https://link.springer.com/chapter/10.1007/978-3-319-57972-6_18>`_. In: Barrios Hernández C., Gitler I., Klapp J. (eds) High Performance Computing. CARLA 2016. Communications in Computer and Information Science, vol 697: 247-256. ISBN 978-3-319-57971-9 Springer, Cham. 2017.
@@ -20,6 +21,10 @@ Papers:
 
 Conferences:
 
+* Castillo-Reyes, O. Modeling and Inversion 3D Electromagnetic Datasets on HPC platforms. ADMOS 2021 10th International Conference On Adaptive Modeling and Simulation. June 2021.
+* Castillo-Reyes, O. Reservoir characterization using geophysics electromagnetic and HPC. SIAM Conference on Mathematical & Computational Issues in the Geosciences. June 2021.
+* Castillo-Reyes, O., Queralt, P., Marcuello, A., Ledo, J., Amor-Martin, A., García-Castillo, L.E. 14:00 - 15:00 3D Electromagnetic Modeling and Inversion using an Open-Source Paradigm: Experiences and Perspectives. SIAM Conference on Mathematical & Computational Issues in the Geosciences. June 2021.
+* Castillo-Reyes, O. Electromagnetic modeling using steel casing in a geothermal exploration context Online AGU Fall Meeting. 8o Congreso Metropolitano de Modelado y Simulación Numérica 2021. May 2021.
 * Co-author.  Open-source lanscape for Three-Dimensional Controlled-Source Electromagnetic Modeling. Online AGU Fall Meeting. December 2020.
 * Castillo-Reyes, O. Control Source Electromagnetic test in the Vallès Basin (Spain) for geothermal characterization: experiment setup and numerical simulations. Online AGU Fall Meeting. December 2020.
 * Castillo-Reyes, O. Land CSEM simulations and experimental test using metallic casing in a geothermal exploration context: Vallés Basin (NE Spain) case study. Online MATHROCKS Workshop on Simulation and Inversion Methods in Geophysics. Workshop virtual organized by the Institut National de Recherche en Informatique et en Automatique – INRIA (Pau University, France) and University of the Basque Country (Spain). November 2020.
@@ -69,5 +74,3 @@ European Regional Development Fund (ERDF) through the Interreg V-A Spain-France-
 (POCTEFA2014-2020). POCTEFA aims to reinforce the economic and social integration of the French-Spanish-Andorran
 border. Its support is focused on developing economic, social and environmental cross-border activities through joint
 strategies favouring sustainable territorial development
-
-Octavio Castillo-Reyes expresses his gratitude to the Mexican National Council for Science and Technology (`CONACyT <http://www.conacyt.mx/>`_) for his support.

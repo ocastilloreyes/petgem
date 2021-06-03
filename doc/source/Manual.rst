@@ -110,12 +110,12 @@ structure.
    * - `doc/`
      - Source files for PETGEM documentation
    * - `examples/`
-     - Templates of basic scripts for 3D CSEM modelling
+     - Templates of basic scripts for 3D CSEM/MT modelling
    * - `petgem/`
      - Source code
    * - `kernel.py`
      - Heart of the code. This file contains the entire work-flow for a
-       3D CSEM survey
+       3D CSEM/MT survey
    * - `DESCRIPTION.rst`
      - Summary of PETGEM features, requirements and installation instructions
    * - `LICENSE.rst`
@@ -140,12 +140,11 @@ The PETGEM source code is `petgem/`, which has the following contents:
    * - `common.py`
      - Common classes and functions for init process.
    * - `hvfem.py`
-     - General modules and classes for describing a 3D CSEM survey by using EFEM of
-       high-order (:math:`p=1,2,3,4,5,6`) in tetrahedral meshes
+     - General modules and classes for describing a 3D CSEM/MT survey by using HEFEM (:math:`p=1,2,3,4,5,6`) in tetrahedral meshes
    * - `mesh.py`
      - Interface to import mesh files
    * - `parallel.py`
-     - Modules for supporting parallel computations and solution of 3D CSEM
+     - Modules for supporting parallel computations and solution of 3D CSEM/MT
    * - `preprocessing.py`
      - Modules for PETGEM pre-processing
    * - `solver.py`
@@ -157,7 +156,7 @@ Running a simulation
 --------------------
 
 This section introduces the basics of running PETGEM on the command
-line. In order to solve a 3D CSEM survey, the PETGEM kernel requires two
+line. In order to solve a 3D CSEM/MT survey, the PETGEM kernel requires two
 files, namely, the ``petsc.opts`` file and the ``params.yaml`` file, which
 are described below.
 
@@ -179,7 +178,7 @@ details about available options. A template of this file is included in
 ``examples/`` of the PETGEM source tree. Additionally, a freely
 available copy of this file is located at :ref:`Download` section.
 
-On the other hand, any 3D CSEM survey should include: order for Nédélec elements
+On the other hand, any 3D CSEM/MT survey should include: order for Nédélec elements
 discretizations, physical parameters,
 a mesh file, source and receivers files. These data are included in the
 ``params.yaml`` file. In order to avoid a specific parser, ``params.yaml``
@@ -195,26 +194,41 @@ A glance of ``params.yaml`` file is the following:
  ###############################################################################
  # Model parameters
  model:
-   mesh_file: examples/DIPOLE1D.msh      # Mesh file (gmsh format v2)
-   basis_order: 1                        # Vector basis order (1,2,3,4,5,6)
-   frequency: 2.0                        # Frequency
-   src_position: [1750., 1750., -975.]   # Source position (xyz)
-   src_azimuth: 0                        # Source rotation in xy plane
-   src_dip: 0                            # Source rotation in xz plane
-   src_current: 1.                       # Source current
-   src_length: 1.                        # Source length
-   sigma_horizontal: [1., 0.01, 1., 3.3333]   # Horizontal conductivity for each material
-   sigma_vertical: [1., 0.01, 1., 3.3333]     # Vertical conductivity for each material
-   receivers_file: examples/receiver_pos.h5 # Receiver positions file (xyz)
+   mode: mt    # Modeling mode: csem or mt
+   csem:
+     sigma:
+       #file: 'my_file.h5'                # Conductivity model file
+       horizontal: [1.e-10, 0.01]       # Horizontal conductivity
+       vertical: [1.e-10, 0.01]         # Vertical conductivity
+     source:
+       frequency: 2.                     # Frequency (Hz)
+       position: [1750., 1750., -975.]   # Source position (xyz)
+       azimuth: 0.                       # Source rotation in xy plane (in degrees)
+       dip: 0.                           # Source rotation in xz plane (in degrees)
+       current: 1.                       # Source current (Am)
+       length: 1.                        # Source length  (m)
+   mt:
+     sigma:
+       #file: 'my_file.h5'                # Conductivity model file
+       horizontal: [1.e-10, 0.01]       # Horizontal conductivity
+       vertical: [1.e-10, 0.01]         # Vertical conductivity
+     frequency: 2.                      # Frequency (Hz)
+     polarization: 'xy'                 # Polarization mode for mt (xyz)
+
+   # Common parameters for all models
+   mesh: examples/case_MT/mesh_trapezoidal.msh   # Mesh file (gmsh format v2)
+   receivers: examples/case_MT/receivers.h5 # Receiver positions file (xyz)
 
  # Execution parameters
  run:
-   cuda: False                           # Flag to activate/deactivate cuda support
+   nord: 1       # Vector basis order (1,2,3,4,5,6)
+   cuda: False   # Cuda support (True or False)
 
  # Output parameters
  output:
-   directory: examples/out               # Directory for output (results)
-   directory_scratch: examples/tmp       # Directory for temporal files
+   vtk: False                               # Postprocess vtk file (EM fields, conductivity)
+   directory: examples/case_MT/out           # Directory for output (results)
+   directory_scratch: examples/case_MT/tmp   # Directory for temporal files
 
 
 The ``params.yaml`` file is divided into 3 sections, namely, model,
@@ -239,8 +253,8 @@ is the modelling parameters file for PETGEM.
 PETGEM solves the problem and outputs the solution to the ``output.directory/`` path.
 The output file will be in h5py format. By default, the file structure contains a
 ``fields`` dataset and a ``receiver_coordinates`` dataset. In example, if the
-model has 3 receivers, ``fields.h5`` would contain six components (Ex, Ey, Ez, Hx, Hy, Hz)
-of the total electromagnetic field responses as follows (``fields`` only for illustrative
+model has 3 receivers, ``fields`` dataset would contain six components (Ex, Ey, Ez, Hx, Hy, Hz)
+of the electromagnetic field responses as follows (``fields`` only for illustrative
 purposes):
 
 .. code-block:: python
@@ -260,25 +274,25 @@ the other hand, the receiver coordinates as follows (``receiver_coordinates``):
   1800. 	 1750. 	  -990
   1850. 	 1750. 	  -990
 
-In summary, for a general 3D CSEM survey, the ``kernel.py`` script follows
+In summary, for a general 3D CSEM/MT survey, the ``kernel.py`` script follows
 the next work-flow:
 
 #. ``kernel.py`` reads a ``params.yaml``
 #. Following the contents of the ``params.yaml``, a problem instance is created
 #. Runs the data preprocessing
-#. The problem sets up its domain, sub-domains, source, solver. This stage include the computation of the main data structures
+#. The problem sets up its domain, sub-domains, source-type, solver. This stage include the computation of the main data structures
 #. Parallel assembling of :math:`Ax=b`.
 #. The solution is obtained in parallel by calling a ``ksp()`` `PETSc <https://www.mcs.anl.gov/petsc/>`__ object.
 #. Interpolation of electromagnetic (electric and magnetic) responses and post-processing parallel stage
 #. Finally the solution can be stored by calling ``solver.postprocess()`` method. Current version support `h5py <https://pypi.org/project/h5py/>`__ format.
 
-Based on previous work-flow, any 3D CSEM modelling requires the following
+Based on previous work-flow, any 3D CSEM/MT modelling requires the following
 input files:
 
-#. A mesh file (current version supports mesh files in MSH ASCII format v2 from `Gmsh <http://gmsh.info/>`__)
+#. A mesh file (current version supports mesh files from `Gmsh <http://gmsh.info/>`__)
 #. A conductivity model associated with the materials defined in the mesh file
 #. A list of receivers positions in hdf5 format for the electric responses post-processing
-#. A ``params.yanl`` file where are defined the 3D CSEM parameters
+#. A ``params.yaml`` file where are defined the 3D CSEM/MT parameters
 #. A ``petsc.opts`` file where are defined options for `PETSc <https://www.mcs.anl.gov/petsc/>`__ solvers
 
 During the preprocessing stage, the ``kernel.py`` generates the mesh file (`Gmsh <http://gmsh.info/>`__ format) with its
@@ -288,9 +302,9 @@ For this phase, the supported/expected formats are the following:
 
 * ``basis_order``: nédélec basis element order for the discretization. Supported orders are :math:`p=1,2,3,4,5,6`
 
-* ``mesh_file``: path to tetrahedral mesh file in MSH ASCII format from `Gmsh <http://gmsh.info/>`__
+* ``mesh_file``: path to tetrahedral mesh file in format from `Gmsh <http://gmsh.info/>`__
 
-* ``sigma``: numpy array where each value represents the horizontal and vertical conductivity for each material defined in ``mesh_file``. Therefore, size of ``sigma`` must match with the number of materials in ``mesh_file``
+* ``sigma``: numpy array or hdf5 file where each value represents the horizontal and vertical conductivity for each material defined in ``mesh_file``. Therefore, size of ``sigma`` must match with the number of materials in ``mesh_file``
 
 * ``receivers_file``: floating point values giving the X, Y and Z coordinates of each receiver in hdf5 format. Therefore, the number of receivers in the modelling will defined the number of the rows in ``receivers_file``, i.e. if the modelling has 3 receivers, ``receivers_file`` should be:
 
@@ -304,7 +318,7 @@ For this phase, the supported/expected formats are the following:
 
 Once the previous information has been provided, the ``kernel.py``
 script will generate all the input files required by PETGEM in order to
-solve a 3D CSEM survey. The ``kernel.py`` output files list is the
+solve a 3D CSEM/MT survey. The ``kernel.py`` output files list is the
 following:
 
 * ``nodes.dat``: floating point values giving the X, Y and Z coordinates of the four nodes that make up each tetrahedral element in the mesh. The dimensions of ``nodes.dat`` are given by (number-of-elements, 12)
@@ -348,7 +362,7 @@ file.
 Mesh formats
 ------------
 
-Current PETGEM version supports mesh files in MSH ASCII (version 2.2) from
+Current PETGEM version supports mesh files from
 `Gmsh <http://gmsh.info/>`__. Aforementioned format must be pre-processed
 using the ``run_preprocessing.py`` script. The ``run_preprocessing.py``
 script is included in the top-level directory of the PETGEM source tree.
@@ -438,7 +452,7 @@ easy way without any extra coding required.
 .. _Figure 7.4:
 .. figure:: _static/figures/PETGEM_parallel_scheme.png
    :scale: 70%
-   :alt: Parallel scheme for assembly in PETGEM V1.0.
+   :alt: Parallel scheme for assembly in PETGEM V1.0.0
    :align: center
 
    Figure 7.4. Parallel scheme for assembly and solution in PETGEM using 4 MPI tasks. Here the elemental matrices computation is done in parallel. After calculations the global system is built and solved in parallel using the petsc4py and mpi4py packages.
@@ -448,10 +462,10 @@ easy way without any extra coding required.
 Visualization of results
 ------------------------
 
-Once a solution of a 3D CSEM survey has been obtained, it should be
+Once a solution of a 3D CSEM/MT survey has been obtained, it should be
 post-processed by using a visualization program. PETGEM does not do the
-visualization by itself, but it generates output files (hdf5 is supported)
-with the electric responses and receivers positions. It also gives timing values
+visualization by itself, but it generates output files (hdf5 and VTK are supported)
+with the electric responses at receivers positions and nodes in the mesh. It also gives timing values
 in order to evaluate the performance.
 
 `Figure 7.5`_ shows an example of PETGEM output for the first modelling case
@@ -469,8 +483,8 @@ in order to evaluate the performance.
 
 .. _Examples:
 
-Example
---------
+CSEM example
+------------
 This section includes a step-by-step walk-through of the process to solve a
 simple 3D CSEM survey. The typical process to solve a problem using
 PETGEM is followed: a model is meshed, PETGEM input files are preprocessed and modeled by
@@ -528,26 +542,34 @@ The parameters file used for this example follows:
   ###############################################################################
   # Model parameters
   model:
-    mesh_file: case1/DIPOLE1D.msh      # Mesh file (gmsh format v2)
-    basis_order: 1                        # Vector basis order (1,2,3,4,5,6)
-    frequency: 2.0                        # Frequency
-    src_position: [1750., 1750., -975.]   # Source position (xyz)
-    src_azimuth: 0                        # Source rotation in xy plane
-    src_dip: 0                            # Source rotation in xz plane
-    src_current: 1.                       # Source current
-    src_length: 1.                        # Source length
-    sigma_horizontal: [1., 0.01, 1., 3.3333]   # Horizontal conductivity for each material
-    sigma_vertical: [1., 0.01, 1., 3.3333]     # Vertical conductivity for each material
-    receivers_file: case1/receiver_pos.h5 # Receiver positions file (xyz)
+    mode: csem    # Modeling mode: csem or mt
+    csem:
+      sigma:
+        #file: 'my_file.h5'                # Conductivity model file
+        horizontal: [1., 0.01, 1., 3.3333]  # Horizontal conductivity
+        vertical: [1., 0.01, 1., 3.3333]    # Vertical conductivity
+      source:
+        frequency: 2.                     # Frequency (Hz)
+        position: [1750., 1750., -975.]   # Source position (xyz)
+        azimuth: 0.                       # Source rotation in xy plane (in degrees)
+        dip: 0.                           # Source rotation in xz plane (in degrees)
+        current: 1.                       # Source current (Am)
+        length: 1.                        # Source length  (m)
+
+    # Common parameters for all models
+    mesh: examples/case_1/DIPOLE1D.msh   # Mesh file (gmsh format v2)
+    receivers: examples/case_1/receiver_pos.h5 # Receiver positions file (xyz)
 
   # Execution parameters
   run:
-    cuda: False                           # Flag to activate/deactivate cuda support
+    nord: 1       # Vector basis order (1,2,3,4,5,6)
+    cuda: False   # Cuda support (True or False)
 
   # Output parameters
   output:
-    directory: case1/out               # Directory for output (results)
-    directory_scratch: case1/tmp       # Directory for temporal files
+    vtk: True                               # Postprocess vtk file (EM fields, conductivity)
+    directory: examples/case_1/out           # Directory for output (results)
+    directory_scratch: examples/case_1/tmp   # Directory for temporal files
 
 Note that you may wish to change the location of the input files to
 somewhere on your drive. The solver options have been configured in the ``petsc.opts`` file as follows:
@@ -633,26 +655,41 @@ The parameters file used for this example follows:
   ###############################################################################
   # Model parameters
   model:
-    mesh_file: case2/DIPOLE1D.msh      # Mesh file (gmsh format v2)
-    basis_order: 2                        # Vector basis order (1,2,3,4,5,6)
-    frequency: 2.0                        # Frequency
-    src_position: [1750., 1750., -975.]   # Source position (xyz)
-    src_azimuth: 0                        # Source rotation in xy plane
-    src_dip: 0                            # Source rotation in xz plane
-    src_current: 1.                       # Source current
-    src_length: 1.                        # Source length
-    sigma_horizontal: [1., 0.01, 1., 3.3333]   # Horizontal conductivity for each material
-    sigma_vertical: [1., 0.01, 1., 3.3333]     # Vertical conductivity for each material
-    receivers_file: case2/receiver_pos.h5 # Receiver positions file (xyz)
+    mode: csem    # Modeling mode: csem or mt
+    csem:
+      sigma:
+        #file: 'my_file.h5'                # Conductivity model file
+        horizontal: [1., 0.01, 1., 3.3333]  # Horizontal conductivity
+        vertical: [1., 0.01, 1., 3.3333]    # Vertical conductivity
+      source:
+        frequency: 2.                     # Frequency (Hz)
+        position: [1750., 1750., -975.]   # Source position (xyz)
+        azimuth: 0.                       # Source rotation in xy plane (in degrees)
+        dip: 0.                           # Source rotation in xz plane (in degrees)
+        current: 1.                       # Source current (Am)
+        length: 1.                        # Source length  (m)
+    mt:
+      sigma:
+        file: 'my_file.h5'                # Conductivity model file
+        #horizontal: [1.e-10, 0.01]       # Horizontal conductivity
+        #vertical: [1.e-10, 0.01]         # Vertical conductivity
+      frequency: 4.                      # Frequency (Hz)
+      polarization: 'xy'                 # Polarization mode for mt (xyz)
+
+    # Common parameters for all models
+    mesh: examples/case_2/DIPOLE1D.msh   # Mesh file (gmsh format v2)
+    receivers: examples/case_2/receiver_pos.h5 # Receiver positions file (xyz)
 
   # Execution parameters
   run:
-    cuda: False                           # Flag to activate/deactivate cuda support
+    nord: 2       # Vector basis order (1,2,3,4,5,6)
+    cuda: False   # Cuda support (True or False)
 
   # Output parameters
   output:
-    directory: case2/out               # Directory for output (results)
-    directory_scratch: case2/tmp       # Directory for temporal files
+    vtk: True                               # Postprocess vtk file (EM fields, conductivity)
+    directory: examples/case_2/out           # Directory for output (results)
+    directory_scratch: examples/case_2/tmp   # Directory for temporal files
 
 Running PETGEM
 ##############
@@ -759,6 +796,133 @@ consideration.
 
 Previous configuration are based on most used in the literature.
 
+MT example
+----------
+This section includes a step-by-step walk-through of the process to solve a
+simple 3D MT survey. The typical process to solve a problem using
+PETGEM is followed: a model is meshed, PETGEM input files are preprocessed and modeled by
+using ``kernel.py`` script to solve
+the modelling and finally the results of the simulation are visualised.
+
+All necessary data to reproduce the following examples are available in the
+:ref:`Download` section.
+
+Example 4: 3D trapezoidal hill model
+************************************
+
+Model
+#####
+
+In order to explain the 3D MT modelling using PETGEM, here is considered a 3D
+trapezoidal hill model. This test case is a homogeneous half-space model with
+1/100 :math:`S/m` as host resistivity and 1e-9 :math:`S/m` as the free-space
+resistivity. The trapezoidal hill, centered at the computational domain, has a
+height of 0.45km with a hill-top square of 0.45km X 0.45km,
+and a hill-bottom square of 2km X 2km. A cross-section view of
+the model under consideration is depicted in `Figure 7.11`_. By using the
+horizontal components of the EM fields at 2Hz, the apparent resistivities are
+computed. 41 sites at 0km and along the x-axis are arranged equidistant
+spacing over the interval x=[-2:2]km. Further, the Nédélec element order
+is p=2 (second order).
+
+.. _Figure 7.11:
+.. figure:: _static/figures/model2.png
+   :scale: 35%
+   :alt: Cross-section view of the 3D trapezoidal hill model (left-panel) with its resulting computational unstructured and hp-adapted mesh for p=2 (right-panel).
+   :align: center
+
+   Figure 7.11. Cross-section view of the 3D trapezoidal hill model (left-panel) with its resulting computational unstructured and hp-adapted mesh for p = 2 (right-panel).
+
+Parameters file for PETGEM
+##########################
+The parameters file used for this example follows:
+
+.. code-block:: python
+
+  ###############################################################################
+  # PETGEM parameters file
+  ###############################################################################
+  # Model parameters
+  model:
+    mode: mt    # Modeling mode: csem or mt
+    mt:
+      sigma:
+        #file: 'my_file.h5'                # Conductivity model file
+        horizontal: [1.e-10, 0.01]       # Horizontal conductivity
+        vertical: [1.e-10, 0.01]         # Vertical conductivity
+      frequency: 2.                      # Frequency (Hz)
+      polarization: 'xy'                 # Polarization mode for mt (xyz)
+
+    # Common parameters for all models
+    mesh: examples/case_4/mesh_trapezoidal.msh   # Mesh file (gmsh format v2)
+    receivers: examples/case_4/receivers.h5 # Receiver positions file (xyz)
+
+  # Execution parameters
+  run:
+    nord: 2       # Vector basis order (1,2,3,4,5,6)
+    cuda: False   # Cuda support (True or False)
+
+  # Output parameters
+  output:
+    vtk: False                               # Postprocess vtk file (EM fields, conductivity)
+    directory: examples/case_4/out           # Directory for output (results)
+    directory_scratch: examples/case_4/tmp   # Directory for temporal files
+
+Note that you may wish to change the location of the input files to
+somewhere on your drive. The solver options have been configured in the ``petsc.opts`` file as follows:
+
+.. code-block:: python
+
+    # Solver options for
+    -pc_type lu
+    -pc_factor_mat_solver_package mumps
+
+That's it, we are now ready to solve the modelling.
+
+Running PETGEM
+##############
+To run the simulation, the following command should be run in the top-level
+directory of the PETGEM source tree:
+
+.. code-block:: bash
+
+  $ mpirun -n 16 python3 kernel.py -options_file case4/petsc.opts case4/params.yaml
+
+``kernel.py`` solves the problem as follows:
+
+#. Problem initialization
+#. Preprocessing data
+#. Import files
+#. Parallel assembly system (twice, 1 for each polarization mode)
+#. Parallel solution system (twice, 1 for each polarization mode)
+#. Post-processing of electric responses, apparent resistivities and phases
+
+and outputs the solution to the output path
+(``case4/out/``). The output file will be in hdf5 format.
+
+PETGEM post-processing
+######################
+Once a solution of a 3D MT survey has been obtained, it should be
+post-processed by using a visualization program. PETGEM does not do the
+visualization by itself, but it generates output file (hdf5)
+with the electric responses (apparent resistivities and phases) and
+receivers positions. It also gives timing values in order to evaluate the
+performance.
+
+The electric fields responses can be handled freely and plotted. The
+dimension of the array is determined by the
+number of receivers in the modelling (41 in this example). `Figure 7.12`_ shows
+a comparison of the obtained apparent resistivity and phase.
+
+.. _Figure 7.12:
+.. figure:: _static/figures/apparent_resistivity_phase.png
+   :scale: 50%
+   :alt: Apparent resistivities (left-panel) and phases (right-panel) for the 3D trapezoidal hill model. The PETGEM solutions were calculated with p = 2.
+   :align: center
+
+   Figure 7.12. Apparent resistivities (left-panel) and phases (right-panel) for the 3D trapezoidal hill model. The PETGEM solutions were calculated with p = 2.
+
+
 .. _Code documentation:
 
 Code documentation
@@ -822,3 +986,11 @@ Parallel
    :maxdepth: 2
 
    petgem/parallel
+
+Post-processing
+***************
+
+.. toctree::
+   :maxdepth: 2
+
+   petgem/postprocessing

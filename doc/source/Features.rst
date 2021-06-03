@@ -30,7 +30,7 @@ A more detailed explanation is the following:
 
 * Independent of problem formulation, numerical solution, and data storage: The kernel provides the independent abstractions for modeling, numerical methods, data storage and analysis.
 
-* Parallel processing support:  Based on distributed-memory parallelism (`petsc4py <https://pypi.python.org/pypi/petsc4py>`__) and static load balancing.  Further, GPUs architectures are supported.
+* Parallel processing support: Based on distributed-memory parallelism (`petsc4py <https://pypi.python.org/pypi/petsc4py>`__) and static load balancing.  Further, GPUs architectures are supported.
 
 * Confidence and performance monitoring: Based on an simple and automatic profiling module.
 
@@ -38,11 +38,11 @@ A more detailed explanation is the following:
 
 * Interface to mesh generator: Simple and light library to export nodal finite element meshes to edge elements data structures. Current version support `Gmsh <http://gmsh.info/>`__ meshes.
 
-* Edge FEM library: High-order Edge-based discretisations, vector basis functions, their geometry description, and generalized integration rules provides a generic support for implementing edge-based solution algorithms.
+* Edge FEM library: High-order Edge-based discretisations, vector basis functions, their geometry description, and generalized integration rules provides a generic support for implementing high-order edge-based solution algorithms.
 
 * Linear systems library: Support to Compressed Row Storage (CSR) format for sparse matrices and their easy and efficient parallel assembly on distributed-memory platforms.
 
-* CSEM module: Ad-hoc design to meet specific requirements for the solution 3D CSEM surveys, namely, conductivity model, physical parameters, transmitter and receiver lists.
+* CSEM/MT module: Ad-hoc design to meet specific requirements for the solution 3D CSEM/MT surveys, namely, conductivity model, physical parameters, transmitter and receiver lists.
 
 * Pre-processing suite: Set of `Python <https://www.python.org/>`__ functions for pre-processing phase within PETGEM.
 

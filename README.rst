@@ -38,15 +38,15 @@ meshes, as these are the easiest to scale-up to very large domains or
 arbitrary shape. It supports distributed-memory parallelism through
 petsc4py package. **petgem** allow users to specify high-order edge-based variational
 forms of H(curl) for the simulation of electromagnetic fields in realistic
-3D CSEM surveys with accuracy, reliability and efficiency.
+3D CSEM/MT surveys with accuracy, reliability and efficiency.
 
 More information
 ----------------
 For more information regarding installation, usage, contributing and bug reports see:
 
-- **Website**: http://petgem.bsc.es/
-- **Documentation**: http://petgem.bsc.es/
-- **Installation**: http://petgem.bsc.es/
+- **Website**: https://petgem.bsc.es/
+- **Documentation**: https://petgem.bsc.es/
+- **Installation**: https://petgem.bsc.es/
 - **Source Code**: https://github.com/ocastilloreyes/petgem
 - **Pypi site**: https://pypi.org/project/petgem/
 - **Examples**: https://github.com/ocastilloreyes/petgem
@@ -58,7 +58,7 @@ Dependencies
 
 -  A matching version of PETSc\_
 
--  Python\_ (versions 3.5.2, 3.6.3, 3.6.9, 3.12.0, 3.14.0 have been tested).
+-  Python\_ (versions 3.5.2, 3.6.3, 3.6.9, 3.12.0, 3.14.0, and 3.17.0 have been tested).
 
 -  A recent NumPy\_ release.
 
