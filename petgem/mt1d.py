@@ -6,14 +6,7 @@
 # ---------------------------------------------------------------
 # Load python modules
 # ---------------------------------------------------------------
-import time
-import yaml
-import sys
-import os
 import numpy as np
-from functools import wraps
-from colorama import Fore
-from singleton_decorator import singleton
 from scipy.sparse import coo_matrix
 from scipy.linalg import lu, solve_triangular
 from scipy.sparse.linalg import spsolve
@@ -21,7 +14,6 @@ from scipy.sparse.linalg import spsolve
 # ---------------------------------------------------------------
 # Load petgem modules (BSC)
 # ---------------------------------------------------------------
-from .parallel import MPIEnvironment
 
 # ###############################################################
 # ################     CLASSES DEFINITION      ##################
@@ -278,40 +270,40 @@ def computeShapeFunctionsReferenceElement2D(nDeg, coord, use_cubature=True):
         # Not implemented yet, need implementation of GaussLegendreCubature2D
         raise Exception('Cubature not implemented yet')
 
-        # Set order of cubature for integration
-        if nDeg == 1:
-            OrderCubature = 5
-        elif nDeg == 2:
-            OrderCubature = 10
-        elif nDeg == 3:
-            OrderCubature = 10
-        elif nDeg == 4:
-            OrderCubature = 15
-        else: raise Exception('Cubature for degree = %i not implemented' % nDeg)
-
-        # Compute quadrature
-        z, w = GaussLegendreCubature2D(OrderCubature)
-        w = 2 * w
-        z = 2 * z - 1
-        nIP = w.shape[0]
-
-        # Shape functions
-        N = np.zeros((nOfNodes, nIP))
-        N_xi = N.copy()
-        N_eta = N.copy()
-        weights = np.zeros(nIP)
-        points = np.zeros((nIP, 2))
-        for i in np.arange(nIP):
-            x = z[i, :]
-            p, p_xi, p_eta = orthopoly2D_deriv_xieta(x, nDeg)
-            B = np.array([p, p_xi, p_eta]).transpose()
-            y0 = solve_triangular(L, P @ B, lower=True)
-            y1 = solve_triangular(U, y0)
-            N[:, i]     = y1[:, 0]
-            N_xi[:, i]  = y1[:, 1]
-            N_eta[:, i] = y1[:, 2]
-            weights[i]   = w[i]
-            points[i, :] = x
+        # # Set order of cubature for integration
+        # if nDeg == 1:
+        #     OrderCubature = 5
+        # elif nDeg == 2:
+        #     OrderCubature = 10
+        # elif nDeg == 3:
+        #     OrderCubature = 10
+        # elif nDeg == 4:
+        #     OrderCubature = 15
+        # else: raise Exception('Cubature for degree = %i not implemented' % nDeg)
+        #
+        # # Compute quadrature
+        # z, w = GaussLegendreCubature2D(OrderCubature)
+        # w = 2 * w
+        # z = 2 * z - 1
+        # nIP = w.shape[0]
+        #
+        # # Shape functions
+        # N = np.zeros((nOfNodes, nIP))
+        # N_xi = N.copy()
+        # N_eta = N.copy()
+        # weights = np.zeros(nIP)
+        # points = np.zeros((nIP, 2))
+        # for i in np.arange(nIP):
+        #     x = z[i, :]
+        #     p, p_xi, p_eta = orthopoly2D_deriv_xieta(x, nDeg)
+        #     B = np.array([p, p_xi, p_eta]).transpose()
+        #     y0 = solve_triangular(L, P @ B, lower=True)
+        #     y1 = solve_triangular(U, y0)
+        #     N[:, i]     = y1[:, 0]
+        #     N_xi[:, i]  = y1[:, 1]
+        #     N_eta[:, i] = y1[:, 2]
+        #     weights[i]   = w[i]
+        #     points[i, :] = x
 
     else:
 

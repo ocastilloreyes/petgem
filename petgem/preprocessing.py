@@ -12,7 +12,6 @@ import h5py
 import meshio
 from scipy.spatial import Delaunay
 from petsc4py import PETSc
-from scipy.io import savemat
 
 # ---------------------------------------------------------------
 # Load petgem modules (BSC)
@@ -80,9 +79,6 @@ class Preprocessing():
             # Number of elements
             size = mesh.cells[0][1][:].shape
             nElems = size[0]
-            # Number of nodes
-            size = mesh.points.shape
-            nNodes = size[0]
 
             # ---------------------------------------------------------------
             # Preprocessing nodal coordinates

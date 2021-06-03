@@ -27,7 +27,6 @@ from .mesh import computeFaces
 from .hvfem import computeConnectivityDOFS
 from .hvfem import computeJacobian, computeElementOrientation, tetrahedronXYZToXiEtaZeta
 from .hvfem import computeBasisFunctions
-from .vectors import invConnectivity
 
 # ###############################################################
 # ################     CLASSES DEFINITION      ##################
@@ -72,12 +71,12 @@ class Postprocessing():
             # Define constants
             # ---------------------------------------------------------------
             num_nodes_per_element = 4
-            num_edges_per_element = 6
-            num_faces_per_element = 4
-            num_nodes_per_face    = 3
+            #num_edges_per_element = 6
+            #num_faces_per_element = 4
+            #num_nodes_per_face    = 3
             num_edges_per_face    = 3
-            num_nodes_per_edge    = 2
-            num_dimensions        = 3
+            #num_nodes_per_edge    = 2
+            #num_dimensions        = 3
             basis_order           = run.get('nord')
             num_polarizations     = run.get('num_polarizations')
             num_dof_in_element    = np.int(basis_order*(basis_order+2)*(basis_order+3)/2)
@@ -115,7 +114,7 @@ class Postprocessing():
             # ---------------------------------------------------------------
             # Compute edges
             elemsE, edgesN = computeEdges(mesh.cells[0][1][:], nElems)
-            nEdges = edgesN.shape[0]
+            #nEdges = edgesN.shape[0]
 
             # Compute faces
             elemsF, facesN = computeFaces(mesh.cells[0][1][:], nElems)
@@ -506,8 +505,9 @@ def fieldInterpolator(solution_vector, nodes, elemsN, elemsE, edgesN, elemsF, fa
     size = elemsN.shape
     nElems = size[0]
     # Number of nodes
-    size = nodes.shape
-    nNodes = size[0]
+    #size = nodes.shape
+    #nNodes = size[0]
+    
     # Num dof per element
     num_dof_in_element    = np.int(basis_order*(basis_order+2)*(basis_order+3)/2)
 

@@ -8,8 +8,6 @@
 # ---------------------------------------------------------------
 import numpy as np
 from petsc4py import PETSc
-import h5py
-import shutil
 from mpi4py import MPI
 
 # ---------------------------------------------------------------
@@ -17,7 +15,7 @@ from mpi4py import MPI
 # ---------------------------------------------------------------
 from .common import Print, Timers, measure_all_class_methods
 from .parallel import readPetscMatrix, readPetscVector, createParallelMatrix, createParallelVector
-from .parallel import MPIEnvironment, createSequentialVector
+from .parallel import MPIEnvironment
 from .parallel import writePetscVector
 from .hvfem import computeJacobian, computeElementOrientation, computeElementalMatrices, computeSourceVectorRotation
 from .hvfem import tetrahedronXYZToXiEtaZeta, computeBasisFunctions
@@ -144,7 +142,6 @@ class Solver():
         # Parameters shortcut (for code legibility)
         model = inputSetup.model
         run = inputSetup.run
-        output = inputSetup.output
 
         Print.master('     Assembling linear system')
 
@@ -159,7 +156,7 @@ class Solver():
         num_nodes_per_element = 4
         num_edges_per_element = 6
         num_faces_per_element = 4
-        num_nodes_per_face    = 3
+        #num_nodes_per_face    = 3
         num_edges_per_face    = 3
         num_nodes_per_edge    = 2
         num_dimensions        = 3
