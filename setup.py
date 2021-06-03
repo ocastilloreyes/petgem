@@ -68,7 +68,7 @@ if __name__ == '__main__':
     setup(name=name(),
           maintainer="Octavio Castillo-Reyes",
           maintainer_email="octavio.castillo@bsc.es",
-          version=get_version,
+          version=1.0,
           long_description=long_description(),
           description=description(),
           url="https://www.bsc.es/castillo-octavio",
