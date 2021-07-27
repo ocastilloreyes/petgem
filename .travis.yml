@@ -32,6 +32,7 @@ before_install:
   - find . -type d -name Tests -prune -exec rm -rf {} \;
   - find . -type d -name testing -prune -exec rm -rf {} \;
   - find . -type d -name Testing -prune -exec rm -rf {} \;
+  - rm -rf $PETESC_DIR/src/binding/petsc4py/demo
   - cd ..
 
 install:
