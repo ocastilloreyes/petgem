@@ -6,7 +6,9 @@ python:
 before_install:
   # We do this conditionally because it saves us some downloading if the version is the same.
   - sudo apt-get update
-  - sudo apt-get install gfortran python3-setuptools python3-yaml python3-cython python3-numpy python3-scipy
+  #- sudo apt-get install gfortran python3-setuptools python3-yaml
+  - sudo apt-get install gfortran
+  - pip install scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls mpi4py h5py setuptools numpy scipy
   # Get petsc
   - git clone -b release https://gitlab.com/petsc/petsc.git petsc
   # Set petsc enviroment
