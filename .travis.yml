@@ -8,7 +8,7 @@ before_install:
   - sudo apt-get update
   #- sudo apt-get install gfortran python3-setuptools python3-yaml
   - sudo apt-get install gfortran
-  - pip install scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls h5py setuptools numpy scipy
+  - pip install scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls h5py setuptools numpy scipy cython
   # Get petsc
   - git clone -b release https://gitlab.com/petsc/petsc.git petsc
   # Set petsc enviroment
