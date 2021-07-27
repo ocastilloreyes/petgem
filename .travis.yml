@@ -9,6 +9,7 @@ before_install:
   #- sudo apt-get install gfortran python3-setuptools python3-yaml
   - sudo apt-get install gfortran
   - pip install scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls h5py setuptools numpy scipy cython
+  - export PYTHONPATH=$PYTHONPATH:$(pwd)
   # Get petsc
   - git clone -b release https://gitlab.com/petsc/petsc.git petsc
   # Set petsc enviroment
@@ -35,8 +36,9 @@ before_install:
 
 install:
   # Ensure PYTHONPATH is on your search path:
-  - export PYTHONPATH=$PYTHONPATH:$(pwd)
+  #- export PYTHONPATH=$PYTHONPATH:$(pwd)
   # Install petgem requirements
+  - pip install mpi4py
   #- pip install scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls mpi4py h5py
   #- pip install numpy scipy singleton_decorator sphinx pytest pyyaml colorama pytest-cov coveralls mpi4py h5py
   # Install python binding for petsc
