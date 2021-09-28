@@ -246,12 +246,13 @@ class Preprocessing():
             i_model = data_model.get('sigma')
 
             if (run.get('conductivity_from_file')):
-                Print.master('     Interpolation from file not supported.')
-                Print.master('     Using a constant conductivity model.')
-                #exit(-1)
-                # Add function to interpolate data from file
-                # Allocate conductivity array
-                conductivityModel = np.ones((nElems, 2), dtype=np.float)
+                # Open sigma file
+                sigma_file = i_model.get('file')
+                fileID = h5py.File(sigma_file, 'r')
+
+                # Read sigma file
+                conductivityModel = fileID.get('data')[()]
+
             else:
                 # Get physical groups
                 elemsS = mesh.cell_data['gmsh:physical'][0]

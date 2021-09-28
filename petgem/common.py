@@ -413,7 +413,7 @@ class Timers():
         self._elems = {}
 
         # Set the output path for writting the times report
-        self._opath = opath
+        #self._opath = opath
 
         # Obtain the process rank once
         self.rank = MPIEnvironment().rank
@@ -421,14 +421,14 @@ class Timers():
         # Prepare the output file
         self._out = None
         self._header = False
-        if  MPIEnvironment().rank == 0 and self._opath:
+        #if  MPIEnvironment().rank == 0 and self._opath:
             # Save times for parallel scalability test
-            out_filename = self._opath + '/times.txt'
-            if os.path.isfile(out_filename):
-                self._out = open(out_filename, 'a')
-            else:
-                self._out = open(out_filename, 'w')
-                self._header = True
+        #    out_filename = self._opath + '/times.txt'
+        #    if os.path.isfile(out_filename):
+        #        self._out = open(out_filename, 'a')
+        #    else:
+        #        self._out = open(out_filename, 'w')
+        #        self._header = True
 
     # Get an specific timer
     def __getitem__(self, key):
@@ -455,22 +455,22 @@ class Timers():
             block.append(key)
             time.append(total)
 
-        if( parEnv.rank == 0):
-            if( self._header):
-                self._out.write("  |  # proc  |" + "".join('%20s  | ' % t for t in block) + "\n")
-            self._out.write("  |  %-6s  |" % parEnv.num_proc + "".join('%20.3f  | ' % t for t in time) + "\n")
-            self._out.close()
+        #if( parEnv.rank == 0):
+        #    if( self._header):
+        #        self._out.write("  |  # proc  |" + "".join('%20s  | ' % t for t in block) + "\n")
+        #    self._out.write("  |  %-6s  |" % parEnv.num_proc + "".join('%20.3f  | ' % t for t in time) + "\n")
+        #    self._out.close()
 
     # Deleting
     def __del__(self):
         """Delete timers."""
-        rank = MPIEnvironment().rank
+        #rank = MPIEnvironment().rank
         # For each stored element
-        for key, value in self._elems.items():
-            msg = ' [Process {:2d}] | {:40s} | {:4.3f} seconds'.format(rank, key, value.elapsed)
-            Print(msg, color_code=4)
+        #for key, value in self._elems.items():
+        #    msg = ' [Process {:2d}] | {:40s} | {:4.3f} seconds'.format(rank, key, value.elapsed)
+        #    Print(msg, color_code=4)
 
-        self._write()
+        #self._write()
 
 # ###############################################################
 # ################     DECORATORS DEFINITION    #################

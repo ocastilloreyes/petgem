@@ -364,6 +364,8 @@ class Postprocessing():
             model_dataprovedance.create_dataset('receivers_file', data=model.get('receivers'))
             # Basis order
             model_dataprovedance.create_dataset('nord', data=run.get('nord'))
+            # Number of dofs
+            model_dataprovedance.create_dataset('dof', data=total_num_dofs) 
             # Cuda support
             model_dataprovedance.create_dataset('cuda', data=run.get('cuda'))
             # vtk output
@@ -371,27 +373,35 @@ class Postprocessing():
             # Modeling mode
             model_dataprovedance.create_dataset('mode', data=mode)
             # Number of polarizations
-            model_dataprovedance.create_dataset('num_polarizations', data=num_polarizations)
+            model_dataprovedance.create_dataset('num-polarizations', data=num_polarizations)
+            # Solver type
+            OptDB = PETSc.Options() # get PETSc option DB
+            solver_type = OptDB.getString('ksp_type', 'None')
+            model_dataprovedance.create_dataset('solver', data=solver_type)
+            # Run-time (assembly and solver)
+            elapsed_time = Timers()["Assembly"].elapsed + Timers()["Solver"].elapsed
+            model_dataprovedance.create_dataset('run-time (s)', data=elapsed_time)
+
             # Create data model
             if (mode == 'csem'):
                 if (run.get('conductivity_from_file')):
-                    model_dataprovedance.create_dataset('sigma', data=data_model.get('sigma').get('file'))
+                    model_dataprovedance.create_dataset('sigma-file', data=data_model.get('sigma').get('file'))
                 else:
-                    model_dataprovedance.create_dataset('sigma_horizontal', data=data_model.get('sigma').get('horizontal'))
-                    model_dataprovedance.create_dataset('sigma_vertical', data=data_model.get('sigma').get('vertical'))
-                model_dataprovedance.create_dataset('frequency', data=data_model.get('source').get('frequency'))
-                model_dataprovedance.create_dataset('source_position', data=np.asarray(data_model.get('source').get('position'), dtype=np.float))
-                model_dataprovedance.create_dataset('source_azimuth', data=data_model.get('source').get('azimuth'))
-                model_dataprovedance.create_dataset('source_dip', data=data_model.get('source').get('dip'))
-                model_dataprovedance.create_dataset('source_current', data=data_model.get('source').get('current'))
-                model_dataprovedance.create_dataset('source_length', data=data_model.get('source').get('length'))
+                    model_dataprovedance.create_dataset('sigma_horizontal (S/m)', data=data_model.get('sigma').get('horizontal'))
+                    model_dataprovedance.create_dataset('sigma_vertical (S/m)', data=data_model.get('sigma').get('vertical'))
+                model_dataprovedance.create_dataset('frequency (Hz)', data=data_model.get('source').get('frequency'))
+                model_dataprovedance.create_dataset('source_position (m)', data=np.asarray(data_model.get('source').get('position'), dtype=np.float))
+                model_dataprovedance.create_dataset('source_azimuth (deg)', data=data_model.get('source').get('azimuth'))
+                model_dataprovedance.create_dataset('source_dip (deg)', data=data_model.get('source').get('dip'))
+                model_dataprovedance.create_dataset('source_current (Am)', data=data_model.get('source').get('current'))
+                model_dataprovedance.create_dataset('source_length (m)', data=data_model.get('source').get('length'))
             elif (mode == 'mt'):
                 if (run.get('conductivity_from_file')):
-                    model_dataprovedance.create_dataset('sigma', data=data_model.get('sigma').get('file'))
+                    model_dataprovedance.create_dataset('sigma-file', data=data_model.get('sigma').get('file'))
                 else:
-                    model_dataprovedance.create_dataset('sigma_horizontal', data=data_model.get('sigma').get('horizontal'))
-                    model_dataprovedance.create_dataset('sigma_vertical', data=data_model.get('sigma').get('vertical'))
-                model_dataprovedance.create_dataset('frequency', data=data_model.get('frequency'))
+                    model_dataprovedance.create_dataset('sigma_horizontal (S/m)', data=data_model.get('sigma').get('horizontal'))
+                    model_dataprovedance.create_dataset('sigma_vertical (S/m)', data=data_model.get('sigma').get('vertical'))
+                model_dataprovedance.create_dataset('frequency (Hz)', data=data_model.get('frequency'))
                 model_dataprovedance.create_dataset('polarization', data=data_model.get('polarization'))
 
             # Write electromagnetic responses
@@ -507,7 +517,7 @@ def fieldInterpolator(solution_vector, nodes, elemsN, elemsE, edgesN, elemsF, fa
     # Number of nodes
     #size = nodes.shape
     #nNodes = size[0]
-    
+
     # Num dof per element
     num_dof_in_element    = np.int(basis_order*(basis_order+2)*(basis_order+3)/2)
 
@@ -522,8 +532,8 @@ def fieldInterpolator(solution_vector, nodes, elemsN, elemsE, edgesN, elemsF, fa
     tri = Delaunay(nodes)
 
     # Overwrite Delaunay structure with mesh_file connectivity and points
-    tri.simplices = elemsN
-    tri.vertices = elemsN
+    tri.simplices = elemsN.astype(np.int32)
+    tri.vertices = elemsN.astype(np.int32)
 
     # Find out which tetrahedral element points are in
     points_in_elements = tri.find_simplex(points, bruteforce=True, tol=1.e-12)
