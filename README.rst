@@ -51,6 +51,20 @@ For more information regarding installation, usage, contributing and bug reports
 - **Pypi site**: https://pypi.org/project/petgem/
 - **Examples**: https://github.com/ocastilloreyes/petgem
 
+The documentation source is in the doc/ directory. The following steps summarize how to generate **petgem** documentation.
+
+Move to the **petgem** doc directory:
+
+  $ cd doc
+
+Generate the **petgem** documentation in HTML format by typing:
+
+  $ make html
+
+Or, if you prefer the PDF format by typing:
+
+  $ make latexpdf
+
 Requests and contributions are welcome.
 
 Dependencies
