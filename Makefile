@@ -129,7 +129,6 @@ clean_coverage: build
 # === Documentation ===
 DOXYFILE := Doxyfile
 SPHINX_PY := python3 # Or just python if it's in your PATH and configured for Sphinx
-SPHINX_GEN_SCRIPT_PATH := scripts/auto_doc/sync_rtd_docs.py
 SPHINX_API_SCRIPT_PATH := scripts/auto_doc/api_rst_generator.py
 SPHINX_SOURCE_DIR := docs/source
 SPHINX_BUILD_DIR := docs/build
@@ -137,7 +136,7 @@ SPHINX_BUILD_CMD := $(SPHINX_PY) -m sphinx # Recommended way to invoke Sphinx
 SPHINX_OUT := $(SPHINX_BUILD_DIR)/html
 
 # Target to generate all documentation
-docs: clean_doc doxygen api_generator readme_sync sphinx_html
+docs: clean_doc doxygen api_generator sphinx_html
 
 # Generate Doxygen XML documentation
 doxygen:
@@ -148,11 +147,6 @@ doxygen:
 api_generator:
 	@echo ">>> [DOCS] Running API generator (api_generator)..."
 	$(SPHINX_PY) $(SPHINX_API_SCRIPT_PATH)
-
-# Sync readme with Sphinx
-readme_sync:
-	@echo ">>> [DOCS] Running README sync (readme_sync)..."
-	$(SPHINX_PY) $(SPHINX_GEN_SCRIPT_PATH)
 
 # Build HTML documentation with Sphinx
 sphinx_html:

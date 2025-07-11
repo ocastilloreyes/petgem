@@ -50,7 +50,7 @@ RUN git pull
 # Configure/compile/check PETSc
 RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich --download-fblaslapack \
                 --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch    \
-                --download-cmake --with-debugging=1 --download-hdf5 --download-triangle                 \
+                --download-cmake --with-debugging=0 --download-hdf5 --download-triangle                 \
                 --PETSC_ARCH=arch-linux-c-opt 
 
 RUN make all check

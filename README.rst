@@ -7,11 +7,11 @@
 
 .. |doc_badge| image:: https://Longue.github.io/petgem/doc_coverage_badge.svg
    :alt: Documentation Coverage
-   :target: https://petgem-c.readthedocs.io/en/latest/index.html
+   :target: https://petgem.readthedocs.io/en/latest/
 
-.. |coverage_badge| image:: https://coveralls.io/repos/github/Longue/petgem/badge.svg?branch=c-development
+.. |coverage_badge| image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=develop
    :alt: Coveralls
-   :target: https://coveralls.io/github/Longue/petgem?branch=c-development
+   :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=develop
 
 .. |release_badge| image:: https://img.shields.io/github/v/release/ocastilloreyes/petgem
    :alt: GitHub release (latest by date)
@@ -39,42 +39,38 @@ forms of H(curl) for the simulation of electromagnetic fields in realistic
 3D CSEM/MT surveys with accuracy, reliability and efficiency.
 
 
-..
-   rtrd-sync-config::
-   :target: docs/source/readme/installation.rst
-   :toctree_entry: Installation
 
 Installation
 ------------
 
-..
-   rtrd-sync-config::
-   :target: docs/source/readme/usage.rst
-   :toctree_entry: Usage
+
+
+
+
 
 Usage
 -----
 
-..
-   rtrd-sync-config::
-   :target: docs/source/readme/publications.rst
-   :toctree_entry: Publications
+
+
+
+
 
 Publications
 -------------
 
-..
-   rtrd-sync-config::
-   :target: docs/source/readme/contributing.rst
-   :toctree_entry: Contributing
+
+
+
+
 
 Contributing
 ------------
 
-..
-   rtrd-sync-config::
-   :target: docs/source/readme/more_information.rst
-   :toctree_entry: More Information
+
+
+
+
 
 More information
 ----------------
@@ -103,10 +99,10 @@ Or, if you prefer the PDF format by typing:
 
 Requests and contributions are welcome.
 
-..
-   rtrd-sync-config::
-   :target: docs/source/readme/dependencies.rst
-   :toctree_entry: Dependencies
+
+
+
+
 
 Dependencies
 ------------
@@ -131,10 +127,10 @@ Dependencies
 
 - A recent h5py\_ release.
 
-..
-   rtrd-sync-config::
-   :target: docs/source/readme/citation.rst
-   :toctree_entry: Citation
+
+
+
+
 
 Citation
 --------
@@ -153,10 +149,10 @@ and `Castillo-Reyes, O. et al. (2018) <https://doi.org/10.1016/j.cageo.2018.07.0
   Geosciences, vol 119: 123-136. ISSN 0098-3004,  Elsevier.
   https://doi.org/10.1016/j.cageo.2018.07.005
 
-..
-   rtrd-sync-config::
-   :target: docs/source/readme/license.rst
-   :toctree_entry: License
+
+
+
+
 
 License
 -------
