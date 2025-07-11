@@ -1,0 +1,16 @@
+# Build output directory
+build/
+
+# Documentation build output
+docs/build/
+docs/doxygen/
+docs/source/api
+docs/source/readme
+data/wham
+
+# Object files, executables, libraries
+*.o
+*.so
+*.a
+*.dll
+*.exe

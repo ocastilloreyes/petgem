@@ -1,0 +1,15 @@
+# docs/requirements.txt
+
+# El motor principal de Sphinx
+sphinx
+
+# El tema visual estándar de Read the Docs
+sphinx-rtd-theme
+
+# La extensión puente entre Doxygen (XML) y Sphinx
+breathe
+
+# Añade aquí cualquier OTRA extensión de Sphinx que uses en tu conf.py
+# Ejemplo:
+# sphinxcontrib-napoleon # Si usas docstrings estilo Google/Numpy
+# sphinx-copybutton      # Si quieres añadir un botón de copiar a los bloques de código

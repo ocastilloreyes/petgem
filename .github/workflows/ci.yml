@@ -1,0 +1,194 @@
+name: PETGEM CI with Docker Cache
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  build_test_and_report:
+    runs-on: ubuntu-latest
+
+    steps:
+      # === Step 1: SETUP & BUILD ===
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image and load to local Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/user/Dockerfile
+          push: false
+          tags: petgem-ci-env:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # === Step 2: INITIALIZE REPORT ===
+      - name: Initialize CI Report
+        run: |
+          echo "# PETGEM CI/CD Execution Report" > ci_summary_report.md
+          echo "" >> ci_summary_report.md
+          echo "## Run Details" >> ci_summary_report.md
+          echo "- **Trigger:** ${{ github.event_name }}" >> ci_summary_report.md
+          echo "- **Commit:** \`${{ github.sha }}\`" >> ci_summary_report.md
+          echo "- **Timestamp:** $(date -u)" >> ci_summary_report.md
+          echo "" >> ci_summary_report.md
+          echo "## Pipeline Status" >> ci_summary_report.md
+
+      # === Step 3: UNIT TESTS & CODE COVERAGE ===
+      - name: Run Unit Tests and Update Report
+        run: |
+          mkdir -p ./build && \
+          docker run --rm \
+            --workdir /app \
+            -v "${{ github.workspace }}":/app \
+            petgem-ci-env:latest \
+            make test > ./build/unit_tests.log 2>&1 || (echo "Unit tests failed. See log below:" && cat ./build/unit_tests.log && exit 1)
+            
+          TEST_SUMMARY=$(grep -Eo '[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored' ./build/unit_tests.log | sed 's/OK//')
+          if [ -n "$TEST_SUMMARY" ]; then
+            echo "✅ **Unit Tests:** Passed ($TEST_SUMMARY)" >> ci_summary_report.md
+          else
+            echo "⚠️ **Unit Tests:** Could not parse test summary." >> ci_summary_report.md
+          fi
+
+      - name: Generate Code Coverage and Update Report
+        run: |
+          docker run --rm \
+            --workdir /app \
+            -v "${{ github.workspace }}":/app \
+            petgem-ci-env:latest \
+            make coverage
+          COVERAGE_PERCENTAGE=$(lcov --summary build/coverage.info | grep "lines......" | awk '{print $2}')
+          echo "✅ **Code Coverage:** Generated (${COVERAGE_PERCENTAGE} line coverage)" >> ci_summary_report.md
+          sed -i 's#^SF:/app/#SF:#g' build/coverage.info
+
+      - name: Upload Code Coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./build/coverage.info
+          fail-on-error: true
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+      
+      - name: Upload HTML coverage report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: petgem-coverage-report-html
+          path: build/coverage-html
+          if-no-files-found: error
+
+      # === Step 4: VALIDATION TEST ===
+      - name: Run Validation Test and Update Report
+        run: |
+          docker run --rm \
+            --workdir /app \
+            -v "${{ github.workspace }}":/app \
+            petgem-ci-env:latest \
+            make validation_test
+          echo "✅ **Validation Test:** Passed (output files generated successfully)" >> ci_summary_report.md
+
+      - name: Upload Validation Test Results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-test-results
+          path: data/wham/
+          if-no-files-found: error
+
+      # === Step 5: DOCUMENTATION & BADGE ===
+      - name: Generate Documentation and Update Report
+        run: |
+          docker run --rm \
+            --workdir /app \
+            -v "${{ github.workspace }}":/app \
+            petgem-ci-env:latest \
+            make docs
+          python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
+          DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
+          echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
+
+      - name: Prepare Badge for GitHub Pages Deployment
+        run: |
+          mkdir -p ./public
+          mv ./build/doc_coverage_badge.svg ./public/
+
+      - name: Deploy Documentation Badge to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./public
+          keep_files: true
+          cname: ''
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+
+      # === Step 6: GATHER ENVIRONMENT INFO & FINALIZE SUCCESS REPORT ===
+      - name: Gather Environment and Tool Versions
+        run: |
+          docker run --rm \
+            --workdir /app \
+            -v "${{ github.workspace }}":/app \
+            petgem-ci-env:latest \
+            bash -c '
+              echo "" >> /app/ci_summary_report.md;
+              echo "---" >> /app/ci_summary_report.md;
+              echo "## Environment & Tool Versions" >> /app/ci_summary_report.md;
+              
+              # Método robusto para obtener la versión de PETSc
+              PETSC_VER_H="${PETSC_DIR}/include/petscversion.h"
+              if [ -f "$PETSC_VER_H" ]; then
+                MAJOR=$(grep "#define PETSC_VERSION_MAJOR" "$PETSC_VER_H" | awk "{print \$3}");
+                MINOR=$(grep "#define PETSC_VERSION_MINOR" "$PETSC_VER_H" | awk "{print \$3}");
+                SUBMINOR=$(grep "#define PETSC_VERSION_SUBMINOR" "$PETSC_VER_H" | awk "{print \$3}");
+                PETSC_VERSION="${MAJOR}.${MINOR}.${SUBMINOR}";
+              else
+                PETSC_VERSION="Not Found";
+              fi;
+              echo "- **PETSc Version:** ${PETSC_VERSION}" >> /app/ci_summary_report.md;
+              
+              echo "- **GCC Version:** $(gcc --version | head -n 1)" >> /app/ci_summary_report.md;
+              echo "- **Python Version:** $(python3 --version)" >> /app/ci_summary_report.md;
+              echo "- **Doxygen Version:** $(doxygen --version)" >> /app/ci_summary_report.md;
+            '
+
+      - name: Finalize Success Report
+        run: |
+          echo "" >> ci_summary_report.md
+          echo "---" >> ci_summary_report.md
+          echo "🎉 **Result:** All steps completed successfully!" >> ci_summary_report.md
+
+      - name: Upload Success Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-execution-report
+          path: ci_summary_report.md
+
+      # === Step 7: HANDLE FAILURE ===
+      - name: Finalize Failure Report
+        if: failure()
+        run: |
+          echo "" >> ci_summary_report.md
+          echo "---" >> ci_summary_report.md
+          echo "❌ **Result:** The pipeline failed at a previous step." >> ci_summary_report.md
+          echo "Please check the logs of the failed step for details." >> ci_summary_report.md
+
+      - name: Upload Failure Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-execution-report-FAILED
+          path: ci_summary_report.md
+          if-no-files-found: warn
