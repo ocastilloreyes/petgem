@@ -31,8 +31,8 @@ jobs:
           push: false
           tags: petgem-ci-env:latest
           load: true
-          #cache-from: type=gha
-          #cache-to: type=gha,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # # === Step 2: INITIALIZE REPORT ===
       # - name: Initialize CI Report
