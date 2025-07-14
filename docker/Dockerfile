@@ -9,6 +9,7 @@ WORKDIR /workspace
 # ------------------------------------------------------------------------------- #
 # Install first level dependencies
 # ------------------------------------------------------------------------------- #
+RUN DEBIAN_FRONTEND="noninteractive" apt-get update 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata texinfo
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
@@ -16,7 +17,7 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk
 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get update && pip3 install sphinx breathe
+#RUN DEBIAN_FRONTEND="noninteractive" pip3 install sphinx breathe
 
 RUN apt-get update && pip3 install cython
 RUN apt-get update && apt-get install -y git 
