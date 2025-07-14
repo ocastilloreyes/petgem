@@ -19,7 +19,6 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk
 
 #RUN DEBIAN_FRONTEND="noninteractive" pip3 install sphinx breathe
 
-RUN apt-get update && pip3 install cython
 RUN apt-get update && apt-get install -y git 
 RUN apt-get update && apt-get install -y gcc lcov
 RUN apt-get update && apt-get install -y gfortran
@@ -39,6 +38,7 @@ RUN apt-get update && apt-get install -y python3-pip
 RUN apt-get update && apt-get install -y python3-matplotlib
 RUN apt-get update && apt-get install -y python3-sphinx 
 RUN apt-get update && apt-get install -y python3-sphinx_rtd_theme
+RUN apt-get update && apt-get install -y python3-cython
 
 # ------------------------------------------------------------------------------- #
 # Install PETSc
