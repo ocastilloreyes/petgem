@@ -19,49 +19,40 @@ RUN apt-get install -y git gcc lcov gfortran g++ make cmake flex bison vim
 RUN apt-get install -y python3 python3-pip
 RUN pip3 install meshio h5py numpy disutils matplotlib sphinx sphinx-rtd-theme
 
-#RUN DEBIAN_FRONTEND="noninteractive" pip3 install sphinx breathe
-#RUN apt-get update && apt-get install -y python3-meshio
-#RUN apt-get update && apt-get install -y python3-h5py
-#RUN apt-get update && apt-get install -y python3-numpy
-#RUN apt-get update && apt-get install -y python3-distutils
-#RUN apt-get update && apt-get install -y python3-matplotlib
-#RUN apt-get update && apt-get install -y python3-sphinx 
-#RUN apt-get update && apt-get install -y python3-sphinx-rtd-theme
-#RUN apt-get update && apt-get install -y python3-cython
-
 # ------------------------------------------------------------------------------- #
 # Install PETSc
 # ------------------------------------------------------------------------------- #
-#RUN mkdir /usr/local/petsc
-#WORKDIR /usr/local/petsc
+RUN mkdir /usr/local/petsc
+WORKDIR /usr/local/petsc
 
 # Get PETSc, configure and compile
-#RUN git clone -b release https://gitlab.com/petsc/petsc.git .
-# obtain new release fixes (since a prior clone or pull)
-#RUN git pull 
+RUN git clone -b release https://gitlab.com/petsc/petsc.git .
+
+# Obtain new release fixes (since a prior clone or pull)
+RUN git pull 
 
 # Configure/compile/check PETSc
-#RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich --download-fblaslapack \
-                #--with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch    \
-                #--download-cmake --with-debugging=0 --download-hdf5 --download-triangle                 \
+RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich --download-fblaslapack \
+                --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch    \
+                --download-cmake --with-debugging=0 --download-hdf5 --download-triangle                 \
                 
-#RUN make all check
-#ENV PETSC_ARCH=arch-linux-c-opt
-#ENV PETSC_DIR=/usr/local/petsc
+RUN make all check
+ENV PETSC_ARCH=arch-linux-c-opt
+ENV PETSC_DIR=/usr/local/petsc
 
 # Install Python wrapper
-#RUN pip3 install src/binding/petsc4py
+RUN pip3 install src/binding/petsc4py
 
 # Add alias for mpirun command
-#RUN echo 'alias mpirun=/usr/local/petsc/arch-linux-c-opt/bin/./mpirun' >> ~/.bashrc
+RUN echo 'alias mpirun=/usr/local/petsc/arch-linux-c-opt/bin/./mpirun' >> ~/.bashrc
 
 # ------------------------------------------------------------------------------- #
 # Install Extrae
 # ------------------------------------------------------------------------------- #
-#RUN mkdir /usr/local/extrae/
-#RUN mkdir /usr/local/extrae/libunwind
-#RUN mkdir /usr/local/extrae/papi
-#RUN mkdir /usr/local/extrae/libxml2
+RUN mkdir /usr/local/extrae/
+RUN mkdir /usr/local/extrae/libunwind
+RUN mkdir /usr/local/extrae/papi
+RUN mkdir /usr/local/extrae/libxml2
 
 # Install libunwind
 #RUN apt-get update && apt-get install -y libtool
