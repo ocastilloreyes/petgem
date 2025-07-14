@@ -14,12 +14,12 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get update
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata texinfo doxygen texlive-latex-base
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra  texlive-fonts-recommended latexmk  
 
-#RUN DEBIAN_FRONTEND="noninteractive" pip3 install sphinx breathe
-
 RUN apt-get install -y git gcc lcov gfortran g++ make cmake flex bison vim
 
 RUN apt-get install -y python3 python3-pip
+RUN pip3 install meshio h5py numpy disutils matplotlib sphinx sphinx-rtd-theme
 
+#RUN DEBIAN_FRONTEND="noninteractive" pip3 install sphinx breathe
 #RUN apt-get update && apt-get install -y python3-meshio
 #RUN apt-get update && apt-get install -y python3-h5py
 #RUN apt-get update && apt-get install -y python3-numpy
