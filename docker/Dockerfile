@@ -51,6 +51,7 @@ ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
 # ------------------------------------------------------------------------------- #
 # Install Extrae                                                                  #
 # ------------------------------------------------------------------------------- #
+WORKDIR /workspace
 RUN mkdir /usr/local/extrae/
 RUN mkdir /usr/local/extrae/libunwind
 RUN mkdir /usr/local/extrae/papi
@@ -95,8 +96,8 @@ RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
         && rm -rf libxml2
 
 # Install extrae
-RUN ls -l 
-#RUN git clone https://github.com/bsc-performance-tools/extrae.git 
+RUN git clone https://github.com/bsc-performance-tools/extrae.git 
+RUN ls -l
 #RUN cd extrae
 #RUN autoreconf -f -i
 #    ./configure --prefix=/usr/local/extrae \
@@ -118,4 +119,5 @@ RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
 
 # Define entry point
 WORKDIR /workspace
+
 CMD [ "bash" ]
