@@ -34,11 +34,10 @@ RUN git pull
 RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich --download-fblaslapack \
                 --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch    \
                 --download-cmake --with-debugging=0 --download-hdf5 --download-triangle                 \
-                
-RUN make all check
+
 ENV PETSC_ARCH=arch-linux-c-opt
 ENV PETSC_DIR=/usr/local/petsc
-RUN ls /usr/local/petsc
+RUN make all check
 
 # Install Python wrapper
 RUN pip3 install src/binding/petsc4py
