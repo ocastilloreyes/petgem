@@ -97,7 +97,14 @@ RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
 # Install extrae
 RUN git clone https://github.com/bsc-performance-tools/extrae.git 
 WORKDIR /usr/local/extrae
-RUN autoreconf -f -i ./configure --prefix=/usr/local/extrae --with-mpi=/usr/local/petsc/arch-linux-c-opt/ --with-papi=/usr/local/extrae/papi --with-xml-prefix=/usr/local/extrae/libxml2 --with-unwind=/usr/local/extrae/libunwind --with-binutils=/usr/local/extrae/binutils --without-dyninst
+RUN autoreconf -f -i && \
+    ./configure --prefix=/usr/local/extrae \
+                --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
+                --with-papi=/usr/local/extrae/papi \
+                --with-xml-prefix=/usr/local/extrae/libxml2 \
+                --with-unwind=/usr/local/extrae/libunwind \
+                --with-binutils=/usr/local/extrae/binutils \
+                --without-dyninst
         #&& make && make install \
         #&& cd .. \
         #&& rm -rf extrae
