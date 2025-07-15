@@ -95,9 +95,10 @@ RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
         && rm -rf libxml2
 
 # Install extrae
-RUN git clone https://github.com/bsc-performance-tools/extrae.git 
-RUN cd extrae
-RUN autoreconf -f -i
+RUN ls -l 
+#RUN git clone https://github.com/bsc-performance-tools/extrae.git 
+#RUN cd extrae
+#RUN autoreconf -f -i
 #    ./configure --prefix=/usr/local/extrae \
 #                --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
 #                --with-papi=/usr/local/extrae/papi \
