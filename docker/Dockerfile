@@ -45,6 +45,9 @@ RUN pip3 install src/binding/petsc4py
 # Add alias for mpirun command
 RUN echo 'alias mpirun=/usr/local/petsc/arch-linux-c-opt/bin/./mpirun' >> ~/.bashrc
 
+# Setup path for petsc
+ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+
 # ------------------------------------------------------------------------------- #
 # Install Extrae                                                                  #
 # ------------------------------------------------------------------------------- #
@@ -92,21 +95,19 @@ RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
         && rm -rf libxml2
 
 # Install extrae
-#RUN git clone https://github.com/bsc-performance-tools/extrae.git \
-#        && cd extrae \
-#        && autoreconf -f -i \
-#        && ./configure --prefix=/usr/local/extrae --with-mpi=/usr/local/petsc/arch-linux-c-opt/ --with-papi=/usr/local/extrae/papi --with-xml-prefix=/usr/local/extrae/libxml2 --with-unwind=/usr/local/extrae/libunwind --with-binutils=/usr/local/extrae/binutils --without-dyninst \
-#        && make && make install \
-#        && cd .. \
-#        && rm -rf extrae
+RUN git clone https://github.com/bsc-performance-tools/extrae.git \
+        && cd extrae \
+        && autoreconf -f -i \
+        && ./configure --prefix=/usr/local/extrae --with-mpi=/usr/local/petsc/arch-linux-c-opt/ --with-papi=/usr/local/extrae/papi --with-xml-prefix=/usr/local/extrae/libxml2 --with-unwind=/usr/local/extrae/libunwind --with-binutils=/usr/local/extrae/binutils --without-dyninst \
+        && make && make install \
+        && cd .. \
+        && rm -rf extrae
 
 
 # ------------------------------------------------------------------------------- #
 # Install Unity (Framework for C tests)                                           #
 # ------------------------------------------------------------------------------- #
-#RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
-
-#ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
 
 # Define entry point
 WORKDIR /workspace
