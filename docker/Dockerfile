@@ -56,6 +56,7 @@ RUN mkdir /usr/local/extrae/
 RUN mkdir /usr/local/extrae/libunwind
 RUN mkdir /usr/local/extrae/papi
 RUN mkdir /usr/local/extrae/libxml2
+RUN mkdir /usr/local/extrae/binutils
 
 # Install libunwind
 RUN apt-get update && apt-get install -y libtool
@@ -76,7 +77,6 @@ RUN git clone https://github.com/icl-utk-edu/papi \
         && rm -rf papi
 
 # Install binutils
-RUN mkdir /usr/local/extrae/binutils
 RUN apt-get update && apt-get install -y automake autoconf pkg-config wget tar \
           && wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz \
           && tar -xf binutils-2.42.tar.gz \
@@ -85,7 +85,8 @@ RUN apt-get update && apt-get install -y automake autoconf pkg-config wget tar \
           && make && make install \
           && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib \
           && cd .. \
-          && rm -r binutils-2.42
+          && rm -r binutils-2.42 \
+          && rm binutils-2.42.tar.gz
 
 # Install libxml2
 RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
@@ -97,8 +98,8 @@ RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
 
 # Install extrae
 RUN git clone https://github.com/bsc-performance-tools/extrae.git 
+RUN cd extrae
 RUN ls -l
-#RUN cd extrae
 #RUN autoreconf -f -i
 #    ./configure --prefix=/usr/local/extrae \
 #                --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
