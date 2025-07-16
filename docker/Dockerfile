@@ -63,14 +63,14 @@ RUN git clone https://github.com/libunwind/libunwind.git
 WORKDIR libunwind
 RUN autoreconf -i \
         && ./configure --prefix=/usr/local/extrae/libunwind \
-	&& make && make install \
+	&& make && make install
 	
 # Install PAPI (HW counters)
 WORKDIR /workspace
 RUN git clone https://github.com/icl-utk-edu/papi 
 WORKDIR papi/src        
 RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
-        && make && make install \
+        && make && make install
     
 # Install binutils
 WORKDIR /workspace
@@ -79,14 +79,14 @@ RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz \
 WORKDIR binutils-2.42 
 RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error" \
         && make && make install \
-        && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib \
+        && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
         
 # Install libxml2
 WORKDIR /workspace
 RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
 WORKDIR libxml2
 RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python \
-        && make && make install \
+        && make && make install 
         
 # Install extrae
 WORKDIR /workspace
