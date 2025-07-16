@@ -75,7 +75,7 @@ RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
 # Install binutils
 WORKDIR /workspace
 RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
-#tar -xf binutils-2.42.tar.gz \
+RUN tar -xf binutils-2.42.tar.gz
 RUN ls -l          
 #WORKDIR binutils-2.42 
 #RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error" \
