@@ -49,7 +49,7 @@ RUN echo 'alias mpirun=/usr/local/petsc/arch-linux-c-opt/bin/./mpirun' >> ~/.bas
 ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
 
 # ------------------------------------------------------------------------------- #
-# Install Extrae                                                                  #
+# Install Extrae and its dependencies                                             #
 # ------------------------------------------------------------------------------- #
 WORKDIR /workspace
 RUN mkdir /usr/local/extrae/
@@ -59,7 +59,7 @@ RUN mkdir /usr/local/extrae/libxml2
 RUN mkdir /usr/local/extrae/binutils
 
 # Install libunwind
-RUN git clone https://github.com/libunwind/libunwind.git \
+RUN git clone https://github.com/libunwind/libunwind.git 
 WORKDIR libunwind
 RUN autoreconf -i \
         && ./configure --prefix=/usr/local/extrae/libunwind \
@@ -67,7 +67,7 @@ RUN autoreconf -i \
 	
 # Install PAPI (HW counters)
 WORKDIR /workspace
-RUN git clone https://github.com/icl-utk-edu/papi \
+RUN git clone https://github.com/icl-utk-edu/papi 
 WORKDIR papi/src        
 RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
         && make && make install \
@@ -83,7 +83,7 @@ RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -
         
 # Install libxml2
 WORKDIR /workspace
-RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
+RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
 WORKDIR libxml2
 RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python \
         && make && make install \
@@ -109,5 +109,6 @@ RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
 
 # Define entry point and clean system
 WORKDIR /workspace
+RUN ls -l
 
 CMD [ "bash" ]
