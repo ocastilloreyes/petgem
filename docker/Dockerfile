@@ -112,6 +112,5 @@ RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
 # Define entry point and clean system
 WORKDIR /workspace
 RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz
-RUN ls -l
 
 CMD [ "bash" ]
