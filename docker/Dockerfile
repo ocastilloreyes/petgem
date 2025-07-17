@@ -107,7 +107,7 @@ RUN make && make install
 # ------------------------------------------------------------------------------- #
 # Install Unity (Framework for C tests)                                           #
 # ------------------------------------------------------------------------------- #
-#RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
+RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
 
 # Define entry point and clean system
 WORKDIR /workspace
