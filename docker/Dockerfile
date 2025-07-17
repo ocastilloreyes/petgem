@@ -78,17 +78,14 @@ RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
 RUN tar -xf binutils-2.42.tar.gz
 WORKDIR binutils-2.42
 RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
-RUN make && make install
-
-
-#        && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
+RUN make && make install && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
         
 # Install libxml2
-#WORKDIR /workspace
-#RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
-#WORKDIR libxml2
-#RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python \
-#        && make && make install 
+WORKDIR /workspace
+RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
+WORKDIR libxml2
+RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
+RUN make && make install 
         
 # Install extrae
 #WORKDIR /workspace
