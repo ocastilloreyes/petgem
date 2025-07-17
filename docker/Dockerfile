@@ -91,6 +91,7 @@ RUN make && make install
 WORKDIR /workspace
 RUN git clone https://github.com/bsc-performance-tools/extrae.git 
 WORKDIR extrae
+RUN git submodule update --init --recursive
 RUN autoreconf -f -i
 RUN ./configure --prefix=/usr/local/extrae \
         --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
