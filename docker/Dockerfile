@@ -33,20 +33,22 @@ RUN git pull
 # Configure/compile/check PETSc
 RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich --download-fblaslapack \
                 --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch    \
-                --download-cmake --with-debugging=0 --download-hdf5 --download-triangle                 \
+                --download-cmake --with-debugging=0 --download-hdf5 --download-triangle
 
-ENV PETSC_ARCH=arch-linux-c-opt
-ENV PETSC_DIR=/usr/local/petsc
+# Set PETSc environment variables and PATH
+ENV PETSC_ARCH=arch-linux-c-opt \
+    PETSC_DIR=/usr/local/petsc \
+    PATH="/usr/local/petsc/arch-linux-c-opt/bin:${PATH}"
+
+# Build PETSc
 RUN make all check
 
 # Install Python wrapper
 RUN pip3 install src/binding/petsc4py
 
 # Add alias for mpirun command
-RUN echo 'alias mpirun=/usr/local/petsc/arch-linux-c-opt/bin/./mpirun' >> ~/.bashrc
-
-# Setup path for petsc
-ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+#RUN echo 'alias mpirun=/usr/local/petsc/arch-linux-c-opt/bin/mpirun' >> ~/.bashrc
+RUN echo 'alias mpirun=\${PETSC_DIR}/\${PETSC_ARCH}/bin/mpirun' >> ~/.bashrc
 
 # ------------------------------------------------------------------------------- #
 # Install Extrae and its dependencies                                             #
@@ -109,6 +111,7 @@ RUN make && make install
 
 # Define entry point and clean system
 WORKDIR /workspace
+RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz
 RUN ls -l
 
 CMD [ "bash" ]
