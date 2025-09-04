@@ -1,9 +1,6 @@
 static char help[] = "PETGEM kernel for 3D CSEM modeling using high-order vector finite elements.\n\
-  -nord                      <n>               : Basis order for finite element computations\n\
-  -mesh_dm_plex_filename     <filename>        : Mesh file (Gmsh format)\n\
-  -pc_type                   <type>            : Preconditioner type (lu)\n\
-  -pc_factor_mat_solver_type <type>            : Solver type (mumps)\n";
-
+  Command line usage:\n\
+    mpirun -n <np> ./kernel -options_file <file.txt>\n"
 
 /* C libraries */ 
 #include <stdio.h>
@@ -31,7 +28,7 @@ static char help[] = "PETGEM kernel for 3D CSEM modeling using high-order vector
 #endif
 
 /**
- * @brief Main execution routine for PETGEM.
+ * @brief Main execution routine for CSEM kernel.
  * @param argc Argument count.
  * @param argv Argument vector.
  * @return int 0 on success, non-zero on failure.
@@ -41,8 +38,7 @@ static char help[] = "PETGEM kernel for 3D CSEM modeling using high-order vector
  *          linear system (A, B, G), solves the system (AX=B) using KSP, performs
  *          post-processing (computes fields at receivers), prints the footer,
  *          and finalizes PETSc, freeing allocated memory. Includes Extrae instrumentation hooks if compiled with USE_EXTRAE.
- * @note Currently, the solve and postprocessing steps are commented out in the source.
- */
+  */
 int main(int argc, char **argv)
 {
 

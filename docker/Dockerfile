@@ -9,32 +9,22 @@ WORKDIR /workspace
 # ------------------------------------------------------------------------------- #
 # Install first level dependencies                                                #
 # ------------------------------------------------------------------------------- #
-RUN apt-get update && apt-get install -y git 
-RUN apt-get update && apt-get install -y python3
-RUN apt-get update && apt-get install -y python3-meshio
-RUN apt-get update && apt-get install -y python3-h5py
-RUN apt-get update && apt-get install -y python3-numpy
-RUN apt-get update && apt-get install -y python3-distutils
-RUN apt-get update && apt-get install -y python3-pip
+RUN apt-get update && apt-get install -y gcc gfortran g++
+RUN apt-get update && apt-get install -y make cmake vim
+RUN apt-get update && apt-get install -y flex bison libtool
+
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata texinfo
-RUN apt-get update && apt-get install -y python3-matplotlib
-RUN apt-get update && pip3 install cython
-RUN apt-get update && pip3 install sphinx sphinx-rtd-theme
 RUN DEBIAN_FRONTEND="noninteractive" apt-get update && pip3 install breathe
-RUN apt-get update && apt-get install -y gcc
-RUN apt-get update && apt-get install -y gfortran
-RUN apt-get update && apt-get install -y g++
-RUN apt-get update && apt-get install -y make
-RUN apt-get update && apt-get install -y cmake
-RUN apt-get update && apt-get install -y flex
-RUN apt-get update && apt-get install -y bison
-RUN apt-get update && apt-get install -y vim
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen latexmk
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk
 
+RUN apt-get update && apt-get install -y git python3
+RUN apt-get update && apt-get install -y python3-meshio python3-h5py
+RUN apt-get update && apt-get install -y python3-numpy python3-distutils
+RUN apt-get update && apt-get install -y python3-pip python3-matplotlib
+RUN apt-get update && pip3 install cython sphinx sphinx-rtd-theme
 
 # ------------------------------------------------------------------------------- #
 # Install PETSc                                                                   #
@@ -55,9 +45,9 @@ RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich
 
 # Set PETSc environment variables and PATH
 ENV PETSC_ARCH=arch-linux-c-opt \
-    PETSC_DIR=/usr/local/petsc \
-    PATH="/usr/local/petsc/arch-linux-c-opt/bin:${PATH}"
-
+    PETSC_DIR=/usr/local/petsc
+ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}
+"
 # Build PETSc
 RUN make all check
 
@@ -78,7 +68,6 @@ RUN mkdir /usr/local/extrae/libxml2
 RUN mkdir /usr/local/extrae/binutils
 
 # Install libunwind
-RUN apt-get update && apt-get install -y libtool
 RUN git clone https://github.com/libunwind/libunwind.git 
 WORKDIR libunwind
 RUN autoreconf -i \
