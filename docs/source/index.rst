@@ -14,7 +14,7 @@ Welcome to PETGEM's documentation!
 
    <div style="clear: both;"></div>
 
-**PETGEM: Parallel Edge-based Tool for Electromagnetic Modelling**
+**PETGEM: Parallel Toolkit for Large-scale Electromagnetic Modeling**
 
 This documentation provides comprehensive information about PETGEM, including installation guides, usage examples, theoretical background, and a detailed API reference.
 

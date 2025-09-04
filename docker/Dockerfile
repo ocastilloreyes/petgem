@@ -78,6 +78,7 @@ RUN mkdir /usr/local/extrae/libxml2
 RUN mkdir /usr/local/extrae/binutils
 
 # Install libunwind
+RUN apt-get update && apt-get install -y libtool
 RUN git clone https://github.com/libunwind/libunwind.git 
 WORKDIR libunwind
 RUN autoreconf -i \
