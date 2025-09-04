@@ -9,14 +9,32 @@ WORKDIR /workspace
 # ------------------------------------------------------------------------------- #
 # Install first level dependencies                                                #
 # ------------------------------------------------------------------------------- #
-RUN DEBIAN_FRONTEND="noninteractive" apt-get update 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata texinfo doxygen texlive-latex-base
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra  texlive-fonts-recommended latexmk  
+RUN apt-get update && apt-get install -y git 
+RUN apt-get update && apt-get install -y python3
+RUN apt-get update && apt-get install -y python3-meshio
+RUN apt-get update && apt-get install -y python3-h5py
+RUN apt-get update && apt-get install -y python3-numpy
+RUN apt-get update && apt-get install -y python3-distutils
+RUN apt-get update && apt-get install -y python3-pip
+RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata texinfo
+RUN apt-get update && apt-get install -y python3-matplotlib
+RUN apt-get update && pip3 install cython
+RUN apt-get update && pip3 install sphinx sphinx-rtd-theme
+RUN DEBIAN_FRONTEND="noninteractive" apt-get update && pip3 install breathe
+RUN apt-get update && apt-get install -y gcc
+RUN apt-get update && apt-get install -y gfortran
+RUN apt-get update && apt-get install -y g++
+RUN apt-get update && apt-get install -y make
+RUN apt-get update && apt-get install -y cmake
+RUN apt-get update && apt-get install -y flex
+RUN apt-get update && apt-get install -y bison
+RUN apt-get update && apt-get install -y vim
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk
 
-RUN apt-get install -y git gcc lcov gfortran g++ make cmake flex bison vim python3 python3-pip libtool
-RUN apt-get install -y automake autoconf pkg-config wget tar
-
-RUN pip3 install meshio h5py numpy disutils matplotlib sphinx sphinx-rtd-theme
 
 # ------------------------------------------------------------------------------- #
 # Install PETSc                                                                   #
@@ -47,7 +65,6 @@ RUN make all check
 RUN pip3 install src/binding/petsc4py
 
 # Add alias for mpirun command
-#RUN echo 'alias mpirun=/usr/local/petsc/arch-linux-c-opt/bin/mpirun' >> ~/.bashrc
 RUN echo 'alias mpirun=\${PETSC_DIR}/\${PETSC_ARCH}/bin/mpirun' >> ~/.bashrc
 
 # ------------------------------------------------------------------------------- #

@@ -34,17 +34,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # # === Step 2: INITIALIZE REPORT ===
-      # - name: Initialize CI Report
-      #   run: |
-      #     echo "# PETGEM CI/CD Execution Report" > ci_summary_report.md
-      #     echo "" >> ci_summary_report.md
-      #     echo "## Run Details" >> ci_summary_report.md
-      #     echo "- **Trigger:** ${{ github.event_name }}" >> ci_summary_report.md
-      #     echo "- **Commit:** \`${{ github.sha }}\`" >> ci_summary_report.md
-      #     echo "- **Timestamp:** $(date -u)" >> ci_summary_report.md
-      #     echo "" >> ci_summary_report.md
-      #     echo "## Pipeline Status" >> ci_summary_report.md
+      # === Step 2: INITIALIZE REPORT ===
+      - name: Initialize CI Report
+        run: |
+          echo "# PETGEM CI/CD Execution Report" > ci_summary_report.md
+          echo "" >> ci_summary_report.md
+          echo "## Run Details" >> ci_summary_report.md
+          echo "- **Trigger:** ${{ github.event_name }}" >> ci_summary_report.md
+          echo "- **Commit:** \`${{ github.sha }}\`" >> ci_summary_report.md
+          echo "- **Timestamp:** $(date -u)" >> ci_summary_report.md
+          echo "" >> ci_summary_report.md
+          echo "## Pipeline Status" >> ci_summary_report.md
 
       # # === Step 3: UNIT TESTS & CODE COVERAGE ===
       # - name: Run Unit Tests and Update Report
