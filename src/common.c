@@ -52,17 +52,16 @@ PetscErrorCode printHeader(){
 
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "----------------------------------------------------------------------------\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                                                          -\n"));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                   PETGEM                                 -\n"));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-          Parallel Edge-based Tool for Electromagnetic Modelling          -\n"));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                  PETGEM                                  -\n"));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-        Parallel Toolkit for Large-scale Electromagnetic Modeling         -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                                                          -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-          GitHub Repository: github.com/ocastilloreyes/petgem             -\n"));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                      Website: https://petgem.bsc.es/                     -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                                                          -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "----------------------------------------------------------------------------\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                                                          -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                         Octavio Castillo-Reyes                           -\n"));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-            Universitat Politècnica de Catalunya (UPC) - 2024             -\n"));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-               Barcelona Supercomputing Center (BSC) - 2024               -\n"));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-            Universitat Politècnica de Catalunya (UPC) - 2025             -\n"));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-               Barcelona Supercomputing Center (BSC) - 2025               -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                                                          -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "----------------------------------------------------------------------------\n"));
 
