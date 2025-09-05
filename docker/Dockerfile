@@ -84,6 +84,7 @@ RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
     
 # Install binutils
 WORKDIR /workspace
+RUN apt-get update && apt-get install -y wget
 RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
 RUN tar -xf binutils-2.42.tar.gz
 WORKDIR binutils-2.42

@@ -2296,6 +2296,7 @@ PetscErrorCode shape3DETet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the elemental mass (Me) and stiffness (Ke) matrices for H(curl) elements.
  *
@@ -2471,6 +2472,7 @@ PetscErrorCode computeElementalMatrix(PetscInt nord, PetscInt cellOrientation[10
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the H(curl) basis functions and their curls at a specific point in the reference element,
  *        transformed to the physical element.
@@ -2504,7 +2506,7 @@ PetscErrorCode computeBasisFunctions(PetscInt nord, PetscInt orientation[10], Pe
         - jacobian[0][1] * (jacobian[1][0] * jacobian[2][2] - jacobian[1][2] * jacobian[2][0])
         + jacobian[0][2] * (jacobian[1][0] * jacobian[2][1] - jacobian[1][1] * jacobian[2][0]);
 
-    /* TODO: remove this small allocation, use work array */
+    /* Allocate arrays */
     PetscCall(PetscCalloc1(NUM_DIMENSIONS, &ShapE));
     PetscCall(PetscCalloc1(NUM_DIMENSIONS, &CurlE));
     for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
