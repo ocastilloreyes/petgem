@@ -9,8 +9,9 @@ WORKDIR /workspace
 # ------------------------------------------------------------------------------- #
 # Install first level dependencies                                                #
 # ------------------------------------------------------------------------------- #
-RUN apt-get update
-RUN  apt-get update && apt-get install -y gcc gfortran g++ make cmake vim flex bison libtool
+RUN apt-get update && apt-get install -y gcc gfortran g++ make cmake vim 
+RUN apt-get update && apt-get install -y flex bison libtool git python3
+
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texinfo 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen 
@@ -18,10 +19,10 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y pip3 install breathe
 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get update && pip3 install breathe
+#RUN DEBIAN_FRONTEND="noninteractive" apt-get update && pip3 install breathe
 
-#RUN apt-get update && apt-get install -y git python3
 #RUN apt-get update && apt-get install -y python3-meshio python3-h5py
 #RUN apt-get update && apt-get install -y python3-numpy python3-distutils
 #RUN apt-get update && apt-get install -y python3-pip python3-matplotlib
