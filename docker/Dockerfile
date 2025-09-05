@@ -19,9 +19,7 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
 
-
-
-#RUN DEBIAN_FRONTEND="noninteractive" apt-get update && pip3 install breathe
+RUN DEBIAN_FRONTEND="noninteractive" apt-get update && pip3 install breathe
 
 #RUN apt-get update && apt-get install -y git python3
 #RUN apt-get update && apt-get install -y python3-meshio python3-h5py
@@ -63,26 +61,26 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommende
 # ------------------------------------------------------------------------------- #
 # Install Extrae and its dependencies                                             #
 # ------------------------------------------------------------------------------- #
-WORKDIR /workspace
-RUN mkdir /usr/local/extrae/
-RUN mkdir /usr/local/extrae/libunwind
-RUN mkdir /usr/local/extrae/papi
-RUN mkdir /usr/local/extrae/libxml2
-RUN mkdir /usr/local/extrae/binutils
+#WORKDIR /workspace
+#RUN mkdir /usr/local/extrae/
+#RUN mkdir /usr/local/extrae/libunwind
+#RUN mkdir /usr/local/extrae/papi
+#RUN mkdir /usr/local/extrae/libxml2
+#RUN mkdir /usr/local/extrae/binutils
 
 # Install libunwind
-RUN git clone https://github.com/libunwind/libunwind.git 
-WORKDIR libunwind
-RUN autoreconf -i \
-        && ./configure --prefix=/usr/local/extrae/libunwind \
-	&& make && make install
+#RUN git clone https://github.com/libunwind/libunwind.git 
+#WORKDIR libunwind
+#RUN autoreconf -i \
+#        && ./configure --prefix=/usr/local/extrae/libunwind \
+#	&& make && make install
 	
 # Install PAPI (HW counters)
-WORKDIR /workspace
-RUN git clone https://github.com/icl-utk-edu/papi 
-WORKDIR papi/src        
-RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
-        && make && make install
+#WORKDIR /workspace
+#RUN git clone https://github.com/icl-utk-edu/papi 
+#WORKDIR papi/src        
+#RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
+#        && make && make install
     
 # Install binutils
 #WORKDIR /workspace
