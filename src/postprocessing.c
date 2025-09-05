@@ -1,15 +1,15 @@
 /*
- * Filename: receivers.c
+ * Filename: postprocessing.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2024-06-04
+ * Date: 2025-08-05
  *
  * Description:
- * This file contains functions for receivers (interpolation points) in a PETGEM simulation. 
- * It includes functions for parsing receivers data based on user-provided parameters. 
- * The functions in this file facilitate the setup and configuration of the PETGEM code.
+ * This file contains functions data postprocessing. 
  *
- * List of Functions:
- * 
+ * Usage:
+ * Include this file in your source code to utilize the postprocessing functions. 
+ * For example:
+ * #include "postprocessing.h"
 */
 
 /* C libraries */ 
@@ -27,9 +27,6 @@
 #include "postprocessing.h"
 #include "version.h"
 
-// =============================================================================
-// Function: computeFields
-// =============================================================================
 
 /**
  * @brief Computes electric (E) and magnetic (H) fields at specified receiver locations.

@@ -1,15 +1,17 @@
 /*
- * Filename: inputs.h
+ * Filename: solver.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2024-10-04
+ * Date: 2025-09-04
  *
  * Description:
  * This file contains functions for handling input data and user parameters in a PETGEM simulation. 
  * It includes functions for parsing input data, and processing user-provided parameters. 
  * The functions in this file facilitate the setup and configuration of the PETGEM code.
  *
- * List of Functions:
- * - void readUserParams(): Read user parameters for PETGEM simulation. 
+ * Usage:
+ * Include this file in your source code to utilize the input functions. 
+ * For example:
+ * #include "inputs.h"
 */
 
 /* C libraries */ 
@@ -24,9 +26,6 @@
 #include "common.h"
 #include "inputs.h"  
 
-// =============================================================================
-// Function: readUserParams
-// =============================================================================
 
 /**
  * @brief Reads and validates user-provided parameters from PETSc options.
@@ -45,7 +44,6 @@
  *          Stores the parsed values in the `params` struct. Validates mandatory parameters
  *          and the range/type of `nord` and `mode`. Stores the MPI size. Creates the output directory.
  */
-
 PetscErrorCode readUserParams(Params *params, PetscMPIInt size) {
 
     PetscFunctionBeginUser;

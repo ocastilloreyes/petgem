@@ -2568,107 +2568,6 @@ PetscErrorCode computeBasisFunctions(PetscInt nord, PetscInt orientation[10], Pe
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/**
- * @brief Computes the elemental discrete gradient matrix for linear order 1 elements.
- *
- * @param[in] cellOrientation Array of 10 orientation flags, only edge orientations (indices 4-9) are used.
- * @param[out] gradientMatrix Output array (numEdges x numVertices = 6x4) storing the gradient matrix.
- * @return PetscErrorCode PETSC_SUCCESS always.
- */
-PetscErrorCode computeElementalGradientMatrix(PetscInt cellOrientation[10], PetscReal **gradientMatrix){
-    PetscFunctionBeginUser;
-
-    /* Variables declaration */ 
-    PetscInt NoriE[NUM_EDGES_PER_ELEMENT];  /* Orientation for edges */
-
-    /* Reset gradient matrix */
-    for (PetscInt i = 0; i < NUM_EDGES_PER_ELEMENT; ++i){
-        for (PetscInt j = 0; j < NUM_VERTICES_PER_ELEMENT; ++j){
-                gradientMatrix[i][j] = 0;                
-        }
-    }
-
-    /* Get matrix gradient directly from cellOrientation array 
-       
-       Order convention for cellOrientation = F0, F1, F2, F3, E0, E1, E2, E3, E4, E5 
-
-       For gradients computation we consider:
-         1 if this vextex is the edge ending point
-        -1 if this vextex is the edge starting point
-    */ 
-    for (PetscInt i = 0; i < NUM_EDGES_PER_ELEMENT; ++i){
-        NoriE[i] = cellOrientation[i+NUM_FACES_PER_ELEMENT]; 
-    }
-
-    for (PetscInt i = 0; i < NUM_EDGES_PER_ELEMENT; ++i){
-        switch (i) {
-        case 0: /* Edge 0: v0 --> v1 */  
-            if (NoriE[i] == 0){
-                gradientMatrix[i][0] =  1;
-                gradientMatrix[i][1] = -1;
-            }
-            else{
-                gradientMatrix[i][0] = -1;
-                gradientMatrix[i][1] =  1;
-            }
-            break;
-        case 1: /* Edge 1: v1 --> v2 */  
-            if (NoriE[i] == 0){
-                gradientMatrix[i][1] =  1;
-                gradientMatrix[i][2] = -1;
-            }
-            else{
-                gradientMatrix[i][1] = -1;
-                gradientMatrix[i][2] =  1;
-            }
-            break;
-        case 2: /* Edge 2: v2 --> v0 */  
-            if (NoriE[i] == 0){
-                gradientMatrix[i][2] =  1;
-                gradientMatrix[i][0] = -1;
-            }
-            else{
-                gradientMatrix[i][2] = -1;
-                gradientMatrix[i][0] =  1;
-            }
-            break;
-        case 3: /* Edge 3: v0 --> v3 */  
-            if (NoriE[i] == 0){
-                gradientMatrix[i][0] =  1;
-                gradientMatrix[i][3] = -1;
-            }
-            else{
-                gradientMatrix[i][0] = -1;
-                gradientMatrix[i][3] =  1;
-            }
-            break;
-        case 4: /* Edge 4: v3 --> v1 */  
-            if (NoriE[i] == 0){
-                gradientMatrix[i][3] =  1;
-                gradientMatrix[i][1] = -1;
-            }
-            else{
-                gradientMatrix[i][3] = -1;
-                gradientMatrix[i][1] =  1;
-            }
-            break;
-        case 5: /* Edge 5: v2 --> v3 */  
-            if (NoriE[i] == 0){
-                gradientMatrix[i][2] =  1;
-                gradientMatrix[i][3] = -1;
-            }
-            else{
-                gradientMatrix[i][2] = -1;
-                gradientMatrix[i][3] =  1;
-            }
-            break;
-        default: break;
-        }    
-    }
-    
-    PetscFunctionReturn(PETSC_SUCCESS);
-
-}
 
 /**
  * @brief Computes the standard H1 nodal basis functions (barycentric coordinates) and their gradients for a tetrahedron.
@@ -2680,20 +2579,8 @@ PetscErrorCode computeElementalGradientMatrix(PetscInt cellOrientation[10], Pets
  * @details This function essentially just copies the barycentric coordinates and their gradients,
  *          as these are the standard P1 nodal basis functions on a tetrahedron.
  */
-
 PetscErrorCode BlendTetV(PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4], PetscReal LambV[NUM_VERTICES_PER_ELEMENT], PetscReal DLambV[NUM_VERTICES_PER_ELEMENT][NUM_DIMENSIONS]){
-    /*Projection of tetrahedral edges in concordance with numbering of topological entities (vertices, edges, faces).
 
-    :param ndarray Lam: affine coordinates
-    :param ndarray DLam: gradients of affine coordinates
-    :return: projection of affine coordinates on edges, projection of gradients of affine coordinates on edges
-    :rtype: ndarray
-
-    .. note:: References:\n
-       Fuentes, F., Keith, B., Demkowicz, L., & Nagaraj, S. (2015). Orientation
-       embedded high order shape functions for the exact sequence elements of
-       all shapes. Computers & Mathematics with applications, 70(4), 353-458.
-    */
     PetscFunctionBeginUser;
 
     /* Variable declaration */
@@ -2727,6 +2614,7 @@ PetscErrorCode BlendTetV(PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4], Pe
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /**
  * @brief Computes integrated shifted scaled Legendre polynomials L_i and related terms P, R.
@@ -2839,6 +2727,7 @@ PetscErrorCode HomILegendre(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], Pet
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes H1 ancillary basis functions associated with an edge (integrated Legendre polynomials).
  * @param[in] S Oriented edge coordinates [s0, s1].
@@ -2851,7 +2740,6 @@ PetscErrorCode HomILegendre(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], Pet
  * @details This function simply calls `HomILegendre` as the required H1 edge functions are the
  *          homogenized integrated Legendre polynomials.
  */
-
 PetscErrorCode AncPhiE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt nord, PetscBool Idec, PetscReal *PhiE, PetscReal **DPhiE){
     PetscFunctionBeginUser;
 
@@ -2860,6 +2748,7 @@ PetscErrorCode AncPhiE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /**
  * @brief Computes H1 ancillary basis functions associated with a triangle face.
@@ -2969,6 +2858,7 @@ PetscErrorCode AncPhiTri(PetscReal S[NUM_DIMENSIONS], PetscReal DS[NUM_DIMENSION
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the H1 conforming shape functions and their gradients for a tetrahedron element.
  * @param[in] X Point coordinates [xi, eta, zeta] in the reference tetrahedron.
@@ -2983,24 +2873,9 @@ PetscErrorCode AncPhiTri(PetscReal S[NUM_DIMENSIONS], PetscReal DS[NUM_DIMENSION
  *          3. Face functions (if nord > 2): Projects onto faces (`ProjectTetF`), orients (`OrientTri`), computes ancillary face functions (`AncPhiTri`).
  *          4. Volume functions (if nord > 3): Combines face ancillary functions (`AncPhiTri`) with integrated Jacobi polynomials (`HomIJacobi`).
  *          The functions are stored hierarchically (vertices first, then edges, faces, volume).
- * @note Reordering to PETSc convention is missing compared to `shape3DETet`. The implementation of volume functions seems incomplete/potentially incorrect in the provided snippet.
  */
-
 PetscErrorCode shape3DHTet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt cellOrientation[10], PetscReal *ShapH, PetscReal **GradH){
-    /*Compute values of 3D tetrahedron element H1 shape functions and their derivatives.
 
-    :param ndarray X: master tetrahedron coordinates from (0,1)^3
-    :param int nord: polynomial order
-    :param ndarray NoriE: edge orientation
-    :param ndarray NoriF: face orientation
-    :return: number of dof, values of the shape functions at the point, curl of the shape functions
-    :rtype: ndarray.
-
-    .. note:: References:\n
-       Amor-Martin, A., Garcia-Castillo, L. E., & Garcia-Doñoro, D. D. (2016). Second-order 
-       Nédélec curl-conforming prismatic element for computational electromagnetics. IEEE 
-       Transactions on Antennas and Propagation, 64(10), 4384-4395.
-    */
     PetscFunctionBeginUser;
    
     /* Local parameters */
@@ -3180,28 +3055,6 @@ PetscErrorCode shape3DHTet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt 
         }
     }
 
-    /*PetscCall(PetscPrintf(PETSC_COMM_SELF, "ShapH\n" ));
-    PetscCall(PetscPrintf(PETSC_COMM_SELF, "[" ));
-    for (PetscInt i=0; i<m; i++){
-        PetscCall(PetscPrintf(PETSC_COMM_SELF, "%f,\n", ShapH[i]));
-    }
-    PetscCall(PetscPrintf(PETSC_COMM_SELF, "];" ));
-
-    PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n\n\nGradH\n" ));
-
-    for (PetscInt i=0; i<NUM_DIMENSIONS; i++){
-        PetscCall(PetscPrintf(PETSC_COMM_SELF, "[" ));
-        for (PetscInt j=0; j<m; j++){
-            PetscCall(PetscPrintf(PETSC_COMM_SELF, "%f\n", GradH[i][j]));
-        }
-        PetscCall(PetscPrintf(PETSC_COMM_SELF, "];" ));
-        PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n" ));
-    }
-                
-    PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n" ));*/
-
-
-
     /* If necessary, create bubbles (basis functions in volume)*/
     PetscInt nordB = nord;
     PetscInt ndofB = (nordB-1)*(nordB-2)*(nordB-3)/6;
@@ -3296,77 +3149,67 @@ PetscErrorCode shape3DHTet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt 
         }
         PetscCall(PetscFree(DPhiTriV));
         PetscCall(PetscFree(DhomLbetV));
-
-
-    
     }
     
+    PetscInt numDofInCell = nord * (nord + 2) * (nord + 3) / 2;
+    PetscInt orderPermutation[numDofInCell];
 
-    
-    
+    /* Define the starting indices of each tmp array */
+    PetscInt offsets[] = {0, 6, 26, 71, 155, 295};
 
-    
-    
-    // PetscInt numDofInCell = nord * (nord + 2) * (nord + 3) / 2;
-    // PetscInt orderPermutation[numDofInCell];
+    for (PetscInt i = 0; i < numDofInCell; i++) {
+        orderPermutation[i] = tmp[offsets[nord - 1] + i];
+    }
 
-    // /* Define the starting indices of each tmp array */
-    // PetscInt offsets[] = {0, 6, 26, 71, 155, 295};
+    /* Copy basis and curl from PETGEM order convention */
+    PetscReal tmpShapE[NUM_DIMENSIONS][numDofInCell], tmpCurlE[NUM_DIMENSIONS][numDofInCell]; 
 
-    // for (PetscInt i = 0; i < numDofInCell; i++) {
-    //     orderPermutation[i] = tmp[offsets[nord - 1] + i];
-    // }
+    for (PetscInt i = 0; i<NUM_DIMENSIONS; i++){
+        for (PetscInt j = 0; j<numDofInCell; j++){
+            tmpShapE[i][j] = ShapE[i][j];
+            tmpCurlE[i][j] = CurlE[i][j];        
+        }    
+    }
 
-    // /* Copy basis and curl from PETGEM order convention */
-    // PetscReal tmpShapE[NUM_DIMENSIONS][numDofInCell], tmpCurlE[NUM_DIMENSIONS][numDofInCell]; 
-
-    // for (PetscInt i = 0; i<NUM_DIMENSIONS; i++){
-    //     for (PetscInt j = 0; j<numDofInCell; j++){
-    //         tmpShapE[i][j] = ShapE[i][j];
-    //         tmpCurlE[i][j] = CurlE[i][j];        
-    //     }    
-    // }
-
-    // /* Apply PETSc ordering */
-    // for (PetscInt i = 0; i<NUM_DIMENSIONS; i++){
-    //     for (PetscInt j = 0; j<numDofInCell; j++){
-    //         ShapE[i][j] = tmpShapE[i][orderPermutation[j]];
-    //         CurlE[i][j] = tmpCurlE[i][orderPermutation[j]];
-    //     }
-    // }
-
-    // /* Free memory */
-    // for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
-    //     for (PetscInt j = 0; j < nordB-minK-1; j++){
-    //         PetscCall(PetscFree(ETriV[i][j]));
-    //     }
-    //     PetscCall(PetscFree(ETriV[i]));
-    // }
-    // PetscCall(PetscFree(ETriV));   
-
-    // for (PetscInt i = 0; i < 2*NUM_DIMENSIONS-3; i++){
-    //     for (PetscInt j = 0; j < nordB-minK-1; j++){
-    //         PetscCall(PetscFree(CurlETriV[i][j]));
-    //     }
-    //     PetscCall(PetscFree(CurlETriV[i]));
-    // }
-    // PetscCall(PetscFree(CurlETriV));
-    
-    // for (PetscInt i = 0; i < maxK; i++){
-    //     PetscCall(PetscFree(homLbet[i]));   
-    // }
-    // PetscCall(PetscFree(homLbet));
-
-    // for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
-    //     for (PetscInt j = 0; j < maxK; j++){
-    //         PetscCall(PetscFree(DhomLbet[i][j]));   
-    //     }  
-    //     PetscCall(PetscFree(DhomLbet[i]));       
-    // }
-    // PetscCall(PetscFree(DhomLbet));           
-
+    /* Apply PETSc ordering */
+    for (PetscInt i = 0; i<NUM_DIMENSIONS; i++){
+        for (PetscInt j = 0; j<numDofInCell; j++){
+            ShapE[i][j] = tmpShapE[i][orderPermutation[j]];
+            CurlE[i][j] = tmpCurlE[i][orderPermutation[j]];
+        }
+    }
 
     /* Free memory */
+    for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
+        for (PetscInt j = 0; j < nordB-minK-1; j++){
+            PetscCall(PetscFree(ETriV[i][j]));
+        }
+        PetscCall(PetscFree(ETriV[i]));
+    }
+    PetscCall(PetscFree(ETriV));   
+
+    for (PetscInt i = 0; i < 2*NUM_DIMENSIONS-3; i++){
+        for (PetscInt j = 0; j < nordB-minK-1; j++){
+            PetscCall(PetscFree(CurlETriV[i][j]));
+        }
+        PetscCall(PetscFree(CurlETriV[i]));
+    }
+    PetscCall(PetscFree(CurlETriV));
+    
+    for (PetscInt i = 0; i < maxK; i++){
+        PetscCall(PetscFree(homLbet[i]));   
+    }
+    PetscCall(PetscFree(homLbet));
+
+    for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
+        for (PetscInt j = 0; j < maxK; j++){
+            PetscCall(PetscFree(DhomLbet[i][j]));   
+        }  
+        PetscCall(PetscFree(DhomLbet[i]));       
+    }
+    PetscCall(PetscFree(DhomLbet));           
+
+
     for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
         PetscCall(PetscFree(DPhiE[i]));
     }
@@ -3389,6 +3232,110 @@ PetscErrorCode shape3DHTet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt 
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+
+/**
+ * @brief Computes the elemental discrete gradient matrix for linear order 1 elements.
+ *
+ * @param[in] cellOrientation Array of 10 orientation flags, only edge orientations (indices 4-9) are used.
+ * @param[out] gradientMatrix Output array (numEdges x numVertices = 6x4) storing the gradient matrix.
+ * @return PetscErrorCode PETSC_SUCCESS always.
+ */
+PetscErrorCode computeElementalGradientMatrix(PetscInt cellOrientation[10], PetscReal **gradientMatrix){
+    PetscFunctionBeginUser;
+
+    /* Variables declaration */ 
+    PetscInt NoriE[NUM_EDGES_PER_ELEMENT];  /* Orientation for edges */
+
+    /* Reset gradient matrix */
+    for (PetscInt i = 0; i < NUM_EDGES_PER_ELEMENT; ++i){
+        for (PetscInt j = 0; j < NUM_VERTICES_PER_ELEMENT; ++j){
+                gradientMatrix[i][j] = 0;                
+        }
+    }
+
+    /* Get matrix gradient directly from cellOrientation array 
+       
+       Order convention for cellOrientation = F0, F1, F2, F3, E0, E1, E2, E3, E4, E5 
+
+       For gradients computation we consider:
+         1 if this vextex is the edge ending point
+        -1 if this vextex is the edge starting point
+    */ 
+    for (PetscInt i = 0; i < NUM_EDGES_PER_ELEMENT; ++i){
+        NoriE[i] = cellOrientation[i+NUM_FACES_PER_ELEMENT]; 
+    }
+
+    for (PetscInt i = 0; i < NUM_EDGES_PER_ELEMENT; ++i){
+        switch (i) {
+        case 0: /* Edge 0: v0 --> v1 */  
+            if (NoriE[i] == 0){
+                gradientMatrix[i][0] =  1;
+                gradientMatrix[i][1] = -1;
+            }
+            else{
+                gradientMatrix[i][0] = -1;
+                gradientMatrix[i][1] =  1;
+            }
+            break;
+        case 1: /* Edge 1: v1 --> v2 */  
+            if (NoriE[i] == 0){
+                gradientMatrix[i][1] =  1;
+                gradientMatrix[i][2] = -1;
+            }
+            else{
+                gradientMatrix[i][1] = -1;
+                gradientMatrix[i][2] =  1;
+            }
+            break;
+        case 2: /* Edge 2: v2 --> v0 */  
+            if (NoriE[i] == 0){
+                gradientMatrix[i][2] =  1;
+                gradientMatrix[i][0] = -1;
+            }
+            else{
+                gradientMatrix[i][2] = -1;
+                gradientMatrix[i][0] =  1;
+            }
+            break;
+        case 3: /* Edge 3: v0 --> v3 */  
+            if (NoriE[i] == 0){
+                gradientMatrix[i][0] =  1;
+                gradientMatrix[i][3] = -1;
+            }
+            else{
+                gradientMatrix[i][0] = -1;
+                gradientMatrix[i][3] =  1;
+            }
+            break;
+        case 4: /* Edge 4: v3 --> v1 */  
+            if (NoriE[i] == 0){
+                gradientMatrix[i][3] =  1;
+                gradientMatrix[i][1] = -1;
+            }
+            else{
+                gradientMatrix[i][3] = -1;
+                gradientMatrix[i][1] =  1;
+            }
+            break;
+        case 5: /* Edge 5: v2 --> v3 */  
+            if (NoriE[i] == 0){
+                gradientMatrix[i][2] =  1;
+                gradientMatrix[i][3] = -1;
+            }
+            else{
+                gradientMatrix[i][2] = -1;
+                gradientMatrix[i][3] =  1;
+            }
+            break;
+        default: break;
+        }    
+    }
+    
+    PetscFunctionReturn(PETSC_SUCCESS);
+
+}
+
 
 /**
  * @brief Computes the elemental discrete gradient matrix (Placeholder/Incomplete for higher order).
@@ -3432,8 +3379,6 @@ PetscErrorCode computeElementalGradientMatrix2(PetscInt nord, PetscInt cellOrien
         PetscCall(shape3DHTet(iPoint, nord, cellOrientation, ShapH, GradH));
     }
 
-    
-        
     PetscFunctionReturn(PETSC_SUCCESS);
 
 }

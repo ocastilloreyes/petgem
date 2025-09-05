@@ -92,11 +92,11 @@ RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -
 RUN make && make install && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
         
 # Install libxml2
-#WORKDIR /workspace
-#RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
-#WORKDIR libxml2
-#RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
-#RUN make && make install 
+WORKDIR /workspace
+RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
+WORKDIR libxml2
+RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
+RUN make && make install 
         
 # Install extrae
 #WORKDIR /workspace

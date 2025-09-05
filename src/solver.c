@@ -1,6 +1,18 @@
+/*
+ * Filename: solver.c
+ * Author: Octavio Castillo Reyes (UPC/BSC)
+ * Date: 2025-08-05
+ *
+ * Description:
+ * This file contains functions solving phase. 
+ *
+ * Usage:
+ * Include this file in your source code to utilize the solver functions. 
+ * For example:
+ * #include "solver.h"
+*/
  
 /* C libraries */ 
-
 
 /* PETSc libraries */
 #include <petscsys.h>
@@ -8,13 +20,8 @@
 #include <petscdmplex.h>
 #include "inputs.h"
 
-
 /* PETGEM functions */ 
 
-
-// =============================================================================
-// Function: readUserParams
-// =============================================================================
 
 /**
  * @brief Solves the linear system AX=B using KSP.
