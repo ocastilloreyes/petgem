@@ -20,13 +20,12 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
 
-RUN apt-get update && apt-get install -y python3-breathe python3-cython
+RUN apt-get update && apt-get install -y python3-breathe
 RUN apt-get update && apt-get install -y python3-meshio python3-h5py
 RUN apt-get update && apt-get install -y python3-numpy python3-distutils
 RUN apt-get update && apt-get install -y python3-pip python3-matplotlib
 RUN apt-get update && apt-get install -y python3-sphinx python3-sphinx-rtd-theme
-
-#RUN apt-get update && pip3 install cython sphinx sphinx-rtd-theme
+RUN apt-get update && pip3 install cython 
 
 # ------------------------------------------------------------------------------- #
 # Install PETSc                                                                   #
