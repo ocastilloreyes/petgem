@@ -76,19 +76,19 @@ RUN autoreconf -i \
 	&& make && make install
 	
 # Install PAPI (HW counters)
-#WORKDIR /workspace
-#RUN git clone https://github.com/icl-utk-edu/papi 
-#WORKDIR papi/src        
-#RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
-#        && make && make install
+WORKDIR /workspace
+RUN git clone https://github.com/icl-utk-edu/papi 
+WORKDIR papi/src        
+RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
+        && make && make install
     
 # Install binutils
-#WORKDIR /workspace
-#RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
-#RUN tar -xf binutils-2.42.tar.gz
-#WORKDIR binutils-2.42
-#RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
-#RUN make && make install && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
+WORKDIR /workspace
+RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
+RUN tar -xf binutils-2.42.tar.gz
+WORKDIR binutils-2.42
+RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
+RUN make && make install && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
         
 # Install libxml2
 #WORKDIR /workspace

@@ -1406,17 +1406,8 @@ PetscErrorCode ProjectTetF(PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4], 
  * @details Permutes the input coordinates and gradients based on the value of `Nori` (0-5), corresponding
  *          to the 6 possible orientations/permutations of the vertices of a triangle.
  */
-
 PetscErrorCode OrientTri(PetscReal S[NUM_DIMENSIONS], PetscReal DS[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscInt Nori, PetscReal GS[NUM_DIMENSIONS], PetscReal GDS[NUM_DIMENSIONS][NUM_DIMENSIONS]){
-    /*Compute the local to global transformations of edges.
-
-    :param ndarray S: projection of affine coordinates on faces
-    :param ndarray DS: projection of gradients of affine coordinates on faces
-    :param ndarray Nori: face orientation
-    :param int N: number of dimensions
-    :return: global transformation of faces and global transformation of gradients of faces
-    :rtype: ndarray
-    */
+    
     PetscFunctionBeginUser;
 
     PetscInt Or[NUM_DIMENSIONS*2][NUM_DIMENSIONS];
@@ -1465,6 +1456,7 @@ PetscErrorCode OrientTri(PetscReal S[NUM_DIMENSIONS], PetscReal DS[NUM_DIMENSION
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes integrated shifted scaled Jacobi polynomials L_j^{alpha,0} and related terms P, R.
  * @param[in] X Coordinate, typically s1 or s2 depending on context (e.g., face or volume basis).
@@ -1480,20 +1472,8 @@ PetscErrorCode OrientTri(PetscReal S[NUM_DIMENSIONS], PetscReal DS[NUM_DIMENSION
  *          involving P to compute the integrated polynomials L and the T-derivative related term R.
  *          Used for constructing face and volume basis functions.
  */
-
 PetscErrorCode PolyIJacobi(PetscReal X, PetscReal T, PetscInt nord, PetscInt Minalpha, PetscBool Idec, PetscReal **L, PetscReal **P, PetscReal **R){
-    /*Compute values of integrated shifted scaled Jacobi polynomials and their derivatives starting with p=1.
 
-    Result is 'half' of a  matrix with each row  associated to a fixed alpha.
-    Alpha grows by 2 in each row.
-
-    :param ndarray X: coordinate from [0,1]
-    :param ndarray T: scaling parameter
-    :param int nord: max polynomial order
-    :param int Minalpha: first row value of alpha
-    :param bool Idec: decision flag to compute (= FALSE polynomials with x and t derivatives, = TRUE  polynomials with x derivatives only)
-    :return: polynomial values, derivatives in x (Jacobi polynomials), derivatives in t
-    */
     PetscFunctionBeginUser;
     
     /* Clearly (minI,maxI)=(1,nord), but the syntax is written as it is
@@ -1575,6 +1555,7 @@ PetscErrorCode PolyIJacobi(PetscReal X, PetscReal T, PetscInt nord, PetscInt Min
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes homogenized integrated Jacobi polynomials and their gradients.
  * @param[in] S Affine-like coordinates [s_a, s_b] (e.g., [s0+s1, s2] for faces).
@@ -1589,20 +1570,8 @@ PetscErrorCode PolyIJacobi(PetscReal X, PetscReal T, PetscInt nord, PetscInt Min
  *          Computes the gradient DHomL using the chain rule: DHomL = P * Grad(s_b) + R * Grad(s_a+s_b).
  *          Handles the simplified case where Idec=TRUE (T=1, so R term is not needed).
  */
-
 PetscErrorCode HomIJacobi(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt nord, PetscInt Minalpha, PetscBool Idec, PetscReal **HomL, PetscReal ***DHomL){
-    /*Compute values of integrated homogenized Jacobi polynomials and their gradients.
-    Result is half of a  matrix with each row  associated to a fixed alpha.
-    Alpha grows by 2 in each row.
 
-    :param ndarray S: (s0,s1) affine(like) coordinates
-    :param ndarray DS: gradients of S in R(N)
-    :param int nord: max polynomial order
-    :param int Minalpha: first row value of alpha (integer)
-    :param bool Idec: decision flag to compute
-    :return: polynomial values and derivatives in x (Jacobi polynomials)
-    :rtype: ndarray
-    */
     PetscFunctionBeginUser;
     
     /* Clearly (minI,maxI)=(1,nord), but the syntax is written as it is
@@ -1670,6 +1639,7 @@ PetscErrorCode HomIJacobi(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], Petsc
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes H(curl) ancillary basis functions associated with a triangle face.
  * @param[in] S Oriented face coordinates [s0, s1, s2].
@@ -1684,18 +1654,8 @@ PetscErrorCode HomIJacobi(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], Petsc
  *          Calculates the curl using the product rule: Curl(EE * L) = Curl(EE)*L + Grad(L) x EE.
  *          The indices [j][k-1] correspond to polynomial orders related to the edge and the transverse direction.
  */
-
 PetscErrorCode AncETri(PetscReal S[NUM_DIMENSIONS], PetscReal DS[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscInt nord, PetscBool Idec, PetscReal ***ETri, PetscReal ***CurlETri){
-    /*Compute triangle face Hcurl ancillary functions and their curls.
 
-    :param ndarray S: (s0,s1,s2) affine coordinates associated to triangle face
-    :param ndarray DS: derivatives of S0,S1,S2
-    :param int nord: polynomial order
-    :param bool Idec: Binary flag:
-    :param int N: spatial dimension
-    :return: triangle Hcurl ancillary functions and curls of triangle Hcurl ancillary functions
-    :rtype: ndarray
-    */
     PetscFunctionBeginUser;
     
     PetscReal DsL[NUM_DIMENSIONS][2];
@@ -1812,6 +1772,7 @@ PetscErrorCode AncETri(PetscReal S[NUM_DIMENSIONS], PetscReal DS[NUM_DIMENSIONS]
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the orientation flags for the 4 faces and 6 edges of a tetrahedron cell.
  *
@@ -1881,6 +1842,7 @@ PetscErrorCode computeCellOrientation(DM dm, PetscInt cell, PetscInt cellOrienta
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the H(curl) conforming shape functions and their curls for a tetrahedron element.
  * @param[in] X Point coordinates [xi, eta, zeta] in the reference tetrahedron.
@@ -1897,22 +1859,8 @@ PetscErrorCode computeCellOrientation(DM dm, PetscInt cell, PetscInt cellOrienta
  *          4. Computes volume functions: Handles 3 families per cell, combines face ancillary functions (`AncETri` on sub-entities) with integrated Jacobi polynomials (`HomIJacobi` in the last barycentric coordinate).
  *          5. Reorders the computed functions from the hierarchical construction order to the PETSc DOF ordering convention.
  */
-
 PetscErrorCode shape3DETet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt cellOrientation[10], PetscReal **ShapE, PetscReal **CurlE){
-    /*Compute values of 3D tetrahedron element H(curl) shape functions and their derivatives.
 
-    :param ndarray X: master tetrahedron coordinates from (0,1)^3
-    :param int nord: polynomial order
-    :param ndarray NoriE: edge orientation
-    :param ndarray NoriF: face orientation
-    :return: number of dof, values of the shape functions at the point, curl of the shape functions
-    :rtype: ndarray.
-
-    .. note:: References:\n
-       Fuentes, F., Keith, B., Demkowicz, L., & Nagaraj, S. (2015). Orientation
-       embedded high order shape functions for the exact sequence elements of
-       all shapes. Computers & Mathematics with applications, 70(4), 353-458.
-    */
     PetscFunctionBeginUser;
    
     /* Local parameters */
