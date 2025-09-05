@@ -1,7 +1,7 @@
 /*
   Filename: inputs.h
   Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2024-10-02
+  Date: 2025-09-05
  
   Description:
   This file contains a collection of definitions for user input functions that are used
@@ -16,10 +16,6 @@
 #ifndef INPUTS_H
 #define INPUTS_H
 
-/* =============================================================================
-   Declaration of structures
-   =============================================================================
-*/
 typedef struct {
     char meshFile[PETSC_MAX_PATH_LEN];
     char receiversFile[PETSC_MAX_PATH_LEN];
@@ -31,11 +27,6 @@ typedef struct {
     PetscMPIInt numMPITasks;
 } Params;
 
-
-/* =============================================================================
-   Declaration of functions
-   =============================================================================
-*/
 PetscErrorCode readUserParams(Params *params, PetscMPIInt size);
 
 #endif

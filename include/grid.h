@@ -1,7 +1,7 @@
 /*
   Filename: grid.h
   Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2024-10-02
+  Date: 2025-09-05
  
   Description:
   This file contains a collection of definitions for grid functions that are used
@@ -19,11 +19,6 @@
 #include <petsc.h>
 #include "inputs.h"
 
-
-/* =============================================================================
-   Declaration of structures
-   =============================================================================
-*/
 typedef struct {
     PetscInt numCellsLocal;     /* Number of local cells        */
     PetscInt numCellsGlobal;    /* Number of global cells       */
@@ -52,11 +47,6 @@ typedef struct {
     DM H1dm;
 } Grid;
 
-
-/* =============================================================================
-   Declaration of functions
-   =============================================================================
-*/
 PetscErrorCode setupGrid(DM *dm, Grid *grid, Params params);
 
 PetscErrorCode importGrid(DM *odm, Vec *resistivity_output, Params params);

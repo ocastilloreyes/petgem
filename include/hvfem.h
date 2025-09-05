@@ -1,7 +1,7 @@
 /*
   Filename: hvfem.h
   Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2024-10-02
+  Date: 2025-09-05
  
   Description:
   This file contains a collection of definitions for high-order vector finite element functions that 
@@ -20,10 +20,7 @@
 #include <petscdmplex.h>
 #include "constants.h"
 
-/* =============================================================================
-   Declaration of functions
-   =============================================================================
-*/
+
 PetscErrorCode computeJacobian(PetscScalar *cellCoords, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS]);
 
 PetscErrorCode computeNumGaussPoints3D(PetscInt nord, PetscInt *numGaussPoints);

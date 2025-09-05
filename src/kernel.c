@@ -16,7 +16,7 @@ static char help[] = "PETGEM kernel for 3D CSEM modeling using high-order vector
 #include "constants.h"
 #include "common.h"
 #include "inputs.h"  
-#include "source.h" 
+#include "transmitter.h" 
 #include "grid.h" 
 #include "assembly.h"
 #include "solver.h"  

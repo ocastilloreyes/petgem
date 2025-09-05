@@ -11,6 +11,7 @@ WORKDIR /workspace
 # ------------------------------------------------------------------------------- #
 RUN apt-get update && apt-get install -y gcc gfortran g++ make cmake vim 
 RUN apt-get update && apt-get install -y flex bison libtool git python3
+RUN apt-get update && apt-get install -y autopoint pkg-config gettext
 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texinfo 
@@ -95,11 +96,7 @@ RUN make && make install && cp libiberty/pic/libiberty.a /usr/local/extrae/binut
 WORKDIR /workspace
 RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
 WORKDIR libxml2
-
-RUN apt-get update && apt-get install -y autopoint pkg-config gettext
-
 RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
-
 RUN make && make install 
         
 # Install extrae
@@ -120,10 +117,10 @@ RUN make && make install
 # ------------------------------------------------------------------------------- #
 # Install Unity (Framework for C tests)                                           #
 # ------------------------------------------------------------------------------- #
-#RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
+RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
 
 # Define entry point and clean system
 WORKDIR /workspace
-#RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz
+RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz
 
 CMD [ "bash" ]

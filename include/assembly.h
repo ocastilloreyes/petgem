@@ -19,15 +19,9 @@
 #include <petsc.h>
 #include "inputs.h"
 #include "grid.h"
-#include "source.h"
+#include "transmitter.h"
 
-/* =============================================================================
-   Declaration of functions
-   ============================================================================= 
-*/
 PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, setSource sources, Params params, Mat *A, Mat *B, Mat *G);
-
-
 
 #endif
 

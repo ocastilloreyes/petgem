@@ -17,7 +17,7 @@
 /* PETGEM functions */ 
 #include "inputs.h"
 #include "grid.h"
-#include "source.h"
+#include "transmitter.h"
 #include "assembly.h"
 #include "hvfem.h"
 #include "constants.h"

@@ -17,10 +17,6 @@
 
 #include <petsc.h>
 
-/* =============================================================================
-   Declaration of constants
-   =============================================================================
-*/
 #define NUM_FACES_PER_ELEMENT     4
 #define NUM_EDGES_PER_ELEMENT     6
 #define NUM_VERTICES_PER_ELEMENT  4
@@ -29,10 +25,6 @@
 #define NUM_VERTICES_PER_FACE     3
 #define NUM_DIMENSIONS 			  3
 
-/* =============================================================================
-   Physical constants
-   =============================================================================
-*/
 #define MU (4.0 * PETSC_PI * 1.0e-7)
 
 #endif

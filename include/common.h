@@ -1,7 +1,7 @@
 /*
   Filename: common.h
   Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2024-10-02
+  Date: 2025-09-05
  
   Description:
   This file contains a collection of definitions for common utility functions that are used
@@ -17,10 +17,6 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-/* =============================================================================
-   Declaration of functions
-   ============================================================================= 
-*/
 PetscErrorCode printHeader();
 
 PetscErrorCode printFooter();

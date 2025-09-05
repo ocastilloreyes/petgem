@@ -1,15 +1,17 @@
 /*
- * Filename: source.c
+ * Filename: transmitter.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2024-06-03
+ * Date: 2025-08-05
  *
  * Description:
- * This file contains functions for source (CSEM or MT) in a PETGEM simulation. 
+ * This file contains functions for transmitter (CSEM or MT) in a PETGEM simulation. 
  * It includes functions for parsing source data based on user-provided parameters. 
  * The functions in this file facilitate the setup and configuration of the PETGEM code.
  *
- * List of Functions:
- * 
+ * Usage:
+ * Include this file in your source code to utilize the transmitter functions. 
+ * For example:
+ * #include "transmitter.h" 
 */
 
 /* C libraries */ 
@@ -20,9 +22,6 @@
 /* PETGEM functions */ 
 #include "source.h"
 
-// =============================================================================
-// Function: setupSource
-// =============================================================================
 
 /**
  * @brief Reads source parameters from a file based on the simulation mode.
