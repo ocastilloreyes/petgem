@@ -11,12 +11,13 @@ WORKDIR /workspace
 # ------------------------------------------------------------------------------- #
 RUN apt-get update
 RUN  apt-get update && apt-get install -y gcc gfortran g++ make cmake vim flex bison libtool
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata texinfo doxygen latexmk 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base texlive-latex-extra 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texinfo 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
-
-
-
 
 
 
