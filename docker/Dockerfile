@@ -10,15 +10,16 @@ WORKDIR /workspace
 # Install first level dependencies                                                #
 # ------------------------------------------------------------------------------- #
 RUN apt-get update
-#RUN apt-get update && apt-get install -y gcc gfortran g++
-#RUN apt-get update && apt-get install -y make cmake vim
-#RUN apt-get update && apt-get install -y flex bison libtool
+RUN apt-get install -y gcc gfortran g++ make cmake vim flex bison libtool
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata texinfo doxygen latexmk 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base texlive-latex-extra 
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
 
-#RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata texinfo
-#RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen latexmk
-#RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
-#RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
-#RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended
+
+
+
+
+
 #RUN DEBIAN_FRONTEND="noninteractive" apt-get update && pip3 install breathe
 
 #RUN apt-get update && apt-get install -y git python3
@@ -46,7 +47,7 @@ RUN apt-get update
 
 # Set PETSc environment variables and PATH
 #ENV PETSC_ARCH=arch-linux-c-opt \
-    PETSC_DIR=/usr/local/petsc
+#    PETSC_DIR=/usr/local/petsc
 #ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
 
 # Build PETSc
