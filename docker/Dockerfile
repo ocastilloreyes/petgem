@@ -20,7 +20,7 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
 
-RUN apt-get update && apt-get install -y python3-breathe
+RUN apt-get update && apt-get install -y python3-breathe python3-cython
 RUN apt-get update && apt-get install -y python3-meshio python3-h5py
 RUN apt-get update && apt-get install -y python3-numpy python3-distutils
 RUN apt-get update && apt-get install -y python3-pip python3-matplotlib
@@ -31,11 +31,11 @@ RUN apt-get update && apt-get install -y python3-sphinx python3-sphinx-rtd-theme
 # ------------------------------------------------------------------------------- #
 # Install PETSc                                                                   #
 # ------------------------------------------------------------------------------- #
-#RUN mkdir /usr/local/petsc
-#WORKDIR /usr/local/petsc
+RUN mkdir /usr/local/petsc
+WORKDIR /usr/local/petsc
 
 # Get PETSc, configure and compile
-#RUN git clone -b release https://gitlab.com/petsc/petsc.git .
+RUN git clone -b release https://gitlab.com/petsc/petsc.git .
 
 # Obtain new release fixes (since a prior clone or pull)
 #RUN git pull 
