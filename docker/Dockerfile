@@ -103,19 +103,19 @@ RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
 RUN make && make install 
         
 # Install extrae
-#WORKDIR /workspace
-#RUN git clone https://github.com/bsc-performance-tools/extrae.git 
-#WORKDIR extrae
-#RUN git submodule update --init --recursive
-#RUN autoreconf -f -i
-#RUN ./configure --prefix=/usr/local/extrae \
-#        --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
-#        --with-papi=/usr/local/extrae/papi \
-#        --with-xml-prefix=/usr/local/extrae/libxml2 \
-#        --with-unwind=/usr/local/extrae/libunwind \
-#        --with-binutils=/usr/local/extrae/binutils \
-#        --without-dyninst
-#RUN make && make install
+WORKDIR /workspace
+RUN git clone https://github.com/bsc-performance-tools/extrae.git 
+WORKDIR extrae
+RUN git submodule update --init --recursive
+RUN autoreconf -f -i
+RUN ./configure --prefix=/usr/local/extrae \
+        --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
+        --with-papi=/usr/local/extrae/papi \
+        --with-xml-prefix=/usr/local/extrae/libxml2 \
+        --with-unwind=/usr/local/extrae/libunwind \
+        --with-binutils=/usr/local/extrae/binutils \
+        --without-dyninst
+RUN make && make install
 
 # ------------------------------------------------------------------------------- #
 # Install Unity (Framework for C tests)                                           #
