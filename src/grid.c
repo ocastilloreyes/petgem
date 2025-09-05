@@ -1,17 +1,14 @@
 /*
  * Filename: grid.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2024-06-04
+ * Date: 2025-06-04
  *
  * Description:
  * This file contains a collection of functions for grid functions that are used
- * throughout the PETGEM project. These functions are based on DMPlex provided by PETSc.
+ * throughout the PETGEM. These functions are based on DMPlex provided by PETSc.
  *
- * List of functions:
- * 
- * 
  * Usage:
- * Include this file in your source code to utilize the common functions. 
+ * Include this file in your source code to utilize the grid functions. 
  * For example:
  * #include "grid.h"
  * 
@@ -28,9 +25,6 @@
 #include "grid.h"
 #include "inputs.h"
 
-// =============================================================================
-// Function: importGrid
-// =============================================================================
 
 /**
  * @brief Imports the mesh topology, coordinates, labels, and resistivity field from an HDF5 file.
@@ -310,12 +304,8 @@ PetscErrorCode setupGrid(DM *dm, Grid *grid, Params params) {
 }
 
 
-// =============================================================================
-// Function: locateCSEMSource
-// =============================================================================
-
 /**
- * @brief Locates the cell containing a given point (e.g., a CSEM source position).
+ * @brief Locates the cell containing a given point (e.g., source position or receiver position).
  * @param[in] dm The DMPlex object representing the mesh.
  * @param[in] position Array containing the [x, y, z] coordinates of the point to locate.
  * @param[out] pointInCell Pointer to an integer where the index of the containing cell will be stored. Set to -1 if not found locally.

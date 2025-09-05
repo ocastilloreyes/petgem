@@ -1,7 +1,7 @@
 /*
  * Filename: common.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2024-05-28
+ * Date: 2025-05-28
  *
  * Description:
  * This file contains a collection of functions for common utility functions that are used
@@ -28,9 +28,6 @@
 #include "common.h"
 #include "version.h"
 
-// =============================================================================
-// Function: printHeader
-// =============================================================================
 
 /**
  * @brief Prints a header with PETGEM project information and the current year.
@@ -66,12 +63,8 @@ PetscErrorCode printHeader(){
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "----------------------------------------------------------------------------\n"));
 
     PetscFunctionReturn(PETSC_SUCCESS);
-
 }
 
-// =============================================================================
-// Function: printFooter
-// =============================================================================
 
 /**
  * @brief Prints the finalization time of the PETGEM simulation.
@@ -98,12 +91,8 @@ PetscErrorCode printFooter(){
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "----------------------------------------------------------------------------\n"));
 
     PetscFunctionReturn(PETSC_SUCCESS);
-
 }
 
-// =============================================================================
-// Function: createDirectory
-// =============================================================================
 
 /**
  * @brief Creates a directory if it does not already exist.

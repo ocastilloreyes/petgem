@@ -61,19 +61,19 @@ RUN echo 'alias mpirun=\${PETSC_DIR}/\${PETSC_ARCH}/bin/mpirun' >> ~/.bashrc
 # ------------------------------------------------------------------------------- #
 # Install Extrae and its dependencies                                             #
 # ------------------------------------------------------------------------------- #
-#WORKDIR /workspace
-#RUN mkdir /usr/local/extrae/
-#RUN mkdir /usr/local/extrae/libunwind
-#RUN mkdir /usr/local/extrae/papi
-#RUN mkdir /usr/local/extrae/libxml2
-#RUN mkdir /usr/local/extrae/binutils
+WORKDIR /workspace
+RUN mkdir /usr/local/extrae/
+RUN mkdir /usr/local/extrae/libunwind
+RUN mkdir /usr/local/extrae/papi
+RUN mkdir /usr/local/extrae/libxml2
+RUN mkdir /usr/local/extrae/binutils
 
 # Install libunwind
-#RUN git clone https://github.com/libunwind/libunwind.git 
-#WORKDIR libunwind
-#RUN autoreconf -i \
-#        && ./configure --prefix=/usr/local/extrae/libunwind \
-#	&& make && make install
+RUN git clone https://github.com/libunwind/libunwind.git 
+WORKDIR libunwind
+RUN autoreconf -i \
+        && ./configure --prefix=/usr/local/extrae/libunwind \
+	&& make && make install
 	
 # Install PAPI (HW counters)
 #WORKDIR /workspace

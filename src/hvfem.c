@@ -1,17 +1,19 @@
 /*
  * Filename: hvfem.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2024-06-12
+ * Date: 2025-06-12
  *
  * Description:
  * This file contains functions for high-order vector finite element method (HVFEM) computations. 
-  *
- * List of Functions:
- * 
+ *
+ * Usage:
+ * Include this file in your source code to utilize the grid functions. 
+ * For example:
+ * #include "grid.h"
+ *
 */
 
 /* C libraries */ 
-
 
 /* PETSc libraries */
 #include <petsc.h>
@@ -20,9 +22,6 @@
 /* PETGEM functions */ 
 #include "constants.h"
 
-// =============================================================================
-// Function: computeJacobian
-// =============================================================================
 
 /**
  * @brief Transforms global XYZ coordinates to reference tetrahedron coordinates (Xi, Eta, Zeta).
@@ -34,15 +33,8 @@
  *          (vertices at (0,0,0), (1,0,0), (0,1,0), (0,0,1)) to the physical tetrahedron defined
  *          by `cellCoords`. Uses Cramer's rule / determinant formulas.
  */
-
 PetscErrorCode tetrahedronXYZToXiEtaZeta(PetscScalar *cellCoords, PetscReal point[NUM_DIMENSIONS], PetscReal XiEtaZeta[NUM_DIMENSIONS]){
-    /*Compute the reference tetrahedron coordinates from xyz global tetrahedron coordinates.
-
-    :param ndarray cellCoords: spatial coordinates of the nodes with dimensions = (4,3)
-    :param ndarray points: xyz points coordinates to be transformed
-    :return: xietazeta points coordinates
-    :rtype: ndarray
-    */
+    
     PetscFunctionBeginUser;
 
     PetscReal J, xi, eta, zeta, cellCoordsReal[NUM_VERTICES_PER_ELEMENT*NUM_DIMENSIONS];
@@ -110,6 +102,7 @@ PetscErrorCode tetrahedronXYZToXiEtaZeta(PetscScalar *cellCoords, PetscReal poin
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes a rotation vector based on azimuth and dip angles.
  * @param[in] azimuth Rotation angle in the x-y plane (degrees).
@@ -121,15 +114,7 @@ PetscErrorCode tetrahedronXYZToXiEtaZeta(PetscScalar *cellCoords, PetscReal poin
  *          A y-z plane rotation (tetha) is included but currently hardcoded to 0 degrees.
  *          The final rotated vector is stored in `rotationVector`.
  */
-
 PetscErrorCode vectorRotation(PetscReal azimuth, PetscReal dip, PetscReal rotationVector[NUM_DIMENSIONS]){
-    /*Compute the weigths vector for source rotation in the xyz plane.
-
-    :param float azimuth: degrees for x-y plane rotation
-    :param float dip: degrees for x-z plane rotation
-    :return: weigths for source rotation
-    :rtype: ndarray.
-    */
 
     PetscFunctionBeginUser;
 
@@ -190,6 +175,7 @@ PetscErrorCode vectorRotation(PetscReal azimuth, PetscReal dip, PetscReal rotati
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the cross product of two 3D vectors.
  * @param[in] vector1 The first input vector [x1, y1, z1].
@@ -198,7 +184,6 @@ PetscErrorCode vectorRotation(PetscReal azimuth, PetscReal dip, PetscReal rotati
  * @return PetscErrorCode PETSC_SUCCESS always.
  * @details Calculates result = vector1 x vector2 using the standard formula.
  */
-
 PetscErrorCode crossProduct(PetscReal vector1[NUM_DIMENSIONS], PetscReal vector2[NUM_DIMENSIONS], PetscReal result[NUM_DIMENSIONS]){
     PetscFunctionBeginUser;
 
@@ -221,7 +206,6 @@ PetscErrorCode crossProduct(PetscReal vector1[NUM_DIMENSIONS], PetscReal vector2
  * @param[out] result The resulting 3D column vector.
  * @return PetscErrorCode PETSC_SUCCESS always.
  */
-
 PetscErrorCode matrixVectorProduct(PetscReal vector[NUM_DIMENSIONS], PetscReal matrix[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal result[NUM_DIMENSIONS]){
     PetscFunctionBeginUser;
 
@@ -235,6 +219,7 @@ PetscErrorCode matrixVectorProduct(PetscReal vector[NUM_DIMENSIONS], PetscReal m
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the product of a 3D row vector and a 3x3 matrix (result = vector * matrix).
  * @param[in] vector The input row vector [v1, v2, v3].
@@ -242,7 +227,6 @@ PetscErrorCode matrixVectorProduct(PetscReal vector[NUM_DIMENSIONS], PetscReal m
  * @param[out] result The resulting 3D row vector.
  * @return PetscErrorCode PETSC_SUCCESS always.
  */
-
 PetscErrorCode vectorMatrixProduct(PetscReal vector[NUM_DIMENSIONS], PetscReal matrix[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal result[NUM_DIMENSIONS]){
     PetscFunctionBeginUser;
 
@@ -256,6 +240,7 @@ PetscErrorCode vectorMatrixProduct(PetscReal vector[NUM_DIMENSIONS], PetscReal m
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the dot product of two 3D vectors.
  * @param[in] vector1 The first input vector [x1, y1, z1].
@@ -264,7 +249,6 @@ PetscErrorCode vectorMatrixProduct(PetscReal vector[NUM_DIMENSIONS], PetscReal m
  * @return PetscErrorCode PETSC_SUCCESS always.
  * @details Calculates *result = vector1[0]*vector2[0] + vector1[1]*vector2[1] + vector1[2]*vector2[2].
  */
-
 PetscErrorCode dotProduct(PetscReal vector1[NUM_DIMENSIONS], PetscReal vector2[NUM_DIMENSIONS], PetscReal *result){
     PetscFunctionBeginUser;
 
@@ -276,6 +260,7 @@ PetscErrorCode dotProduct(PetscReal vector1[NUM_DIMENSIONS], PetscReal vector2[N
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the Jacobian matrix and its inverse for the affine mapping from the reference tetrahedron to the physical tetrahedron.
  * @param[in] cellCoords Spatial coordinates of the tetrahedron's 4 vertices (PetscScalar array, size 12).
@@ -285,7 +270,6 @@ PetscErrorCode dotProduct(PetscReal vector1[NUM_DIMENSIONS], PetscReal vector2[N
  * @details Calculates the Jacobian matrix based on the differences between vertex coordinates.
  *          Computes the determinant, cofactor matrix, adjugate matrix, and finally the inverse Jacobian.
  */
-
 PetscErrorCode computeJacobian(PetscScalar *cellCoords, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS]) {
     PetscFunctionBeginUser;
 
@@ -342,6 +326,7 @@ PetscErrorCode computeJacobian(PetscScalar *cellCoords, PetscReal jacobian[NUM_D
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Determines the number of Gauss points and its Weights required for integrating polynomials
  *        up to a given order on a tetrahedron.
@@ -381,6 +366,7 @@ PetscErrorCode computeNumGaussPoints3D(PetscInt nord, PetscInt *numGaussPoints){
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Renormalizes Gauss points from a [-1, 1]-based domain to the [0, 1]-based reference tetrahedron.
  *
@@ -402,6 +388,7 @@ PetscErrorCode renormalization3DGaussPoints(PetscInt numPoints, const PetscReal 
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /**
  * @brief Provides coordinates and weights for Gauss quadrature on the reference tetrahedron for various orders.
@@ -990,6 +977,7 @@ PetscErrorCode computeGaussPoints3D(PetscInt numPoints, PetscReal **points, Pets
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes the barycentric (affine) coordinates and their gradients on the reference tetrahedron.
  *
@@ -999,17 +987,7 @@ PetscErrorCode computeGaussPoints3D(PetscInt numPoints, PetscReal **points, Pets
  * @return PetscErrorCode PETSC_SUCCESS always.
  */
 PetscErrorCode AffineTetrahedron(PetscReal X[NUM_DIMENSIONS], PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4]){
-    /*Compute affine coordinates and their gradients.
-
-    :param ndarray X: point coordinates
-    :return: affine coordinates and gradients of affine coordinates
-    :rtype: ndarray
-
-    .. note:: References:\n
-       Fuentes, F., Keith, B., Demkowicz, L., & Nagaraj, S. (2015). Orientation
-       embedded high order shape functions for the exact sequence elements of
-       all shapes. Computers & Mathematics with applications, 70(4), 353-458.
-    */
+    
     PetscFunctionBeginUser;
     
     /* Define affine coordinates */
@@ -1029,6 +1007,7 @@ PetscErrorCode AffineTetrahedron(PetscReal X[NUM_DIMENSIONS], PetscReal Lam[4], 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Projects tetrahedral barycentric coordinates and gradients onto the 6 edges.
  *
@@ -1040,18 +1019,7 @@ PetscErrorCode AffineTetrahedron(PetscReal X[NUM_DIMENSIONS], PetscReal Lam[4], 
  * @return PetscErrorCode PETSC_SUCCESS always.
  */
 PetscErrorCode ProjectTetE(PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4], PetscReal LampE[NUM_EDGES_PER_ELEMENT][2], PetscReal DLampE[NUM_EDGES_PER_ELEMENT][NUM_DIMENSIONS][2], PetscBool* IdecE){
-    /*Projection of tetrahedral edges in concordance with numbering of topological entities (vertices, edges, faces).
 
-    :param ndarray Lam: affine coordinates
-    :param ndarray DLam: gradients of affine coordinates
-    :return: projection of affine coordinates on edges, projection of gradients of affine coordinates on edges
-    :rtype: ndarray
-
-    .. note:: References:\n
-       Fuentes, F., Keith, B., Demkowicz, L., & Nagaraj, S. (2015). Orientation
-       embedded high order shape functions for the exact sequence elements of
-       all shapes. Computers & Mathematics with applications, 70(4), 353-458.
-    */
     PetscFunctionBeginUser;
     
     /* Compute projection */
@@ -1116,6 +1084,7 @@ PetscErrorCode ProjectTetE(PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4], 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Orients edge-projected coordinates and gradients based on the edge orientation flag.
  * @param[in] S The pair of projected coordinates for the edge [s0, s1].
@@ -1129,15 +1098,7 @@ PetscErrorCode ProjectTetE(PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4], 
  */
 
 PetscErrorCode OrientE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt Nori, PetscReal GS[2], PetscReal GDS[NUM_DIMENSIONS][2]){
-    /*Compute the local to global transformations of edges.
 
-    :param ndarray S: projection of affine coordinates on edges
-    :param ndarray DS: projection of gradients of affine coordinates on edges
-    :param ndarray Nori: edge orientation
-    :param int N: number of dimensions
-    :return: global transformation of edges and global transformation of gradients of edges
-    :rtype: ndarray
-    */
     PetscFunctionBeginUser;
 
     PetscInt Or[2][2];
@@ -1161,6 +1122,7 @@ PetscErrorCode OrientE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes shifted scaled Legendre polynomials P_i(y) where y = 2*X - T.
  *
@@ -1174,14 +1136,7 @@ PetscErrorCode OrientE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt
  * @return PetscErrorCode PETSC_SUCCESS always.
  */
 PetscErrorCode PolyLegendre(PetscReal X, PetscReal T, PetscInt nord, PetscReal P[]){
-    /*Compute values of shifted scaled Legendre polynomials.
 
-    :param ndarray X: coordinate from [0,1]
-    :param float T: scaling parameter
-    :param int nord: polynomial order
-    :return: polynomial values
-    :rtype: ndarray
-    */
     PetscFunctionBeginUser;
 
     /* Variables declaration */
@@ -1207,6 +1162,7 @@ PetscErrorCode PolyLegendre(PetscReal X, PetscReal T, PetscInt nord, PetscReal P
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes Jacobi polynomials P_j^{alpha, 0} using a recurrence relation adapted for the shifted variable y = 2*X - T.
  *
@@ -1220,18 +1176,7 @@ PetscErrorCode PolyLegendre(PetscReal X, PetscReal T, PetscInt nord, PetscReal P
  *          corresponding to Minalpha, Minalpha+2, …). Used for constructing face and volume basis functions.
  */
 PetscErrorCode PolyJacobi(PetscReal X, PetscReal T, PetscInt nord, PetscInt Minalpha, PetscReal **P){
-    /*Compute values of shifted scaled Jacobi polynomials P**alpha-i.
-
-    Result is a half of a matrix with each row associated to a fixed alpha.
-    Alpha grows by 2 in each row.
-
-    :param ndarray X: coordinate from [0,1]
-    :param float T: scaling parameter
-    :param int nord: max polynomial order
-    :param int Minalpha: first row value of alpha (integer)
-    :return: polynomial values
-    :rtype: ndarray
-    */
+    
     PetscFunctionBeginUser;
 
     PetscReal *alpha, y;
@@ -1288,6 +1233,7 @@ PetscErrorCode PolyJacobi(PetscReal X, PetscReal T, PetscInt nord, PetscInt Mina
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Computes homogenized Legendre polynomials L_i(s1 / (s0+s1)) * (s0+s1)^i.
  * @param[in] S Affine-like coordinates [s0, s1].
@@ -1297,21 +1243,15 @@ PetscErrorCode PolyJacobi(PetscReal X, PetscReal T, PetscInt nord, PetscInt Mina
  * @details Calls `PolyLegendre` with X = s1 and T = s0 + s1. The result `HomP[i]` corresponds
  *          to the i-th homogenized Legendre polynomial evaluated at S.
  */
-
 PetscErrorCode HomLegendre(PetscReal S[2], PetscInt nord, PetscReal HomP[]){
-    /*Compute values of homogenized Legendre polynomials.
 
-    :param ndarray S: affine(like) coordinates
-    :param int nord: polynomial order
-    :return: polynomial values
-    :rtype: ndarray
-    */
     PetscFunctionBeginUser;
 
     PetscCall(PolyLegendre(S[1], S[0] + S[1], nord, HomP));
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /**
  * @brief Computes H(curl) ancillary basis functions associated with an edge.
@@ -1326,22 +1266,8 @@ PetscErrorCode HomLegendre(PetscReal S[2], PetscInt nord, PetscReal HomP[]){
  *          Computes higher-order functions by multiplying W by homogenized Legendre polynomials (from `HomLegendre`).
  *          The curl of the i-th function is (i+1)*P_{i-1}*Curl(W).
  */
-
 PetscErrorCode AncEE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt nord, PetscBool Idec, PetscReal **EE, PetscReal **CurlEE){
-    /*Compute edge Hcurl ancillary functions and their curls.
 
-    :param ndarray S: affine coordinates associated to edge
-    :param ndarray DS: derivatives of S in R^N
-    :param int nord: polynomial order
-    :param bool Idec: Binary flag
-    :param int N: spatial dimension
-    :return: edge Hcurl ancillary functions, curls of edge Hcurl ancillary functions
-    :rtype: ndarray
-
-    .. note:: References:\n
-       Idec: = FALSE  s0+s1 != 1
-             = TRUE   s0+s1  = 1
-    */
     PetscFunctionBeginUser;
 
     // Local parameters
@@ -1351,14 +1277,7 @@ PetscErrorCode AncEE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt n
     
     PetscReal *homP;
     
-    /*if (nord <= 1){
-        PetscCall(PetscCalloc1(nord+1, &homP));
-    } else{
-        PetscCall(PetscCalloc1(nord, &homP));
-    }*/ 
-
-
-    /* VERIFY THIS ALLOCATION */
+    /* Allocate */
     PetscCall(PetscCalloc1(nord+1, &homP));
     
     /* Extract homogenized Legendre polyomials first */
@@ -1409,6 +1328,7 @@ PetscErrorCode AncEE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt n
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
  * @brief Projects tetrahedral barycentric coordinates and gradients onto the 4 faces.
  * @param[in] Lam The four barycentric coordinates [L0, L1, L2, L3].
@@ -1419,15 +1339,8 @@ PetscErrorCode AncEE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt n
  * @return PetscErrorCode PETSC_SUCCESS always.
  * @details Maps the 4 barycentric coordinates/gradients to the triplet associated with each of the 4 faces according to a fixed local numbering convention (e.g., face 0 uses L1, L0, L2; face 1 uses L1, L3, L0, etc.).
  */
-
 PetscErrorCode ProjectTetF(PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4], PetscReal LampF[NUM_FACES_PER_ELEMENT][NUM_DIMENSIONS], PetscReal DLampF[NUM_FACES_PER_ELEMENT][NUM_DIMENSIONS][NUM_DIMENSIONS], PetscBool* IdecF){
-    /*Projection of tetrahedral faces in concordance with numbering of topological entities (vertices, edges, faces).
 
-    :param ndarray Lam: affine coordinates
-    :param ndarray DLam: gradients of affine coordinates
-    :return: projection of affine coordinates on faces, projection of gradients of affine coordinates on faces
-    :rtype: ndarray
-    */
     PetscFunctionBeginUser;
     
     /* Compute projection */
@@ -1480,6 +1393,7 @@ PetscErrorCode ProjectTetF(PetscReal Lam[4], PetscReal DLam[NUM_DIMENSIONS][4], 
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /**
  * @brief Orients face-projected coordinates and gradients based on the face orientation flag.
