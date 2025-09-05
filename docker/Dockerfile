@@ -96,10 +96,11 @@ WORKDIR /workspace
 RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
 WORKDIR libxml2
 
-RUN apt-get update && apt-get install -y autoconf automake m4
+#RUN apt-get update && apt-get install -y autopoint pkg-config gettext
 
 
-RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
+#RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
+RUN ./configure --prefix=/usr/local/extrae/libxml2 --without-python
 RUN make && make install 
         
 # Install extrae
