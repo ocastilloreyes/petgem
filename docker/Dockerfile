@@ -46,8 +46,8 @@ RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich
 # Set PETSc environment variables and PATH
 ENV PETSC_ARCH=arch-linux-c-opt \
     PETSC_DIR=/usr/local/petsc
-ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}
-"
+ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+
 # Build PETSc
 RUN make all check
 
@@ -82,42 +82,42 @@ RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
         && make && make install
     
 # Install binutils
-WORKDIR /workspace
-RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
-RUN tar -xf binutils-2.42.tar.gz
-WORKDIR binutils-2.42
-RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
-RUN make && make install && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
+#WORKDIR /workspace
+#RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
+#RUN tar -xf binutils-2.42.tar.gz
+#WORKDIR binutils-2.42
+#RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
+#RUN make && make install && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
         
 # Install libxml2
-WORKDIR /workspace
-RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
-WORKDIR libxml2
-RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
-RUN make && make install 
+#WORKDIR /workspace
+#RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
+#WORKDIR libxml2
+#RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
+#RUN make && make install 
         
 # Install extrae
-WORKDIR /workspace
-RUN git clone https://github.com/bsc-performance-tools/extrae.git 
-WORKDIR extrae
-RUN git submodule update --init --recursive
-RUN autoreconf -f -i
-RUN ./configure --prefix=/usr/local/extrae \
-        --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
-        --with-papi=/usr/local/extrae/papi \
-        --with-xml-prefix=/usr/local/extrae/libxml2 \
-        --with-unwind=/usr/local/extrae/libunwind \
-        --with-binutils=/usr/local/extrae/binutils \
-        --without-dyninst
-RUN make && make install
+#WORKDIR /workspace
+#RUN git clone https://github.com/bsc-performance-tools/extrae.git 
+#WORKDIR extrae
+#RUN git submodule update --init --recursive
+#RUN autoreconf -f -i
+#RUN ./configure --prefix=/usr/local/extrae \
+#        --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
+#        --with-papi=/usr/local/extrae/papi \
+#        --with-xml-prefix=/usr/local/extrae/libxml2 \
+#        --with-unwind=/usr/local/extrae/libunwind \
+#        --with-binutils=/usr/local/extrae/binutils \
+#        --without-dyninst
+#RUN make && make install
 
 # ------------------------------------------------------------------------------- #
 # Install Unity (Framework for C tests)                                           #
 # ------------------------------------------------------------------------------- #
-RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
+#RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
 
 # Define entry point and clean system
 WORKDIR /workspace
-RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz
+#RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz
 
 CMD [ "bash" ]

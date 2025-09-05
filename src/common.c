@@ -5,12 +5,7 @@
  *
  * Description:
  * This file contains a collection of functions for common utility functions that are used
- * throughout the PETGEM project. These functions include operations for printing and timers.
- *
- * List of functions:
- * - void printHeader(): Prints PETGEM Header. 
- * - void printFooter(): Prints PETGEM Footer. 
- * - void createDirectory(): Creates a directory. 
+ * throughout the PETGEM toolkit. These functions include operations for printing and timers.
  *
  * Usage:
  * Include this file in your source code to utilize the common functions. 

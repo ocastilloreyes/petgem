@@ -57,15 +57,19 @@ int main(int argc, char **argv)
     Params  params;  
     Grid    grid; 
     setSource sources = {0, 0, NULL};
+    PetscLogDouble timers[4]; 
+    PetscLogDouble start_timer, end_timer;
 
     /* PETSC initialization */
     PetscFunctionBeginUser;
     #ifdef USE_EXTRAE
     Extrae_event (1000, 1);
     #endif
+    
     PetscCall(PetscInitialize(&argc, &argv, (char *)0, help));
     PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
     PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
+    
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
@@ -74,7 +78,9 @@ int main(int argc, char **argv)
     #ifdef USE_EXTRAE
     Extrae_event (1000, 2);
     #endif
+
     PetscCall(printHeader());
+
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
@@ -83,7 +89,13 @@ int main(int argc, char **argv)
     #ifdef USE_EXTRAE
     Extrae_event (1000, 3);
     #endif
+    
+    /* Start timer for read/setup grid */
+    PetscCall(PetscTime(&start_timer));
+    
+    /* Call fuction */
     PetscCall(readUserParams(&params, size));
+    
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
@@ -92,7 +104,9 @@ int main(int argc, char **argv)
     #ifdef USE_EXTRAE
     Extrae_event (1000, 4);
     #endif
+
     PetscCall(setupSource(&sources, params));
+
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
@@ -101,7 +115,9 @@ int main(int argc, char **argv)
     #ifdef USE_EXTRAE
     Extrae_event (1000, 5);
     #endif    
+
     PetscCall(importGrid(&dm, &resistivity, params));
+
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
@@ -110,7 +126,13 @@ int main(int argc, char **argv)
     #ifdef USE_EXTRAE
     Extrae_event (1000, 6);
     #endif
+    
     PetscCall(setupGrid(&dm, &grid, params));
+    
+    /* End timer for read/setup grid */
+    PetscCall(PetscTime(&end_timer));
+    timers[0] = end_timer-start_timer;
+
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
@@ -119,31 +141,61 @@ int main(int argc, char **argv)
     #ifdef USE_EXTRAE
     Extrae_event (1000, 7);
     #endif
+
+    /* Start timer for assembly grid */
+    PetscCall(PetscTime(&start_timer));
+
     /* Assemble linear system */
     PetscCall(assembleSystem(dm, resistivity, grid, sources, params, &A, &B, &G));
+
+    /* End timer for assembly */
+    PetscCall(PetscTime(&end_timer));
+    timers[1] = end_timer-start_timer;
+
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
 
-    // /* Solve linear system */
+    /* Solve linear system */
     #ifdef USE_EXTRAE
-    Extrae_event (1000, 8);
+     Extrae_event (1000, 8);
     #endif
+    
+    /* Start timer for solver */
+    PetscCall(PetscTime(&start_timer));
+
     PetscCall(solveSystem(dm, A, B, G, params, &X));
+
+    /* End timer for solver */
+    PetscCall(PetscTime(&end_timer));
+    timers[2] = end_timer-start_timer;
+
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
 
-    // /* Postprocessing solution */
+    /* Postprocessing solution */
     #ifdef USE_EXTRAE
     Extrae_event (1000, 9);
     #endif
+    
+    /* Start timer for postprocessing */
+    PetscCall(PetscTime(&start_timer));
+
     PetscCall(computeFields(dm, X, grid, sources, params));
+
+    /* End timer for postprocessing */
+    PetscCall(PetscTime(&end_timer));
+    timers[3] = end_timer-start_timer;
+    
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
 
-    // /* Print PETGEM footer */
+    /* Print timers */ 
+    PetscCall(printTimers(timers));
+
+    /* Print PETGEM footer */
     #ifdef USE_EXTRAE
     Extrae_event (1000, 10);
     #endif
