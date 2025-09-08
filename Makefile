@@ -5,7 +5,7 @@
 # Target executable
 TARGET := build/kernel
 # List of source files
-SRCS := src/kernel.c src/common.c src/inputs.c src/source.c src/grid.c src/assembly.c src/hvfem.c src/solver.c src/postprocessing.c
+SRCS := src/kernel.c src/common.c src/inputs.c src/transmitter.c src/grid.c src/assembly.c src/hvfem.c src/solver.c src/postprocessing.c
 # List of object files
 OBJS := $(SRCS:.c=.o)
 

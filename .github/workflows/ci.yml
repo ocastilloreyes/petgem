@@ -46,42 +46,42 @@ jobs:
           echo "" >> ci_summary_report.md
           echo "## Pipeline Status" >> ci_summary_report.md
 
-      # # === Step 3: UNIT TESTS & CODE COVERAGE ===
-      # - name: Run Unit Tests and Update Report
-      #   run: |
-      #     mkdir -p ./build && \
-      #     docker run --rm \
-      #       --workdir /app \
-      #       -v "${{ github.workspace }}":/app \
-      #       petgem-ci-env:latest \
-      #       make test > ./build/unit_tests.log 2>&1 || (echo "Unit tests failed. See log below:" && cat ./build/unit_tests.log && exit 1)
+      # === Step 3: UNIT TESTS & CODE COVERAGE ===
+      - name: Run Unit Tests and Update Report
+        run: |
+          mkdir -p ./build && \
+            docker run --rm \
+            --workdir /app \
+            -v "${{ github.workspace }}":/app \
+            petgem-ci-env:latest \
+            make test > ./build/unit_tests.log 2>&1 || (echo "Unit tests failed. See log below:" && cat ./build/unit_tests.log && exit 1)
             
-      #     TEST_SUMMARY=$(grep -Eo '[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored' ./build/unit_tests.log | sed 's/OK//')
-      #     if [ -n "$TEST_SUMMARY" ]; then
-      #       echo "✅ **Unit Tests:** Passed ($TEST_SUMMARY)" >> ci_summary_report.md
-      #     else
-      #       echo "⚠️ **Unit Tests:** Could not parse test summary." >> ci_summary_report.md
-      #     fi
+          TEST_SUMMARY=$(grep -Eo '[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored' ./build/unit_tests.log | sed 's/OK//')
+          if [ -n "$TEST_SUMMARY" ]; then
+            echo "✅ **Unit Tests:** Passed ($TEST_SUMMARY)" >> ci_summary_report.md
+          else
+            echo "⚠️ **Unit Tests:** Could not parse test summary." >> ci_summary_report.md
+          fi
 
-      # - name: Generate Code Coverage and Update Report
-      #   run: |
-      #     docker run --rm \
-      #       --workdir /app \
-      #       -v "${{ github.workspace }}":/app \
-      #       petgem-ci-env:latest \
-      #       make coverage
-      #     COVERAGE_PERCENTAGE=$(lcov --summary build/coverage.info | grep "lines......" | awk '{print $2}')
-      #     echo "✅ **Code Coverage:** Generated (${COVERAGE_PERCENTAGE} line coverage)" >> ci_summary_report.md
-      #     sed -i 's#^SF:/app/#SF:#g' build/coverage.info
+      - name: Generate Code Coverage and Update Report
+        run: |
+          docker run --rm \
+            --workdir /app \
+              -v "${{ github.workspace }}":/app \
+              petgem-ci-env:latest \
+            make coverage
+          COVERAGE_PERCENTAGE=$(lcov --summary build/coverage.info | grep "lines......" | awk '{print $2}')
+          echo "✅ **Code Coverage:** Generated (${COVERAGE_PERCENTAGE} line coverage)" >> ci_summary_report.md
+          sed -i 's#^SF:/app/#SF:#g' build/coverage.info
 
-      # - name: Upload Code Coverage to Coveralls
-      #   uses: coverallsapp/github-action@v2
-      #   with:
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
-      #     path-to-lcov: ./build/coverage.info
-      #     fail-on-error: true
-      #   env:
-      #     COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+      - name: Upload Code Coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./build/coverage.info
+          fail-on-error: true
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
       
       # - name: Upload HTML coverage report as artifact
       #   uses: actions/upload-artifact@v4
