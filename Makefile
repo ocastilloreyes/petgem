@@ -1,38 +1,92 @@
-# PETGEM Makefile
+# ----------------------------------------------------------------------------- 
+# PETGEM Makefile (dual-compiler support)
+# ----------------------------------------------------------------------------- 
+# This Makefile compiles and links the PETGEM kernel application with PETSc. 
+# It supports optional integration with Extrae for tracing and ensures that 
+# build artifacts are stored inside the "build" directory. 
+# Supports PETSc default compiler and Intel MPI compiler (mpiicc). 
+# ----------------------------------------------------------------------------- 
 
+# ----------------------------------------------------------------------------- 
 # Target executable
-TARGET := build/kernel
+# ----------------------------------------------------------------------------- 
+TARGET := build/csem_kernel
 all: $(TARGET)
 
+# ----------------------------------------------------------------------------- 
+# Include PETSc-provided makefile configuration
+# These bring in compiler settings, flags, and useful rules for PETSc builds. 
+# ----------------------------------------------------------------------------- 
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
 
-# Conditional flag for Extrae support ( set 1 to include Extrae, 0 to exclude)
+# ----------------------------------------------------------------------------- 
+# Optional Extrae instrumentation
+# ----------------------------------------------------------------------------- 
 USE_EXTRAE ?= 0
-
-# Add Extrae includes and flags if USE_EXTRAE is set to 1
 ifeq ($(USE_EXTRAE), 1)
-    E_CFLAGS := -I$(EXTRAE_HOME)/include -DUSE_EXTRAE
+    E_CFLAGS  := -I$(EXTRAE_HOME)/include -DUSE_EXTRAE
     E_LDFLAGS := -L$(EXTRAE_HOME)/lib -lmpitrace
+else
+    E_CFLAGS  :=
+    E_LDFLAGS :=
 endif
 
-# Our include folder
+# ----------------------------------------------------------------------------- 
+# Include directory for PETGEM headers
+# ----------------------------------------------------------------------------- 
 I_CFLAGS := -Iinclude
 
-# List of source files
-SRCS := src/kernel.c src/common.c src/inputs.c src/transmitter.c src/grid.c src/assembly.c src/hvfem.c src/solver.c src/postprocessing.c
+# ----------------------------------------------------------------------------- 
+# Choose compiler
+# ----------------------------------------------------------------------------- 
+USE_INTEL ?= 0
+ifeq ($(USE_INTEL), 1)
+    CC := mpiicc
+    CFLAGS := -Iinclude ${PETSC_CC_INCLUDES} -O3 -g
+else
+    CC := ${PETSC_CC}
+    CFLAGS := ${PETSC_CC_INCLUDES} -O3 -g
+endif
 
-# List of object files
+# ----------------------------------------------------------------------------- 
+# Source files for the PETGEM kernel
+# ----------------------------------------------------------------------------- 
+SRCS := src/csem_kernel.c \
+        src/common.c \
+        src/inputs.c \
+        src/transmitter.c \
+        src/grid.c \
+        src/assembly.c \
+        src/hvfem.c \
+        src/solver.c \
+        src/postprocessing.c
 OBJS := $(SRCS:.c=.o)
 
-# Compile all object files and generate the final executable
+# ----------------------------------------------------------------------------- 
+# Build rules
+# ----------------------------------------------------------------------------- 
+
+# Ensure build directory exists before linking
+$(TARGET): | build
+
+# Link all object files into the final executable
 $(TARGET): $(OBJS)
-	$(CLINKER) $^ -o $@ $(CFLAGS) $(E_LDFLAGS) $(PETSC_LIB)
+	@echo "[LD] $@"
+	@$(CLINKER) $^ -o $@ $(CFLAGS) $(E_LDFLAGS) $(PETSC_LIB)
 
-# Rule to compile each source file (uses PETSc's makefile variable)
+# Compilation rule for each source file
 %.o: %.c
-	${PETSC_COMPILE_SINGLE} $(CFLAGS) $(I_CFLAGS) $(E_FLAGS) $< -o $@
+	@echo "[CC] $<"
+	@${PETSC_COMPILE_SINGLE} $(CFLAGS) $(I_CFLAGS) $(E_CFLAGS) $< -o $@
 
-# Clean rule
+# Create build directory
+build:
+	@mkdir -p build
+
+# ----------------------------------------------------------------------------- 
+# Cleaning
+# ----------------------------------------------------------------------------- 
 clean::
-	rm -f $(OBJS) $(TARGET)
+	@echo "[CLEAN]"
+	@rm -f $(OBJS) $(TARGET)
