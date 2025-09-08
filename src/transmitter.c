@@ -20,7 +20,7 @@
 #include <petscsys.h>
 
 /* PETGEM functions */ 
-#include "source.h"
+#include "transmitter.h"
 
 
 /**
