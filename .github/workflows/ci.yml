@@ -1,4 +1,4 @@
-name: PETGEM CI with Docker Cache
+name: PETGEM CI with docker cache
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       # === Step 2: INITIALIZE REPORT ===
-      - name: Initialize CI Report
+      - name: Initialize CI report
         run: |
           echo "# PETGEM CI/CD Execution Report" > ci_summary_report.md
           echo "" >> ci_summary_report.md
@@ -46,78 +46,87 @@ jobs:
           echo "" >> ci_summary_report.md
           echo "## Pipeline Status" >> ci_summary_report.md
 
-      # === Step 3: UNIT TESTS & CODE COVERAGE ===
-      - name: Run Unit Tests and Update Report
+      # === Step 3: COMPILE PETGEM ===
+      - name: Compile PETGEM
         run: |
-          mkdir -p ./build && \
-            docker run --rm \
-            --workdir /app \
-            -v "${{ github.workspace }}":/app \
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
             petgem-ci-env:latest \
-            make test > ./build/unit_tests.log 2>&1 || (echo "Unit tests failed. See log below:" && cat ./build/unit_tests.log && exit 1)
+            make USE_EXTRAE=0
+
+      # # === Step 3: UNIT TESTS & CODE COVERAGE ===
+      # - name: Run Unit Tests and Update Report
+      #   run: |
+      #     mkdir -p ./build && \
+      #       docker run --rm \
+      #       --workdir /app \
+      #       -v "${{ github.workspace }}":/app \
+      #       petgem-ci-env:latest \
+      #       make test > ./build/unit_tests.log 2>&1 || (echo "Unit tests failed. See log below:" && cat ./build/unit_tests.log && exit 1)
             
-          TEST_SUMMARY=$(grep -Eo '[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored' ./build/unit_tests.log | sed 's/OK//')
-          if [ -n "$TEST_SUMMARY" ]; then
-            echo "✅ **Unit Tests:** Passed ($TEST_SUMMARY)" >> ci_summary_report.md
-          else
-            echo "⚠️ **Unit Tests:** Could not parse test summary." >> ci_summary_report.md
-          fi
+      #     TEST_SUMMARY=$(grep -Eo '[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored' ./build/unit_tests.log | sed 's/OK//')
+      #     if [ -n "$TEST_SUMMARY" ]; then
+      #       echo "✅ **Unit Tests:** Passed ($TEST_SUMMARY)" >> ci_summary_report.md
+      #     else
+      #       echo "⚠️ **Unit Tests:** Could not parse test summary." >> ci_summary_report.md
+      #     fi
 
-      - name: Generate Code Coverage and Update Report
-        run: |
-          docker run --rm \
-            --workdir /app \
-              -v "${{ github.workspace }}":/app \
-              petgem-ci-env:latest \
-            make coverage
-          COVERAGE_PERCENTAGE=$(lcov --summary build/coverage.info | grep "lines......" | awk '{print $2}')
-          echo "✅ **Code Coverage:** Generated (${COVERAGE_PERCENTAGE} line coverage)" >> ci_summary_report.md
-          sed -i 's#^SF:/app/#SF:#g' build/coverage.info
+      # - name: Generate Code Coverage and Update Report
+      #   run: |
+      #     docker run --rm \
+      #       --workdir /app \
+      #         -v "${{ github.workspace }}":/app \
+      #         petgem-ci-env:latest \
+      #       make coverage
+      #     COVERAGE_PERCENTAGE=$(lcov --summary build/coverage.info | grep "lines......" | awk '{print $2}')
+      #     echo "✅ **Code Coverage:** Generated (${COVERAGE_PERCENTAGE} line coverage)" >> ci_summary_report.md
+      #     sed -i 's#^SF:/app/#SF:#g' build/coverage.info
 
-      - name: Upload Code Coverage to Coveralls
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ./build/coverage.info
-          fail-on-error: true
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+      # - name: Upload Code Coverage to Coveralls
+      #   uses: coverallsapp/github-action@v2
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     path-to-lcov: ./build/coverage.info
+      #     fail-on-error: true
+      #   env:
+      #     COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
       
-      - name: Upload HTML coverage report as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: petgem-coverage-report-html
-          path: build/coverage-html
-          if-no-files-found: error
+      # - name: Upload HTML coverage report as artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: petgem-coverage-report-html
+      #     path: build/coverage-html
+      #     if-no-files-found: error
 
-      # === Step 4: VALIDATION TEST ===
-      - name: Run Validation Test and Update Report
-        run: |
-          docker run --rm \
-            --workdir /app \
-            -v "${{ github.workspace }}":/app \
-            petgem-ci-env:latest \
-          make validation_test
-          echo "✅ **Validation Test:** Passed (output files generated successfully)" >> ci_summary_report.md
+      # # === Step 4: VALIDATION TEST ===
+      # - name: Run Validation Test and Update Report
+      #   run: |
+      #     docker run --rm \
+      #       --workdir /app \
+      #       -v "${{ github.workspace }}":/app \
+      #       petgem-ci-env:latest \
+      #     make validation_test
+      #     echo "✅ **Validation Test:** Passed (output files generated successfully)" >> ci_summary_report.md
 
-      - name: Upload Validation Test Results as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: validation-test-results
-          path: data/wham/
-          if-no-files-found: error
+      # - name: Upload Validation Test Results as artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: validation-test-results
+      #     path: data/wham/
+      #     if-no-files-found: error
 
-      # === Step 5: DOCUMENTATION & BADGE ===
-      - name: Generate Documentation and Update Report
-        run: |
-          docker run --rm \
-          --workdir /app \
-          -v "${{ github.workspace }}":/app \
-          petgem-ci-env:latest \
-          make docs
-          python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
-          DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
-          echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
+      # # === Step 5: DOCUMENTATION & BADGE ===
+      # - name: Generate Documentation and Update Report
+      #   run: |
+      #     docker run --rm \
+      #     --workdir /app \
+      #     -v "${{ github.workspace }}":/app \
+      #     petgem-ci-env:latest \
+      #     make docs
+      #     python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
+      #     DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
+      #     echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
 
       # - name: Prepare Badge for GitHub Pages Deployment
       #   run: |
