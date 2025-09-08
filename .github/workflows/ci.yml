@@ -83,22 +83,22 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
       
-      # - name: Upload HTML coverage report as artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: petgem-coverage-report-html
-      #     path: build/coverage-html
-      #     if-no-files-found: error
+      - name: Upload HTML coverage report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: petgem-coverage-report-html
+          path: build/coverage-html
+          if-no-files-found: error
 
-      # # === Step 4: VALIDATION TEST ===
-      # - name: Run Validation Test and Update Report
-      #   run: |
-      #     docker run --rm \
-      #       --workdir /app \
-      #       -v "${{ github.workspace }}":/app \
-      #       petgem-ci-env:latest \
-      #       make validation_test
-      #     echo "✅ **Validation Test:** Passed (output files generated successfully)" >> ci_summary_report.md
+      # === Step 4: VALIDATION TEST ===
+      - name: Run Validation Test and Update Report
+        run: |
+          docker run --rm \
+            --workdir /app \
+            -v "${{ github.workspace }}":/app \
+            petgem-ci-env:latest \
+          make validation_test
+          echo "✅ **Validation Test:** Passed (output files generated successfully)" >> ci_summary_report.md
 
       # - name: Upload Validation Test Results as artifact
       #   uses: actions/upload-artifact@v4

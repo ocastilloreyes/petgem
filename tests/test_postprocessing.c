@@ -4,7 +4,7 @@
 #include "../include/postprocessing.h"
 #include "../include/inputs.h"
 #include "../include/grid.h"
-#include "../include/source.h"
+#include "../include/transmitter.h"
 #include "../include/constants.h"
 #include "../include/version.h" // For VERSION_MAJOR, etc.
 #include "../include/common.h" // For createDirectory

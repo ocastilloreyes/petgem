@@ -3,7 +3,7 @@
 #include "../include/assembly.h"
 #include "../include/inputs.h"
 #include "../include/grid.h"
-#include "../include/source.h"
+#include "../include/transmitter.h"
 #include "../include/constants.h"
 #include <petscdmplex.h> // For DMPlexCreateBoxMesh, DMPlexCreateSection etc.
 #include <petscsection.h> // For PetscSection related functions

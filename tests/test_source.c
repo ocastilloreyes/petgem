@@ -1,7 +1,7 @@
 // tests/test_source.c
 #include "/opt/unity/src/unity.h"
 #include <petscsys.h> // Para PetscOptionsClear(NULL)
-#include "../include/source.h" // Para setSource, Source, setupSource
+#include "../include/transmitter.h" // Para setSource, Source, setupSource
 #include <stdio.h>    // For FILE operations, remove
 #include <string.h>   // For memset, strcpy
 #include <stdlib.h>   // For system()
