@@ -23,5 +23,7 @@ PetscErrorCode printFooter();
 
 PetscErrorCode createDirectory(const char *path);
 
+PetscErrorCode printTimers(PetscLogDouble timers[]);
+
 #endif
 

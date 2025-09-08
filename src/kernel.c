@@ -1,12 +1,10 @@
 static char help[] = "PETGEM kernel for 3D CSEM modeling using high-order vector finite elements.\n\
   Command line usage:\n\
-    mpirun -n <np> ./kernel -options_file <file.txt>\n"
+    mpirun -n <np> ./kernel -options_file <file.txt>\n";
 
 /* C libraries */ 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <stddef.h>  
 
 /* PETSc functions */   
 #include <petsc.h>  
@@ -40,14 +38,14 @@ static char help[] = "PETGEM kernel for 3D CSEM modeling using high-order vector
  *          linear system (A, B, G), solves the system (AX=B) using KSP, performs
  *          post-processing (computes fields at receivers), prints the footer,
  *          and finalizes PETSc, freeing allocated memory. Includes Extrae instrumentation hooks if compiled with USE_EXTRAE.
-  */
+*/
 int main(int argc, char **argv)
 {
 
     /* Check if the --version option is provided */
     if (argc > 1 && strcmp(argv[1], "--version") == 0) {
-        printf("PETGEM version %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-        return 0;
+      printf("PETGEM version %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+      return 0;
     }
 
     /* Variables declaration */

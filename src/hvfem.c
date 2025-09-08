@@ -1277,7 +1277,7 @@ PetscErrorCode AncEE(PetscReal S[2], PetscReal DS[NUM_DIMENSIONS][2], PetscInt n
     
     PetscReal *homP;
     
-    /* Allocate */
+    /* Allocate array */
     PetscCall(PetscCalloc1(nord+1, &homP));
     
     /* Extract homogenized Legendre polyomials first */
@@ -2771,7 +2771,6 @@ PetscErrorCode AncPhiTri(PetscReal S[NUM_DIMENSIONS], PetscReal DS[NUM_DIMENSION
     PetscInt minIJ = minI+minJ; 
     PetscInt maxIJ = nordFace;
     PetscInt minalpha = 2*minI;
-    PetscBool IdecE = PETSC_FALSE;
     PetscReal GLampE[2] = {0.0};
     PetscReal GDLampE[NUM_DIMENSIONS][2] = {{0.0}};
     PetscReal *PhiE, **DPhiE;
@@ -3063,9 +3062,6 @@ PetscErrorCode shape3DHTet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt 
         /* Local variables */
         PetscInt minbeta = 2*(minIJ+2);
         PetscInt maxIJK = nordB;
-        PetscInt maxIJ = maxIJK-minK;
-        PetscInt maxI = maxIJ-minJ;
-        PetscInt maxJ = maxIJ-minI;
         PetscInt maxK = maxIJK-minIJ-2;
         PetscReal **PhiTriV, ***DPhiTriV; 
         PetscReal **homLbetV, ***DhomLbetV;
@@ -3114,14 +3110,10 @@ PetscErrorCode shape3DHTet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt 
         }
 
         PetscCall(HomIJacobi(tmp1, tmp2, maxK, minbeta, IdecB[1], homLbetV, DhomLbetV));
-
-
-        
+    
         for(PetscInt i = minIJK+3; i < maxIJK+1; i++){
             for(PetscInt j = minIJ; j < i-minK-2; j++){
                 for(PetscInt k = minI; k < j-minJ+1; k++){
-                    PetscInt p = j - k;
-                    PetscInt q = i - j - 3;
                     ShapH[m] = PhiTriV[k-1][j]*homLbetV[j-1][k];
                     for (PetscInt n = 0; n < NUM_DIMENSIONS; n++) {
                         GradH[n][m] = homLbetV[j-1][k]*DPhiTriV[n][k-1][j] + PhiTriV[k-1][j]*DhomLbetV[n][j-1][k];
@@ -3151,65 +3143,6 @@ PetscErrorCode shape3DHTet(PetscReal X[NUM_DIMENSIONS], PetscInt nord, PetscInt 
         PetscCall(PetscFree(DhomLbetV));
     }
     
-    PetscInt numDofInCell = nord * (nord + 2) * (nord + 3) / 2;
-    PetscInt orderPermutation[numDofInCell];
-
-    /* Define the starting indices of each tmp array */
-    PetscInt offsets[] = {0, 6, 26, 71, 155, 295};
-
-    for (PetscInt i = 0; i < numDofInCell; i++) {
-        orderPermutation[i] = tmp[offsets[nord - 1] + i];
-    }
-
-    /* Copy basis and curl from PETGEM order convention */
-    PetscReal tmpShapE[NUM_DIMENSIONS][numDofInCell], tmpCurlE[NUM_DIMENSIONS][numDofInCell]; 
-
-    for (PetscInt i = 0; i<NUM_DIMENSIONS; i++){
-        for (PetscInt j = 0; j<numDofInCell; j++){
-            tmpShapE[i][j] = ShapE[i][j];
-            tmpCurlE[i][j] = CurlE[i][j];        
-        }    
-    }
-
-    /* Apply PETSc ordering */
-    for (PetscInt i = 0; i<NUM_DIMENSIONS; i++){
-        for (PetscInt j = 0; j<numDofInCell; j++){
-            ShapE[i][j] = tmpShapE[i][orderPermutation[j]];
-            CurlE[i][j] = tmpCurlE[i][orderPermutation[j]];
-        }
-    }
-
-    /* Free memory */
-    for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
-        for (PetscInt j = 0; j < nordB-minK-1; j++){
-            PetscCall(PetscFree(ETriV[i][j]));
-        }
-        PetscCall(PetscFree(ETriV[i]));
-    }
-    PetscCall(PetscFree(ETriV));   
-
-    for (PetscInt i = 0; i < 2*NUM_DIMENSIONS-3; i++){
-        for (PetscInt j = 0; j < nordB-minK-1; j++){
-            PetscCall(PetscFree(CurlETriV[i][j]));
-        }
-        PetscCall(PetscFree(CurlETriV[i]));
-    }
-    PetscCall(PetscFree(CurlETriV));
-    
-    for (PetscInt i = 0; i < maxK; i++){
-        PetscCall(PetscFree(homLbet[i]));   
-    }
-    PetscCall(PetscFree(homLbet));
-
-    for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
-        for (PetscInt j = 0; j < maxK; j++){
-            PetscCall(PetscFree(DhomLbet[i][j]));   
-        }  
-        PetscCall(PetscFree(DhomLbet[i]));       
-    }
-    PetscCall(PetscFree(DhomLbet));           
-
-
     for (PetscInt i = 0; i < NUM_DIMENSIONS; i++){
         PetscCall(PetscFree(DPhiE[i]));
     }

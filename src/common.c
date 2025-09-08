@@ -128,3 +128,45 @@ PetscErrorCode createDirectory(const char *path) {
     
     PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+
+/**
+ * @brief Prints execution time statistics for different computational stages.
+ *
+ * This function receives an array of timers containing the elapsed execution
+ * times of different phases of the PETGEM workflow. It prints to the console
+ * the time spent in:
+ *   - Reading and setting up the grid
+ *   - Assembly
+ *   - Solver
+ *   - Postprocessing
+ *
+ * In addition, it computes and displays the total elapsed time as the sum
+ * of these stages. The output is generated using PETSc's parallel printing
+ * functions, ensuring consistency across all processes in the PETSc communicator.
+ *
+ * @param[in] timers Array of length 4 containing execution times (in seconds)
+ *                   for each stage of the workflow in the following order:
+ *                   timers[0] = Read/setup grid
+ *                   timers[1] = Assembly
+ *                   timers[2] = Solver
+ *                   timers[3] = Postprocessing
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful completion, or an error code otherwise.
+ */
+PetscErrorCode printTimers(PetscLogDouble timers[]) {
+
+    PetscLogDouble elapsed_time;
+
+    /* Compute elapsed time */
+    elapsed_time = timers[0] + timers[1] + timers[2] + timers[3];
+
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Timers:\n"));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Read/setup grid  = %.4g secs\n", timers[0]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Assembly         = %.4g secs\n", timers[1]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Solver           = %.4g secs\n", timers[2]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Postprocessing   = %.4g secs\n", timers[3]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Elapsed time     = %.4g secs\n", elapsed_time));
+
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
