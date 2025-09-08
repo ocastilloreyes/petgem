@@ -100,24 +100,24 @@ jobs:
           make validation_test
           echo "✅ **Validation Test:** Passed (output files generated successfully)" >> ci_summary_report.md
 
-      # - name: Upload Validation Test Results as artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: validation-test-results
-      #     path: data/wham/
-      #     if-no-files-found: error
+      - name: Upload Validation Test Results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-test-results
+          path: data/wham/
+          if-no-files-found: error
 
-      # # === Step 5: DOCUMENTATION & BADGE ===
-      # - name: Generate Documentation and Update Report
-      #   run: |
-      #     docker run --rm \
-      #       --workdir /app \
-      #       -v "${{ github.workspace }}":/app \
-      #       petgem-ci-env:latest \
-      #       make docs
-      #     python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
-      #     DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
-      #     echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
+      # === Step 5: DOCUMENTATION & BADGE ===
+      - name: Generate Documentation and Update Report
+        run: |
+          docker run --rm \
+          --workdir /app \
+          -v "${{ github.workspace }}":/app \
+          petgem-ci-env:latest \
+          make docs
+          python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
+          DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
+          echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
 
       # - name: Prepare Badge for GitHub Pages Deployment
       #   run: |

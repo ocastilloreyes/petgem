@@ -20,7 +20,7 @@
 #include <petscdmplex.h>
 #include "inputs.h"
 #include "grid.h"
-#include "source.h"
+#include "transmitter.h"
 
 PetscErrorCode computeFields(DM dm, Mat X, Grid grid, setSource source, Params params);
 
