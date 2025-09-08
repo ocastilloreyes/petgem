@@ -52,8 +52,13 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
+            -e PETSC_DIR=/usr/local/petsc \
+            -e PETSC_ARCH=arch-linux-c-opt \
+            -e PATH=/usr/local/petsc/arch-linux-c-opt/bin:$PATH \
             petgem-ci-env:latest \
             make USE_EXTRAE=0
+
+
 
       # # === Step 3: UNIT TESTS & CODE COVERAGE ===
       # - name: Run Unit Tests and Update Report
