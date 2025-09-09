@@ -122,7 +122,7 @@ sphinx_html:                                            ## Build HTML Sphinx doc
 # Doc clean rule
 clean_doc:                                              ## Clean documentation
 	@echo ">>> [CLEAN] Cleaning documentation"
-	rm -rf $(SPHINX_OUT)/* docs 
+	rm -rf $(SPHINX_OUT)/* docs/doxygen/* docs/source/api/* docs/source/readme/* docs/build/html
 
 # ----------------------------------------------------------------------------- 
 # Help
