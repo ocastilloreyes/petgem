@@ -69,21 +69,21 @@ jobs:
           DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
           echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
 
-      # - name: Prepare Badge for GitHub Pages Deployment
-      #   run: |
-      #     mkdir -p ./public
-      #     mv ./build/doc_coverage_badge.svg ./public/
+      - name: Prepare badge for GitHub pages deployment
+        run: |
+          mkdir -p ./public
+          mv ./build/doc_coverage_badge.svg ./public/
 
-      # - name: Deploy Documentation Badge to GitHub Pages
-      #   uses: peaceiris/actions-gh-pages@v3
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     publish_branch: gh-pages
-      #     publish_dir: ./public
-      #     keep_files: true
-      #     cname: ''
-      #     user_name: 'github-actions[bot]'
-      #     user_email: 'github-actions[bot]@users.noreply.github.com'
+      - name: Deploy documentation badge to GitHub pages
+          uses: peaceiris/actions-gh-pages@v3
+          with:
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            publish_branch: gh-pages
+            publish_dir: ./public
+            keep_files: true
+            cname: ''
+            user_name: 'github-actions[bot]'
+            user_email: 'github-actions[bot]@users.noreply.github.com'
       
 
 
