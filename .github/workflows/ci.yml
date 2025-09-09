@@ -12,6 +12,11 @@ jobs:
   build_test_and_report:
     runs-on: ubuntu-latest
 
+    # === Define environment ===
+    env:
+      PETSC_DIR: /usr/local/petsc
+      PETSC_ARCH: arch-linux-c-opt
+
     steps:
       # === Step 1: SETUP & BUILD ===
       - name: Checkout code
@@ -52,12 +57,12 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -e PETSC_DIR=/usr/local/petsc \
-            -e PETSC_ARCH=arch-linux-c-opt \
+            -e PETSC_DIR=$PETSC_DIR \
+            -e PETSC_ARCH=$PETSC_ARCH \
             petgem-ci-env:latest \
             make USE_EXTRAE=0
 
-      # === Step 5: DOCUMENTATION & BADGE ===
+      # === Step 4: DOCUMENTATION & BADGE ===
       - name: Generate documentation and badge
         run: |
           docker run --rm \
@@ -85,17 +90,30 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
       
+      # === Step 5: UNIT TEST ===
+     # - name: Preprocessing data for testing
+     #   run: |
+     #     docker run --rm \
+     #       -v ${{ github.workspace }}:/workspace \
+     #       -w /workspace \
+     #       -e PETSC_DIR=$PETSC_DIR \
+     #       -e PETSC_ARCH=$PETSC_ARCH \
+     #       petgem-ci-env:latest \
+
+         #   $PETSC_DIR/$PETSC_ARCH/bin/mpirun -n 1 build/./kernel -options_file data/options.txt > output.txt
+
+              
 
 
-      # === Step 3: UNIT TESTS & CODE COVERAGE ===
-      # - name: Run Unit Tests and Update Report
-      #   run: |
-      #     mkdir -p ./build && \
-      #       docker run --rm \
-      #       --workdir /app \
-      #       -v "${{ github.workspace }}":/app \
-      #       petgem-ci-env:latest \
-      #       make test > ./build/unit_tests.log 2>&1 || (echo "Unit tests failed. See log below:" && cat ./build/unit_tests.log && exit 1)
+
+
+      #- name: Run unit tests and update report
+      #  run: |
+      #    docker run --rm \
+      #      --workdir /app \
+      #      -v "${{ github.workspace }}":/app \
+      #      petgem-ci-env:latest \
+      #      make -f tests/Makefile test > ./build/unit_tests.log 2>&1 || (echo "Unit tests failed. See log below:" && cat ./build/unit_tests.log && exit 1)
             
       #     TEST_SUMMARY=$(grep -Eo '[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored' ./build/unit_tests.log | sed 's/OK//')
       #     if [ -n "$TEST_SUMMARY" ]; then
