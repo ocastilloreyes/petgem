@@ -91,14 +91,14 @@ jobs:
           user_email: 'github-actions[bot]@users.noreply.github.com'
       
       # === Step 5: UNIT TEST ===
-     # - name: Preprocessing data for testing
-     #   run: |
-     #     docker run --rm \
-     #       -v ${{ github.workspace }}:/workspace \
-     #       -w /workspace \
-     #       -e PETSC_DIR=$PETSC_DIR \
-     #       -e PETSC_ARCH=$PETSC_ARCH \
-     #       petgem-ci-env:latest \
+      - name: Preprocessing data for testing
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            petgem-ci-env:latest \
+            gmsh tests/canonical_model/mesh.geo -3
+            
 
          #   $PETSC_DIR/$PETSC_ARCH/bin/mpirun -n 1 build/./kernel -options_file data/options.txt > output.txt
 
