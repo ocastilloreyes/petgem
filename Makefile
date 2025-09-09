@@ -87,7 +87,7 @@ build:
 # Cleaning
 clean::         ## Remove object files and executables
 	@echo "[CLEAN]"
-	@rm -f $(OBJS) $(TARGET)
+	@rm -rf build
 
 # ----------------------------------------------------------------------------- 
 # Documentation
@@ -122,7 +122,7 @@ sphinx_html:                                            ## Build HTML Sphinx doc
 # Doc clean rule
 clean_doc:                                              ## Clean documentation
 	@echo ">>> [CLEAN] Cleaning documentation"
-	rm -rf $(SPHINX_OUT)/* docs/doxygen/* docs/source/api/* docs/source/readme/*
+	rm -rf $(SPHINX_OUT)/* docs 
 
 # ----------------------------------------------------------------------------- 
 # Help

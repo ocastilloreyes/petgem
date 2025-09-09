@@ -1,9 +1,0 @@
-#!/bin/bash
-echo "===================================================================================="
-echo "Compiling code"
-mkdir /workspace/build
-make
-# original /usr/local/petsc/arch-linux-c-debug/bin/mpirun -n 1 build/./kernel -options_file data/marine/options.txt
-/usr/local/petsc/arch-linux-c-opt/bin/mpirun -n 1 build/./kernel -options_file data/options.txt
-rm -r build
-
