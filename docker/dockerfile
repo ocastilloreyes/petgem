@@ -60,6 +60,19 @@ RUN pip3 install src/binding/petsc4py
 RUN echo 'alias mpirun=\${PETSC_DIR}/\${PETSC_ARCH}/bin/mpirun' >> ~/.bashrc
 
 # ------------------------------------------------------------------------------- #
+# Install gmsh                                                                    #
+# ------------------------------------------------------------------------------- #
+WORKDIR /workspace
+RUN mkdir /usr/local/gmsh
+
+# Clone Gmsh repository and build it
+RUN git clone https://gitlab.onelab.info/gmsh/gmsh.git \
+    && mkdir -p gmsh/build \
+    && cd gmsh/build \
+    && cmake -DCMAKE_INSTALL_PREFIX=/usr/local/gmsh .. \
+    && make install
+
+# ------------------------------------------------------------------------------- #
 # Install Extrae and its dependencies                                             #
 # ------------------------------------------------------------------------------- #
 WORKDIR /workspace
@@ -115,21 +128,11 @@ RUN ./configure --prefix=/usr/local/extrae \
 RUN make && make install
 
 # ------------------------------------------------------------------------------- #
-# Install Unity (Framework for C tests)                                           #
+# Define entry point and clean system                                             #
 # ------------------------------------------------------------------------------- #
-RUN git clone https://github.com/ThrowTheSwitch/Unity.git /opt/unity
-
-# Define entry point and clean system
 WORKDIR /workspace
 
-RUN mkdir /usr/local/gmsh
-RUN git clone https://gitlab.onelab.info/gmsh/gmsh.git
-WORKDIR /workspace/gmsh
-RUN mkdir build
-WORKDIR /workspace/gmsh/build
-RUN cmake -DCMAKE_INSTALL_PREFIX=/usr/local/gmsh
-RUN make install 
-
-RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz
+# Clean up unnecessary directories and files
+RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz gmsh
 
 CMD [ "bash" ]
