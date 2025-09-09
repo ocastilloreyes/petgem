@@ -61,24 +61,27 @@ jobs:
       - name: Generate documentation and badge
         run: |
           docker run --rm \
-          --workdir /app \
-          -v "${{ github.workspace }}":/app \
-          petgem-ci-env:latest \
-          bash -c "make docs && \
-               python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./docs/doc_coverage_badge.svg && \
-               ls "
+            --workdir /app \
+            -v "${{ github.workspace }}":/app \
+            petgem-ci-env:latest \
+            make docs
+          python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
           DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
           echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
+        #bash -c "make docs && \
+        #     python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./docs/doc_coverage_badge.svg && \
+        #     ls "
+        #  DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
+        #  echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
 
 
-      # make docs
-      # python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
+      
           
 
       - name: Prepare badge for GitHub pages deployment
         run: |
           mkdir -p ./public
-          # mv ./docs/doc_coverage_badge.svg ./public/
+          mv ./docs/doc_coverage_badge.svg ./public/
 
       # - name: Deploy documentation badge to GitHub pages
       #     uses: peaceiris/actions-gh-pages@v3
