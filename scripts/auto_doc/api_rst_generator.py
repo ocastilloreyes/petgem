@@ -2,11 +2,11 @@ import os
 import glob
 
 # --- Configuration ---
-SOURCE_CODE_DIR = '../../src'      # Path to C source code directory
-API_RST_DIR = '../../docs/source/api'         # Output directory for generated .rst API files
-PROJECT_NAME_DOXYGEN = "PETGEM"    # Doxygen project name (for :project: directive)
-CREATE_API_INDEX = True            # Whether to create an index.rst for the API directory
-API_INDEX_FILENAME = 'index.rst'   # Filename for the API index.rst
+SOURCE_CODE_DIR = '../../src'           # Path to C source code directory
+API_RST_DIR = '../../docs/source/api'   # Output directory for generated .rst API files
+PROJECT_NAME_DOXYGEN = "PETGEM"         # Doxygen project name (for :project: directive)
+CREATE_API_INDEX = True                 # Whether to create an index.rst for the API directory
+API_INDEX_FILENAME = 'index.rst'        # Filename for the API index.rst
 # --- End Configuration ---
 
 def create_api_rst_files():

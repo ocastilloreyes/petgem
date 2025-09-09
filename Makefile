@@ -90,3 +90,38 @@ build:
 clean::
 	@echo "[CLEAN]"
 	@rm -f $(OBJS) $(TARGET)
+
+# ----------------------------------------------------------------------------- 
+# Documentation
+# ----------------------------------------------------------------------------- 
+DOXYFILE := Doxyfile
+SPHINX_PY := python3      # Or just python if it's in your PATH and configured for Sphinx
+SPHINX_API_SCRIPT_PATH := scripts/auto_doc/api_rst_generator.py
+SPHINX_SOURCE_DIR := docs/source
+SPHINX_BUILD_DIR := docs/build
+SPHINX_BUILD_CMD := $(SPHINX_PY) -m sphinx # Recommended way to invoke Sphinx
+SPHINX_OUT := $(SPHINX_BUILD_DIR)/html
+
+# Target to generate all documentation
+docs: clean_doc doxygen api_generator sphinx_html
+
+# Generate Doxygen XML documentation
+doxygen:
+	@echo ">>> [DOC] Generating Doxygen XML"
+	doxygen $(DOXYFILE)
+
+# Generate structure for Sphinx
+api_generator:
+	@echo ">>> [DOC] Running API generator (api_generator)"
+	$(SPHINX_PY) $(SPHINX_API_SCRIPT_PATH)
+
+# Build HTML documentation with Sphinx
+sphinx_html:
+	@echo ">>> [DOC] Building Sphinx HTML documentation..."
+	LC_ALL=C.UTF-8 LANG=C.UTF-8 $(SPHINX_BUILD_CMD) -b html $(SPHINX_SOURCE_DIR) $(SPHINX_BUILD_DIR)/html
+	@echo ">>> [DOCS] HTML documentation generated in $(SPHINX_BUILD_DIR)/html"
+
+# Doc clean rule
+clean_doc:
+	@echo ">>> [CLEAN] Cleaning documentation"
+	rm -rf $(SPHINX_OUT)/* docs/doxygen/* docs/source/api/* docs/source/readme/*

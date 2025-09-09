@@ -57,9 +57,37 @@ jobs:
             petgem-ci-env:latest \
             make USE_EXTRAE=0
 
+      # === Step 5: DOCUMENTATION & BADGE ===
+      - name: Generate documentation
+        run: |
+          docker run --rm \
+          --workdir /app \
+          -v "${{ github.workspace }}":/app \
+          petgem-ci-env:latest \
+          make docs
+          python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
+          DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
+          echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
+
+      # - name: Prepare Badge for GitHub Pages Deployment
+      #   run: |
+      #     mkdir -p ./public
+      #     mv ./build/doc_coverage_badge.svg ./public/
+
+      # - name: Deploy Documentation Badge to GitHub Pages
+      #   uses: peaceiris/actions-gh-pages@v3
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     publish_branch: gh-pages
+      #     publish_dir: ./public
+      #     keep_files: true
+      #     cname: ''
+      #     user_name: 'github-actions[bot]'
+      #     user_email: 'github-actions[bot]@users.noreply.github.com'
+      
 
 
-      # # === Step 3: UNIT TESTS & CODE COVERAGE ===
+      # === Step 3: UNIT TESTS & CODE COVERAGE ===
       # - name: Run Unit Tests and Update Report
       #   run: |
       #     mkdir -p ./build && \
@@ -120,33 +148,7 @@ jobs:
       #     path: data/wham/
       #     if-no-files-found: error
 
-      # # === Step 5: DOCUMENTATION & BADGE ===
-      # - name: Generate Documentation and Update Report
-      #   run: |
-      #     docker run --rm \
-      #     --workdir /app \
-      #     -v "${{ github.workspace }}":/app \
-      #     petgem-ci-env:latest \
-      #     make docs
-      #     python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./build/doc_coverage_badge.svg
-      #     DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
-      #     echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
-
-      # - name: Prepare Badge for GitHub Pages Deployment
-      #   run: |
-      #     mkdir -p ./public
-      #     mv ./build/doc_coverage_badge.svg ./public/
-
-      # - name: Deploy Documentation Badge to GitHub Pages
-      #   uses: peaceiris/actions-gh-pages@v3
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     publish_branch: gh-pages
-      #     publish_dir: ./public
-      #     keep_files: true
-      #     cname: ''
-      #     user_name: 'github-actions[bot]'
-      #     user_email: 'github-actions[bot]@users.noreply.github.com'
+      
 
       # # === Step 6: GATHER ENVIRONMENT INFO & FINALIZE SUCCESS REPORT ===
       # - name: Gather Environment and Tool Versions
