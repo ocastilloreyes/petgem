@@ -33,7 +33,7 @@
  * @param[in] params A CsemParams struct containing simulation parameters, including source filename.
  * @return PetscErrorCode PETSC_SUCCESS on successful reading and parsing. Returns error codes on file open/read errors or format inconsistencies.
  */
-PetscErrorCode setupCsemSource(setCsemSource* sources, CsemParams params) {
+PetscErrorCode setupCsemSource(CsemSourceSet* sources, Params params) {
     PetscFunctionBeginUser;
 
     /* Variables declaration */
@@ -60,8 +60,8 @@ PetscErrorCode setupCsemSource(setCsemSource* sources, CsemParams params) {
         ret = fscanf(inputFile, "%lf %lf %lf %lf %lf %lf %lf", 
             &sources->sourceArray[i].position[0], &sources->sourceArray[i].position[1],
             &sources->sourceArray[i].position[2], &sources->sourceArray[i].current, 
-            &sources->sourceArray[i].length, &sources->sourceArray[i].dip, 
-            &sources->sourceArray[i].azimuth);
+            &sources->sourceArray[i].length, &sources->sourceArray[i].dipAngle, 
+            &sources->sourceArray[i].azimuthAngle);
         PetscCheck(ret == 7, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ, "Exiting: Error reading CSEM source data. Verify source file format.\n");
     }
         
@@ -74,13 +74,11 @@ PetscErrorCode setupCsemSource(setCsemSource* sources, CsemParams params) {
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Number of sources = %" PetscInt_FMT "\n", sources->numSources));
     for (PetscInt i = 0; i < sources->numSources; i++) {
         PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Data for source %" PetscInt_FMT ":\n", i+1));
-        if (sourceType) {   /* CSEM source */
-            PetscCall(PetscPrintf(PETSC_COMM_WORLD, "       Current         = %g\n", sources->sourceArray[i].current));
-            PetscCall(PetscPrintf(PETSC_COMM_WORLD, "       Length          = %g\n", sources->sourceArray[i].length));
-            PetscCall(PetscPrintf(PETSC_COMM_WORLD, "       Dip             = %g\n", sources->sourceArray[i].dip));
-            PetscCall(PetscPrintf(PETSC_COMM_WORLD, "       Azimuth         = %g\n", sources->sourceArray[i].azimuth));
-            PetscCall(PetscPrintf(PETSC_COMM_WORLD, "       Position (xyz)  = [%g, %g, %g]\n", sources->sourceArray[i].position[0], sources->sourceArray[i].position[1], sources->sourceArray[i].position[2]));
-        }
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     Current         = %g\n", sources->sourceArray[i].current));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     Length          = %g\n", sources->sourceArray[i].length));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     Dip             = %g\n", sources->sourceArray[i].dipAngle));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     Azimuth         = %g\n", sources->sourceArray[i].azimuthAngle));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     Position (xyz)  = [%g, %g, %g]\n", sources->sourceArray[i].position[0], sources->sourceArray[i].position[1], sources->sourceArray[i].position[2]));
     }
 
     PetscFunctionReturn(PETSC_SUCCESS);

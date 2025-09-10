@@ -19,21 +19,21 @@
 #include "inputs.h"
 
 typedef struct {
-   PetscReal position[3]; /* Transmitter position (x, y, z) */    
-   PetscReal current;     /* Electric current          */
-   PetscReal length;      /* Dipole length             */
-   PetscReal dip;         /* Dip                       */
-   PetscReal azimuth;     /* Azimuth                   */
+   PetscReal position[3];  /* Transmitter position (x, y, z) */    
+   PetscReal current;      /* Electric current          */
+   PetscReal length;       /* Dipole length             */
+   PetscReal dipAngle;     /* Dip angle                 */
+   PetscReal azimuthAngle; /* Azimuth angle             */
 } CsemSource;
 
 typedef struct {
    PetscReal freq;        /* Frequency                 */
    PetscInt numSources;   /* Total number of transmitters */
    CsemSource*  sourceArray;  /* Array of sources */
-} setCsemSource;
+} CsemSourceSet;
 
 
-PetscErrorCode setupSource(setCsemSource* sources, Params params);
+PetscErrorCode setupCsemSource(CsemSourceSet* sources, Params params);
 
 #endif 
 

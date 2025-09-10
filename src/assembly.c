@@ -82,7 +82,7 @@ PetscErrorCode check_kernel(PetscReal *M, PetscReal *G, PetscInt m, PetscInt n, 
  * @param[out] G Pointer to the assembled discrete gradient matrix (maps H1 DOFs to H(curl) DOFs).
  * @return PetscErrorCode PETSC_SUCCESS on success, or an error code otherwise.
  */
-PetscErrorCode assembleCsemSystem(DM dm, Vec resistivity, Grid grid, setCsemSource sources, CsemParams params, Mat *A, Mat *B, Mat *G) 
+PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, CsemSourceSet sources, Params params, Mat *A, Mat *B, Mat *G) 
 {
    PetscFunctionBeginUser;
     
@@ -211,7 +211,7 @@ PetscErrorCode assembleCsemSystem(DM dm, Vec resistivity, Grid grid, setCsemSour
       for (PetscInt j=0; j<NUM_DIMENSIONS; j++){
          sourceRotationVector[j] = 0.0;
       }
-      PetscCall(vectorRotation(sources.sourceArray[i].azimuth, sources.sourceArray[i].dip, sourceRotationVector));
+      PetscCall(vectorRotation(sources.sourceArray[i].azimuthAngle, sources.sourceArray[i].dipAngle, sourceRotationVector));
 
       /* Rotate source and setup electric field */
       sourceVector[0] = sourceRotationVector[0]*Dx[0] + sourceRotationVector[1]*Dy[0] + sourceRotationVector[2]*Dz[0];
@@ -325,7 +325,7 @@ PetscErrorCode assembleCsemSystem(DM dm, Vec resistivity, Grid grid, setCsemSour
       PetscCall(DMPlexVecRestoreClosure(dmResistivity, NULL, resistivity, i, &numResistivityComponents, &resistivityValues));
 
       /* Compute mass and stifness matrices for cell i */
-      //PetscCall(computeElementalMatrix(params.nord, cellOrientation, jacobian, invJacobian, numGaussPoints, gaussPoints, weigths, cellResistivity, Me, Ke));
+      PetscCall(computeElementalMatrix(params.nord, cellOrientation, jacobian, invJacobian, numGaussPoints, gaussPoints, weigths, cellResistivity, Me, Ke));
       
       /* Compute gradient matrix XXX TODO higher order*/
       //if (params.nord == 2) {

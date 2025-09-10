@@ -29,7 +29,7 @@
 
 /**
  * @brief Reads and validates user-provided parameters from PETSc options.
- * @param[out] params Pointer to the CsemParams struct to be populated.
+ * @param[out] params Pointer to the Params struct to be populated.
  * @param[in] size The total number of MPI tasks (MPI_Comm_size).
  * @return PetscErrorCode PETSC_SUCCESS on successful parsing and validation.
  *         Returns error codes if mandatory parameters are missing or invalid.
@@ -43,7 +43,7 @@
  *          Stores the parsed values in the `params` struct. Validates mandatory parameters
  *          and the range/type of `nord` and `mode`. Stores the MPI size. Creates the output directory.
  */
-PetscErrorCode readCsemParams(CsemParams *params, PetscMPIInt size) {
+PetscErrorCode readParams(Params *params, PetscMPIInt size) {
 
     PetscFunctionBeginUser;
     

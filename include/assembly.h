@@ -21,7 +21,7 @@
 #include "grid.h"
 #include "transmitter.h"
 
-PetscErrorCode assembleCsemSystem(DM dm, Vec resistivity, Grid grid, setCsemSource sources, CsemParams params, Mat *A, Mat *B, Mat *G);
+PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, CsemSourceSet sources, Params params, Mat *A, Mat *B, Mat *G);
 
 #endif
 

@@ -54,9 +54,9 @@ int main(int argc, char **argv)
     Vec     resistivity;
     Mat     A, B, X;
     Mat     G = NULL;
-    CsemParams  params;  
+    Params  params;  
     Grid    grid; 
-    setCsemSource sources = {0, 0, NULL};
+    CsemSourceSet sources = {0, 0, NULL};
     PetscLogDouble timers[4]; 
     PetscLogDouble start_timer, end_timer;
 
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
     PetscCall(PetscTime(&start_timer));
     
     /* Call fuction */
-    PetscCall(readCsemParams(&params, size));
+    PetscCall(readParams(&params, size));
     
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);

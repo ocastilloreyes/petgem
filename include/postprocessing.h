@@ -22,6 +22,6 @@
 #include "grid.h"
 #include "transmitter.h"
 
-PetscErrorCode computeFields(DM dm, Mat X, Grid grid, setSource source, Params params);
+PetscErrorCode computeFields(DM dm, Mat X, Grid grid, CsemSourceSet source, Params params);
 
 #endif

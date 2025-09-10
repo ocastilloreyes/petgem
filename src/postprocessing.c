@@ -42,7 +42,7 @@
  * @param[in] params A Params struct containing simulation parameters (basis order, mode, output settings, etc.).
  * @return PetscErrorCode PETSC_SUCCESS on success, or an error code otherwise.
  */
-PetscErrorCode computeFields(DM dm, Mat X, Grid grid, setSource sources, Params params){
+PetscErrorCode computeFields(DM dm, Mat X, Grid grid, CsemSourceSet sources, Params params){
     PetscFunctionBeginUser;
     MPI_Comm comm = PetscObjectComm((PetscObject)dm);
     
@@ -67,7 +67,7 @@ PetscErrorCode computeFields(DM dm, Mat X, Grid grid, setSource sources, Params 
     PetscInt    month = 0;
     PetscMPIInt rank;
 
-    PetscBool   isDG, sourceType, flag;
+    PetscBool   isDG, flag;
     PetscSF     receiverGlobalSF = NULL;
     
     Vec         xLocal, receivers, Ex, Ey, Ez, Hx, Hy, Hz;
@@ -287,7 +287,6 @@ PetscErrorCode computeFields(DM dm, Mat X, Grid grid, setSource sources, Params 
         /* Write attributes for data provedance */
         sprintf(version, "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Petgem_version", PETSC_STRING, version));
-        PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Mode", PETSC_STRING, params.mode));
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Mesh_filename", PETSC_STRING, params.meshFile));
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Receivers_filename", PETSC_STRING, params.receiversFile));
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Date", PETSC_STRING, date));
@@ -295,20 +294,14 @@ PetscErrorCode computeFields(DM dm, Mat X, Grid grid, setSource sources, Params 
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "MPI_tasks", PETSC_INT, &params.numMPITasks));
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_frequency", PETSC_REAL, &sources.freq));
 
-        /* Check modeling mode */
-        PetscCall(PetscStrcasecmp(params.mode, "CSEM", &sourceType));
-
-        /* CSEM mode */
-        if (sourceType){
-            PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_x_pos", PETSC_REAL, &sources.sourceArray[i].position[0]));
-            PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_y_pos", PETSC_REAL, &sources.sourceArray[i].position[1]));
-            PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_z_pos", PETSC_REAL, &sources.sourceArray[i].position[2]));
-            PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_current", PETSC_REAL, &sources.sourceArray[i].current));
-            PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_length", PETSC_REAL, &sources.sourceArray[i].length));
-            PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_dip", PETSC_REAL, &sources.sourceArray[i].dip));
-            PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_azimuth", PETSC_REAL, &sources.sourceArray[i].azimuth));
-        }
-
+        PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_x_pos", PETSC_REAL, &sources.sourceArray[i].position[0]));
+        PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_y_pos", PETSC_REAL, &sources.sourceArray[i].position[1]));
+        PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_z_pos", PETSC_REAL, &sources.sourceArray[i].position[2]));
+        PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_current", PETSC_REAL, &sources.sourceArray[i].current));
+        PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_length", PETSC_REAL, &sources.sourceArray[i].length));
+        PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_dip", PETSC_REAL, &sources.sourceArray[i].dipAngle));
+        PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_azimuth", PETSC_REAL, &sources.sourceArray[i].azimuthAngle));
+        
         /* Free memory */ 
         PetscCall(PetscViewerDestroy(&viewerOutput));
     }   
