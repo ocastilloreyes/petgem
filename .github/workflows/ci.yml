@@ -16,6 +16,8 @@ jobs:
     env:
       PETSC_DIR: /usr/local/petsc
       PETSC_ARCH: arch-linux-c-opt
+      GMSH_DIR: /usr/local/gmsh/bin
+      PETGEM_TEST_DIR: tests/canonical_model
 
     steps:
       # === Step 1: SETUP & BUILD ===
@@ -91,14 +93,24 @@ jobs:
           user_email: 'github-actions[bot]@users.noreply.github.com'
       
       # === Step 5: UNIT TEST ===
-      - name: Preprocessing data for testing
+      - name: Preprocessing mesh for testing PETGEM
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             petgem-ci-env:latest \
-            gmsh tests/canonical_model/mesh.geo -3
-            
+            gmsh ${PETGEM_TEST_DIR}/mesh.geo -3 \
+            python3 ${PETGEM_TEST_DIR}/generate_params_file.py
+
+      - name: Preprocessing resistivity model for testing PETGEM
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            petgem-ci-env:latest \
+            python3 ${PETGEM_TEST_DIR}/generate_resistivity_model.py
+
+    
 
          #   $PETSC_DIR/$PETSC_ARCH/bin/mpirun -n 1 build/./kernel -options_file data/options.txt > output.txt
 

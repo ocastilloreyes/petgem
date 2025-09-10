@@ -1,6 +1,6 @@
 /*********************************************************************
 *
-* Mesh for 3D CSEM modelling using PETGEM (http://petgem.bsc.es/)
+* Mesh for 3D CSEM modelling using PETGEM.
 *
 * Parameters:
 *    Frequency --> 2 Hz
@@ -23,13 +23,14 @@
 *
 * Visit http://gmsh.info/ for details about mesh scripting with Gmsh
 *
-* by Octavio Castillo-Reyes, BSC-CASE (octavio.castillo@bsc.es)
-* Latest update: October 9th, 2018
+# Author: Octavio Castillo-Reyes (UPC/BSC) (octavio.castillo@upc.edu; octavio.castillo@bsc.es)
+# Latest update: September 10th, 2025
 *********************************************************************/
+
 // #################################################################
 // #                        Parameters                             #
 // #################################################################
-// Dimensions
+// Mesh dimensions
 MIN_X = -1000.0;
 MAX_X = 4500.0;
 MIN_Y = 0.0;
@@ -39,22 +40,19 @@ MAX_Z = 0.0;
 DEPTH_MATERIAL1 = -1000.0;
 DEPTH_MATERIAL2 = -2000.0;
 DEPTH_MATERIAL3 = -2100.0;
-// Mesh size for p1
+
+// Mesh cell-size
 rg = 1.0;
-rs = 10.0;
-dg = 350./rg;
+rs = 10.;
+dg = 200./rg;
 ds = dg/rs;
+dg = 200.;
 
-
-dg = 400.;
-ds = 50.;
-
-
-
-// Source position
+// Transmitter position
 SRC_X = 1750.0;
 SRC_Y = 1750.0;
 SRC_Z = -975.0;
+
 // Depth of receivers
 DEPTH_RECEIVERS = -990.0;
 

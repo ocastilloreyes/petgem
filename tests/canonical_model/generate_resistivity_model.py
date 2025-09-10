@@ -1,18 +1,23 @@
 # --------------------------------------------------------------
-# Python Script for preprocessing mesh and associated resistivity
-# data and receivers for PETGEM simulations
-#
-# Author: Octavio Castillo-Reyes UPC/BSC
-# Date: November 5, 2024
-# --------------------------------------------------------------
-# This script reads a GMSH mesh, associates resistivity values 
-# with each cell, and prepares the data for PETGEM simulations.
+# Python Script for preprocessing mesh, resistivity data, and 
+# receiver information for PETGEM simulations.
+# This script processes a Gmsh-generated mesh by associating 
+# resistivity values with each finite element cell and 
+# incorporating receiver locations. The resulting datasets 
+# are formatted and stored for use in PETGEM forward modeling 
+# and inversion workflows.
 #
 # Usage:
-#   python3 preprocessing.py -resistivity_view vtk:wham_model.vtu
+#   python3 preprocessing.py -resistivity_view vtk:canonical_model.vtu
 #
-# The `-field_view vtk:wham_model.vtu` option exports the field data 
-# in VTK format for visualization in tools such as ParaView.
+# Notes:
+#   - The option `-resistivity_view vtk:canonical_model.vtu` exports 
+#     the resistivity distribution in VTK format, allowing direct 
+#     visualization with tools such as ParaView.
+#   - Similarly, the option `-field_view vtk:wham_model.vtu` 
+#     exports the simulated field data in VTK format for 
+#     postprocessing and analysis.
+# --------------------------------------------------------------
 
 import sys
 import meshio
@@ -27,10 +32,10 @@ from petsc4py import PETSc
 # ------------------------------------------------------------------------------
 # USER PARAMS
 # ------------------------------------------------------------------------------
-input_mesh_filename = "mesh.msh"
-output_mesh_filename = "land_model.h5"
-input_receivers_filename = "receivers.txt"
-output_receivers_filename = "receivers.h5"
+input_mesh_filename = "tests/canonical_model/mesh.msh"
+output_mesh_filename = "tests/canonical_model/canonical_model.h5"
+input_receivers_filename = "tests/canonical_model/receivers.txt"
+output_receivers_filename = "tests/canonical_model/receivers.h5"
 numDimensions = 3
 sigma_x = np.array([1.e-8, 0.1, 0.2, 0.001], dtype=float)
 sigma_y = np.array([1.e-8, 0.1, 0.2, 0.001], dtype=float)

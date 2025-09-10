@@ -10,8 +10,8 @@ WORKDIR /workspace
 # Install first level dependencies                                                #
 # ------------------------------------------------------------------------------- #
 RUN apt-get update && apt-get install -y gcc gfortran g++ make cmake vim 
-RUN apt-get update && apt-get install -y flex bison libtool git python3
-RUN apt-get update && apt-get install -y autopoint pkg-config gettext
+RUN apt-get update && apt-get install -y flex bison libtool git wget python3
+RUN apt-get update && apt-get install -y autopoint pkg-config gettext 
 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texinfo 
@@ -57,23 +57,21 @@ RUN make check
 RUN pip3 install src/binding/petsc4py
 
 # Add alias for mpirun command
-RUN echo 'alias mpirun=\${PETSC_DIR}/\${PETSC_ARCH}/bin/mpirun' >> ~/.bashrc
+RUN echo 'alias mpirun=${PETSC_DIR}/\${PETSC_ARCH}/bin/mpirun' >> ~/.bashrc
 
 # ------------------------------------------------------------------------------- #
 # Install gmsh                                                                    #
 # ------------------------------------------------------------------------------- #
 WORKDIR /workspace
 RUN mkdir /usr/local/gmsh
+ENV GMSH_DIR=/usr/local/gmsh
 
-# Clone Gmsh repository and build it
-RUN git clone https://gitlab.onelab.info/gmsh/gmsh.git \
-    && mkdir -p gmsh/build \
-    && cd gmsh/build \
-    && cmake -DCMAKE_INSTALL_PREFIX=/usr/local/gmsh .. \
-    && make install
+# Download binaries
+RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz
+RUN tar -xf gmsh-stable-Linux64.tgz -C $GMSH_DIR --strip-components=1
 
 # Add alias for gmsh command
-RUN echo 'alias gmsh=/usr/local/gmsh/bin/gmsh' >> ~/.bashrc
+RUN echo 'alias gmsh=/${GMSH_DIR}/bin/gmsh' >> ~/.bashrc
 
 # ------------------------------------------------------------------------------- #
 # Install Extrae and its dependencies                                             #
@@ -101,7 +99,6 @@ RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
     
 # Install binutils
 WORKDIR /workspace
-RUN apt-get update && apt-get install -y wget
 RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
 RUN tar -xf binutils-2.42.tar.gz
 WORKDIR binutils-2.42
@@ -136,6 +133,6 @@ RUN make && make install
 WORKDIR /workspace
 
 # Clean up unnecessary directories and files
-RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz gmsh
+RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz gmsh-stable-Linux64.tgz
 
 CMD [ "bash" ]
