@@ -11,7 +11,7 @@ WORKDIR /workspace
 # ------------------------------------------------------------------------------- #
 RUN apt-get update && apt-get install -y gcc gfortran g++ make cmake vim 
 RUN apt-get update && apt-get install -y flex bison libtool git wget python3
-RUN apt-get update && apt-get install -y autopoint pkg-config gettext 
+RUN apt-get update && apt-get install -y autopoint pkg-config gettext libglu1
 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texinfo 
@@ -90,14 +90,14 @@ WORKDIR libunwind
 RUN autoreconf -i \
         && ./configure --prefix=$EXTRAE_DIR/libunwind \
 	&& make && make install
-	
+
 # Install PAPI (HW counters)
 WORKDIR /workspace
 RUN git clone https://github.com/icl-utk-edu/papi 
 WORKDIR papi/src        
 RUN ./configure --prefix=$EXTRAE_DIR/papi CC=gcc F77=gfortran \
         && make && make install
-    
+
 # Install binutils
 WORKDIR /workspace
 RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
@@ -105,14 +105,14 @@ RUN tar -xf binutils-2.42.tar.gz
 WORKDIR binutils-2.42
 RUN ./configure --prefix=$EXTRAE_DIR/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
 RUN make && make install && cp libiberty/pic/libiberty.a $EXTRAE_DIR/binutils/lib 
-        
+
 # Install libxml2
 WORKDIR /workspace
 RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
 WORKDIR libxml2
 RUN ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python
 RUN make && make install 
-        
+
 # Install extrae
 WORKDIR /workspace
 RUN git clone https://github.com/bsc-performance-tools/extrae.git 
