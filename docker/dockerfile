@@ -71,7 +71,7 @@ RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz
 RUN tar -xf gmsh-stable-Linux64.tgz -C $GMSH_DIR --strip-components=1
 
 # Add alias for gmsh command
-RUN echo 'alias gmsh=/${GMSH_DIR}/bin/gmsh' >> ~/.bashrc
+RUN echo 'alias gmsh=${GMSH_DIR}/bin/gmsh' >> ~/.bashrc
 
 # ------------------------------------------------------------------------------- #
 # Install Extrae and its dependencies                                             #
