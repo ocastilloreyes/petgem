@@ -24,16 +24,16 @@ typedef struct {
    PetscReal length;      /* Dipole length             */
    PetscReal dip;         /* Dip                       */
    PetscReal azimuth;     /* Azimuth                   */
-} Source;
+} CsemSource;
 
 typedef struct {
    PetscReal freq;        /* Frequency                 */
    PetscInt numSources;   /* Total number of transmitters */
-   Source*  sourceArray;  /* Array of sources */
-} setSource;
+   CsemSource*  sourceArray;  /* Array of sources */
+} setCsemSource;
 
 
-PetscErrorCode setupSource(setSource* sources, Params params);
+PetscErrorCode setupSource(setCsemSource* sources, Params params);
 
 #endif 
 

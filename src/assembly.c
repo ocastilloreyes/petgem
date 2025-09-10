@@ -82,7 +82,7 @@ PetscErrorCode check_kernel(PetscReal *M, PetscReal *G, PetscInt m, PetscInt n, 
  * @param[out] G Pointer to the assembled discrete gradient matrix (maps H1 DOFs to H(curl) DOFs).
  * @return PetscErrorCode PETSC_SUCCESS on success, or an error code otherwise.
  */
-PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, setSource sources, Params params, Mat *A, Mat *B, Mat *G) 
+PetscErrorCode assembleCsemSystem(DM dm, Vec resistivity, Grid grid, setCsemSource sources, CsemParams params, Mat *A, Mat *B, Mat *G) 
 {
    PetscFunctionBeginUser;
     
@@ -103,7 +103,7 @@ PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, setSource sourc
    PetscScalar *cellCoords = NULL;
    PetscScalar *resistivityValues = NULL;
 
-   PetscBool   isDG, sourceType;
+   PetscBool   isDG;
     
    PetscSection section, H1section;
     
@@ -191,95 +191,89 @@ PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, setSource sourc
    omega = sources.freq * 2.0 * PETSC_PI;
    constFactor = (0.0 + 1.0*PETSC_i) * (omega * MU);      
 
-   /* Check modeling mode */
-   PetscCall(PetscStrcasecmp(params.mode, "CSEM", &sourceType));
-   
    /* Perform finite element assembly for RHS (one vector per source) */    
-   if (sourceType){  /* CSEM mode */
-      /* Loop over number of sources */ 
-      for (PetscInt i=0; i<sources.numSources; i++){
-         /* Variables declaration */
-         PetscReal sourceRotationVector[NUM_DIMENSIONS], sourceVector[NUM_DIMENSIONS];
-         PetscReal Dx[NUM_DIMENSIONS] = {0.0};
-         PetscReal Dy[NUM_DIMENSIONS] = {0.0};
-         PetscReal Dz[NUM_DIMENSIONS] = {0.0};
-         PetscInt sourceInCell; 
+   for (PetscInt i=0; i<sources.numSources; i++){
+      /* Variables declaration */
+      PetscReal sourceRotationVector[NUM_DIMENSIONS], sourceVector[NUM_DIMENSIONS];
+      PetscReal Dx[NUM_DIMENSIONS] = {0.0};
+      PetscReal Dy[NUM_DIMENSIONS] = {0.0};
+      PetscReal Dz[NUM_DIMENSIONS] = {0.0};
+      PetscInt sourceInCell; 
 
-         PetscCall(VecZeroEntries(b));
+      PetscCall(VecZeroEntries(b));
 
-         /* Define dipole for total electric field formulation */
-         Dx[0] = sources.sourceArray[i].current * sources.sourceArray[i].length;   /* x-directed dipole */
-         Dy[1] = sources.sourceArray[i].current * sources.sourceArray[i].length;   /* y-directed dipole */
-         Dz[2] = sources.sourceArray[i].current * sources.sourceArray[i].length;   /* z-directed dipole */
+      /* Define dipole for total electric field formulation */
+      Dx[0] = sources.sourceArray[i].current * sources.sourceArray[i].length;   /* x-directed dipole */
+      Dy[1] = sources.sourceArray[i].current * sources.sourceArray[i].length;   /* y-directed dipole */
+      Dz[2] = sources.sourceArray[i].current * sources.sourceArray[i].length;   /* z-directed dipole */
 
-         /* Compute matrices for source rotation */
-         for (PetscInt j=0; j<NUM_DIMENSIONS; j++){
-            sourceRotationVector[j] = 0.0;
-         }
-         PetscCall(vectorRotation(sources.sourceArray[i].azimuth, sources.sourceArray[i].dip, sourceRotationVector));
-
-         /* Rotate source and setup electric field */
-         sourceVector[0] = sourceRotationVector[0]*Dx[0] + sourceRotationVector[1]*Dy[0] + sourceRotationVector[2]*Dz[0];
-         sourceVector[1] = sourceRotationVector[0]*Dx[1] + sourceRotationVector[1]*Dy[1] + sourceRotationVector[2]*Dz[1];
-         sourceVector[2] = sourceRotationVector[0]*Dx[2] + sourceRotationVector[1]*Dy[2] + sourceRotationVector[2]*Dz[2];
-
-         /* Locate source within computational domain */
-         sourceInCell = -1; 
-         PetscCall(locatePoint(dm, sources.sourceArray[i].position, &sourceInCell));
-
-         /* Insert CSEM source */
-         if (sourceInCell >= 0){
-            /* Get cell coordinates */ 
-            PetscCall(DMPlexGetCellCoordinates(dm, sourceInCell, &isDG, &numCoords, &arrayCoords, &cellCoords));
-
-            /* Compute jacobian and its inverse for sourceInCell */
-            PetscCall(computeJacobian(cellCoords, jacobian, invJacobian));
-            
-            /* Transform xyz source position to XiEtaZeta coordinates (reference tetrahedral element) */
-            PetscCall(tetrahedronXYZToXiEtaZeta(cellCoords, sources.sourceArray[i].position, XiEtaZeta));
-            
-            /* Restore cell coordinates */ 
-            PetscCall(DMPlexRestoreCellCoordinates(dm, sourceInCell, &isDG, &numCoords, &arrayCoords, &cellCoords));
-
-            /* Compute cell orientation */
-            for(PetscInt j = 0; j < 10; j++){
-               cellOrientation[j] = 0;                
-            }
-            PetscCall(computeCellOrientation(dm, sourceInCell, cellOrientation));
-
-            /* Compute basis functions for sourceInCell */ 
-            PetscCall(computeBasisFunctions(params.nord, cellOrientation, jacobian, invJacobian, XiEtaZeta, basisFunctions, curlBasisFunctions));
-
-            /* Get closure indices for sourceInCell */
-            PetscCall(DMPlexGetClosureIndices(dm, section, section, sourceInCell, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
-
-            /* Compute contribution for closure */
-            for (PetscInt j = 0; j < grid.numDofInCell; j++){
-               closureRHS[j] = 0;
-               for (PetscInt k = 0; k < NUM_DIMENSIONS; k++){
-                  closureRHS[j] += (basisFunctions[k][j] * sourceVector[k]);
-               }
-            }
-
-            /* Add closure to vector */
-            PetscCall(VecSetValuesLocal(b, numDofIndices, dofIndices, closureRHS, INSERT_VALUES));
-
-            /* Restore closure indices for sourceInCell */
-            PetscCall(DMPlexRestoreClosureIndices(dm, section, section, sourceInCell, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
-         }
-         /* Perform global assembly for RHS */
-         PetscCall(VecAssemblyBegin(b));
-         PetscCall(VecAssemblyEnd(b));
-
-         /* Copy rhs into B matrix */
-         Vec bcol;
-         PetscCall(MatDenseGetColumnVecWrite(*B, i, &bcol));
-         PetscCall(VecCopy(b, bcol));
-         PetscCall(MatDenseRestoreColumnVecWrite(*B, i, &bcol));
+      /* Compute matrices for source rotation */
+      for (PetscInt j=0; j<NUM_DIMENSIONS; j++){
+         sourceRotationVector[j] = 0.0;
       }
-   } else { /* MT mode */ 
-   /* TODO */
+      PetscCall(vectorRotation(sources.sourceArray[i].azimuth, sources.sourceArray[i].dip, sourceRotationVector));
+
+      /* Rotate source and setup electric field */
+      sourceVector[0] = sourceRotationVector[0]*Dx[0] + sourceRotationVector[1]*Dy[0] + sourceRotationVector[2]*Dz[0];
+      sourceVector[1] = sourceRotationVector[0]*Dx[1] + sourceRotationVector[1]*Dy[1] + sourceRotationVector[2]*Dz[1];
+      sourceVector[2] = sourceRotationVector[0]*Dx[2] + sourceRotationVector[1]*Dy[2] + sourceRotationVector[2]*Dz[2];
+
+      /* Locate source within computational domain */
+      sourceInCell = -1; 
+      PetscCall(locatePoint(dm, sources.sourceArray[i].position, &sourceInCell));
+
+      /* Insert CSEM source */
+      if (sourceInCell >= 0){
+         /* Get cell coordinates */ 
+         PetscCall(DMPlexGetCellCoordinates(dm, sourceInCell, &isDG, &numCoords, &arrayCoords, &cellCoords));
+
+         /* Compute jacobian and its inverse for sourceInCell */
+         PetscCall(computeJacobian(cellCoords, jacobian, invJacobian));
+         
+         /* Transform xyz source position to XiEtaZeta coordinates (reference tetrahedral element) */
+         PetscCall(tetrahedronXYZToXiEtaZeta(cellCoords, sources.sourceArray[i].position, XiEtaZeta));
+            
+         /* Restore cell coordinates */ 
+         PetscCall(DMPlexRestoreCellCoordinates(dm, sourceInCell, &isDG, &numCoords, &arrayCoords, &cellCoords));
+
+         /* Compute cell orientation */
+         for(PetscInt j = 0; j < 10; j++){
+            cellOrientation[j] = 0;                
+         }
+         PetscCall(computeCellOrientation(dm, sourceInCell, cellOrientation));
+
+         /* Compute basis functions for sourceInCell */ 
+         PetscCall(computeBasisFunctions(params.nord, cellOrientation, jacobian, invJacobian, XiEtaZeta, basisFunctions, curlBasisFunctions));
+
+         /* Get closure indices for sourceInCell */
+         PetscCall(DMPlexGetClosureIndices(dm, section, section, sourceInCell, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
+
+         /* Compute contribution for closure */
+         for (PetscInt j = 0; j < grid.numDofInCell; j++){
+            closureRHS[j] = 0;
+            for (PetscInt k = 0; k < NUM_DIMENSIONS; k++){
+               closureRHS[j] += (basisFunctions[k][j] * sourceVector[k]);
+            }
+         }
+
+         /* Add closure to vector */
+         PetscCall(VecSetValuesLocal(b, numDofIndices, dofIndices, closureRHS, INSERT_VALUES));
+
+         /* Restore closure indices for sourceInCell */
+         PetscCall(DMPlexRestoreClosureIndices(dm, section, section, sourceInCell, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
+      }
+      
+      /* Perform global assembly for RHS */
+      PetscCall(VecAssemblyBegin(b));
+      PetscCall(VecAssemblyEnd(b));
+
+      /* Copy rhs into B matrix */
+      Vec bcol;
+      PetscCall(MatDenseGetColumnVecWrite(*B, i, &bcol));
+      PetscCall(VecCopy(b, bcol));
+      PetscCall(MatDenseRestoreColumnVecWrite(*B, i, &bcol));
    }
+   
    PetscCall(VecDestroy(&b));
 
    /* Apply constant factor */
@@ -305,25 +299,13 @@ PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, setSource sourc
    PetscCall(VecGetDM(resistivity, &dmResistivity));
    
    /* Perform finite element assembly for LHS */
-   //for (PetscInt i = grid.cellStart; i < grid.cellEnd; ++i) {
-   for (PetscInt i = grid.cellStart; i < 1; ++i) {   
-
+   for (PetscInt i = grid.cellStart; i < grid.cellEnd; ++i) {
+   
       /* Get spatial coordinates for cell i */ 
       PetscCall(DMPlexGetCellCoordinates(dm, i, &isDG, &numCoords, &arrayCoords, &cellCoords));
 
       /* Compute jacobian and its inverse for cell i */
       PetscCall(computeJacobian(cellCoords, jacobian, invJacobian));
-
-
-
-      PetscCall(PetscPrintf(comm, "\n"));
-         PetscCall(PetscPrintf(comm, "Coordinates\n"));
-         for(PetscInt j = 0; j < 4; j++){
-            PetscCall(PetscPrintf(comm, "(%f, %f, %f)\n", PetscRealPart(cellCoords[j+0]), PetscRealPart(cellCoords[j+1]), PetscRealPart(cellCoords[j+2])));
-         }
-
-
-
 
       /* Restore coordinates for cell i */ 
       PetscCall(DMPlexRestoreCellCoordinates(dm, i, &isDG, &numCoords, &arrayCoords, &cellCoords));

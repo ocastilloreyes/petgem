@@ -63,8 +63,8 @@ RUN echo 'alias mpirun=${PETSC_DIR}/\${PETSC_ARCH}/bin/mpirun' >> ~/.bashrc
 # Install gmsh                                                                    #
 # ------------------------------------------------------------------------------- #
 WORKDIR /workspace
-RUN mkdir /usr/local/gmsh
 ENV GMSH_DIR=/usr/local/gmsh
+RUN mkdir $GMSH_DIR
 
 # Download binaries
 RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz
@@ -77,24 +77,25 @@ RUN echo 'alias gmsh=/${GMSH_DIR}/bin/gmsh' >> ~/.bashrc
 # Install Extrae and its dependencies                                             #
 # ------------------------------------------------------------------------------- #
 WORKDIR /workspace
-RUN mkdir /usr/local/extrae/
-RUN mkdir /usr/local/extrae/libunwind
-RUN mkdir /usr/local/extrae/papi
-RUN mkdir /usr/local/extrae/libxml2
-RUN mkdir /usr/local/extrae/binutils
+ENV EXTRAE_DIR=/usr/local/extrae
+RUN mkdir $EXTRAE_DIR
+RUN mkdir $EXTRAE_DIR/libunwind
+RUN mkdir $EXTRAE_DIR/papi
+RUN mkdir $EXTRAE_DIR/libxml2
+RUN mkdir $EXTRAE_DIR/binutils
 
 # Install libunwind
 RUN git clone https://github.com/libunwind/libunwind.git 
 WORKDIR libunwind
 RUN autoreconf -i \
-        && ./configure --prefix=/usr/local/extrae/libunwind \
+        && ./configure --prefix=$EXTRAE_DIR/libunwind \
 	&& make && make install
 	
 # Install PAPI (HW counters)
 WORKDIR /workspace
 RUN git clone https://github.com/icl-utk-edu/papi 
 WORKDIR papi/src        
-RUN ./configure --prefix=/usr/local/extrae/papi CC=gcc F77=gfortran \
+RUN ./configure --prefix=$EXTRAE_DIR/papi CC=gcc F77=gfortran \
         && make && make install
     
 # Install binutils
@@ -102,14 +103,14 @@ WORKDIR /workspace
 RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
 RUN tar -xf binutils-2.42.tar.gz
 WORKDIR binutils-2.42
-RUN ./configure --prefix=/usr/local/extrae/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
-RUN make && make install && cp libiberty/pic/libiberty.a /usr/local/extrae/binutils/lib 
+RUN ./configure --prefix=$EXTRAE_DIR/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
+RUN make && make install && cp libiberty/pic/libiberty.a $EXTRAE_DIR/binutils/lib 
         
 # Install libxml2
 WORKDIR /workspace
 RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
 WORKDIR libxml2
-RUN ./autogen.sh --prefix=/usr/local/extrae/libxml2 --without-python
+RUN ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python
 RUN make && make install 
         
 # Install extrae
@@ -118,12 +119,12 @@ RUN git clone https://github.com/bsc-performance-tools/extrae.git
 WORKDIR extrae
 RUN git submodule update --init --recursive
 RUN autoreconf -f -i
-RUN ./configure --prefix=/usr/local/extrae \
-        --with-mpi=/usr/local/petsc/arch-linux-c-opt/ \
-        --with-papi=/usr/local/extrae/papi \
-        --with-xml-prefix=/usr/local/extrae/libxml2 \
-        --with-unwind=/usr/local/extrae/libunwind \
-        --with-binutils=/usr/local/extrae/binutils \
+RUN ./configure --prefix=$EXTRAE_DIR \
+        --with-mpi=$PETSC_DIR/$PETSC_ARCH/ \
+        --with-papi=$EXTRAE_DIR/papi \
+        --with-xml-prefix=$EXTRAE_DIR/libxml2 \
+        --with-unwind=$EXTRAE_DIR/libunwind \
+        --with-binutils=$EXTRAE_DIR/binutils \
         --without-dyninst
 RUN make && make install
 

@@ -29,7 +29,7 @@
 
 /**
  * @brief Reads and validates user-provided parameters from PETSc options.
- * @param[out] params Pointer to the Params struct to be populated.
+ * @param[out] params Pointer to the CsemParams struct to be populated.
  * @param[in] size The total number of MPI tasks (MPI_Comm_size).
  * @return PetscErrorCode PETSC_SUCCESS on successful parsing and validation.
  *         Returns error codes if mandatory parameters are missing or invalid.
@@ -39,12 +39,11 @@
  *          - `-output_dir`: Output directory path (mandatory).
  *          - `-output_filename`: Base name for output files (mandatory).
  *          - `-nord`: Finite element basis order (1-6, mandatory).
- *          - `-mode`: Simulation mode ("CSEM" or "MT", mandatory).
- *          - `-source_filename`: Path to the source definition file (mandatory).
+  *          - `-source_filename`: Path to the source definition file (mandatory).
  *          Stores the parsed values in the `params` struct. Validates mandatory parameters
  *          and the range/type of `nord` and `mode`. Stores the MPI size. Creates the output directory.
  */
-PetscErrorCode readUserParams(Params *params, PetscMPIInt size) {
+PetscErrorCode readCsemParams(CsemParams *params, PetscMPIInt size) {
 
     PetscFunctionBeginUser;
     
@@ -54,9 +53,8 @@ PetscErrorCode readUserParams(Params *params, PetscMPIInt size) {
     char  outputDir[PETSC_MAX_PATH_LEN];
     char  outputFilename[PETSC_MAX_PATH_LEN];
     char  sourceFilename[PETSC_MAX_PATH_LEN];
-    char  mode[PETSC_MAX_PATH_LEN];
-    PetscBool   meshFilenameIsPresent, receiversFilenameIsPresent, nordIsPresent, modeIsPresent, sourceFilenameIsPresent;
-    PetscBool   outputDirIsPresent, outputFilenameIsPresent, isCSEM, isMT;
+    PetscBool   meshFilenameIsPresent, receiversFilenameIsPresent, nordIsPresent, sourceFilenameIsPresent;
+    PetscBool   outputDirIsPresent, outputFilenameIsPresent;
     PetscInt    nord; /* Basis order = 1, 2, 3, 4, 5, 6 */    
     
     /* Read mesh filename (hdf5 format) */
@@ -87,19 +85,6 @@ PetscErrorCode readUserParams(Params *params, PetscMPIInt size) {
     PetscCheck(nordIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Exiting: Nord parameter out of valid range (nord = 1, 2, 3, 4, 5, 6).\n");
     params->nord = nord;
     
-    /* Read modeling mode (csem or mt) */
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-mode", mode, sizeof(mode), &modeIsPresent));  
-    PetscCheck(modeIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Exiting: Mode parameter missing. Mandatory parameter required for simulation.\n");
-    /* Check if is a valid mode type */
-    PetscCall(PetscStrcasecmp(mode, "CSEM", &isCSEM));
-    PetscCall(PetscStrcasecmp(mode, "MT", &isMT));
-    PetscCheck(isCSEM || isMT, PETSC_COMM_WORLD, PETSC_ERR_ARG_WRONG,  "Exiting: Expected mode type 'CSEM' or 'MT'.\n");
-    if (isCSEM) {
-        PetscCall(PetscStrncpy(params->mode, "CSEM", sizeof(params->mode)));
-    } else {
-        PetscCall(PetscStrncpy(params->mode, "MT", sizeof(params->mode)));
-    }
-
     /* Read source filename */
     PetscCall(PetscOptionsGetString(NULL, NULL, "-source_filename", sourceFilename, sizeof(sourceFilename), &sourceFilenameIsPresent));  
     PetscCheck(sourceFilenameIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Exiting: Source filename missing. Mandatory parameter required for simulation.\n");

@@ -22,12 +22,11 @@ typedef struct {
     char outputDirectory[PETSC_MAX_PATH_LEN];
     char outputFilename[PETSC_MAX_PATH_LEN];
     char sourceFilename[PETSC_MAX_PATH_LEN];
-    char mode[PETSC_MAX_PATH_LEN];
     PetscInt nord;
     PetscMPIInt numMPITasks;
-} Params;
+} CsemParams;
 
-PetscErrorCode readUserParams(Params *params, PetscMPIInt size);
+PetscErrorCode readCsemParams(CsemParams *params, PetscMPIInt size);
 
 #endif
 

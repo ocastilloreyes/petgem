@@ -24,20 +24,19 @@
 
 
 /**
- * @brief Reads source parameters from a file based on the simulation mode.
+ * @brief Reads CSEM source parameters from a file.
  *
  * Opens the file specified in @p params.sourceFilename. Reads the number of sources
  * and the source frequency. Allocates memory for @p sources->sourceArray.
  *
- * @param[out] sources Pointer to the setSource struct to be populated.
- * @param[in] params A Params struct containing simulation parameters, including mode and source filename.
+ * @param[out] sources Pointer to the setCsemSource struct to be populated.
+ * @param[in] params A CsemParams struct containing simulation parameters, including source filename.
  * @return PetscErrorCode PETSC_SUCCESS on successful reading and parsing. Returns error codes on file open/read errors or format inconsistencies.
  */
-PetscErrorCode setupSource(setSource* sources, Params params) {
+PetscErrorCode setupCsemSource(setCsemSource* sources, CsemParams params) {
     PetscFunctionBeginUser;
 
     /* Variables declaration */
-    PetscBool   sourceType;
     PetscInt    ret; 
     FILE        *inputFile;
     
@@ -45,9 +44,6 @@ PetscErrorCode setupSource(setSource* sources, Params params) {
     inputFile = fopen(params.sourceFilename, "r");
     PetscCheck(inputFile, PETSC_COMM_WORLD, PETSC_ERR_FILE_OPEN, "Exiting: Error opening source file.\n");
 
-    /* Check modeling mode */
-    PetscCall(PetscStrcasecmp(params.mode, "CSEM", &sourceType));
-    
     /* Read the number of sources */
     ret = fscanf(inputFile, "%" PetscInt_FMT "", &sources->numSources);
     PetscCheck(ret == 1, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ, "Exiting: Error reading number of sources.\n");
@@ -59,37 +55,21 @@ PetscErrorCode setupSource(setSource* sources, Params params) {
     ret = fscanf(inputFile, "%lf", &sources->freq);
     PetscCheck(ret == 1, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ, "Exiting: Error reading source frequency.\n");
 
-    /* Check modelling mode */
-     PetscCall(PetscStrcasecmp(params.mode, "CSEM", &sourceType));
-    
-    /* Read the data from the file into the sources array */
+    /* Read the data from the file into the CSEM sources array */
     for (PetscInt i = 0; i < sources->numSources; i++) {
-        if (sourceType) {   /* CSEM source */
-            ret = fscanf(inputFile, "%lf %lf %lf %lf %lf %lf %lf", 
-                        &sources->sourceArray[i].position[0], &sources->sourceArray[i].position[1],
-                        &sources->sourceArray[i].position[2], &sources->sourceArray[i].current, 
-                        &sources->sourceArray[i].length, &sources->sourceArray[i].dip, 
-                        &sources->sourceArray[i].azimuth);
-            PetscCheck(ret == 7, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ, "Exiting: Error reading CSEM source data. Verify source file format.\n");
-        }
-        else {  /* MT source */
-            /* Set unused fields to 0 for MT */
-            sources->sourceArray[i].position[0] = 0.0;
-            sources->sourceArray[i].position[1] = 0.0;
-            sources->sourceArray[i].position[2] = 0.0;
-            sources->sourceArray[i].current     = 0.0;
-            sources->sourceArray[i].length      = 0.0;
-            sources->sourceArray[i].dip         = 0.0; 
-            sources->sourceArray[i].azimuth     = 0.0;
-        }
+        ret = fscanf(inputFile, "%lf %lf %lf %lf %lf %lf %lf", 
+            &sources->sourceArray[i].position[0], &sources->sourceArray[i].position[1],
+            &sources->sourceArray[i].position[2], &sources->sourceArray[i].current, 
+            &sources->sourceArray[i].length, &sources->sourceArray[i].dip, 
+            &sources->sourceArray[i].azimuth);
+        PetscCheck(ret == 7, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ, "Exiting: Error reading CSEM source data. Verify source file format.\n");
     }
-
+        
     /* Close file */
     fclose(inputFile);
 
     /* Print source data */
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\nSource data:\n"));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Mode              = %s\n", params.mode));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\nCSEM source data:\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Freq (Hz)         = %g\n", sources->freq));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Number of sources = %" PetscInt_FMT "\n", sources->numSources));
     for (PetscInt i = 0; i < sources->numSources; i++) {
