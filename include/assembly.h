@@ -23,5 +23,9 @@
 
 PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, CsemSourceSet sources, Params params, Mat *A, Mat *B, Mat *G);
 
+PetscErrorCode assembleCsemRHS(DM dm, Grid grid, CsemSourceSet sources, Params params, Mat *B);
+
+PetscErrorCode assembleCsemLHS(DM dm, Grid grid, CsemSourceSet sources, Params params, Vec resistivity,   Mat *A, Mat *G);
+
 #endif
 

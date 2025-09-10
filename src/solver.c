@@ -37,7 +37,7 @@
  * @param[out] X Pointer to the solution matrix (Mat) to be created and populated.
  * @return PetscErrorCode PETSC_SUCCESS on successful solve, or an error code otherwise.
  */
-PetscErrorCode solveSystem(DM dm, Mat A, Mat B, Mat G, Params params, Mat *X){
+PetscErrorCode solveCsemSystem(DM dm, Mat A, Mat B, Mat G, Params params, Mat *X){
     
     PetscFunctionBeginUser;
     

@@ -9,7 +9,7 @@
 project = 'PETGEM'
 copyright = '2025, Castillo Reyes, Octavio'
 author = 'Castillo Reyes, Octavio'
-release = '2.0'
+release = '2.0.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

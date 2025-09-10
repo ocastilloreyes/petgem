@@ -258,8 +258,15 @@ PetscErrorCode computeFields(DM dm, Mat X, Grid grid, CsemSourceSet sources, Par
         /* Format the date as YYYY-MM-DD */
         snprintf(formattedDate, sizeof(formattedDate), "%04" PetscInt_FMT "-%02" PetscInt_FMT "-%02" PetscInt_FMT, year, month, day);
 
-        /* Build the output file path */
+        /* Build output file name robustly */
         PetscCall(PetscStrncpy(outFileName, params.outputDirectory, sizeof(outFileName)));
+
+        /* Add "/" if missing */
+        size_t len = strlen(outFileName);
+        if (len > 0 && outFileName[len-1] != '/') {
+            PetscCall(PetscStrlcat(outFileName, "/", sizeof(outFileName)));
+        }
+
         PetscCall(PetscStrlcat(outFileName, params.outputFilename, sizeof(outFileName)));
         PetscCall(PetscStrlcat(outFileName, "_src", sizeof(outFileName)));
         snprintf(idSource, sizeof(idSource), "%" PetscInt_FMT, i+1);    
@@ -293,7 +300,6 @@ PetscErrorCode computeFields(DM dm, Mat X, Grid grid, CsemSourceSet sources, Par
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Nord", PETSC_INT, &params.nord));
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "MPI_tasks", PETSC_INT, &params.numMPITasks));
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_frequency", PETSC_REAL, &sources.freq));
-
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_x_pos", PETSC_REAL, &sources.sourceArray[i].position[0]));
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_y_pos", PETSC_REAL, &sources.sourceArray[i].position[1]));
         PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "Source_z_pos", PETSC_REAL, &sources.sourceArray[i].position[2]));

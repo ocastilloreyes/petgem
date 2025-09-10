@@ -47,7 +47,7 @@ typedef struct {
     DM H1dm;
 } Grid;
 
-PetscErrorCode setupGrid(DM *dm, Grid *grid, Params params);
+PetscErrorCode setupCsemGrid(DM *dm, Grid *grid, Params params);
 
 PetscErrorCode importGrid(DM *odm, Vec *resistivity_output, Params params);
 

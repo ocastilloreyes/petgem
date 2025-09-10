@@ -45,6 +45,8 @@ PetscErrorCode importGrid(DM *odm, Vec *resistivity_output, Params params)
     PetscSF     sfLoad, sfDist, sfG;
     PetscSF     sfXC      = NULL;
     Vec         resistivity, globalResistivity;
+    char        typeName[256];
+    PetscBool   flg;
     size_t      load;
 
     PetscFunctionBegin;
@@ -102,8 +104,6 @@ PetscErrorCode importGrid(DM *odm, Vec *resistivity_output, Params params)
     *resistivity_output = resistivity;
 
     /* Process some DM options */
-    char typeName[256];
-    PetscBool flg;
     PetscCall(PetscOptionsGetString(NULL, NULL, "-dm_vec_type", typeName, 256, &flg));
     if (flg) PetscCall(DMSetVecType(*odm, typeName));
     PetscCall(PetscOptionsGetString(NULL, NULL, "-dm_mat_type", typeName, 256, &flg));
@@ -113,8 +113,8 @@ PetscErrorCode importGrid(DM *odm, Vec *resistivity_output, Params params)
 
 
 /**
- * @brief Sets up the DMPlex object with appropriate sections for H(curl) and H1 finite elements.
- *
+ * @brief Sets up the DMPlex object with appropriate sections for H(curl) and H1 finite elements for CSEM modeling. *
+ * 
  * Configures the primary DM for H(curl) elements of order @p params.nord. Concretely:
  * - Sets the number of fields to 1.
  * - Creates a "Boundary" label and marks boundary faces (ID 100).
@@ -125,11 +125,11 @@ PetscErrorCode importGrid(DM *odm, Vec *resistivity_output, Params params)
  * - Prints mesh statistics.
  *
  * @param[inout] dm Pointer to the DMPlex object to be configured.
- * @param[out] grid Pointer to the Grid struct to be populated with mesh statistics and DOF info.
+ * @param[out] grid Pointer to the Grid struct to be populated with mesh statistics and DOF info for CSEM modeling.
  * @param[in] params A Params struct containing simulation parameters, especially the basis order (@p params.nord).
  * @return PetscErrorCode PETSC_SUCCESS on success, or an error code otherwise.
  */
-PetscErrorCode setupGrid(DM *dm, Grid *grid, Params params) {
+PetscErrorCode setupCsemGrid(DM *dm, Grid *grid, Params params) {
 
 	PetscFunctionBeginUser;
 
@@ -286,7 +286,7 @@ PetscErrorCode setupGrid(DM *dm, Grid *grid, Params params) {
     grid->numH1DofInCell = numH1DofInCell;
     grid->H1dm = H1dm;
 
-    /* Print petgemGrid data */
+    /* Print grid data */
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Mesh data:\n"));
 
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Filename         = %s\n", params.meshFile));
@@ -294,7 +294,16 @@ PetscErrorCode setupGrid(DM *dm, Grid *grid, Params params) {
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of edges     = %" PetscInt_FMT "\n", grid->numEdgesGlobal));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of faces     = %" PetscInt_FMT "\n", grid->numFacesGlobal));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of cells     = %" PetscInt_FMT "\n", grid->numCellsGlobal));
-    
+
+    /* Print HEFEM statistics */
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n HEFEM data:\n"));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Basis order             = %" PetscInt_FMT "\n", params.nord));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of dofs per vertex  = %" PetscInt_FMT "\n", grid->numDofInVertex));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of dofs per edge    = %" PetscInt_FMT "\n", grid->numDofInEdge));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of dofs per Face    = %" PetscInt_FMT "\n", grid->numDofInFace));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of dofs per volume  = %" PetscInt_FMT "\n", grid->numDofInVolume));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of dofs per cell    = %" PetscInt_FMT "\n", grid->numDofInCell));
+       
     /* Restore global numbering and free memory */
     PetscCall(ISRestoreIndices(globalPointNumbering, &gidxs));
     PetscCall(ISDestroy(&globalPointNumbering));

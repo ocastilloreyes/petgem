@@ -43,10 +43,9 @@ DEPTH_MATERIAL3 = -2100.0;
 
 // Mesh cell-size
 rg = 1.0;
-rs = 10.;
-dg = 200./rg;
+rs = 8.5;
+dg = 350./rg;
 ds = dg/rs;
-dg = 200.;
 
 // Transmitter position
 SRC_X = 1750.0;

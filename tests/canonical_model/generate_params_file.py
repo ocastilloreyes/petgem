@@ -6,20 +6,22 @@
 # Author: Octavio Castillo-Reyes (UPC/BSC) (octavio.castillo@upc.edu; octavio.castillo@bsc.es)
 # Latest update: September 10th, 2025
 #********************************************************************* 
+import textwrap
 
 
 def write_params(nord, output_dir, output_filename):
-    content = f"""-mesh_filename {output_dir}/canonical_model.h5
+    content = textwrap.dedent(f"""\
+        -mesh_filename {output_dir}/canonical_model.h5
         -receivers_filename {output_dir}/receivers.h5
-        -output_dir {output_dir}
-        -output_filename {output_filename}/
-        -mode csem
         -source_filename {output_dir}/sources.txt
         -nord {nord}
         -pc_type lu 
         -pc_factor_mat_solver_type mumps
-    """
-    
+        -output_dir {output_dir}/
+        -output_filename {output_filename}
+        -malloc_dump
+    """)
+
     filename = f"{output_dir}/params_nord{nord}.txt"
     with open(filename, "w") as f:
         f.write(content)

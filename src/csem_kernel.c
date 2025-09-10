@@ -127,7 +127,7 @@ int main(int argc, char **argv)
     Extrae_event (1000, 6);
     #endif
     
-    PetscCall(setupGrid(&dm, &grid, params));
+    PetscCall(setupCsemGrid(&dm, &grid, params));
     
     /* End timer for read/setup grid */
     PetscCall(PetscTime(&end_timer));
@@ -146,8 +146,10 @@ int main(int argc, char **argv)
     PetscCall(PetscTime(&start_timer));
 
     /* Assemble linear system */
-    PetscCall(assembleSystem(dm, resistivity, grid, sources, params, &A, &B, &G));
-
+    //PetscCall(assembleSystem(dm, resistivity, grid, sources, params, &A, &B, &G));
+    PetscCall(assembleCsemRHS(dm, grid, sources, params, &B));
+    PetscCall(assembleCsemLHS(dm, grid, sources, params, resistivity, &A, &G));
+    
     /* End timer for assembly */
     PetscCall(PetscTime(&end_timer));
     timers[1] = end_timer-start_timer;
@@ -158,13 +160,13 @@ int main(int argc, char **argv)
 
     /* Solve linear system */
     #ifdef USE_EXTRAE
-     Extrae_event (1000, 8);
+    Extrae_event (1000, 8);
     #endif
     
     /* Start timer for solver */
     PetscCall(PetscTime(&start_timer));
 
-    PetscCall(solveSystem(dm, A, B, G, params, &X));
+    PetscCall(solveCsemSystem(dm, A, B, G, params, &X));
 
     /* End timer for solver */
     PetscCall(PetscTime(&end_timer));
