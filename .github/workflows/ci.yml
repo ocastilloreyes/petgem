@@ -139,7 +139,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y pandoc wkhtmltopdf
           pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.html
-          pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf --pdf-engine=wkhtmltopdf
+          pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf
       - name: Generate CI Dashboard
         run: |
           cat > ci-reports/index.html <<'EOF'
@@ -176,10 +176,14 @@ jobs:
         with:
           name: ci-execution-report
           path: ci-reports/
-      - name: Deploy reports (badge + CI report + dashboard) to GitHub Pages
+      - name: Deploy reports to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: ci-reports
           destination_dir: ci-reports
+      - name: Show GitHub Pages URL
+        run: |
+          echo "✅ CI reports deployed! Access the dashboard at:"
+          echo "https://ocastilloreyes.github.io/petgem/ci-reports/"
