@@ -96,7 +96,7 @@ jobs:
             -v "${{ github.workspace }}":/app \
             -w /app \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "make docs
+            bash -c "make docs"
  
 # === JOB: test-petgem ===
 # Run PETGEM test preprocessing scripts inside Docker
