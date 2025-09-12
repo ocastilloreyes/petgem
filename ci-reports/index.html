@@ -9,7 +9,7 @@
     ul { line-height: 1.8; }
     a { color: #0a5275; text-decoration: none; font-weight: bold; }
     a:hover { text-decoration: underline; }
-    .badge { margin-top: 20px; }
+    .badge { margin-top: 20px; display: block; }
   </style>
 </head>
 <body>
@@ -17,11 +17,12 @@
   <ul>
     <li><a href="ci_summary_report.html">📊 CI Summary Report (HTML)</a></li>
     <li><a href="ci_summary_report.pdf">📄 CI Summary Report (PDF)</a></li>
-    <li><a href="doc_coverage_badge.svg">🟢 Documentation Coverage Badge</a></li>
   </ul>
+
+  <!-- Display the documentation coverage badge inline -->
   <div class="badge">
-    <h3>Live Badge:</h3>
-    <img src="doc_coverage_badge.svg" alt="Documentation Coverage Badge"/>
+    <h2>Documentation Coverage</h2>
+    <img src="doc_coverage_badge.svg" alt="Documentation Coverage Badge">
   </div>
 </body>
 </html>
