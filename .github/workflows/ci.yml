@@ -117,120 +117,120 @@ jobs:
           name: test-logs
           path: test_petgem.log
 
-ci-report:
-  runs-on: ubuntu-latest
-  needs: [compile-petgem, compile-docs, test-petgem]
-  steps:
-    - uses: actions/checkout@v4
+  ci-report:
+    runs-on: ubuntu-latest
+    needs: [compile-petgem, compile-docs, test-petgem]
+    steps:
+      - uses: actions/checkout@v4
 
-    # === Step 1: Download artifacts from previous jobs ===
-    - name: Download compile logs
-      uses: actions/download-artifact@v4
-      with:
-        name: compile-logs
-        path: ci-logs
+      # === Step 1: Download artifacts from previous jobs ===
+      - name: Download compile logs
+        uses: actions/download-artifact@v4
+        with:
+          name: compile-logs
+          path: ci-logs
 
-    - name: Download docs logs
-      uses: actions/download-artifact@v4
-      with:
-        name: docs-logs
-        path: ci-logs
+      - name: Download docs logs
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-logs
+          path: ci-logs
 
-    - name: Download test logs
-      uses: actions/download-artifact@v4
-      with:
-        name: test-logs
-        path: ci-logs
+      - name: Download test logs
+        uses: actions/download-artifact@v4
+        with:
+          name: test-logs
+          path: ci-logs
 
-    # === Step 2: Build Markdown report ===
-    - name: Build Markdown CI report
-      run: |
-        mkdir -p ci-reports
-        echo "# PETGEM CI Summary Report" > ci-reports/ci_summary_report.md
-        echo "" >> ci-reports/ci_summary_report.md
-
-        # Append compile logs
-        if [ -f ci-logs/compile_petgem.log ]; then
-          echo "## Compile PETGEM Log" >> ci-reports/ci_summary_report.md
-          cat ci-logs/compile_petgem.log >> ci-reports/ci_summary_report.md
+      # === Step 2: Build Markdown report ===
+      - name: Build Markdown CI report
+        run: |
+          mkdir -p ci-reports
+          echo "# PETGEM CI Summary Report" > ci-reports/ci_summary_report.md
           echo "" >> ci-reports/ci_summary_report.md
-        fi
 
-        # Append documentation logs
-        if [ -f ci-logs/docs.log ]; then
-          echo "## Documentation Log" >> ci-reports/ci_summary_report.md
-          cat ci-logs/docs.log >> ci-reports/ci_summary_report.md
-          echo "" >> ci-reports/ci_summary_report.md
-        fi
+          # Append compile logs
+          if [ -f ci-logs/compile_petgem.log ]; then
+            echo "## Compile PETGEM Log" >> ci-reports/ci_summary_report.md
+            cat ci-logs/compile_petgem.log >> ci-reports/ci_summary_report.md
+            echo "" >> ci-reports/ci_summary_report.md
+          fi
 
-        # Append test logs
-        if [ -f ci-logs/test_petgem.log ]; then
-          echo "## Test Log" >> ci-reports/ci_summary_report.md
-          cat ci-logs/test_petgem.log >> ci-reports/ci_summary_report.md
-          echo "" >> ci-reports/ci_summary_report.md
-        fi
+          # Append documentation logs
+          if [ -f ci-logs/docs.log ]; then
+            echo "## Documentation Log" >> ci-reports/ci_summary_report.md
+            cat ci-logs/docs.log >> ci-reports/ci_summary_report.md
+            echo "" >> ci-reports/ci_summary_report.md
+          fi
 
-        echo "---" >> ci-reports/ci_summary_report.md
-        echo "🎉 CI workflow completed at $(date)" >> ci-reports/ci_summary_report.md
+          # Append test logs
+          if [ -f ci-logs/test_petgem.log ]; then
+            echo "## Test Log" >> ci-reports/ci_summary_report.md
+            cat ci-logs/test_petgem.log >> ci-reports/ci_summary_report.md
+            echo "" >> ci-reports/ci_summary_report.md
+          fi
 
-    # === Step 3: Convert Markdown to HTML/PDF ===
-    - name: Convert Markdown to HTML/PDF
-      run: |
-        sudo apt-get update && sudo apt-get install -y pandoc wkhtmltopdf
-        pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.html
-        pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf
+          echo "---" >> ci-reports/ci_summary_report.md
+          echo "🎉 CI workflow completed at $(date)" >> ci-reports/ci_summary_report.md
 
-    # === Step 4: Generate dashboard index.html ===
-    - name: Generate CI Dashboard
-      run: |
-        cat > ci-reports/index.html <<'EOF'
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>PETGEM CI Reports</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; color: #333; }
-            h1 { color: #0a5275; }
-            ul { line-height: 1.8; }
-            a { color: #0a5275; text-decoration: none; font-weight: bold; }
-            a:hover { text-decoration: underline; }
-            .badge { margin-top: 20px; }
-          </style>
-        </head>
-        <body>
-          <h1>PETGEM CI Reports</h1>
-          <ul>
-            <li><a href="ci_summary_report.html">📊 CI Summary Report (HTML)</a></li>
-            <li><a href="ci_summary_report.pdf">📄 CI Summary Report (PDF)</a></li>
-            <li><a href="doc_coverage_badge.svg">🟢 Documentation Coverage Badge</a></li>
-          </ul>
-          <div class="badge">
-            <h3>Live Badge:</h3>
-            <img src="doc_coverage_badge.svg" alt="Documentation Coverage Badge"/>
-          </div>
-        </body>
-        </html>
-        EOF
+      # === Step 3: Convert Markdown to HTML/PDF ===
+      - name: Convert Markdown to HTML/PDF
+        run: |
+          sudo apt-get update && sudo apt-get install -y pandoc wkhtmltopdf
+          pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.html
+          pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf
 
-    # === Step 5: Upload CI reports as artifact ===
-    - name: Upload CI Report as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ci-execution-report
-        path: ci-reports/
+      # === Step 4: Generate dashboard index.html ===
+      - name: Generate CI Dashboard
+        run: |
+          cat > ci-reports/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>PETGEM CI Reports</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; color: #333; }
+              h1 { color: #0a5275; }
+              ul { line-height: 1.8; }
+              a { color: #0a5275; text-decoration: none; font-weight: bold; }
+              a:hover { text-decoration: underline; }
+              .badge { margin-top: 20px; }
+            </style>
+          </head>
+          <body>
+            <h1>PETGEM CI Reports</h1>
+            <ul>
+              <li><a href="ci_summary_report.html">📊 CI Summary Report (HTML)</a></li>
+              <li><a href="ci_summary_report.pdf">📄 CI Summary Report (PDF)</a></li>
+              <li><a href="doc_coverage_badge.svg">🟢 Documentation Coverage Badge</a></li>
+            </ul>
+            <div class="badge">
+              <h3>Live Badge:</h3>
+              <img src="doc_coverage_badge.svg" alt="Documentation Coverage Badge"/>
+            </div>
+          </body>
+          </html>
+          EOF
 
-    # === Step 6: Deploy reports to GitHub Pages ===
-    - name: Deploy reports to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_branch: gh-pages
-        publish_dir: ci-reports
-        destination_dir: ci-reports
+      # === Step 5: Upload CI reports as artifact ===
+      - name: Upload CI Report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-execution-report
+          path: ci-reports/
 
-    # === Step 7: Print URL in Actions log ===
-    - name: Show GitHub Pages URL
-      run: |
-        echo "✅ CI reports deployed! Access the dashboard at:"
-        echo "https://ocastilloreyes.github.io/petgem/ci-reports/"
+      # === Step 6: Deploy reports to GitHub Pages ===
+      - name: Deploy reports to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ci-reports
+          destination_dir: ci-reports
+
+      # === Step 7: Print URL in Actions log ===
+      - name: Show GitHub Pages URL
+        run: |
+          echo "✅ CI reports deployed! Access the dashboard at:"
+          echo "https://ocastilloreyes.github.io/petgem/ci-reports/"
