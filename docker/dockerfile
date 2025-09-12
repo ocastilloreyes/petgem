@@ -1,4 +1,37 @@
-# Obtain a clean Ubuntu distribution
+# # Obtain a clean Ubuntu distribution
+# FROM ubuntu:22.04
+
+# # ------------------------------------------------------------------------------- #
+# # Set the working directory                                                       #
+# # ------------------------------------------------------------------------------- #
+# WORKDIR /workspace
+
+# # ------------------------------------------------------------------------------- #
+# # Install first level dependencies                                                #
+# # ------------------------------------------------------------------------------- #
+# RUN apt-get update && apt-get install -y gcc gfortran g++ make cmake vim 
+# RUN apt-get update && apt-get install -y flex bison libtool git wget python3
+# RUN apt-get update && apt-get install -y autopoint pkg-config gettext libglu1
+
+# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata 
+# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texinfo 
+# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen 
+# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk 
+# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
+# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
+# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
+
+# RUN apt-get update && apt-get install -y python3-breathe
+# RUN apt-get update && apt-get install -y python3-meshio python3-h5py
+# RUN apt-get update && apt-get install -y python3-numpy python3-distutils
+# RUN apt-get update && apt-get install -y python3-pip python3-matplotlib
+# RUN apt-get update && apt-get install -y python3-sphinx python3-sphinx-rtd-theme
+# RUN apt-get update && pip3 install cython 
+
+
+# ------------------------------------------------------------------------------- #
+# Obtain a clean Ubuntu distribution                                              #
+# ------------------------------------------------------------------------------- #      
 FROM ubuntu:22.04
 
 # ------------------------------------------------------------------------------- #
@@ -6,27 +39,33 @@ FROM ubuntu:22.04
 # ------------------------------------------------------------------------------- #
 WORKDIR /workspace
 
+# Prevent tzdata prompts and set noninteractive mode
 # ------------------------------------------------------------------------------- #
-# Install first level dependencies                                                #
+# Set noninteractive mode                                                         #
 # ------------------------------------------------------------------------------- #
-RUN apt-get update && apt-get install -y gcc gfortran g++ make cmake vim 
-RUN apt-get update && apt-get install -y flex bison libtool git wget python3
-RUN apt-get update && apt-get install -y autopoint pkg-config gettext libglu1
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texinfo 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
-
-RUN apt-get update && apt-get install -y python3-breathe
-RUN apt-get update && apt-get install -y python3-meshio python3-h5py
-RUN apt-get update && apt-get install -y python3-numpy python3-distutils
-RUN apt-get update && apt-get install -y python3-pip python3-matplotlib
-RUN apt-get update && apt-get install -y python3-sphinx python3-sphinx-rtd-theme
-RUN apt-get update && pip3 install cython 
+# ------------------------------------------------------------------------------- #
+# Install all dependencies in one layer
+# ------------------------------------------------------------------------------- #
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc gfortran g++ make cmake \
+        flex bison libtool git wget \
+        python3 python3-pip python3-distutils \
+        autopoint pkg-config gettext libglu1 \
+        tzdata \
+        texinfo doxygen latexmk \
+        texlive-latex-base texlive-latex-extra texlive-fonts-recommended \
+        python3-breathe python3-meshio python3-h5py python3-numpy python3-matplotlib \
+        python3-sphinx python3-sphinx-rtd-theme && \
+    
+    # Install Cython via pip
+    pip3 install --no-cache-dir cython && \
+    
+    # Clean up
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # ------------------------------------------------------------------------------- #
 # Install PETSc                                                                   #
