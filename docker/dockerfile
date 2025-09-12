@@ -160,7 +160,7 @@ RUN ./configure --prefix=$EXTRAE_DIR \
         --with-xml-prefix=$EXTRAE_DIR/libxml2 \
         --with-unwind=$EXTRAE_DIR/libunwind \
         --with-binutils=$EXTRAE_DIR/binutils \
-        --without-dyninst
+        --without-dyninst --disable-openmp
 RUN make -j1 && make install
 
 # ------------------------------------------------------------------------------- #
