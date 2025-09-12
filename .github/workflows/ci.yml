@@ -178,7 +178,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y pandoc wkhtmltopdf
           pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.html
-          pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf
+          pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf --pdf-engine=wkhtmltopdf
 
       # === Step 4: Generate dashboard index.html ===
       - name: Generate CI Dashboard
