@@ -20,18 +20,13 @@ env:
 # === Jobs definition ===
 jobs:
   # === First job: build docker image ===
-  docker-build:
+    docker-build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
         uses: docker/build-push-action@v5
@@ -43,6 +38,15 @@ jobs:
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Save Docker image as artifact
+        run: docker save petgem-ci-env:latest | gzip > petgem-ci-env.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: petgem-ci-env
+          path: petgem-ci-env.tar.gz
+
 
   # # === Second job: compile PETGEM ===
   # compile-petgem:
