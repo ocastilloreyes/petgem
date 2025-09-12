@@ -161,7 +161,7 @@ RUN ./configure --prefix=$EXTRAE_DIR \
         --with-unwind=$EXTRAE_DIR/libunwind \
         --with-binutils=$EXTRAE_DIR/binutils \
         --without-dyninst
-RUN make && make install
+RUN make -j1 && make install
 
 # ------------------------------------------------------------------------------- #
 # Define entry point and clean system                                             #
