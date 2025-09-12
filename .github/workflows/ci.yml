@@ -1,5 +1,5 @@
 # === Workflow name as it will appear in GitHub Actions UI ===
-name: PETGEM CI with docker cache
+name: PETGEM CI
 
 # === Trigger conditions for the workflow ===
 on:
