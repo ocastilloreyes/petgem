@@ -1,5 +1,4686 @@
 # PETGEM CI Summary Report
 
+## Docker Build Log
+### Starting Docker build for PETGEM CI image
+#0 building with "builder-2bd32030-ecdb-46a3-a021-579c5605d743" instance using docker-container driver
+
+#1 [internal] load build definition from dockerfile
+#1 transferring dockerfile: 7.53kB done
+#1 WARN: NoEmptyContinuation: Empty continuation line (line 68)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/ubuntu:22.04
+#2 ...
+
+#3 [auth] library/ubuntu:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/ubuntu:22.04
+#2 DONE 0.9s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [ 1/48] FROM docker.io/library/ubuntu:22.04@sha256:4e0171b9275e12d375863f2b3ae9ce00a4c53ddda176bd55868df97ac6f21a6e
+#5 resolve docker.io/library/ubuntu:22.04@sha256:4e0171b9275e12d375863f2b3ae9ce00a4c53ddda176bd55868df97ac6f21a6e done
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 0B / 29.54MB 0.2s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 2.10MB / 29.54MB 0.5s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 4.19MB / 29.54MB 0.6s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 6.29MB / 29.54MB 1.1s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 8.39MB / 29.54MB 1.2s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 10.49MB / 29.54MB 1.4s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 12.58MB / 29.54MB 1.5s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 15.73MB / 29.54MB 1.7s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 19.92MB / 29.54MB 1.8s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 25.17MB / 29.54MB 2.0s
+#5 sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 29.54MB / 29.54MB 2.1s done
+#5 extracting sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e
+#5 extracting sha256:60d98d907669dc22e547405da3e409eb14496606f4ac90692c5f2ef5081c4b1e 0.7s done
+#5 DONE 2.7s
+
+#6 [ 2/48] WORKDIR /workspace
+#6 DONE 0.1s
+
+#7 [ 3/48] RUN apt-get update &&     apt-get install -y --no-install-recommends         gcc gfortran g++ make cmake         flex bison libtool git wget         python3 python3-pip python3-distutils         autopoint pkg-config gettext libglu1         tzdata         texinfo doxygen latexmk         texlive-latex-base texlive-latex-extra texlive-fonts-recommended         python3-breathe python3-meshio python3-h5py python3-numpy python3-matplotlib         python3-sphinx python3-sphinx-rtd-theme &&     pip3 install --no-cache-dir cython &&     apt-get clean &&     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+#7 0.424 Get:1 http://archive.ubuntu.com/ubuntu jammy InRelease [270 kB]
+#7 0.675 Get:2 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+#7 1.090 Get:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+#7 1.249 Get:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+#7 1.267 Get:5 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3310 kB]
+#7 1.408 Get:6 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [17.5 MB]
+#7 1.983 Get:7 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1274 kB]
+#7 2.015 Get:8 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [5374 kB]
+#7 2.180 Get:9 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [48.5 kB]
+#7 2.266 Get:10 http://archive.ubuntu.com/ubuntu jammy/restricted amd64 Packages [164 kB]
+#7 2.268 Get:11 http://archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [266 kB]
+#7 2.277 Get:12 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages [1792 kB]
+#7 2.332 Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 Packages [5627 kB]
+#7 2.479 Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [3623 kB]
+#7 2.578 Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1581 kB]
+#7 2.619 Get:16 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [88.8 kB]
+#7 2.621 Get:17 http://archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [35.2 kB]
+#7 2.622 Get:18 http://archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [83.2 kB]
+#7 3.382 Fetched 41.4 MB in 3s (12.5 MB/s)
+#7 3.382 Reading package lists...
+#7 4.194 Reading package lists...
+#7 4.979 Building dependency tree...
+#7 5.141 Reading state information...
+#7 5.285 The following additional packages will be installed:
+#7 5.285   autotools-dev binutils binutils-common binutils-x86-64-linux-gnu blt
+#7 5.285   ca-certificates cmake-data cpp cpp-11 dh-elpa-helper docutils-common
+#7 5.285   emacsen-common file fontconfig fontconfig-config fonts-dejavu-core
+#7 5.285   fonts-font-awesome fonts-lato fonts-lmodern fonts-lyx g++-11 gcc-11
+#7 5.286   gcc-11-base gettext-base gfortran-11 git-man graphviz libaec0 libann0
+#7 5.286   libapache-pom-java libarchive13 libasan6 libatomic1 libbinutils libblas3
+#7 5.286   libboost-dev libboost1.74-dev libbrotli1 libbsd0 libc-dev-bin libc6-dev
+#7 5.286   libcairo2 libcc1-0 libcdt5 libcgraph6 libclang-cpp14 libclang1-14
+#7 5.286   libcommons-logging-java libcommons-parent-java libcrypt-dev libctf-nobfd0
+#7 5.286   libctf0 libcurl3-gnutls libcurl4 libdatrie1 libdeflate0 libdpkg-perl
+#7 5.286   libedit2 liberror-perl libexpat1 libexpat1-dev libfontbox-java
+#7 5.286   libfontconfig1 libfreetype6 libfribidi0 libgcc-11-dev libgd3 libgdbm-compat4
+#7 5.286   libgdbm6 libgfortran-11-dev libgfortran5 libglib2.0-0 libglvnd0 libgomp1
+#7 5.286   libgraphite2-3 libgts-0.7-5 libgvc6 libgvpr2 libharfbuzz0b libhdf5-103-1
+#7 5.286   libhdf5-hl-100 libice6 libicu70 libimagequant0 libisl23 libitm1 libjbig0
+#7 5.286   libjpeg-turbo8 libjpeg8 libjs-jquery libjs-jquery-ui libjs-sphinxdoc
+#7 5.286   libjs-underscore libjsoncpp25 libkpathsea6 liblab-gamut1 liblapack3
+#7 5.286   liblbfgsb0 liblcms2-2 libldap-2.5-0 libllvm14 liblsan0 libltdl7 liblzf1
+#7 5.286   libmagic-mgc libmagic1 libmd0 libmpc3 libmpdec3 libmpfr6 libnghttp2-14
+#7 5.286   libnsl-dev libopenblas-dev libopenblas-pthread-dev libopenblas0
+#7 5.286   libopenblas0-pthread libopengl0 libopenjp2-7 libpango-1.0-0
+#7 5.286   libpangocairo-1.0-0 libpangoft2-1.0-0 libpaper-utils libpaper1 libpathplan4
+#7 5.286   libpdfbox-java libperl5.34 libpixman-1-0 libpng16-16 libpsl5 libptexenc1
+#7 5.286   libpython3-dev libpython3-stdlib libpython3.10 libpython3.10-dev
+#7 5.286   libpython3.10-minimal libpython3.10-stdlib libqhull-r8.0 libquadmath0
+#7 5.286   libraqm0 libreadline8 librhash0 librtmp1 libsasl2-2 libsasl2-modules-db
+#7 5.286   libsigsegv2 libsm6 libsqlite3-0 libssh-4 libstdc++-11-dev libsynctex2 libsz2
+#7 5.286   libtcl8.6 libteckit0 libtexlua53 libtexluajit2 libtext-unidecode-perl
+#7 5.286   libthai-data libthai0 libtiff5 libtirpc-dev libtk8.6 libtsan0 libubsan1
+#7 5.286   libuv1 libwebp7 libwebpdemux2 libwebpmux3 libx11-6 libx11-data libxapian30
+#7 5.286   libxau6 libxaw7 libxcb-render0 libxcb-shm0 libxcb1 libxdmcp6 libxext6
+#7 5.286   libxft2 libxi6 libxml-libxml-perl libxml-namespacesupport-perl
+#7 5.286   libxml-sax-base-perl libxml-sax-perl libxml2 libxmu6 libxpm4 libxrender1
+#7 5.287   libxsimd-dev libxslt1.1 libxss1 libxt6 libzzip-0-13 linux-libc-dev m4
+#7 5.287   media-types openssl perl perl-modules-5.34 preview-latex-style
+#7 5.287   python-babel-localedata python-matplotlib-data python3-alabaster
+#7 5.287   python3-appdirs python3-attr python3-babel python3-beniget python3-brotli
+#7 5.287   python3-certifi python3-chardet python3-colorama python3-commonmark
+#7 5.287   python3-cycler python3-dateutil python3-decorator python3-dev
+#7 5.287   python3-docutils python3-fonttools python3-fs python3-gast
+#7 5.287   python3-h5py-serial python3-idna python3-imagesize python3-jinja2
+#7 5.287   python3-kiwisolver python3-lib2to3 python3-lxml python3-lz4
+#7 5.287   python3-markupsafe python3-minimal python3-mpmath python3-packaging
+#7 5.287   python3-pil python3-pil.imagetk python3-pkg-resources python3-ply
+#7 5.287   python3-pygments python3-pyparsing python3-pythran python3-requests
+#7 5.287   python3-rich python3-roman python3-scipy python3-setuptools python3-six
+#7 5.287   python3-snowballstemmer python3-sympy python3-tk python3-tz python3-ufolib2
+#7 5.287   python3-unicodedata2 python3-urllib3 python3-wheel python3.10 python3.10-dev
+#7 5.287   python3.10-minimal readline-common rpcsvc-proto sgml-base sphinx-common
+#7 5.287   sphinx-rtd-theme-common t1utils tex-common texlive-base texlive-binaries
+#7 5.287   texlive-latex-recommended texlive-pictures tk8.6-blt2.5 ucf unicode-data
+#7 5.287   x11-common xdg-utils xml-core xz-utils zlib1g-dev
+#7 5.288 Suggested packages:
+#7 5.288   binutils-doc bison-doc blt-demo cmake-doc ninja-build cmake-format cpp-doc
+#7 5.288   gcc-11-locales doxygen-latex doxygen-doc doxygen-gui build-essential
+#7 5.288   flex-doc g++-multilib g++-11-multilib gcc-11-doc gcc-multilib manpages-dev
+#7 5.288   autoconf automake gdb gcc-doc gcc-11-multilib gettext-doc libasprintf-dev
+#7 5.288   libgettextpo-dev gfortran-multilib gfortran-doc gfortran-11-multilib
+#7 5.288   gfortran-11-doc libcoarrays-dev git-daemon-run | git-daemon-sysvinit git-doc
+#7 5.288   git-email git-gui gitk gitweb git-cvs git-mediawiki git-svn gsfonts
+#7 5.288   graphviz-doc ghostscript lrzip libboost-doc libboost1.74-doc
+#7 5.288   libboost-atomic1.74-dev libboost-chrono1.74-dev libboost-container1.74-dev
+#7 5.288   libboost-context1.74-dev libboost-contract1.74-dev
+#7 5.288   libboost-coroutine1.74-dev libboost-date-time1.74-dev
+#7 5.288   libboost-exception1.74-dev libboost-fiber1.74-dev
+#7 5.288   libboost-filesystem1.74-dev libboost-graph1.74-dev
+#7 5.288   libboost-graph-parallel1.74-dev libboost-iostreams1.74-dev
+#7 5.288   libboost-locale1.74-dev libboost-log1.74-dev libboost-math1.74-dev
+#7 5.288   libboost-mpi1.74-dev libboost-mpi-python1.74-dev libboost-numpy1.74-dev
+#7 5.288   libboost-program-options1.74-dev libboost-python1.74-dev
+#7 5.288   libboost-random1.74-dev libboost-regex1.74-dev
+#7 5.288   libboost-serialization1.74-dev libboost-stacktrace1.74-dev
+#7 5.288   libboost-system1.74-dev libboost-test1.74-dev libboost-thread1.74-dev
+#7 5.288   libboost-timer1.74-dev libboost-type-erasure1.74-dev libboost-wave1.74-dev
+#7 5.288   libboost1.74-tools-dev libmpfrc++-dev libntl-dev libboost-nowide1.74-dev
+#7 5.288   glibc-doc libavalon-framework-java libcommons-logging-java-doc
+#7 5.288   libexcalibur-logkit-java liblog4j1.2-java debian-keyring gnupg patch bzr
+#7 5.288   libgd-tools gdbm-l10n libjs-jquery-ui-docs liblcms2-utils libstdc++-11-doc
+#7 5.288   tcl8.6 tk8.6 libtool-doc automaken gcj-jdk xapian-tools libxsimd-doc m4-doc
+#7 5.288   make-doc perl-doc libterm-readline-gnu-perl | libterm-readline-perl-perl
+#7 5.288   libtap-harness-archive-perl dpkg-dev python3-doc python3-venv
+#7 5.288   python-attr-doc breathe-doc python-cycler-doc docutils-doc
+#7 5.288   fonts-linuxlibertine | ttf-linux-libertine texlive-lang-french
+#7 5.288   python-h5py-doc python-jinja2-doc python-lxml-doc dvipng ffmpeg
+#7 5.288   fonts-staypuft gir1.2-gtk-3.0 inkscape ipython3 librsvg2-common
+#7 5.288   python-matplotlib-doc python3-cairocffi python3-gi python3-gi-cairo
+#7 5.288   python3-gobject python3-pyqt5 python3-sip python3-tornado
+#7 5.288   texlive-extra-utils python-mpmath-doc python3-gmpy2 python-numpy-doc
+#7 5.288   python3-pytest python-pil-doc python-ply-doc python-pygments-doc
+#7 5.288   ttf-bitstream-vera python-pyparsing-doc python3-cryptography python3-openssl
+#7 5.288   python3-socks python-requests-doc python-scipy-doc python-setuptools-doc
+#7 5.288   python3-stemmer fonts-freefont-otf imagemagick-6.q16 libjs-mathjax
+#7 5.288   sphinx-doc tex-gyre texlive-plain-generic texlive-fonts-extra
+#7 5.288   python-sympy-doc tix python3-tk-dbg python3.10-venv python3.10-doc
+#7 5.288   binfmt-support readline-doc sgml-base-doc debhelper gv | postscript-viewer
+#7 5.288   perl-tk xpdf | pdf-viewer xzdec texlive-fonts-recommended-doc
+#7 5.288   texlive-latex-base-doc icc-profiles libfile-which-perl
+#7 5.288   libspreadsheet-parseexcel-perl texlive-latex-extra-doc
+#7 5.288   texlive-latex-recommended-doc texlive-luatex texlive-pstricks dot2tex prerex
+#7 5.288   texlive-pictures-doc vprerex
+#7 5.288 Recommended packages:
+#7 5.288   libfl-dev patch less ssh-client fonts-liberation xpdf | pdf-viewer gv
+#7 5.288   | postscript-viewer manpages manpages-dev libc-devtools
+#7 5.288   libfile-fcntllock-perl liblocale-gettext-perl bzip2 libglib2.0-data
+#7 5.288   shared-mime-info xdg-user-dirs libgts-bin javascript-common libldap-common
+#7 5.288   publicsuffix libsasl2-modules libltdl-dev libwww-perl libxml-sax-expat-perl
+#7 5.288   netbase python3-bs4 python3-html5lib meshio-tools python3-netcdf4
+#7 5.288   python3-olefile build-essential lmodern dvisvgm tex-gyre tipa
+#7 5.288   texlive-plain-generic ruby tk libfile-mimeinfo-perl libnet-dbus-perl
+#7 5.288   libx11-protocol-perl x11-utils x11-xserver-utils
+#7 5.906 The following NEW packages will be installed:
+#7 5.906   autopoint autotools-dev binutils binutils-common binutils-x86-64-linux-gnu
+#7 5.906   bison blt ca-certificates cmake cmake-data cpp cpp-11 dh-elpa-helper
+#7 5.906   docutils-common doxygen emacsen-common file flex fontconfig
+#7 5.906   fontconfig-config fonts-dejavu-core fonts-font-awesome fonts-lato
+#7 5.906   fonts-lmodern fonts-lyx g++ g++-11 gcc gcc-11 gcc-11-base gettext
+#7 5.906   gettext-base gfortran gfortran-11 git git-man graphviz latexmk libaec0
+#7 5.906   libann0 libapache-pom-java libarchive13 libasan6 libatomic1 libbinutils
+#7 5.906   libblas3 libboost-dev libboost1.74-dev libbrotli1 libbsd0 libc-dev-bin
+#7 5.906   libc6-dev libcairo2 libcc1-0 libcdt5 libcgraph6 libclang-cpp14 libclang1-14
+#7 5.906   libcommons-logging-java libcommons-parent-java libcrypt-dev libctf-nobfd0
+#7 5.906   libctf0 libcurl3-gnutls libcurl4 libdatrie1 libdeflate0 libdpkg-perl
+#7 5.906   libedit2 liberror-perl libexpat1 libexpat1-dev libfontbox-java
+#7 5.906   libfontconfig1 libfreetype6 libfribidi0 libgcc-11-dev libgd3 libgdbm-compat4
+#7 5.906   libgdbm6 libgfortran-11-dev libgfortran5 libglib2.0-0 libglu1-mesa libglvnd0
+#7 5.906   libgomp1 libgraphite2-3 libgts-0.7-5 libgvc6 libgvpr2 libharfbuzz0b
+#7 5.906   libhdf5-103-1 libhdf5-hl-100 libice6 libicu70 libimagequant0 libisl23
+#7 5.906   libitm1 libjbig0 libjpeg-turbo8 libjpeg8 libjs-jquery libjs-jquery-ui
+#7 5.906   libjs-sphinxdoc libjs-underscore libjsoncpp25 libkpathsea6 liblab-gamut1
+#7 5.906   liblapack3 liblbfgsb0 liblcms2-2 libldap-2.5-0 libllvm14 liblsan0 libltdl7
+#7 5.906   liblzf1 libmagic-mgc libmagic1 libmd0 libmpc3 libmpdec3 libmpfr6
+#7 5.906   libnghttp2-14 libnsl-dev libopenblas-dev libopenblas-pthread-dev
+#7 5.906   libopenblas0 libopenblas0-pthread libopengl0 libopenjp2-7 libpango-1.0-0
+#7 5.906   libpangocairo-1.0-0 libpangoft2-1.0-0 libpaper-utils libpaper1 libpathplan4
+#7 5.906   libpdfbox-java libperl5.34 libpixman-1-0 libpng16-16 libpsl5 libptexenc1
+#7 5.906   libpython3-dev libpython3-stdlib libpython3.10 libpython3.10-dev
+#7 5.906   libpython3.10-minimal libpython3.10-stdlib libqhull-r8.0 libquadmath0
+#7 5.906   libraqm0 libreadline8 librhash0 librtmp1 libsasl2-2 libsasl2-modules-db
+#7 5.906   libsigsegv2 libsm6 libsqlite3-0 libssh-4 libstdc++-11-dev libsynctex2 libsz2
+#7 5.906   libtcl8.6 libteckit0 libtexlua53 libtexluajit2 libtext-unidecode-perl
+#7 5.906   libthai-data libthai0 libtiff5 libtirpc-dev libtk8.6 libtool libtsan0
+#7 5.906   libubsan1 libuv1 libwebp7 libwebpdemux2 libwebpmux3 libx11-6 libx11-data
+#7 5.906   libxapian30 libxau6 libxaw7 libxcb-render0 libxcb-shm0 libxcb1 libxdmcp6
+#7 5.906   libxext6 libxft2 libxi6 libxml-libxml-perl libxml-namespacesupport-perl
+#7 5.906   libxml-sax-base-perl libxml-sax-perl libxml2 libxmu6 libxpm4 libxrender1
+#7 5.907   libxsimd-dev libxslt1.1 libxss1 libxt6 libzzip-0-13 linux-libc-dev m4 make
+#7 5.907   media-types openssl perl perl-modules-5.34 pkg-config preview-latex-style
+#7 5.907   python-babel-localedata python-matplotlib-data python3 python3-alabaster
+#7 5.907   python3-appdirs python3-attr python3-babel python3-beniget python3-breathe
+#7 5.907   python3-brotli python3-certifi python3-chardet python3-colorama
+#7 5.907   python3-commonmark python3-cycler python3-dateutil python3-decorator
+#7 5.907   python3-dev python3-distutils python3-docutils python3-fonttools python3-fs
+#7 5.907   python3-gast python3-h5py python3-h5py-serial python3-idna python3-imagesize
+#7 5.907   python3-jinja2 python3-kiwisolver python3-lib2to3 python3-lxml python3-lz4
+#7 5.907   python3-markupsafe python3-matplotlib python3-meshio python3-minimal
+#7 5.907   python3-mpmath python3-numpy python3-packaging python3-pil
+#7 5.907   python3-pil.imagetk python3-pip python3-pkg-resources python3-ply
+#7 5.907   python3-pygments python3-pyparsing python3-pythran python3-requests
+#7 5.907   python3-rich python3-roman python3-scipy python3-setuptools python3-six
+#7 5.907   python3-snowballstemmer python3-sphinx python3-sphinx-rtd-theme
+#7 5.907   python3-sympy python3-tk python3-tz python3-ufolib2 python3-unicodedata2
+#7 5.907   python3-urllib3 python3-wheel python3.10 python3.10-dev python3.10-minimal
+#7 5.907   readline-common rpcsvc-proto sgml-base sphinx-common sphinx-rtd-theme-common
+#7 5.907   t1utils tex-common texinfo texlive-base texlive-binaries
+#7 5.907   texlive-fonts-recommended texlive-latex-base texlive-latex-extra
+#7 5.907   texlive-latex-recommended texlive-pictures tk8.6-blt2.5 tzdata ucf
+#7 5.907   unicode-data wget x11-common xdg-utils xml-core xz-utils zlib1g-dev
+#7 6.426 0 upgraded, 305 newly installed, 0 to remove and 0 not upgraded.
+#7 6.426 Need to get 365 MB of archives.
+#7 6.426 After this operation, 1589 MB of additional disk space will be used.
+#7 6.426 Get:1 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpython3.10-minimal amd64 3.10.12-1~22.04.11 [815 kB]
+#7 7.275 Get:2 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libexpat1 amd64 2.4.7-1ubuntu0.6 [92.1 kB]
+#7 7.284 Get:3 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3.10-minimal amd64 3.10.12-1~22.04.11 [2264 kB]
+#7 7.524 Get:4 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-minimal amd64 3.10.6-1~22.04.1 [24.3 kB]
+#7 7.525 Get:5 http://archive.ubuntu.com/ubuntu jammy/main amd64 media-types all 7.0.0 [25.5 kB]
+#7 7.527 Get:6 http://archive.ubuntu.com/ubuntu jammy/main amd64 libmpdec3 amd64 2.5.1-2build2 [86.8 kB]
+#7 7.531 Get:7 http://archive.ubuntu.com/ubuntu jammy/main amd64 readline-common all 8.1.2-1 [53.5 kB]
+#7 7.533 Get:8 http://archive.ubuntu.com/ubuntu jammy/main amd64 libreadline8 amd64 8.1.2-1 [153 kB]
+#7 7.541 Get:9 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libsqlite3-0 amd64 3.37.2-2ubuntu0.5 [643 kB]
+#7 7.572 Get:10 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpython3.10-stdlib amd64 3.10.12-1~22.04.11 [1850 kB]
+#7 7.651 Get:11 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3.10 amd64 3.10.12-1~22.04.11 [508 kB]
+#7 7.664 Get:12 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpython3-stdlib amd64 3.10.6-1~22.04.1 [6812 B]
+#7 7.664 Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3 amd64 3.10.6-1~22.04.1 [22.8 kB]
+#7 7.759 Get:14 http://archive.ubuntu.com/ubuntu jammy/main amd64 libsigsegv2 amd64 2.13-1ubuntu3 [14.6 kB]
+#7 7.760 Get:15 http://archive.ubuntu.com/ubuntu jammy/main amd64 m4 amd64 1.4.18-5ubuntu2 [199 kB]
+#7 7.762 Get:16 http://archive.ubuntu.com/ubuntu jammy/main amd64 flex amd64 2.6.4-8build2 [307 kB]
+#7 7.767 Get:17 http://archive.ubuntu.com/ubuntu jammy/main amd64 fonts-lato all 2.0-2.1 [2696 kB]
+#7 7.806 Get:18 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 perl-modules-5.34 all 5.34.0-3ubuntu1.5 [2977 kB]
+#7 7.901 Get:19 http://archive.ubuntu.com/ubuntu jammy/main amd64 libgdbm6 amd64 1.23-1 [33.9 kB]
+#7 7.901 Get:20 http://archive.ubuntu.com/ubuntu jammy/main amd64 libgdbm-compat4 amd64 1.23-1 [6606 B]
+#7 7.902 Get:21 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libperl5.34 amd64 5.34.0-3ubuntu1.5 [4797 kB]
+#7 8.021 Get:22 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 perl amd64 5.34.0-3ubuntu1.5 [232 kB]
+#7 8.024 Get:23 http://archive.ubuntu.com/ubuntu jammy/main amd64 sgml-base all 1.30 [12.5 kB]
+#7 8.024 Get:24 http://archive.ubuntu.com/ubuntu jammy/main amd64 ucf all 3.0043 [56.1 kB]
+#7 8.025 Get:25 http://archive.ubuntu.com/ubuntu jammy/universe amd64 tex-common all 6.17 [33.7 kB]
+#7 8.026 Get:26 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 openssl amd64 3.0.2-0ubuntu1.19 [1186 kB]
+#7 8.042 Get:27 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 ca-certificates all 20240203~22.04.1 [162 kB]
+#7 8.107 Get:28 http://archive.ubuntu.com/ubuntu jammy/main amd64 libmd0 amd64 1.0.4-1build1 [23.0 kB]
+#7 8.108 Get:29 http://archive.ubuntu.com/ubuntu jammy/main amd64 libbsd0 amd64 0.11.5-1 [44.8 kB]
+#7 8.109 Get:30 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libfribidi0 amd64 1.0.8-2ubuntu3.1 [26.1 kB]
+#7 8.224 Get:31 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libglib2.0-0 amd64 2.72.4-0ubuntu2.6 [1467 kB]
+#7 8.237 Get:32 http://archive.ubuntu.com/ubuntu jammy/main amd64 libicu70 amd64 70.1-2 [10.6 MB]
+#7 8.487 Get:33 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libxml2 amd64 2.9.13+dfsg-1ubuntu0.9 [764 kB]
+#7 8.494 Get:34 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-pkg-resources all 59.6.0-1.2ubuntu0.22.04.3 [133 kB]
+#7 8.496 Get:35 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 tzdata all 2025b-0ubuntu0.22.04.1 [347 kB]
+#7 8.501 Get:36 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libmagic-mgc amd64 1:5.41-3ubuntu0.1 [257 kB]
+#7 8.505 Get:37 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libmagic1 amd64 1:5.41-3ubuntu0.1 [87.2 kB]
+#7 8.506 Get:38 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 file amd64 1:5.41-3ubuntu0.1 [21.5 kB]
+#7 8.506 Get:39 http://archive.ubuntu.com/ubuntu jammy/main amd64 gettext-base amd64 0.21-4ubuntu4 [37.8 kB]
+#7 8.507 Get:40 http://archive.ubuntu.com/ubuntu jammy/main amd64 libedit2 amd64 3.1-20210910-1build1 [96.8 kB]
+#7 8.573 Get:41 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libnghttp2-14 amd64 1.43.0-1ubuntu0.2 [76.9 kB]
+#7 8.604 Get:42 http://archive.ubuntu.com/ubuntu jammy/main amd64 libpng16-16 amd64 1.6.37-3build5 [191 kB]
+#7 8.720 Get:43 http://archive.ubuntu.com/ubuntu jammy/main amd64 libpsl5 amd64 0.21.0-1.2build2 [58.4 kB]
+#7 8.721 Get:44 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libuv1 amd64 1.43.0-1ubuntu0.1 [92.7 kB]
+#7 8.723 Get:45 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxau6 amd64 1:1.0.9-1build5 [7634 B]
+#7 8.724 Get:46 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxdmcp6 amd64 1:1.1.3-0ubuntu5 [10.9 kB]
+#7 8.724 Get:47 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxcb1 amd64 1.14-3ubuntu3 [49.0 kB]
+#7 8.725 Get:48 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libx11-data all 2:1.7.5-1ubuntu0.3 [120 kB]
+#7 8.728 Get:49 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libx11-6 amd64 2:1.7.5-1ubuntu0.3 [667 kB]
+#7 8.745 Get:50 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxext6 amd64 2:1.3.4-1build1 [31.8 kB]
+#7 8.746 Get:51 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 wget amd64 1.21.2-2ubuntu1.1 [339 kB]
+#7 8.836 Get:52 http://archive.ubuntu.com/ubuntu jammy/main amd64 xz-utils amd64 5.2.5-2ubuntu1 [84.8 kB]
+#7 8.953 Get:53 http://archive.ubuntu.com/ubuntu jammy/main amd64 autopoint all 0.21-4ubuntu4 [422 kB]
+#7 8.964 Get:54 http://archive.ubuntu.com/ubuntu jammy/main amd64 autotools-dev all 20220109.1 [44.9 kB]
+#7 8.965 Get:55 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils-common amd64 2.38-4ubuntu2.8 [223 kB]
+#7 8.970 Get:56 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libbinutils amd64 2.38-4ubuntu2.8 [661 kB]
+#7 8.987 Get:57 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libctf-nobfd0 amd64 2.38-4ubuntu2.8 [108 kB]
+#7 8.989 Get:58 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libctf0 amd64 2.38-4ubuntu2.8 [103 kB]
+#7 8.991 Get:59 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils-x86-64-linux-gnu amd64 2.38-4ubuntu2.8 [2324 kB]
+#7 9.052 Get:60 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils amd64 2.38-4ubuntu2.8 [3196 B]
+#7 9.052 Get:61 http://archive.ubuntu.com/ubuntu jammy/main amd64 bison amd64 2:3.8.2+dfsg-1build1 [748 kB]
+#7 9.070 Get:62 http://archive.ubuntu.com/ubuntu jammy/main amd64 libtcl8.6 amd64 8.6.12+dfsg-1build1 [990 kB]
+#7 9.185 Get:63 http://archive.ubuntu.com/ubuntu jammy/main amd64 libbrotli1 amd64 1.0.9-2build6 [315 kB]
+#7 9.193 Get:64 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libfreetype6 amd64 2.11.1+dfsg-1ubuntu0.3 [388 kB]
+#7 9.202 Get:65 http://archive.ubuntu.com/ubuntu jammy/main amd64 fonts-dejavu-core all 2.37-2build1 [1041 kB]
+#7 9.229 Get:66 http://archive.ubuntu.com/ubuntu jammy/main amd64 fontconfig-config all 2.13.1-4.2ubuntu5 [29.1 kB]
+#7 9.230 Get:67 http://archive.ubuntu.com/ubuntu jammy/main amd64 libfontconfig1 amd64 2.13.1-4.2ubuntu5 [131 kB]
+#7 9.233 Get:68 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxrender1 amd64 1:0.9.10-1build4 [19.7 kB]
+#7 9.234 Get:69 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxft2 amd64 2.3.4-1 [41.8 kB]
+#7 9.235 Get:70 http://archive.ubuntu.com/ubuntu jammy/main amd64 x11-common all 1:7.7+23ubuntu2 [23.4 kB]
+#7 9.302 Get:71 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxss1 amd64 1:1.2.3-1build2 [8476 B]
+#7 9.302 Get:72 http://archive.ubuntu.com/ubuntu jammy/main amd64 libtk8.6 amd64 8.6.12-1build1 [784 kB]
+#7 9.419 Get:73 http://archive.ubuntu.com/ubuntu jammy/main amd64 tk8.6-blt2.5 amd64 2.5.3+dfsg-4.1build2 [643 kB]
+#7 9.430 Get:74 http://archive.ubuntu.com/ubuntu jammy/main amd64 blt amd64 2.5.3+dfsg-4.1build2 [4838 B]
+#7 9.430 Get:75 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libarchive13 amd64 3.6.0-1ubuntu1.5 [368 kB]
+#7 9.437 Get:76 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libsasl2-modules-db amd64 2.1.27+dfsg2-3ubuntu1.2 [20.5 kB]
+#7 9.438 Get:77 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libsasl2-2 amd64 2.1.27+dfsg2-3ubuntu1.2 [53.8 kB]
+#7 9.439 Get:78 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libldap-2.5-0 amd64 2.5.19+dfsg-0ubuntu0.22.04.1 [184 kB]
+#7 9.443 Get:79 http://archive.ubuntu.com/ubuntu jammy/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2build4 [58.2 kB]
+#7 9.444 Get:80 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libssh-4 amd64 0.9.6-2ubuntu0.22.04.4 [187 kB]
+#7 9.536 Get:81 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcurl4 amd64 7.81.0-1ubuntu1.20 [289 kB]
+#7 9.541 Get:82 http://archive.ubuntu.com/ubuntu jammy/main amd64 libjsoncpp25 amd64 1.9.5-3 [80.0 kB]
+#7 9.652 Get:83 http://archive.ubuntu.com/ubuntu jammy/main amd64 librhash0 amd64 1.4.2-1ubuntu1 [125 kB]
+#7 9.654 Get:84 http://archive.ubuntu.com/ubuntu jammy/main amd64 dh-elpa-helper all 2.0.9ubuntu1 [7610 B]
+#7 9.654 Get:85 http://archive.ubuntu.com/ubuntu jammy/main amd64 emacsen-common all 3.0.4 [14.9 kB]
+#7 9.655 Get:86 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 cmake-data all 3.22.1-1ubuntu1.22.04.2 [1913 kB]
+#7 9.693 Get:87 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 cmake amd64 3.22.1-1ubuntu1.22.04.2 [5010 kB]
+#7 9.826 Get:88 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-11-base amd64 11.4.0-1ubuntu1~22.04.2 [20.8 kB]
+#7 9.826 Get:89 http://archive.ubuntu.com/ubuntu jammy/main amd64 libisl23 amd64 0.24-2build1 [727 kB]
+#7 9.840 Get:90 http://archive.ubuntu.com/ubuntu jammy/main amd64 libmpfr6 amd64 4.1.0-3build3 [1425 kB]
+#7 9.886 Get:91 http://archive.ubuntu.com/ubuntu jammy/main amd64 libmpc3 amd64 1.2.1-2build1 [46.9 kB]
+#7 9.887 Get:92 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 cpp-11 amd64 11.4.0-1ubuntu1~22.04.2 [10.0 MB]
+#7 10.14 Get:93 http://archive.ubuntu.com/ubuntu jammy/main amd64 cpp amd64 4:11.2.0-1ubuntu1 [27.7 kB]
+#7 10.14 Get:94 http://archive.ubuntu.com/ubuntu jammy/main amd64 xml-core all 0.18+nmu1 [21.6 kB]
+#7 10.14 Get:95 http://archive.ubuntu.com/ubuntu jammy/main amd64 docutils-common all 0.17.1+dfsg-2 [117 kB]
+#7 10.14 Get:96 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libllvm14 amd64 1:14.0.0-1ubuntu1.1 [24.0 MB]
+#7 10.76 Get:97 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang-cpp14 amd64 1:14.0.0-1ubuntu1.1 [12.1 MB]
+#7 11.06 Get:98 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang1-14 amd64 1:14.0.0-1ubuntu1.1 [6792 kB]
+#7 11.24 Get:99 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libxapian30 amd64 1.4.18-4 [701 kB]
+#7 11.26 Get:100 http://archive.ubuntu.com/ubuntu jammy/universe amd64 doxygen amd64 1.9.1-2ubuntu2 [4620 kB]
+#7 11.37 Get:101 http://archive.ubuntu.com/ubuntu jammy/main amd64 fontconfig amd64 2.13.1-4.2ubuntu5 [177 kB]
+#7 11.73 Get:102 http://archive.ubuntu.com/ubuntu jammy/main amd64 fonts-font-awesome all 5.0.10+really4.7.0~dfsg-4.1 [516 kB]
+#7 12.51 Get:103 http://archive.ubuntu.com/ubuntu jammy/universe amd64 fonts-lmodern all 2.004.5-6.1 [4532 kB]
+#7 12.93 Get:104 http://archive.ubuntu.com/ubuntu jammy/universe amd64 fonts-lyx all 2.3.6-1 [159 kB]
+#7 12.93 Get:105 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcc1-0 amd64 12.3.0-1ubuntu1~22.04.2 [48.3 kB]
+#7 12.93 Get:106 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgomp1 amd64 12.3.0-1ubuntu1~22.04.2 [127 kB]
+#7 12.94 Get:107 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libitm1 amd64 12.3.0-1ubuntu1~22.04.2 [30.2 kB]
+#7 12.94 Get:108 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libatomic1 amd64 12.3.0-1ubuntu1~22.04.2 [10.4 kB]
+#7 12.94 Get:109 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libasan6 amd64 11.4.0-1ubuntu1~22.04.2 [2283 kB]
+#7 13.02 Get:110 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 liblsan0 amd64 12.3.0-1ubuntu1~22.04.2 [1069 kB]
+#7 13.04 Get:111 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtsan0 amd64 11.4.0-1ubuntu1~22.04.2 [2262 kB]
+#7 13.11 Get:112 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libubsan1 amd64 12.3.0-1ubuntu1~22.04.2 [976 kB]
+#7 13.13 Get:113 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libquadmath0 amd64 12.3.0-1ubuntu1~22.04.2 [154 kB]
+#7 13.16 Get:114 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgcc-11-dev amd64 11.4.0-1ubuntu1~22.04.2 [2517 kB]
+#7 13.19 Get:115 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-11 amd64 11.4.0-1ubuntu1~22.04.2 [20.1 MB]
+#7 13.72 Get:116 http://archive.ubuntu.com/ubuntu jammy/main amd64 gcc amd64 4:11.2.0-1ubuntu1 [5112 B]
+#7 13.72 Get:117 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc-dev-bin amd64 2.35-0ubuntu3.10 [20.3 kB]
+#7 13.72 Get:118 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 linux-libc-dev amd64 5.15.0-153.163 [1324 kB]
+#7 13.77 Get:119 http://archive.ubuntu.com/ubuntu jammy/main amd64 libcrypt-dev amd64 1:4.4.27-1 [112 kB]
+#7 13.78 Get:120 http://archive.ubuntu.com/ubuntu jammy/main amd64 rpcsvc-proto amd64 1.4.2-0ubuntu6 [68.5 kB]
+#7 13.78 Get:121 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtirpc-dev amd64 1.3.2-2ubuntu0.1 [192 kB]
+#7 13.78 Get:122 http://archive.ubuntu.com/ubuntu jammy/main amd64 libnsl-dev amd64 1.3.0-2build2 [71.3 kB]
+#7 13.79 Get:123 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-dev amd64 2.35-0ubuntu3.10 [2100 kB]
+#7 13.84 Get:124 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libstdc++-11-dev amd64 11.4.0-1ubuntu1~22.04.2 [2101 kB]
+#7 13.89 Get:125 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 g++-11 amd64 11.4.0-1ubuntu1~22.04.2 [11.4 MB]
+#7 14.19 Get:126 http://archive.ubuntu.com/ubuntu jammy/main amd64 g++ amd64 4:11.2.0-1ubuntu1 [1412 B]
+#7 14.19 Get:127 http://archive.ubuntu.com/ubuntu jammy/main amd64 gettext amd64 0.21-4ubuntu4 [868 kB]
+#7 14.21 Get:128 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgfortran5 amd64 12.3.0-1ubuntu1~22.04.2 [879 kB]
+#7 14.23 Get:129 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgfortran-11-dev amd64 11.4.0-1ubuntu1~22.04.2 [842 kB]
+#7 14.25 Get:130 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 gfortran-11 amd64 11.4.0-1ubuntu1~22.04.2 [11.2 MB]
+#7 14.54 Get:131 http://archive.ubuntu.com/ubuntu jammy/main amd64 gfortran amd64 4:11.2.0-1ubuntu1 [1182 B]
+#7 14.54 Get:132 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcurl3-gnutls amd64 7.81.0-1ubuntu1.20 [284 kB]
+#7 14.54 Get:133 http://archive.ubuntu.com/ubuntu jammy/main amd64 liberror-perl all 0.17029-1 [26.5 kB]
+#7 14.54 Get:134 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 git-man all 1:2.34.1-1ubuntu1.15 [955 kB]
+#7 14.57 Get:135 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 git amd64 1:2.34.1-1ubuntu1.15 [3166 kB]
+#7 14.65 Get:136 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libann0 amd64 1.1.2+doc-7build1 [26.0 kB]
+#7 14.65 Get:137 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libcdt5 amd64 2.42.2-6ubuntu0.1 [21.1 kB]
+#7 14.65 Get:138 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libcgraph6 amd64 2.42.2-6ubuntu0.1 [45.4 kB]
+#7 14.65 Get:139 http://archive.ubuntu.com/ubuntu jammy/main amd64 libjpeg-turbo8 amd64 2.1.2-0ubuntu1 [134 kB]
+#7 14.66 Get:140 http://archive.ubuntu.com/ubuntu jammy/main amd64 libjpeg8 amd64 8c-2ubuntu10 [2264 B]
+#7 14.66 Get:141 http://archive.ubuntu.com/ubuntu jammy/main amd64 libdeflate0 amd64 1.10-2 [70.9 kB]
+#7 14.77 Get:142 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libjbig0 amd64 2.1-3.1ubuntu0.22.04.1 [29.2 kB]
+#7 14.77 Get:143 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libwebp7 amd64 1.2.2-2ubuntu0.22.04.2 [206 kB]
+#7 14.78 Get:144 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtiff5 amd64 4.3.0-6ubuntu0.11 [185 kB]
+#7 14.78 Get:145 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libxpm4 amd64 1:3.5.12-1ubuntu0.22.04.2 [36.7 kB]
+#7 14.78 Get:146 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgd3 amd64 2.3.0-2ubuntu2.3 [129 kB]
+#7 14.78 Get:147 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libgts-0.7-5 amd64 0.7.6+darcs121130-5 [164 kB]
+#7 14.79 Get:148 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpixman-1-0 amd64 0.40.0-1ubuntu0.22.04.1 [264 kB]
+#7 14.79 Get:149 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxcb-render0 amd64 1.14-3ubuntu3 [16.4 kB]
+#7 14.89 Get:150 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxcb-shm0 amd64 1.14-3ubuntu3 [5780 B]
+#7 14.89 Get:151 http://archive.ubuntu.com/ubuntu jammy/main amd64 libcairo2 amd64 1.16.0-5ubuntu2 [628 kB]
+#7 15.01 Get:152 http://archive.ubuntu.com/ubuntu jammy/main amd64 libltdl7 amd64 2.4.6-15build2 [39.6 kB]
+#7 15.01 Get:153 http://archive.ubuntu.com/ubuntu jammy/main amd64 libgraphite2-3 amd64 1.3.14-1build2 [71.3 kB]
+#7 15.01 Get:154 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libharfbuzz0b amd64 2.7.4-1ubuntu3.2 [353 kB]
+#7 15.02 Get:155 http://archive.ubuntu.com/ubuntu jammy/main amd64 libthai-data all 0.1.29-1build1 [162 kB]
+#7 15.02 Get:156 http://archive.ubuntu.com/ubuntu jammy/main amd64 libdatrie1 amd64 0.2.13-2 [19.9 kB]
+#7 15.02 Get:157 http://archive.ubuntu.com/ubuntu jammy/main amd64 libthai0 amd64 0.1.29-1build1 [19.2 kB]
+#7 15.02 Get:158 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpango-1.0-0 amd64 1.50.6+ds-2ubuntu1 [230 kB]
+#7 15.02 Get:159 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpangoft2-1.0-0 amd64 1.50.6+ds-2ubuntu1 [54.0 kB]
+#7 15.12 Get:160 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpangocairo-1.0-0 amd64 1.50.6+ds-2ubuntu1 [39.8 kB]
+#7 15.13 Get:161 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libpathplan4 amd64 2.42.2-6ubuntu0.1 [23.4 kB]
+#7 15.24 Get:162 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libgvc6 amd64 2.42.2-6ubuntu0.1 [724 kB]
+#7 15.26 Get:163 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libgvpr2 amd64 2.42.2-6ubuntu0.1 [192 kB]
+#7 15.26 Get:164 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 liblab-gamut1 amd64 2.42.2-6ubuntu0.1 [1965 kB]
+#7 15.30 Get:165 http://archive.ubuntu.com/ubuntu jammy/main amd64 libice6 amd64 2:1.0.10-1build2 [42.6 kB]
+#7 15.30 Get:166 http://archive.ubuntu.com/ubuntu jammy/main amd64 libsm6 amd64 2:1.2.3-1build2 [16.7 kB]
+#7 15.30 Get:167 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxt6 amd64 1:1.2.1-1 [177 kB]
+#7 15.30 Get:168 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxmu6 amd64 2:1.1.3-3 [49.6 kB]
+#7 15.30 Get:169 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxaw7 amd64 2:1.0.14-1 [191 kB]
+#7 15.36 Get:170 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 graphviz amd64 2.42.2-6ubuntu0.1 [653 kB]
+#7 15.37 Get:171 http://archive.ubuntu.com/ubuntu jammy/main amd64 libpaper1 amd64 1.1.28build2 [13.8 kB]
+#7 15.47 Get:172 http://archive.ubuntu.com/ubuntu jammy/main amd64 libpaper-utils amd64 1.1.28build2 [8674 B]
+#7 15.47 Get:173 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libkpathsea6 amd64 2021.20210626.59705-1ubuntu0.2 [60.4 kB]
+#7 15.47 Get:174 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libptexenc1 amd64 2021.20210626.59705-1ubuntu0.2 [39.1 kB]
+#7 15.48 Get:175 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libsynctex2 amd64 2021.20210626.59705-1ubuntu0.2 [55.6 kB]
+#7 15.48 Get:176 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtexlua53 amd64 2021.20210626.59705-1ubuntu0.2 [120 kB]
+#7 15.48 Get:177 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtexluajit2 amd64 2021.20210626.59705-1ubuntu0.2 [267 kB]
+#7 15.48 Get:178 http://archive.ubuntu.com/ubuntu jammy/main amd64 t1utils amd64 1.41-4build2 [61.3 kB]
+#7 15.49 Get:179 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libteckit0 amd64 2.5.11+ds1-1 [421 kB]
+#7 15.59 Get:180 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxi6 amd64 2:1.8-1build1 [32.6 kB]
+#7 15.59 Get:181 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libzzip-0-13 amd64 0.13.72+dfsg.1-1.1 [27.0 kB]
+#7 15.71 Get:182 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 texlive-binaries amd64 2021.20210626.59705-1ubuntu0.2 [9860 kB]
+#7 15.95 Get:183 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 xdg-utils all 1.1.3-4.1ubuntu3~22.04.1 [61.9 kB]
+#7 15.96 Get:184 http://archive.ubuntu.com/ubuntu jammy/universe amd64 texlive-base all 2021.20220204-1 [21.0 MB]
+#7 16.61 Get:185 http://archive.ubuntu.com/ubuntu jammy/universe amd64 texlive-latex-base all 2021.20220204-1 [1128 kB]
+#7 16.63 Get:186 http://archive.ubuntu.com/ubuntu jammy/universe amd64 latexmk all 1:4.76-1 [171 kB]
+#7 16.64 Get:187 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libaec0 amd64 1.0.6-1 [20.1 kB]
+#7 16.64 Get:188 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libapache-pom-java all 18-1 [4720 B]
+#7 16.64 Get:189 http://archive.ubuntu.com/ubuntu jammy/main amd64 libblas3 amd64 3.10.0-2ubuntu1 [228 kB]
+#7 16.65 Get:190 http://archive.ubuntu.com/ubuntu jammy/main amd64 libboost1.74-dev amd64 1.74.0-14ubuntu3 [9609 kB]
+#7 16.94 Get:191 http://archive.ubuntu.com/ubuntu jammy/main amd64 libboost-dev amd64 1.74.0.3ubuntu7 [3490 B]
+#7 16.94 Get:192 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libcommons-parent-java all 43-1 [10.8 kB]
+#7 16.94 Get:193 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libcommons-logging-java all 1.2-2 [60.3 kB]
+#7 16.94 Get:194 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libdpkg-perl all 1.21.1ubuntu2.3 [237 kB]
+#7 16.94 Get:195 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libexpat1-dev amd64 2.4.7-1ubuntu0.6 [148 kB]
+#7 16.95 Get:196 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libsz2 amd64 1.0.6-1 [5354 B]
+#7 16.95 Get:197 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libhdf5-103-1 amd64 1.10.7+repack-4ubuntu2 [1295 kB]
+#7 16.98 Get:198 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libhdf5-hl-100 amd64 1.10.7+repack-4ubuntu2 [59.1 kB]
+#7 16.98 Get:199 http://archive.ubuntu.com/ubuntu jammy/main amd64 libimagequant0 amd64 2.17.0-1 [34.6 kB]
+#7 17.06 Get:200 http://archive.ubuntu.com/ubuntu jammy/main amd64 libjs-jquery all 3.6.0+dfsg+~3.5.13-1 [321 kB]
+#7 17.06 Get:201 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libjs-jquery-ui all 1.13.1+dfsg-1 [253 kB]
+#7 17.17 Get:202 http://archive.ubuntu.com/ubuntu jammy/main amd64 libjs-underscore all 1.13.2~dfsg-2 [118 kB]
+#7 17.53 Get:203 http://archive.ubuntu.com/ubuntu jammy/main amd64 libjs-sphinxdoc all 4.3.2-1 [139 kB]
+#7 18.07 Get:204 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libopenblas0-pthread amd64 0.3.20+ds-1 [6803 kB]
+#7 18.77 Get:205 http://archive.ubuntu.com/ubuntu jammy/main amd64 liblapack3 amd64 3.10.0-2ubuntu1 [2504 kB]
+#7 18.84 Get:206 http://archive.ubuntu.com/ubuntu jammy/universe amd64 liblbfgsb0 amd64 3.0+dfsg.3-10 [29.9 kB]
+#7 18.84 Get:207 http://archive.ubuntu.com/ubuntu jammy/main amd64 liblcms2-2 amd64 2.12~rc1-2build2 [159 kB]
+#7 18.84 Get:208 http://archive.ubuntu.com/ubuntu jammy/universe amd64 liblzf1 amd64 3.6-3 [7444 B]
+#7 18.84 Get:209 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libopenblas0 amd64 0.3.20+ds-1 [6098 B]
+#7 18.84 Get:210 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libopenblas-pthread-dev amd64 0.3.20+ds-1 [4634 kB]
+#7 18.97 Get:211 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libopenblas-dev amd64 0.3.20+ds-1 [18.6 kB]
+#7 18.97 Get:212 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpython3.10 amd64 3.10.12-1~22.04.11 [1949 kB]
+#7 19.02 Get:213 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 zlib1g-dev amd64 1:1.2.11.dfsg-2ubuntu9.2 [164 kB]
+#7 19.02 Get:214 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpython3.10-dev amd64 3.10.12-1~22.04.11 [4764 kB]
+#7 19.15 Get:215 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpython3-dev amd64 3.10.6-1~22.04.1 [7064 B]
+#7 19.15 Get:216 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libqhull-r8.0 amd64 2020.2-4 [196 kB]
+#7 19.15 Get:217 http://archive.ubuntu.com/ubuntu jammy/main amd64 libraqm0 amd64 0.7.0-4ubuntu1 [11.7 kB]
+#7 19.15 Get:218 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libtext-unidecode-perl all 1.30-1 [99.0 kB]
+#7 19.16 Get:219 http://archive.ubuntu.com/ubuntu jammy/main amd64 libtool all 2.4.6-15build2 [164 kB]
+#7 19.16 Get:220 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libwebpdemux2 amd64 1.2.2-2ubuntu0.22.04.2 [9964 B]
+#7 19.16 Get:221 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libwebpmux3 amd64 1.2.2-2ubuntu0.22.04.2 [20.5 kB]
+#7 19.24 Get:222 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxml-namespacesupport-perl all 1.12-1.1 [13.2 kB]
+#7 19.24 Get:223 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxml-sax-base-perl all 1.09-1.1 [19.0 kB]
+#7 19.36 Get:224 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxml-sax-perl all 1.02+dfsg-3 [57.0 kB]
+#7 19.36 Get:225 http://archive.ubuntu.com/ubuntu jammy/main amd64 libxml-libxml-perl amd64 2.0207+dfsg+really+2.0134-1 [325 kB]
+#7 19.37 Get:226 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libxsimd-dev amd64 7.6.0-2 [108 kB]
+#7 19.37 Get:227 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libxslt1.1 amd64 1.1.34-4ubuntu0.22.04.4 [165 kB]
+#7 19.38 Get:228 http://archive.ubuntu.com/ubuntu jammy/main amd64 make amd64 4.3-4.1build1 [180 kB]
+#7 19.38 Get:229 http://archive.ubuntu.com/ubuntu jammy/main amd64 pkg-config amd64 0.29.2-1ubuntu3 [48.2 kB]
+#7 19.38 Get:230 http://archive.ubuntu.com/ubuntu jammy/universe amd64 preview-latex-style all 12.2-1ubuntu1 [185 kB]
+#7 19.38 Get:231 http://archive.ubuntu.com/ubuntu jammy/main amd64 python-babel-localedata all 2.8.0+dfsg.1-7 [4982 kB]
+#7 19.52 Get:232 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python-matplotlib-data all 3.5.1-2build1 [2942 kB]
+#7 19.60 Get:233 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-appdirs all 1.4.4-2 [11.4 kB]
+#7 19.60 Get:234 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-attr all 21.2.0-1 [44.0 kB]
+#7 19.60 Get:235 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-tz all 2022.1-1ubuntu0.22.04.1 [30.7 kB]
+#7 19.60 Get:236 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-babel all 2.8.0+dfsg.1-7 [85.1 kB]
+#7 19.61 Get:237 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-gast all 0.5.2-2 [9394 B]
+#7 19.61 Get:238 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-beniget all 0.4.1-2 [9904 B]
+#7 19.61 Get:239 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-roman all 3.3-1 [10.6 kB]
+#7 19.61 Get:240 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-docutils all 0.17.1+dfsg-2 [387 kB]
+#7 19.71 Get:241 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-lib2to3 all 3.10.8-1~22.04 [77.6 kB]
+#7 19.83 Get:242 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-distutils all 3.10.8-1~22.04 [139 kB]
+#7 19.83 Get:243 http://archive.ubuntu.com/ubuntu jammy/main amd64 sphinx-common all 4.3.2-1 [680 kB]
+#7 19.85 Get:244 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-alabaster all 0.7.12-1 [17.8 kB]
+#7 19.85 Get:245 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-imagesize all 1.3.0-1 [6458 B]
+#7 19.85 Get:246 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-markupsafe amd64 2.0.1-2build1 [12.7 kB]
+#7 19.85 Get:247 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-jinja2 all 3.0.3-1ubuntu0.4 [108 kB]
+#7 19.85 Get:248 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-pyparsing all 2.4.7-1 [61.4 kB]
+#7 19.85 Get:249 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-packaging all 21.3-1 [30.7 kB]
+#7 19.85 Get:250 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-pygments all 2.11.2+dfsg-2ubuntu0.1 [750 kB]
+#7 19.95 Get:251 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-certifi all 2020.6.20-1 [150 kB]
+#7 20.06 Get:252 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-chardet all 4.0.0-1 [98.0 kB]
+#7 20.07 Get:253 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-idna all 3.3-1ubuntu0.1 [52.1 kB]
+#7 20.07 Get:254 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-six all 1.16.0-3ubuntu1 [12.6 kB]
+#7 20.07 Get:255 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-urllib3 all 1.26.5-1~exp1ubuntu0.3 [98.6 kB]
+#7 20.07 Get:256 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-requests all 2.25.1+dfsg-2ubuntu0.3 [48.8 kB]
+#7 20.07 Get:257 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-snowballstemmer all 2.2.0-1build1 [60.2 kB]
+#7 20.07 Get:258 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-sphinx all 4.3.2-1 [541 kB]
+#7 20.08 Get:259 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-breathe all 4.33.1-3 [69.6 kB]
+#7 20.09 Get:260 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-brotli amd64 1.0.9-2build6 [319 kB]
+#7 20.18 Get:261 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-colorama all 0.4.4-1 [24.5 kB]
+#7 20.30 Get:262 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-commonmark all 0.9.1-3 [43.7 kB]
+#7 20.30 Get:263 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-cycler all 0.11.0-1 [8156 B]
+#7 20.30 Get:264 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-dateutil all 2.8.1-6 [78.4 kB]
+#7 20.30 Get:265 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-decorator all 4.4.2-0ubuntu1 [10.3 kB]
+#7 20.30 Get:266 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3.10-dev amd64 3.10.12-1~22.04.11 [508 kB]
+#7 20.31 Get:267 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-dev amd64 3.10.6-1~22.04.1 [26.0 kB]
+#7 20.31 Get:268 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-numpy amd64 1:1.21.5-1ubuntu22.04.1 [3467 kB]
+#7 20.39 Get:269 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-ply all 3.11-5 [47.5 kB]
+#7 20.39 Get:270 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-pythran amd64 0.10.0+ds2-1 [423 kB]
+#7 20.42 Get:271 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-scipy amd64 1.8.0-1exp2ubuntu1 [14.7 MB]
+#7 20.81 Get:272 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-ufolib2 all 0.13.1+dfsg1-1 [32.2 kB]
+#7 20.81 Get:273 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-mpmath all 1.2.1-2 [419 kB]
+#7 20.82 Get:274 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-sympy all 1.9-1 [4312 kB]
+#7 20.94 Get:275 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-fs all 2.4.12-1 [84.9 kB]
+#7 20.94 Get:276 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-lxml amd64 4.8.0-1build1 [1150 kB]
+#7 20.97 Get:277 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-lz4 amd64 3.1.3+dfsg-1build3 [33.3 kB]
+#7 20.97 Get:278 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-unicodedata2 amd64 14.0.0+ds-8 [376 kB]
+#7 20.98 Get:279 http://archive.ubuntu.com/ubuntu jammy/universe amd64 unicode-data all 14.0.0-1.1 [8206 kB]
+#7 21.20 Get:280 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-fonttools amd64 4.29.1-2build1 [810 kB]
+#7 21.22 Get:281 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-h5py-serial amd64 3.6.0-2build1 [872 kB]
+#7 21.26 Get:282 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-h5py all 3.6.0-2build1 [4740 B]
+#7 21.26 Get:283 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-kiwisolver amd64 1.3.2-1build1 [48.0 kB]
+#7 21.26 Get:284 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libopenjp2-7 amd64 2.4.0-6ubuntu0.3 [158 kB]
+#7 21.26 Get:285 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-pil amd64 9.0.1-1ubuntu0.3 [419 kB]
+#7 21.27 Get:286 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-tk amd64 3.10.8-1~22.04 [110 kB]
+#7 21.27 Get:287 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 python3-pil.imagetk amd64 9.0.1-1ubuntu0.3 [9616 B]
+#7 21.28 Get:288 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-matplotlib amd64 3.5.1-2build1 [5937 kB]
+#7 21.43 Get:289 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-rich all 11.2.0-1 [177 kB]
+#7 21.44 Get:290 http://archive.ubuntu.com/ubuntu jammy/universe amd64 python3-meshio all 5.3.0-1 [110 kB]
+#7 21.44 Get:291 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 python3-setuptools all 59.6.0-1.2ubuntu0.22.04.3 [340 kB]
+#7 21.45 Get:292 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 python3-wheel all 0.37.1-2ubuntu0.22.04.1 [32.0 kB]
+#7 21.45 Get:293 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 python3-pip all 22.0.2+dfsg-1ubuntu0.6 [1306 kB]
+#7 21.49 Get:294 http://archive.ubuntu.com/ubuntu jammy/main amd64 sphinx-rtd-theme-common all 1.0.0+dfsg-1 [991 kB]
+#7 21.51 Get:295 http://archive.ubuntu.com/ubuntu jammy/main amd64 python3-sphinx-rtd-theme all 1.0.0+dfsg-1 [21.3 kB]
+#7 21.51 Get:296 http://archive.ubuntu.com/ubuntu jammy/universe amd64 texinfo amd64 6.8-4build1 [1423 kB]
+#7 21.55 Get:297 http://archive.ubuntu.com/ubuntu jammy/universe amd64 texlive-fonts-recommended all 2021.20220204-1 [4972 kB]
+#7 21.68 Get:298 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libfontbox-java all 1:1.8.16-2 [207 kB]
+#7 21.69 Get:299 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libpdfbox-java all 1:1.8.16-2 [5199 kB]
+#7 21.84 Get:300 http://archive.ubuntu.com/ubuntu jammy/universe amd64 texlive-latex-recommended all 2021.20220204-1 [14.4 MB]
+#7 22.23 Get:301 http://archive.ubuntu.com/ubuntu jammy/universe amd64 texlive-pictures all 2021.20220204-1 [8720 kB]
+#7 22.46 Get:302 http://archive.ubuntu.com/ubuntu jammy/universe amd64 texlive-latex-extra all 2021.20220204-1 [13.9 MB]
+#7 22.83 Get:303 http://archive.ubuntu.com/ubuntu jammy/main amd64 libglvnd0 amd64 1.4.0-1 [73.6 kB]
+#7 23.07 Get:304 http://archive.ubuntu.com/ubuntu jammy/main amd64 libopengl0 amd64 1.4.0-1 [36.5 kB]
+#7 23.36 Get:305 http://archive.ubuntu.com/ubuntu jammy/main amd64 libglu1-mesa amd64 9.0.2-1 [145 kB]
+#7 23.76 debconf: delaying package configuration, since apt-utils is not installed
+#7 23.79 Fetched 365 MB in 18s (20.6 MB/s)
+#7 23.80 Selecting previously unselected package libpython3.10-minimal:amd64.
+#7 23.80 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 4393 files and directories currently installed.)
+#7 23.81 Preparing to unpack .../libpython3.10-minimal_3.10.12-1~22.04.11_amd64.deb ...
+#7 23.81 Unpacking libpython3.10-minimal:amd64 (3.10.12-1~22.04.11) ...
+#7 23.89 Selecting previously unselected package libexpat1:amd64.
+#7 23.89 Preparing to unpack .../libexpat1_2.4.7-1ubuntu0.6_amd64.deb ...
+#7 23.89 Unpacking libexpat1:amd64 (2.4.7-1ubuntu0.6) ...
+#7 23.91 Selecting previously unselected package python3.10-minimal.
+#7 23.91 Preparing to unpack .../python3.10-minimal_3.10.12-1~22.04.11_amd64.deb ...
+#7 23.91 Unpacking python3.10-minimal (3.10.12-1~22.04.11) ...
+#7 23.95 Setting up libpython3.10-minimal:amd64 (3.10.12-1~22.04.11) ...
+#7 23.95 Setting up libexpat1:amd64 (2.4.7-1ubuntu0.6) ...
+#7 23.96 Setting up python3.10-minimal (3.10.12-1~22.04.11) ...
+#7 24.48 Selecting previously unselected package python3-minimal.
+#7 24.48 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 4697 files and directories currently installed.)
+#7 24.48 Preparing to unpack .../0-python3-minimal_3.10.6-1~22.04.1_amd64.deb ...
+#7 24.48 Unpacking python3-minimal (3.10.6-1~22.04.1) ...
+#7 24.50 Selecting previously unselected package media-types.
+#7 24.50 Preparing to unpack .../1-media-types_7.0.0_all.deb ...
+#7 24.50 Unpacking media-types (7.0.0) ...
+#7 24.51 Selecting previously unselected package libmpdec3:amd64.
+#7 24.52 Preparing to unpack .../2-libmpdec3_2.5.1-2build2_amd64.deb ...
+#7 24.52 Unpacking libmpdec3:amd64 (2.5.1-2build2) ...
+#7 24.53 Selecting previously unselected package readline-common.
+#7 24.53 Preparing to unpack .../3-readline-common_8.1.2-1_all.deb ...
+#7 24.53 Unpacking readline-common (8.1.2-1) ...
+#7 24.55 Selecting previously unselected package libreadline8:amd64.
+#7 24.55 Preparing to unpack .../4-libreadline8_8.1.2-1_amd64.deb ...
+#7 24.55 Unpacking libreadline8:amd64 (8.1.2-1) ...
+#7 24.57 Selecting previously unselected package libsqlite3-0:amd64.
+#7 24.57 Preparing to unpack .../5-libsqlite3-0_3.37.2-2ubuntu0.5_amd64.deb ...
+#7 24.57 Unpacking libsqlite3-0:amd64 (3.37.2-2ubuntu0.5) ...
+#7 24.59 Selecting previously unselected package libpython3.10-stdlib:amd64.
+#7 24.59 Preparing to unpack .../6-libpython3.10-stdlib_3.10.12-1~22.04.11_amd64.deb ...
+#7 24.59 Unpacking libpython3.10-stdlib:amd64 (3.10.12-1~22.04.11) ...
+#7 24.67 Selecting previously unselected package python3.10.
+#7 24.67 Preparing to unpack .../7-python3.10_3.10.12-1~22.04.11_amd64.deb ...
+#7 24.67 Unpacking python3.10 (3.10.12-1~22.04.11) ...
+#7 24.69 Selecting previously unselected package libpython3-stdlib:amd64.
+#7 24.69 Preparing to unpack .../8-libpython3-stdlib_3.10.6-1~22.04.1_amd64.deb ...
+#7 24.69 Unpacking libpython3-stdlib:amd64 (3.10.6-1~22.04.1) ...
+#7 24.71 Setting up python3-minimal (3.10.6-1~22.04.1) ...
+#7 24.84 Selecting previously unselected package python3.
+#7 24.84 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 5127 files and directories currently installed.)
+#7 24.84 Preparing to unpack .../000-python3_3.10.6-1~22.04.1_amd64.deb ...
+#7 24.85 Unpacking python3 (3.10.6-1~22.04.1) ...
+#7 24.86 Selecting previously unselected package libsigsegv2:amd64.
+#7 24.86 Preparing to unpack .../001-libsigsegv2_2.13-1ubuntu3_amd64.deb ...
+#7 24.86 Unpacking libsigsegv2:amd64 (2.13-1ubuntu3) ...
+#7 24.88 Selecting previously unselected package m4.
+#7 24.88 Preparing to unpack .../002-m4_1.4.18-5ubuntu2_amd64.deb ...
+#7 24.88 Unpacking m4 (1.4.18-5ubuntu2) ...
+#7 24.90 Selecting previously unselected package flex.
+#7 24.90 Preparing to unpack .../003-flex_2.6.4-8build2_amd64.deb ...
+#7 24.90 Unpacking flex (2.6.4-8build2) ...
+#7 24.92 Selecting previously unselected package fonts-lato.
+#7 24.92 Preparing to unpack .../004-fonts-lato_2.0-2.1_all.deb ...
+#7 24.92 Unpacking fonts-lato (2.0-2.1) ...
+#7 25.13 Selecting previously unselected package perl-modules-5.34.
+#7 25.13 Preparing to unpack .../005-perl-modules-5.34_5.34.0-3ubuntu1.5_all.deb ...
+#7 25.13 Unpacking perl-modules-5.34 (5.34.0-3ubuntu1.5) ...
+#7 25.39 Selecting previously unselected package libgdbm6:amd64.
+#7 25.39 Preparing to unpack .../006-libgdbm6_1.23-1_amd64.deb ...
+#7 25.39 Unpacking libgdbm6:amd64 (1.23-1) ...
+#7 25.41 Selecting previously unselected package libgdbm-compat4:amd64.
+#7 25.41 Preparing to unpack .../007-libgdbm-compat4_1.23-1_amd64.deb ...
+#7 25.41 Unpacking libgdbm-compat4:amd64 (1.23-1) ...
+#7 25.42 Selecting previously unselected package libperl5.34:amd64.
+#7 25.42 Preparing to unpack .../008-libperl5.34_5.34.0-3ubuntu1.5_amd64.deb ...
+#7 25.42 Unpacking libperl5.34:amd64 (5.34.0-3ubuntu1.5) ...
+#7 25.58 Selecting previously unselected package perl.
+#7 25.58 Preparing to unpack .../009-perl_5.34.0-3ubuntu1.5_amd64.deb ...
+#7 25.59 Unpacking perl (5.34.0-3ubuntu1.5) ...
+#7 25.61 Selecting previously unselected package sgml-base.
+#7 25.61 Preparing to unpack .../010-sgml-base_1.30_all.deb ...
+#7 25.62 Unpacking sgml-base (1.30) ...
+#7 25.64 Selecting previously unselected package ucf.
+#7 25.64 Preparing to unpack .../011-ucf_3.0043_all.deb ...
+#7 25.64 Moving old data out of the way
+#7 25.64 Unpacking ucf (3.0043) ...
+#7 25.66 Selecting previously unselected package tex-common.
+#7 25.66 Preparing to unpack .../012-tex-common_6.17_all.deb ...
+#7 25.66 Unpacking tex-common (6.17) ...
+#7 25.69 Selecting previously unselected package openssl.
+#7 25.69 Preparing to unpack .../013-openssl_3.0.2-0ubuntu1.19_amd64.deb ...
+#7 25.69 Unpacking openssl (3.0.2-0ubuntu1.19) ...
+#7 25.72 Selecting previously unselected package ca-certificates.
+#7 25.72 Preparing to unpack .../014-ca-certificates_20240203~22.04.1_all.deb ...
+#7 25.72 Unpacking ca-certificates (20240203~22.04.1) ...
+#7 25.76 Selecting previously unselected package libmd0:amd64.
+#7 25.76 Preparing to unpack .../015-libmd0_1.0.4-1build1_amd64.deb ...
+#7 25.76 Unpacking libmd0:amd64 (1.0.4-1build1) ...
+#7 25.78 Selecting previously unselected package libbsd0:amd64.
+#7 25.78 Preparing to unpack .../016-libbsd0_0.11.5-1_amd64.deb ...
+#7 25.78 Unpacking libbsd0:amd64 (0.11.5-1) ...
+#7 25.79 Selecting previously unselected package libfribidi0:amd64.
+#7 25.79 Preparing to unpack .../017-libfribidi0_1.0.8-2ubuntu3.1_amd64.deb ...
+#7 25.79 Unpacking libfribidi0:amd64 (1.0.8-2ubuntu3.1) ...
+#7 25.81 Selecting previously unselected package libglib2.0-0:amd64.
+#7 25.81 Preparing to unpack .../018-libglib2.0-0_2.72.4-0ubuntu2.6_amd64.deb ...
+#7 25.81 Unpacking libglib2.0-0:amd64 (2.72.4-0ubuntu2.6) ...
+#7 25.84 Selecting previously unselected package libicu70:amd64.
+#7 25.84 Preparing to unpack .../019-libicu70_70.1-2_amd64.deb ...
+#7 25.84 Unpacking libicu70:amd64 (70.1-2) ...
+#7 25.96 Selecting previously unselected package libxml2:amd64.
+#7 25.96 Preparing to unpack .../020-libxml2_2.9.13+dfsg-1ubuntu0.9_amd64.deb ...
+#7 25.96 Unpacking libxml2:amd64 (2.9.13+dfsg-1ubuntu0.9) ...
+#7 25.98 Selecting previously unselected package python3-pkg-resources.
+#7 25.99 Preparing to unpack .../021-python3-pkg-resources_59.6.0-1.2ubuntu0.22.04.3_all.deb ...
+#7 25.99 Unpacking python3-pkg-resources (59.6.0-1.2ubuntu0.22.04.3) ...
+#7 26.00 Selecting previously unselected package tzdata.
+#7 26.01 Preparing to unpack .../022-tzdata_2025b-0ubuntu0.22.04.1_all.deb ...
+#7 26.01 Unpacking tzdata (2025b-0ubuntu0.22.04.1) ...
+#7 26.28 Selecting previously unselected package libmagic-mgc.
+#7 26.29 Preparing to unpack .../023-libmagic-mgc_1%3a5.41-3ubuntu0.1_amd64.deb ...
+#7 26.29 Unpacking libmagic-mgc (1:5.41-3ubuntu0.1) ...
+#7 26.32 Selecting previously unselected package libmagic1:amd64.
+#7 26.32 Preparing to unpack .../024-libmagic1_1%3a5.41-3ubuntu0.1_amd64.deb ...
+#7 26.32 Unpacking libmagic1:amd64 (1:5.41-3ubuntu0.1) ...
+#7 26.34 Selecting previously unselected package file.
+#7 26.34 Preparing to unpack .../025-file_1%3a5.41-3ubuntu0.1_amd64.deb ...
+#7 26.34 Unpacking file (1:5.41-3ubuntu0.1) ...
+#7 26.35 Selecting previously unselected package gettext-base.
+#7 26.35 Preparing to unpack .../026-gettext-base_0.21-4ubuntu4_amd64.deb ...
+#7 26.35 Unpacking gettext-base (0.21-4ubuntu4) ...
+#7 26.37 Selecting previously unselected package libedit2:amd64.
+#7 26.37 Preparing to unpack .../027-libedit2_3.1-20210910-1build1_amd64.deb ...
+#7 26.37 Unpacking libedit2:amd64 (3.1-20210910-1build1) ...
+#7 26.39 Selecting previously unselected package libnghttp2-14:amd64.
+#7 26.39 Preparing to unpack .../028-libnghttp2-14_1.43.0-1ubuntu0.2_amd64.deb ...
+#7 26.39 Unpacking libnghttp2-14:amd64 (1.43.0-1ubuntu0.2) ...
+#7 26.40 Selecting previously unselected package libpng16-16:amd64.
+#7 26.40 Preparing to unpack .../029-libpng16-16_1.6.37-3build5_amd64.deb ...
+#7 26.40 Unpacking libpng16-16:amd64 (1.6.37-3build5) ...
+#7 26.42 Selecting previously unselected package libpsl5:amd64.
+#7 26.42 Preparing to unpack .../030-libpsl5_0.21.0-1.2build2_amd64.deb ...
+#7 26.42 Unpacking libpsl5:amd64 (0.21.0-1.2build2) ...
+#7 26.43 Selecting previously unselected package libuv1:amd64.
+#7 26.43 Preparing to unpack .../031-libuv1_1.43.0-1ubuntu0.1_amd64.deb ...
+#7 26.44 Unpacking libuv1:amd64 (1.43.0-1ubuntu0.1) ...
+#7 26.45 Selecting previously unselected package libxau6:amd64.
+#7 26.45 Preparing to unpack .../032-libxau6_1%3a1.0.9-1build5_amd64.deb ...
+#7 26.45 Unpacking libxau6:amd64 (1:1.0.9-1build5) ...
+#7 26.46 Selecting previously unselected package libxdmcp6:amd64.
+#7 26.46 Preparing to unpack .../033-libxdmcp6_1%3a1.1.3-0ubuntu5_amd64.deb ...
+#7 26.46 Unpacking libxdmcp6:amd64 (1:1.1.3-0ubuntu5) ...
+#7 26.48 Selecting previously unselected package libxcb1:amd64.
+#7 26.48 Preparing to unpack .../034-libxcb1_1.14-3ubuntu3_amd64.deb ...
+#7 26.48 Unpacking libxcb1:amd64 (1.14-3ubuntu3) ...
+#7 26.49 Selecting previously unselected package libx11-data.
+#7 26.49 Preparing to unpack .../035-libx11-data_2%3a1.7.5-1ubuntu0.3_all.deb ...
+#7 26.49 Unpacking libx11-data (2:1.7.5-1ubuntu0.3) ...
+#7 26.54 Selecting previously unselected package libx11-6:amd64.
+#7 26.55 Preparing to unpack .../036-libx11-6_2%3a1.7.5-1ubuntu0.3_amd64.deb ...
+#7 26.55 Unpacking libx11-6:amd64 (2:1.7.5-1ubuntu0.3) ...
+#7 26.56 Selecting previously unselected package libxext6:amd64.
+#7 26.57 Preparing to unpack .../037-libxext6_2%3a1.3.4-1build1_amd64.deb ...
+#7 26.57 Unpacking libxext6:amd64 (2:1.3.4-1build1) ...
+#7 26.58 Selecting previously unselected package wget.
+#7 26.58 Preparing to unpack .../038-wget_1.21.2-2ubuntu1.1_amd64.deb ...
+#7 26.58 Unpacking wget (1.21.2-2ubuntu1.1) ...
+#7 26.60 Selecting previously unselected package xz-utils.
+#7 26.60 Preparing to unpack .../039-xz-utils_5.2.5-2ubuntu1_amd64.deb ...
+#7 26.60 Unpacking xz-utils (5.2.5-2ubuntu1) ...
+#7 26.62 Selecting previously unselected package autopoint.
+#7 26.62 Preparing to unpack .../040-autopoint_0.21-4ubuntu4_all.deb ...
+#7 26.62 Unpacking autopoint (0.21-4ubuntu4) ...
+#7 26.63 Selecting previously unselected package autotools-dev.
+#7 26.63 Preparing to unpack .../041-autotools-dev_20220109.1_all.deb ...
+#7 26.63 Unpacking autotools-dev (20220109.1) ...
+#7 26.65 Selecting previously unselected package binutils-common:amd64.
+#7 26.65 Preparing to unpack .../042-binutils-common_2.38-4ubuntu2.8_amd64.deb ...
+#7 26.65 Unpacking binutils-common:amd64 (2.38-4ubuntu2.8) ...
+#7 26.66 Selecting previously unselected package libbinutils:amd64.
+#7 26.66 Preparing to unpack .../043-libbinutils_2.38-4ubuntu2.8_amd64.deb ...
+#7 26.66 Unpacking libbinutils:amd64 (2.38-4ubuntu2.8) ...
+#7 26.68 Selecting previously unselected package libctf-nobfd0:amd64.
+#7 26.69 Preparing to unpack .../044-libctf-nobfd0_2.38-4ubuntu2.8_amd64.deb ...
+#7 26.69 Unpacking libctf-nobfd0:amd64 (2.38-4ubuntu2.8) ...
+#7 26.70 Selecting previously unselected package libctf0:amd64.
+#7 26.70 Preparing to unpack .../045-libctf0_2.38-4ubuntu2.8_amd64.deb ...
+#7 26.70 Unpacking libctf0:amd64 (2.38-4ubuntu2.8) ...
+#7 26.72 Selecting previously unselected package binutils-x86-64-linux-gnu.
+#7 26.72 Preparing to unpack .../046-binutils-x86-64-linux-gnu_2.38-4ubuntu2.8_amd64.deb ...
+#7 26.72 Unpacking binutils-x86-64-linux-gnu (2.38-4ubuntu2.8) ...
+#7 26.79 Selecting previously unselected package binutils.
+#7 26.79 Preparing to unpack .../047-binutils_2.38-4ubuntu2.8_amd64.deb ...
+#7 26.80 Unpacking binutils (2.38-4ubuntu2.8) ...
+#7 26.81 Selecting previously unselected package bison.
+#7 26.81 Preparing to unpack .../048-bison_2%3a3.8.2+dfsg-1build1_amd64.deb ...
+#7 26.82 Unpacking bison (2:3.8.2+dfsg-1build1) ...
+#7 26.84 Selecting previously unselected package libtcl8.6:amd64.
+#7 26.84 Preparing to unpack .../049-libtcl8.6_8.6.12+dfsg-1build1_amd64.deb ...
+#7 26.84 Unpacking libtcl8.6:amd64 (8.6.12+dfsg-1build1) ...
+#7 26.90 Selecting previously unselected package libbrotli1:amd64.
+#7 26.90 Preparing to unpack .../050-libbrotli1_1.0.9-2build6_amd64.deb ...
+#7 26.91 Unpacking libbrotli1:amd64 (1.0.9-2build6) ...
+#7 26.92 Selecting previously unselected package libfreetype6:amd64.
+#7 26.92 Preparing to unpack .../051-libfreetype6_2.11.1+dfsg-1ubuntu0.3_amd64.deb ...
+#7 26.92 Unpacking libfreetype6:amd64 (2.11.1+dfsg-1ubuntu0.3) ...
+#7 26.94 Selecting previously unselected package fonts-dejavu-core.
+#7 26.94 Preparing to unpack .../052-fonts-dejavu-core_2.37-2build1_all.deb ...
+#7 26.94 Unpacking fonts-dejavu-core (2.37-2build1) ...
+#7 27.02 Selecting previously unselected package fontconfig-config.
+#7 27.02 Preparing to unpack .../053-fontconfig-config_2.13.1-4.2ubuntu5_all.deb ...
+#7 27.03 Unpacking fontconfig-config (2.13.1-4.2ubuntu5) ...
+#7 27.05 Selecting previously unselected package libfontconfig1:amd64.
+#7 27.05 Preparing to unpack .../054-libfontconfig1_2.13.1-4.2ubuntu5_amd64.deb ...
+#7 27.05 Unpacking libfontconfig1:amd64 (2.13.1-4.2ubuntu5) ...
+#7 27.06 Selecting previously unselected package libxrender1:amd64.
+#7 27.06 Preparing to unpack .../055-libxrender1_1%3a0.9.10-1build4_amd64.deb ...
+#7 27.06 Unpacking libxrender1:amd64 (1:0.9.10-1build4) ...
+#7 27.08 Selecting previously unselected package libxft2:amd64.
+#7 27.08 Preparing to unpack .../056-libxft2_2.3.4-1_amd64.deb ...
+#7 27.08 Unpacking libxft2:amd64 (2.3.4-1) ...
+#7 27.09 Selecting previously unselected package x11-common.
+#7 27.09 Preparing to unpack .../057-x11-common_1%3a7.7+23ubuntu2_all.deb ...
+#7 27.09 Unpacking x11-common (1:7.7+23ubuntu2) ...
+#7 27.11 Selecting previously unselected package libxss1:amd64.
+#7 27.11 Preparing to unpack .../058-libxss1_1%3a1.2.3-1build2_amd64.deb ...
+#7 27.11 Unpacking libxss1:amd64 (1:1.2.3-1build2) ...
+#7 27.12 Selecting previously unselected package libtk8.6:amd64.
+#7 27.13 Preparing to unpack .../059-libtk8.6_8.6.12-1build1_amd64.deb ...
+#7 27.13 Unpacking libtk8.6:amd64 (8.6.12-1build1) ...
+#7 27.16 Selecting previously unselected package tk8.6-blt2.5.
+#7 27.16 Preparing to unpack .../060-tk8.6-blt2.5_2.5.3+dfsg-4.1build2_amd64.deb ...
+#7 27.16 Unpacking tk8.6-blt2.5 (2.5.3+dfsg-4.1build2) ...
+#7 27.18 Selecting previously unselected package blt.
+#7 27.18 Preparing to unpack .../061-blt_2.5.3+dfsg-4.1build2_amd64.deb ...
+#7 27.18 Unpacking blt (2.5.3+dfsg-4.1build2) ...
+#7 27.20 Selecting previously unselected package libarchive13:amd64.
+#7 27.20 Preparing to unpack .../062-libarchive13_3.6.0-1ubuntu1.5_amd64.deb ...
+#7 27.20 Unpacking libarchive13:amd64 (3.6.0-1ubuntu1.5) ...
+#7 27.22 Selecting previously unselected package libsasl2-modules-db:amd64.
+#7 27.22 Preparing to unpack .../063-libsasl2-modules-db_2.1.27+dfsg2-3ubuntu1.2_amd64.deb ...
+#7 27.22 Unpacking libsasl2-modules-db:amd64 (2.1.27+dfsg2-3ubuntu1.2) ...
+#7 27.23 Selecting previously unselected package libsasl2-2:amd64.
+#7 27.23 Preparing to unpack .../064-libsasl2-2_2.1.27+dfsg2-3ubuntu1.2_amd64.deb ...
+#7 27.23 Unpacking libsasl2-2:amd64 (2.1.27+dfsg2-3ubuntu1.2) ...
+#7 27.25 Selecting previously unselected package libldap-2.5-0:amd64.
+#7 27.25 Preparing to unpack .../065-libldap-2.5-0_2.5.19+dfsg-0ubuntu0.22.04.1_amd64.deb ...
+#7 27.25 Unpacking libldap-2.5-0:amd64 (2.5.19+dfsg-0ubuntu0.22.04.1) ...
+#7 27.26 Selecting previously unselected package librtmp1:amd64.
+#7 27.26 Preparing to unpack .../066-librtmp1_2.4+20151223.gitfa8646d.1-2build4_amd64.deb ...
+#7 27.27 Unpacking librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2build4) ...
+#7 27.28 Selecting previously unselected package libssh-4:amd64.
+#7 27.28 Preparing to unpack .../067-libssh-4_0.9.6-2ubuntu0.22.04.4_amd64.deb ...
+#7 27.28 Unpacking libssh-4:amd64 (0.9.6-2ubuntu0.22.04.4) ...
+#7 27.30 Selecting previously unselected package libcurl4:amd64.
+#7 27.30 Preparing to unpack .../068-libcurl4_7.81.0-1ubuntu1.20_amd64.deb ...
+#7 27.30 Unpacking libcurl4:amd64 (7.81.0-1ubuntu1.20) ...
+#7 27.32 Selecting previously unselected package libjsoncpp25:amd64.
+#7 27.32 Preparing to unpack .../069-libjsoncpp25_1.9.5-3_amd64.deb ...
+#7 27.32 Unpacking libjsoncpp25:amd64 (1.9.5-3) ...
+#7 27.33 Selecting previously unselected package librhash0:amd64.
+#7 27.33 Preparing to unpack .../070-librhash0_1.4.2-1ubuntu1_amd64.deb ...
+#7 27.34 Unpacking librhash0:amd64 (1.4.2-1ubuntu1) ...
+#7 27.35 Selecting previously unselected package dh-elpa-helper.
+#7 27.35 Preparing to unpack .../071-dh-elpa-helper_2.0.9ubuntu1_all.deb ...
+#7 27.35 Unpacking dh-elpa-helper (2.0.9ubuntu1) ...
+#7 27.36 Selecting previously unselected package emacsen-common.
+#7 27.36 Preparing to unpack .../072-emacsen-common_3.0.4_all.deb ...
+#7 27.37 Unpacking emacsen-common (3.0.4) ...
+#7 27.39 Selecting previously unselected package cmake-data.
+#7 27.39 Preparing to unpack .../073-cmake-data_3.22.1-1ubuntu1.22.04.2_all.deb ...
+#7 27.40 Unpacking cmake-data (3.22.1-1ubuntu1.22.04.2) ...
+#7 27.85 Selecting previously unselected package cmake.
+#7 27.86 Preparing to unpack .../074-cmake_3.22.1-1ubuntu1.22.04.2_amd64.deb ...
+#7 27.86 Unpacking cmake (3.22.1-1ubuntu1.22.04.2) ...
+#7 27.93 Selecting previously unselected package gcc-11-base:amd64.
+#7 27.93 Preparing to unpack .../075-gcc-11-base_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 27.93 Unpacking gcc-11-base:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 27.95 Selecting previously unselected package libisl23:amd64.
+#7 27.95 Preparing to unpack .../076-libisl23_0.24-2build1_amd64.deb ...
+#7 27.95 Unpacking libisl23:amd64 (0.24-2build1) ...
+#7 27.97 Selecting previously unselected package libmpfr6:amd64.
+#7 27.98 Preparing to unpack .../077-libmpfr6_4.1.0-3build3_amd64.deb ...
+#7 27.98 Unpacking libmpfr6:amd64 (4.1.0-3build3) ...
+#7 28.00 Selecting previously unselected package libmpc3:amd64.
+#7 28.00 Preparing to unpack .../078-libmpc3_1.2.1-2build1_amd64.deb ...
+#7 28.00 Unpacking libmpc3:amd64 (1.2.1-2build1) ...
+#7 28.02 Selecting previously unselected package cpp-11.
+#7 28.02 Preparing to unpack .../079-cpp-11_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 28.02 Unpacking cpp-11 (11.4.0-1ubuntu1~22.04.2) ...
+#7 28.13 Selecting previously unselected package cpp.
+#7 28.13 Preparing to unpack .../080-cpp_4%3a11.2.0-1ubuntu1_amd64.deb ...
+#7 28.13 Unpacking cpp (4:11.2.0-1ubuntu1) ...
+#7 28.15 Selecting previously unselected package xml-core.
+#7 28.15 Preparing to unpack .../081-xml-core_0.18+nmu1_all.deb ...
+#7 28.15 Unpacking xml-core (0.18+nmu1) ...
+#7 28.17 Selecting previously unselected package docutils-common.
+#7 28.17 Preparing to unpack .../082-docutils-common_0.17.1+dfsg-2_all.deb ...
+#7 28.18 Unpacking docutils-common (0.17.1+dfsg-2) ...
+#7 28.21 Selecting previously unselected package libllvm14:amd64.
+#7 28.21 Preparing to unpack .../083-libllvm14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#7 28.21 Unpacking libllvm14:amd64 (1:14.0.0-1ubuntu1.1) ...
+#7 28.54 Selecting previously unselected package libclang-cpp14.
+#7 28.54 Preparing to unpack .../084-libclang-cpp14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#7 28.55 Unpacking libclang-cpp14 (1:14.0.0-1ubuntu1.1) ...
+#7 28.72 Selecting previously unselected package libclang1-14.
+#7 28.72 Preparing to unpack .../085-libclang1-14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#7 28.72 Unpacking libclang1-14 (1:14.0.0-1ubuntu1.1) ...
+#7 28.83 Selecting previously unselected package libxapian30:amd64.
+#7 28.83 Preparing to unpack .../086-libxapian30_1.4.18-4_amd64.deb ...
+#7 28.83 Unpacking libxapian30:amd64 (1.4.18-4) ...
+#7 28.85 Selecting previously unselected package doxygen.
+#7 28.85 Preparing to unpack .../087-doxygen_1.9.1-2ubuntu2_amd64.deb ...
+#7 28.85 Unpacking doxygen (1.9.1-2ubuntu2) ...
+#7 28.92 Selecting previously unselected package fontconfig.
+#7 28.92 Preparing to unpack .../088-fontconfig_2.13.1-4.2ubuntu5_amd64.deb ...
+#7 28.92 Unpacking fontconfig (2.13.1-4.2ubuntu5) ...
+#7 28.94 Selecting previously unselected package fonts-font-awesome.
+#7 28.94 Preparing to unpack .../089-fonts-font-awesome_5.0.10+really4.7.0~dfsg-4.1_all.deb ...
+#7 28.95 Unpacking fonts-font-awesome (5.0.10+really4.7.0~dfsg-4.1) ...
+#7 28.99 Selecting previously unselected package fonts-lmodern.
+#7 29.00 Preparing to unpack .../090-fonts-lmodern_2.004.5-6.1_all.deb ...
+#7 29.00 Unpacking fonts-lmodern (2.004.5-6.1) ...
+#7 29.30 Selecting previously unselected package fonts-lyx.
+#7 29.30 Preparing to unpack .../091-fonts-lyx_2.3.6-1_all.deb ...
+#7 29.30 Unpacking fonts-lyx (2.3.6-1) ...
+#7 29.32 Selecting previously unselected package libcc1-0:amd64.
+#7 29.33 Preparing to unpack .../092-libcc1-0_12.3.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.33 Unpacking libcc1-0:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 29.34 Selecting previously unselected package libgomp1:amd64.
+#7 29.34 Preparing to unpack .../093-libgomp1_12.3.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.34 Unpacking libgomp1:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 29.36 Selecting previously unselected package libitm1:amd64.
+#7 29.36 Preparing to unpack .../094-libitm1_12.3.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.36 Unpacking libitm1:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 29.37 Selecting previously unselected package libatomic1:amd64.
+#7 29.38 Preparing to unpack .../095-libatomic1_12.3.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.38 Unpacking libatomic1:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 29.39 Selecting previously unselected package libasan6:amd64.
+#7 29.39 Preparing to unpack .../096-libasan6_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.39 Unpacking libasan6:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 29.43 Selecting previously unselected package liblsan0:amd64.
+#7 29.43 Preparing to unpack .../097-liblsan0_12.3.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.44 Unpacking liblsan0:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 29.46 Selecting previously unselected package libtsan0:amd64.
+#7 29.46 Preparing to unpack .../098-libtsan0_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.46 Unpacking libtsan0:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 29.50 Selecting previously unselected package libubsan1:amd64.
+#7 29.51 Preparing to unpack .../099-libubsan1_12.3.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.51 Unpacking libubsan1:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 29.53 Selecting previously unselected package libquadmath0:amd64.
+#7 29.53 Preparing to unpack .../100-libquadmath0_12.3.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.53 Unpacking libquadmath0:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 29.55 Selecting previously unselected package libgcc-11-dev:amd64.
+#7 29.55 Preparing to unpack .../101-libgcc-11-dev_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.55 Unpacking libgcc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 29.62 Selecting previously unselected package gcc-11.
+#7 29.62 Preparing to unpack .../102-gcc-11_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 29.62 Unpacking gcc-11 (11.4.0-1ubuntu1~22.04.2) ...
+#7 29.82 Selecting previously unselected package gcc.
+#7 29.82 Preparing to unpack .../103-gcc_4%3a11.2.0-1ubuntu1_amd64.deb ...
+#7 29.82 Unpacking gcc (4:11.2.0-1ubuntu1) ...
+#7 29.84 Selecting previously unselected package libc-dev-bin.
+#7 29.84 Preparing to unpack .../104-libc-dev-bin_2.35-0ubuntu3.10_amd64.deb ...
+#7 29.84 Unpacking libc-dev-bin (2.35-0ubuntu3.10) ...
+#7 29.85 Selecting previously unselected package linux-libc-dev:amd64.
+#7 29.85 Preparing to unpack .../105-linux-libc-dev_5.15.0-153.163_amd64.deb ...
+#7 29.85 Unpacking linux-libc-dev:amd64 (5.15.0-153.163) ...
+#7 30.04 Selecting previously unselected package libcrypt-dev:amd64.
+#7 30.04 Preparing to unpack .../106-libcrypt-dev_1%3a4.4.27-1_amd64.deb ...
+#7 30.04 Unpacking libcrypt-dev:amd64 (1:4.4.27-1) ...
+#7 30.05 Selecting previously unselected package rpcsvc-proto.
+#7 30.05 Preparing to unpack .../107-rpcsvc-proto_1.4.2-0ubuntu6_amd64.deb ...
+#7 30.06 Unpacking rpcsvc-proto (1.4.2-0ubuntu6) ...
+#7 30.07 Selecting previously unselected package libtirpc-dev:amd64.
+#7 30.07 Preparing to unpack .../108-libtirpc-dev_1.3.2-2ubuntu0.1_amd64.deb ...
+#7 30.07 Unpacking libtirpc-dev:amd64 (1.3.2-2ubuntu0.1) ...
+#7 30.09 Selecting previously unselected package libnsl-dev:amd64.
+#7 30.10 Preparing to unpack .../109-libnsl-dev_1.3.0-2build2_amd64.deb ...
+#7 30.10 Unpacking libnsl-dev:amd64 (1.3.0-2build2) ...
+#7 30.11 Selecting previously unselected package libc6-dev:amd64.
+#7 30.11 Preparing to unpack .../110-libc6-dev_2.35-0ubuntu3.10_amd64.deb ...
+#7 30.11 Unpacking libc6-dev:amd64 (2.35-0ubuntu3.10) ...
+#7 30.24 Selecting previously unselected package libstdc++-11-dev:amd64.
+#7 30.24 Preparing to unpack .../111-libstdc++-11-dev_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 30.24 Unpacking libstdc++-11-dev:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 30.42 Selecting previously unselected package g++-11.
+#7 30.42 Preparing to unpack .../112-g++-11_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 30.42 Unpacking g++-11 (11.4.0-1ubuntu1~22.04.2) ...
+#7 30.53 Selecting previously unselected package g++.
+#7 30.53 Preparing to unpack .../113-g++_4%3a11.2.0-1ubuntu1_amd64.deb ...
+#7 30.53 Unpacking g++ (4:11.2.0-1ubuntu1) ...
+#7 30.55 Selecting previously unselected package gettext.
+#7 30.55 Preparing to unpack .../114-gettext_0.21-4ubuntu4_amd64.deb ...
+#7 30.55 Unpacking gettext (0.21-4ubuntu4) ...
+#7 30.59 Selecting previously unselected package libgfortran5:amd64.
+#7 30.59 Preparing to unpack .../115-libgfortran5_12.3.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 30.59 Unpacking libgfortran5:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 30.61 Selecting previously unselected package libgfortran-11-dev:amd64.
+#7 30.61 Preparing to unpack .../116-libgfortran-11-dev_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 30.61 Unpacking libgfortran-11-dev:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 30.64 Selecting previously unselected package gfortran-11.
+#7 30.64 Preparing to unpack .../117-gfortran-11_11.4.0-1ubuntu1~22.04.2_amd64.deb ...
+#7 30.64 Unpacking gfortran-11 (11.4.0-1ubuntu1~22.04.2) ...
+#7 30.76 Selecting previously unselected package gfortran.
+#7 30.76 Preparing to unpack .../118-gfortran_4%3a11.2.0-1ubuntu1_amd64.deb ...
+#7 30.76 Unpacking gfortran (4:11.2.0-1ubuntu1) ...
+#7 30.78 Selecting previously unselected package libcurl3-gnutls:amd64.
+#7 30.78 Preparing to unpack .../119-libcurl3-gnutls_7.81.0-1ubuntu1.20_amd64.deb ...
+#7 30.78 Unpacking libcurl3-gnutls:amd64 (7.81.0-1ubuntu1.20) ...
+#7 30.80 Selecting previously unselected package liberror-perl.
+#7 30.80 Preparing to unpack .../120-liberror-perl_0.17029-1_all.deb ...
+#7 30.80 Unpacking liberror-perl (0.17029-1) ...
+#7 30.81 Selecting previously unselected package git-man.
+#7 30.81 Preparing to unpack .../121-git-man_1%3a2.34.1-1ubuntu1.15_all.deb ...
+#7 30.81 Unpacking git-man (1:2.34.1-1ubuntu1.15) ...
+#7 30.84 Selecting previously unselected package git.
+#7 30.84 Preparing to unpack .../122-git_1%3a2.34.1-1ubuntu1.15_amd64.deb ...
+#7 30.84 Unpacking git (1:2.34.1-1ubuntu1.15) ...
+#7 30.96 Selecting previously unselected package libann0.
+#7 30.96 Preparing to unpack .../123-libann0_1.1.2+doc-7build1_amd64.deb ...
+#7 30.96 Unpacking libann0 (1.1.2+doc-7build1) ...
+#7 30.97 Selecting previously unselected package libcdt5:amd64.
+#7 30.98 Preparing to unpack .../124-libcdt5_2.42.2-6ubuntu0.1_amd64.deb ...
+#7 30.98 Unpacking libcdt5:amd64 (2.42.2-6ubuntu0.1) ...
+#7 30.99 Selecting previously unselected package libcgraph6:amd64.
+#7 30.99 Preparing to unpack .../125-libcgraph6_2.42.2-6ubuntu0.1_amd64.deb ...
+#7 30.99 Unpacking libcgraph6:amd64 (2.42.2-6ubuntu0.1) ...
+#7 31.01 Selecting previously unselected package libjpeg-turbo8:amd64.
+#7 31.01 Preparing to unpack .../126-libjpeg-turbo8_2.1.2-0ubuntu1_amd64.deb ...
+#7 31.01 Unpacking libjpeg-turbo8:amd64 (2.1.2-0ubuntu1) ...
+#7 31.02 Selecting previously unselected package libjpeg8:amd64.
+#7 31.03 Preparing to unpack .../127-libjpeg8_8c-2ubuntu10_amd64.deb ...
+#7 31.03 Unpacking libjpeg8:amd64 (8c-2ubuntu10) ...
+#7 31.04 Selecting previously unselected package libdeflate0:amd64.
+#7 31.04 Preparing to unpack .../128-libdeflate0_1.10-2_amd64.deb ...
+#7 31.04 Unpacking libdeflate0:amd64 (1.10-2) ...
+#7 31.06 Selecting previously unselected package libjbig0:amd64.
+#7 31.06 Preparing to unpack .../129-libjbig0_2.1-3.1ubuntu0.22.04.1_amd64.deb ...
+#7 31.06 Unpacking libjbig0:amd64 (2.1-3.1ubuntu0.22.04.1) ...
+#7 31.07 Selecting previously unselected package libwebp7:amd64.
+#7 31.07 Preparing to unpack .../130-libwebp7_1.2.2-2ubuntu0.22.04.2_amd64.deb ...
+#7 31.08 Unpacking libwebp7:amd64 (1.2.2-2ubuntu0.22.04.2) ...
+#7 31.09 Selecting previously unselected package libtiff5:amd64.
+#7 31.09 Preparing to unpack .../131-libtiff5_4.3.0-6ubuntu0.11_amd64.deb ...
+#7 31.09 Unpacking libtiff5:amd64 (4.3.0-6ubuntu0.11) ...
+#7 31.11 Selecting previously unselected package libxpm4:amd64.
+#7 31.11 Preparing to unpack .../132-libxpm4_1%3a3.5.12-1ubuntu0.22.04.2_amd64.deb ...
+#7 31.11 Unpacking libxpm4:amd64 (1:3.5.12-1ubuntu0.22.04.2) ...
+#7 31.13 Selecting previously unselected package libgd3:amd64.
+#7 31.13 Preparing to unpack .../133-libgd3_2.3.0-2ubuntu2.3_amd64.deb ...
+#7 31.13 Unpacking libgd3:amd64 (2.3.0-2ubuntu2.3) ...
+#7 31.14 Selecting previously unselected package libgts-0.7-5:amd64.
+#7 31.15 Preparing to unpack .../134-libgts-0.7-5_0.7.6+darcs121130-5_amd64.deb ...
+#7 31.15 Unpacking libgts-0.7-5:amd64 (0.7.6+darcs121130-5) ...
+#7 31.16 Selecting previously unselected package libpixman-1-0:amd64.
+#7 31.17 Preparing to unpack .../135-libpixman-1-0_0.40.0-1ubuntu0.22.04.1_amd64.deb ...
+#7 31.17 Unpacking libpixman-1-0:amd64 (0.40.0-1ubuntu0.22.04.1) ...
+#7 31.18 Selecting previously unselected package libxcb-render0:amd64.
+#7 31.18 Preparing to unpack .../136-libxcb-render0_1.14-3ubuntu3_amd64.deb ...
+#7 31.19 Unpacking libxcb-render0:amd64 (1.14-3ubuntu3) ...
+#7 31.20 Selecting previously unselected package libxcb-shm0:amd64.
+#7 31.20 Preparing to unpack .../137-libxcb-shm0_1.14-3ubuntu3_amd64.deb ...
+#7 31.20 Unpacking libxcb-shm0:amd64 (1.14-3ubuntu3) ...
+#7 31.22 Selecting previously unselected package libcairo2:amd64.
+#7 31.22 Preparing to unpack .../138-libcairo2_1.16.0-5ubuntu2_amd64.deb ...
+#7 31.22 Unpacking libcairo2:amd64 (1.16.0-5ubuntu2) ...
+#7 31.24 Selecting previously unselected package libltdl7:amd64.
+#7 31.24 Preparing to unpack .../139-libltdl7_2.4.6-15build2_amd64.deb ...
+#7 31.24 Unpacking libltdl7:amd64 (2.4.6-15build2) ...
+#7 31.25 Selecting previously unselected package libgraphite2-3:amd64.
+#7 31.25 Preparing to unpack .../140-libgraphite2-3_1.3.14-1build2_amd64.deb ...
+#7 31.25 Unpacking libgraphite2-3:amd64 (1.3.14-1build2) ...
+#7 31.27 Selecting previously unselected package libharfbuzz0b:amd64.
+#7 31.27 Preparing to unpack .../141-libharfbuzz0b_2.7.4-1ubuntu3.2_amd64.deb ...
+#7 31.27 Unpacking libharfbuzz0b:amd64 (2.7.4-1ubuntu3.2) ...
+#7 31.29 Selecting previously unselected package libthai-data.
+#7 31.29 Preparing to unpack .../142-libthai-data_0.1.29-1build1_all.deb ...
+#7 31.29 Unpacking libthai-data (0.1.29-1build1) ...
+#7 31.31 Selecting previously unselected package libdatrie1:amd64.
+#7 31.31 Preparing to unpack .../143-libdatrie1_0.2.13-2_amd64.deb ...
+#7 31.31 Unpacking libdatrie1:amd64 (0.2.13-2) ...
+#7 31.32 Selecting previously unselected package libthai0:amd64.
+#7 31.32 Preparing to unpack .../144-libthai0_0.1.29-1build1_amd64.deb ...
+#7 31.33 Unpacking libthai0:amd64 (0.1.29-1build1) ...
+#7 31.34 Selecting previously unselected package libpango-1.0-0:amd64.
+#7 31.34 Preparing to unpack .../145-libpango-1.0-0_1.50.6+ds-2ubuntu1_amd64.deb ...
+#7 31.34 Unpacking libpango-1.0-0:amd64 (1.50.6+ds-2ubuntu1) ...
+#7 31.36 Selecting previously unselected package libpangoft2-1.0-0:amd64.
+#7 31.36 Preparing to unpack .../146-libpangoft2-1.0-0_1.50.6+ds-2ubuntu1_amd64.deb ...
+#7 31.36 Unpacking libpangoft2-1.0-0:amd64 (1.50.6+ds-2ubuntu1) ...
+#7 31.37 Selecting previously unselected package libpangocairo-1.0-0:amd64.
+#7 31.38 Preparing to unpack .../147-libpangocairo-1.0-0_1.50.6+ds-2ubuntu1_amd64.deb ...
+#7 31.38 Unpacking libpangocairo-1.0-0:amd64 (1.50.6+ds-2ubuntu1) ...
+#7 31.39 Selecting previously unselected package libpathplan4:amd64.
+#7 31.39 Preparing to unpack .../148-libpathplan4_2.42.2-6ubuntu0.1_amd64.deb ...
+#7 31.40 Unpacking libpathplan4:amd64 (2.42.2-6ubuntu0.1) ...
+#7 31.41 Selecting previously unselected package libgvc6.
+#7 31.41 Preparing to unpack .../149-libgvc6_2.42.2-6ubuntu0.1_amd64.deb ...
+#7 31.41 Unpacking libgvc6 (2.42.2-6ubuntu0.1) ...
+#7 31.44 Selecting previously unselected package libgvpr2:amd64.
+#7 31.44 Preparing to unpack .../150-libgvpr2_2.42.2-6ubuntu0.1_amd64.deb ...
+#7 31.44 Unpacking libgvpr2:amd64 (2.42.2-6ubuntu0.1) ...
+#7 31.45 Selecting previously unselected package liblab-gamut1:amd64.
+#7 31.46 Preparing to unpack .../151-liblab-gamut1_2.42.2-6ubuntu0.1_amd64.deb ...
+#7 31.46 Unpacking liblab-gamut1:amd64 (2.42.2-6ubuntu0.1) ...
+#7 31.48 Selecting previously unselected package libice6:amd64.
+#7 31.48 Preparing to unpack .../152-libice6_2%3a1.0.10-1build2_amd64.deb ...
+#7 31.48 Unpacking libice6:amd64 (2:1.0.10-1build2) ...
+#7 31.50 Selecting previously unselected package libsm6:amd64.
+#7 31.50 Preparing to unpack .../153-libsm6_2%3a1.2.3-1build2_amd64.deb ...
+#7 31.50 Unpacking libsm6:amd64 (2:1.2.3-1build2) ...
+#7 31.52 Selecting previously unselected package libxt6:amd64.
+#7 31.52 Preparing to unpack .../154-libxt6_1%3a1.2.1-1_amd64.deb ...
+#7 31.52 Unpacking libxt6:amd64 (1:1.2.1-1) ...
+#7 31.53 Selecting previously unselected package libxmu6:amd64.
+#7 31.54 Preparing to unpack .../155-libxmu6_2%3a1.1.3-3_amd64.deb ...
+#7 31.54 Unpacking libxmu6:amd64 (2:1.1.3-3) ...
+#7 31.55 Selecting previously unselected package libxaw7:amd64.
+#7 31.55 Preparing to unpack .../156-libxaw7_2%3a1.0.14-1_amd64.deb ...
+#7 31.55 Unpacking libxaw7:amd64 (2:1.0.14-1) ...
+#7 31.57 Selecting previously unselected package graphviz.
+#7 31.57 Preparing to unpack .../157-graphviz_2.42.2-6ubuntu0.1_amd64.deb ...
+#7 31.57 Unpacking graphviz (2.42.2-6ubuntu0.1) ...
+#7 31.60 Selecting previously unselected package libpaper1:amd64.
+#7 31.61 Preparing to unpack .../158-libpaper1_1.1.28build2_amd64.deb ...
+#7 31.61 Unpacking libpaper1:amd64 (1.1.28build2) ...
+#7 31.62 Selecting previously unselected package libpaper-utils.
+#7 31.62 Preparing to unpack .../159-libpaper-utils_1.1.28build2_amd64.deb ...
+#7 31.62 Unpacking libpaper-utils (1.1.28build2) ...
+#7 31.64 Selecting previously unselected package libkpathsea6:amd64.
+#7 31.64 Preparing to unpack .../160-libkpathsea6_2021.20210626.59705-1ubuntu0.2_amd64.deb ...
+#7 31.64 Unpacking libkpathsea6:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 31.65 Selecting previously unselected package libptexenc1:amd64.
+#7 31.66 Preparing to unpack .../161-libptexenc1_2021.20210626.59705-1ubuntu0.2_amd64.deb ...
+#7 31.66 Unpacking libptexenc1:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 31.67 Selecting previously unselected package libsynctex2:amd64.
+#7 31.67 Preparing to unpack .../162-libsynctex2_2021.20210626.59705-1ubuntu0.2_amd64.deb ...
+#7 31.67 Unpacking libsynctex2:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 31.69 Selecting previously unselected package libtexlua53:amd64.
+#7 31.69 Preparing to unpack .../163-libtexlua53_2021.20210626.59705-1ubuntu0.2_amd64.deb ...
+#7 31.69 Unpacking libtexlua53:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 31.71 Selecting previously unselected package libtexluajit2:amd64.
+#7 31.71 Preparing to unpack .../164-libtexluajit2_2021.20210626.59705-1ubuntu0.2_amd64.deb ...
+#7 31.71 Unpacking libtexluajit2:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 31.72 Selecting previously unselected package t1utils.
+#7 31.73 Preparing to unpack .../165-t1utils_1.41-4build2_amd64.deb ...
+#7 31.73 Unpacking t1utils (1.41-4build2) ...
+#7 31.74 Selecting previously unselected package libteckit0:amd64.
+#7 31.74 Preparing to unpack .../166-libteckit0_2.5.11+ds1-1_amd64.deb ...
+#7 31.75 Unpacking libteckit0:amd64 (2.5.11+ds1-1) ...
+#7 31.77 Selecting previously unselected package libxi6:amd64.
+#7 31.77 Preparing to unpack .../167-libxi6_2%3a1.8-1build1_amd64.deb ...
+#7 31.78 Unpacking libxi6:amd64 (2:1.8-1build1) ...
+#7 31.79 Selecting previously unselected package libzzip-0-13:amd64.
+#7 31.80 Preparing to unpack .../168-libzzip-0-13_0.13.72+dfsg.1-1.1_amd64.deb ...
+#7 31.80 Unpacking libzzip-0-13:amd64 (0.13.72+dfsg.1-1.1) ...
+#7 31.82 Selecting previously unselected package texlive-binaries.
+#7 31.82 Preparing to unpack .../169-texlive-binaries_2021.20210626.59705-1ubuntu0.2_amd64.deb ...
+#7 31.82 Unpacking texlive-binaries (2021.20210626.59705-1ubuntu0.2) ...
+#7 32.00 Selecting previously unselected package xdg-utils.
+#7 32.00 Preparing to unpack .../170-xdg-utils_1.1.3-4.1ubuntu3~22.04.1_all.deb ...
+#7 32.00 Unpacking xdg-utils (1.1.3-4.1ubuntu3~22.04.1) ...
+#7 32.03 Selecting previously unselected package texlive-base.
+#7 32.03 Preparing to unpack .../171-texlive-base_2021.20220204-1_all.deb ...
+#7 32.05 Unpacking texlive-base (2021.20220204-1) ...
+#7 33.43 Selecting previously unselected package texlive-latex-base.
+#7 33.44 Preparing to unpack .../172-texlive-latex-base_2021.20220204-1_all.deb ...
+#7 33.44 Unpacking texlive-latex-base (2021.20220204-1) ...
+#7 33.75 Selecting previously unselected package latexmk.
+#7 33.75 Preparing to unpack .../173-latexmk_1%3a4.76-1_all.deb ...
+#7 33.75 Unpacking latexmk (1:4.76-1) ...
+#7 33.77 Selecting previously unselected package libaec0:amd64.
+#7 33.77 Preparing to unpack .../174-libaec0_1.0.6-1_amd64.deb ...
+#7 33.77 Unpacking libaec0:amd64 (1.0.6-1) ...
+#7 33.79 Selecting previously unselected package libapache-pom-java.
+#7 33.79 Preparing to unpack .../175-libapache-pom-java_18-1_all.deb ...
+#7 33.79 Unpacking libapache-pom-java (18-1) ...
+#7 33.81 Selecting previously unselected package libblas3:amd64.
+#7 33.81 Preparing to unpack .../176-libblas3_3.10.0-2ubuntu1_amd64.deb ...
+#7 33.81 Unpacking libblas3:amd64 (3.10.0-2ubuntu1) ...
+#7 33.83 Selecting previously unselected package libboost1.74-dev:amd64.
+#7 33.83 Preparing to unpack .../177-libboost1.74-dev_1.74.0-14ubuntu3_amd64.deb ...
+#7 33.83 Unpacking libboost1.74-dev:amd64 (1.74.0-14ubuntu3) ...
+#7 36.32 Selecting previously unselected package libboost-dev:amd64.
+#7 36.33 Preparing to unpack .../178-libboost-dev_1.74.0.3ubuntu7_amd64.deb ...
+#7 36.33 Unpacking libboost-dev:amd64 (1.74.0.3ubuntu7) ...
+#7 36.34 Selecting previously unselected package libcommons-parent-java.
+#7 36.34 Preparing to unpack .../179-libcommons-parent-java_43-1_all.deb ...
+#7 36.35 Unpacking libcommons-parent-java (43-1) ...
+#7 36.36 Selecting previously unselected package libcommons-logging-java.
+#7 36.36 Preparing to unpack .../180-libcommons-logging-java_1.2-2_all.deb ...
+#7 36.36 Unpacking libcommons-logging-java (1.2-2) ...
+#7 36.38 Selecting previously unselected package libdpkg-perl.
+#7 36.39 Preparing to unpack .../181-libdpkg-perl_1.21.1ubuntu2.3_all.deb ...
+#7 36.39 Unpacking libdpkg-perl (1.21.1ubuntu2.3) ...
+#7 36.42 Selecting previously unselected package libexpat1-dev:amd64.
+#7 36.42 Preparing to unpack .../182-libexpat1-dev_2.4.7-1ubuntu0.6_amd64.deb ...
+#7 36.42 Unpacking libexpat1-dev:amd64 (2.4.7-1ubuntu0.6) ...
+#7 36.44 Selecting previously unselected package libsz2:amd64.
+#7 36.45 Preparing to unpack .../183-libsz2_1.0.6-1_amd64.deb ...
+#7 36.45 Unpacking libsz2:amd64 (1.0.6-1) ...
+#7 36.46 Selecting previously unselected package libhdf5-103-1:amd64.
+#7 36.46 Preparing to unpack .../184-libhdf5-103-1_1.10.7+repack-4ubuntu2_amd64.deb ...
+#7 36.47 Unpacking libhdf5-103-1:amd64 (1.10.7+repack-4ubuntu2) ...
+#7 36.49 Selecting previously unselected package libhdf5-hl-100:amd64.
+#7 36.50 Preparing to unpack .../185-libhdf5-hl-100_1.10.7+repack-4ubuntu2_amd64.deb ...
+#7 36.50 Unpacking libhdf5-hl-100:amd64 (1.10.7+repack-4ubuntu2) ...
+#7 36.51 Selecting previously unselected package libimagequant0:amd64.
+#7 36.52 Preparing to unpack .../186-libimagequant0_2.17.0-1_amd64.deb ...
+#7 36.52 Unpacking libimagequant0:amd64 (2.17.0-1) ...
+#7 36.53 Selecting previously unselected package libjs-jquery.
+#7 36.54 Preparing to unpack .../187-libjs-jquery_3.6.0+dfsg+~3.5.13-1_all.deb ...
+#7 36.54 Unpacking libjs-jquery (3.6.0+dfsg+~3.5.13-1) ...
+#7 36.56 Selecting previously unselected package libjs-jquery-ui.
+#7 36.56 Preparing to unpack .../188-libjs-jquery-ui_1.13.1+dfsg-1_all.deb ...
+#7 36.56 Unpacking libjs-jquery-ui (1.13.1+dfsg-1) ...
+#7 36.64 Selecting previously unselected package libjs-underscore.
+#7 36.64 Preparing to unpack .../189-libjs-underscore_1.13.2~dfsg-2_all.deb ...
+#7 36.64 Unpacking libjs-underscore (1.13.2~dfsg-2) ...
+#7 36.66 Selecting previously unselected package libjs-sphinxdoc.
+#7 36.66 Preparing to unpack .../190-libjs-sphinxdoc_4.3.2-1_all.deb ...
+#7 36.66 Unpacking libjs-sphinxdoc (4.3.2-1) ...
+#7 36.68 Selecting previously unselected package libopenblas0-pthread:amd64.
+#7 36.68 Preparing to unpack .../191-libopenblas0-pthread_0.3.20+ds-1_amd64.deb ...
+#7 36.68 Unpacking libopenblas0-pthread:amd64 (0.3.20+ds-1) ...
+#7 36.82 Selecting previously unselected package liblapack3:amd64.
+#7 36.83 Preparing to unpack .../192-liblapack3_3.10.0-2ubuntu1_amd64.deb ...
+#7 36.83 Unpacking liblapack3:amd64 (3.10.0-2ubuntu1) ...
+#7 36.87 Selecting previously unselected package liblbfgsb0:amd64.
+#7 36.88 Preparing to unpack .../193-liblbfgsb0_3.0+dfsg.3-10_amd64.deb ...
+#7 36.88 Unpacking liblbfgsb0:amd64 (3.0+dfsg.3-10) ...
+#7 36.89 Selecting previously unselected package liblcms2-2:amd64.
+#7 36.90 Preparing to unpack .../194-liblcms2-2_2.12~rc1-2build2_amd64.deb ...
+#7 36.90 Unpacking liblcms2-2:amd64 (2.12~rc1-2build2) ...
+#7 36.92 Selecting previously unselected package liblzf1:amd64.
+#7 36.92 Preparing to unpack .../195-liblzf1_3.6-3_amd64.deb ...
+#7 36.92 Unpacking liblzf1:amd64 (3.6-3) ...
+#7 36.93 Selecting previously unselected package libopenblas0:amd64.
+#7 36.94 Preparing to unpack .../196-libopenblas0_0.3.20+ds-1_amd64.deb ...
+#7 36.94 Unpacking libopenblas0:amd64 (0.3.20+ds-1) ...
+#7 36.95 Selecting previously unselected package libopenblas-pthread-dev:amd64.
+#7 36.96 Preparing to unpack .../197-libopenblas-pthread-dev_0.3.20+ds-1_amd64.deb ...
+#7 36.96 Unpacking libopenblas-pthread-dev:amd64 (0.3.20+ds-1) ...
+#7 37.13 Selecting previously unselected package libopenblas-dev:amd64.
+#7 37.14 Preparing to unpack .../198-libopenblas-dev_0.3.20+ds-1_amd64.deb ...
+#7 37.14 Unpacking libopenblas-dev:amd64 (0.3.20+ds-1) ...
+#7 37.15 Selecting previously unselected package libpython3.10:amd64.
+#7 37.16 Preparing to unpack .../199-libpython3.10_3.10.12-1~22.04.11_amd64.deb ...
+#7 37.16 Unpacking libpython3.10:amd64 (3.10.12-1~22.04.11) ...
+#7 37.19 Selecting previously unselected package zlib1g-dev:amd64.
+#7 37.19 Preparing to unpack .../200-zlib1g-dev_1%3a1.2.11.dfsg-2ubuntu9.2_amd64.deb ...
+#7 37.20 Unpacking zlib1g-dev:amd64 (1:1.2.11.dfsg-2ubuntu9.2) ...
+#7 37.21 Selecting previously unselected package libpython3.10-dev:amd64.
+#7 37.22 Preparing to unpack .../201-libpython3.10-dev_3.10.12-1~22.04.11_amd64.deb ...
+#7 37.22 Unpacking libpython3.10-dev:amd64 (3.10.12-1~22.04.11) ...
+#7 37.33 Selecting previously unselected package libpython3-dev:amd64.
+#7 37.33 Preparing to unpack .../202-libpython3-dev_3.10.6-1~22.04.1_amd64.deb ...
+#7 37.33 Unpacking libpython3-dev:amd64 (3.10.6-1~22.04.1) ...
+#7 37.35 Selecting previously unselected package libqhull-r8.0:amd64.
+#7 37.35 Preparing to unpack .../203-libqhull-r8.0_2020.2-4_amd64.deb ...
+#7 37.35 Unpacking libqhull-r8.0:amd64 (2020.2-4) ...
+#7 37.37 Selecting previously unselected package libraqm0:amd64.
+#7 37.37 Preparing to unpack .../204-libraqm0_0.7.0-4ubuntu1_amd64.deb ...
+#7 37.37 Unpacking libraqm0:amd64 (0.7.0-4ubuntu1) ...
+#7 37.38 Selecting previously unselected package libtext-unidecode-perl.
+#7 37.39 Preparing to unpack .../205-libtext-unidecode-perl_1.30-1_all.deb ...
+#7 37.39 Unpacking libtext-unidecode-perl (1.30-1) ...
+#7 37.45 Selecting previously unselected package libtool.
+#7 37.46 Preparing to unpack .../206-libtool_2.4.6-15build2_all.deb ...
+#7 37.46 Unpacking libtool (2.4.6-15build2) ...
+#7 37.48 Selecting previously unselected package libwebpdemux2:amd64.
+#7 37.48 Preparing to unpack .../207-libwebpdemux2_1.2.2-2ubuntu0.22.04.2_amd64.deb ...
+#7 37.48 Unpacking libwebpdemux2:amd64 (1.2.2-2ubuntu0.22.04.2) ...
+#7 37.50 Selecting previously unselected package libwebpmux3:amd64.
+#7 37.50 Preparing to unpack .../208-libwebpmux3_1.2.2-2ubuntu0.22.04.2_amd64.deb ...
+#7 37.50 Unpacking libwebpmux3:amd64 (1.2.2-2ubuntu0.22.04.2) ...
+#7 37.52 Selecting previously unselected package libxml-namespacesupport-perl.
+#7 37.52 Preparing to unpack .../209-libxml-namespacesupport-perl_1.12-1.1_all.deb ...
+#7 37.52 Unpacking libxml-namespacesupport-perl (1.12-1.1) ...
+#7 37.53 Selecting previously unselected package libxml-sax-base-perl.
+#7 37.54 Preparing to unpack .../210-libxml-sax-base-perl_1.09-1.1_all.deb ...
+#7 37.54 Unpacking libxml-sax-base-perl (1.09-1.1) ...
+#7 37.55 Selecting previously unselected package libxml-sax-perl.
+#7 37.56 Preparing to unpack .../211-libxml-sax-perl_1.02+dfsg-3_all.deb ...
+#7 37.56 Unpacking libxml-sax-perl (1.02+dfsg-3) ...
+#7 37.58 Selecting previously unselected package libxml-libxml-perl.
+#7 37.58 Preparing to unpack .../212-libxml-libxml-perl_2.0207+dfsg+really+2.0134-1_amd64.deb ...
+#7 37.58 Unpacking libxml-libxml-perl (2.0207+dfsg+really+2.0134-1) ...
+#7 37.61 Selecting previously unselected package libxsimd-dev:amd64.
+#7 37.62 Preparing to unpack .../213-libxsimd-dev_7.6.0-2_amd64.deb ...
+#7 37.62 Unpacking libxsimd-dev:amd64 (7.6.0-2) ...
+#7 37.65 Selecting previously unselected package libxslt1.1:amd64.
+#7 37.65 Preparing to unpack .../214-libxslt1.1_1.1.34-4ubuntu0.22.04.4_amd64.deb ...
+#7 37.65 Unpacking libxslt1.1:amd64 (1.1.34-4ubuntu0.22.04.4) ...
+#7 37.67 Selecting previously unselected package make.
+#7 37.67 Preparing to unpack .../215-make_4.3-4.1build1_amd64.deb ...
+#7 37.68 Unpacking make (4.3-4.1build1) ...
+#7 37.69 Selecting previously unselected package pkg-config.
+#7 37.70 Preparing to unpack .../216-pkg-config_0.29.2-1ubuntu3_amd64.deb ...
+#7 37.70 Unpacking pkg-config (0.29.2-1ubuntu3) ...
+#7 37.72 Selecting previously unselected package preview-latex-style.
+#7 37.72 Preparing to unpack .../217-preview-latex-style_12.2-1ubuntu1_all.deb ...
+#7 37.72 Unpacking preview-latex-style (12.2-1ubuntu1) ...
+#7 37.74 Selecting previously unselected package python-babel-localedata.
+#7 37.75 Preparing to unpack .../218-python-babel-localedata_2.8.0+dfsg.1-7_all.deb ...
+#7 37.75 Unpacking python-babel-localedata (2.8.0+dfsg.1-7) ...
+#7 38.15 Selecting previously unselected package python-matplotlib-data.
+#7 38.16 Preparing to unpack .../219-python-matplotlib-data_3.5.1-2build1_all.deb ...
+#7 38.16 Unpacking python-matplotlib-data (3.5.1-2build1) ...
+#7 38.23 Selecting previously unselected package python3-appdirs.
+#7 38.23 Preparing to unpack .../220-python3-appdirs_1.4.4-2_all.deb ...
+#7 38.23 Unpacking python3-appdirs (1.4.4-2) ...
+#7 38.25 Selecting previously unselected package python3-attr.
+#7 38.25 Preparing to unpack .../221-python3-attr_21.2.0-1_all.deb ...
+#7 38.25 Unpacking python3-attr (21.2.0-1) ...
+#7 38.27 Selecting previously unselected package python3-tz.
+#7 38.28 Preparing to unpack .../222-python3-tz_2022.1-1ubuntu0.22.04.1_all.deb ...
+#7 38.28 Unpacking python3-tz (2022.1-1ubuntu0.22.04.1) ...
+#7 38.29 Selecting previously unselected package python3-babel.
+#7 38.30 Preparing to unpack .../223-python3-babel_2.8.0+dfsg.1-7_all.deb ...
+#7 38.30 Unpacking python3-babel (2.8.0+dfsg.1-7) ...
+#7 38.32 Selecting previously unselected package python3-gast.
+#7 38.32 Preparing to unpack .../224-python3-gast_0.5.2-2_all.deb ...
+#7 38.32 Unpacking python3-gast (0.5.2-2) ...
+#7 38.34 Selecting previously unselected package python3-beniget.
+#7 38.34 Preparing to unpack .../225-python3-beniget_0.4.1-2_all.deb ...
+#7 38.34 Unpacking python3-beniget (0.4.1-2) ...
+#7 38.36 Selecting previously unselected package python3-roman.
+#7 38.36 Preparing to unpack .../226-python3-roman_3.3-1_all.deb ...
+#7 38.36 Unpacking python3-roman (3.3-1) ...
+#7 38.38 Selecting previously unselected package python3-docutils.
+#7 38.38 Preparing to unpack .../227-python3-docutils_0.17.1+dfsg-2_all.deb ...
+#7 38.39 Unpacking python3-docutils (0.17.1+dfsg-2) ...
+#7 38.43 Selecting previously unselected package python3-lib2to3.
+#7 38.43 Preparing to unpack .../228-python3-lib2to3_3.10.8-1~22.04_all.deb ...
+#7 38.43 Unpacking python3-lib2to3 (3.10.8-1~22.04) ...
+#7 38.46 Selecting previously unselected package python3-distutils.
+#7 38.47 Preparing to unpack .../229-python3-distutils_3.10.8-1~22.04_all.deb ...
+#7 38.47 Unpacking python3-distutils (3.10.8-1~22.04) ...
+#7 38.50 Selecting previously unselected package sphinx-common.
+#7 38.50 Preparing to unpack .../230-sphinx-common_4.3.2-1_all.deb ...
+#7 38.50 Unpacking sphinx-common (4.3.2-1) ...
+#7 38.59 Selecting previously unselected package python3-alabaster.
+#7 38.59 Preparing to unpack .../231-python3-alabaster_0.7.12-1_all.deb ...
+#7 38.59 Unpacking python3-alabaster (0.7.12-1) ...
+#7 38.61 Selecting previously unselected package python3-imagesize.
+#7 38.61 Preparing to unpack .../232-python3-imagesize_1.3.0-1_all.deb ...
+#7 38.61 Unpacking python3-imagesize (1.3.0-1) ...
+#7 38.63 Selecting previously unselected package python3-markupsafe.
+#7 38.63 Preparing to unpack .../233-python3-markupsafe_2.0.1-2build1_amd64.deb ...
+#7 38.63 Unpacking python3-markupsafe (2.0.1-2build1) ...
+#7 38.65 Selecting previously unselected package python3-jinja2.
+#7 38.65 Preparing to unpack .../234-python3-jinja2_3.0.3-1ubuntu0.4_all.deb ...
+#7 38.65 Unpacking python3-jinja2 (3.0.3-1ubuntu0.4) ...
+#7 38.68 Selecting previously unselected package python3-pyparsing.
+#7 38.68 Preparing to unpack .../235-python3-pyparsing_2.4.7-1_all.deb ...
+#7 38.68 Unpacking python3-pyparsing (2.4.7-1) ...
+#7 38.70 Selecting previously unselected package python3-packaging.
+#7 38.70 Preparing to unpack .../236-python3-packaging_21.3-1_all.deb ...
+#7 38.70 Unpacking python3-packaging (21.3-1) ...
+#7 38.72 Selecting previously unselected package python3-pygments.
+#7 38.73 Preparing to unpack .../237-python3-pygments_2.11.2+dfsg-2ubuntu0.1_all.deb ...
+#7 38.73 Unpacking python3-pygments (2.11.2+dfsg-2ubuntu0.1) ...
+#7 38.80 Selecting previously unselected package python3-certifi.
+#7 38.81 Preparing to unpack .../238-python3-certifi_2020.6.20-1_all.deb ...
+#7 38.81 Unpacking python3-certifi (2020.6.20-1) ...
+#7 38.84 Selecting previously unselected package python3-chardet.
+#7 38.84 Preparing to unpack .../239-python3-chardet_4.0.0-1_all.deb ...
+#7 38.84 Unpacking python3-chardet (4.0.0-1) ...
+#7 38.86 Selecting previously unselected package python3-idna.
+#7 38.87 Preparing to unpack .../240-python3-idna_3.3-1ubuntu0.1_all.deb ...
+#7 38.87 Unpacking python3-idna (3.3-1ubuntu0.1) ...
+#7 38.89 Selecting previously unselected package python3-six.
+#7 38.89 Preparing to unpack .../241-python3-six_1.16.0-3ubuntu1_all.deb ...
+#7 38.89 Unpacking python3-six (1.16.0-3ubuntu1) ...
+#7 38.91 Selecting previously unselected package python3-urllib3.
+#7 38.91 Preparing to unpack .../242-python3-urllib3_1.26.5-1~exp1ubuntu0.3_all.deb ...
+#7 38.91 Unpacking python3-urllib3 (1.26.5-1~exp1ubuntu0.3) ...
+#7 38.93 Selecting previously unselected package python3-requests.
+#7 38.94 Preparing to unpack .../243-python3-requests_2.25.1+dfsg-2ubuntu0.3_all.deb ...
+#7 38.94 Unpacking python3-requests (2.25.1+dfsg-2ubuntu0.3) ...
+#7 38.96 Selecting previously unselected package python3-snowballstemmer.
+#7 38.96 Preparing to unpack .../244-python3-snowballstemmer_2.2.0-1build1_all.deb ...
+#7 38.96 Unpacking python3-snowballstemmer (2.2.0-1build1) ...
+#7 38.98 Selecting previously unselected package python3-sphinx.
+#7 38.99 Preparing to unpack .../245-python3-sphinx_4.3.2-1_all.deb ...
+#7 38.99 Unpacking python3-sphinx (4.3.2-1) ...
+#7 39.04 Selecting previously unselected package python3-breathe.
+#7 39.05 Preparing to unpack .../246-python3-breathe_4.33.1-3_all.deb ...
+#7 39.05 Unpacking python3-breathe (4.33.1-3) ...
+#7 39.07 Selecting previously unselected package python3-brotli.
+#7 39.07 Preparing to unpack .../247-python3-brotli_1.0.9-2build6_amd64.deb ...
+#7 39.07 Unpacking python3-brotli (1.0.9-2build6) ...
+#7 39.09 Selecting previously unselected package python3-colorama.
+#7 39.10 Preparing to unpack .../248-python3-colorama_0.4.4-1_all.deb ...
+#7 39.10 Unpacking python3-colorama (0.4.4-1) ...
+#7 39.11 Selecting previously unselected package python3-commonmark.
+#7 39.12 Preparing to unpack .../249-python3-commonmark_0.9.1-3_all.deb ...
+#7 39.12 Unpacking python3-commonmark (0.9.1-3) ...
+#7 39.14 Selecting previously unselected package python3-cycler.
+#7 39.14 Preparing to unpack .../250-python3-cycler_0.11.0-1_all.deb ...
+#7 39.14 Unpacking python3-cycler (0.11.0-1) ...
+#7 39.18 Selecting previously unselected package python3-dateutil.
+#7 39.18 Preparing to unpack .../251-python3-dateutil_2.8.1-6_all.deb ...
+#7 39.18 Unpacking python3-dateutil (2.8.1-6) ...
+#7 39.20 Selecting previously unselected package python3-decorator.
+#7 39.20 Preparing to unpack .../252-python3-decorator_4.4.2-0ubuntu1_all.deb ...
+#7 39.20 Unpacking python3-decorator (4.4.2-0ubuntu1) ...
+#7 39.22 Selecting previously unselected package python3.10-dev.
+#7 39.22 Preparing to unpack .../253-python3.10-dev_3.10.12-1~22.04.11_amd64.deb ...
+#7 39.22 Unpacking python3.10-dev (3.10.12-1~22.04.11) ...
+#7 39.24 Selecting previously unselected package python3-dev.
+#7 39.24 Preparing to unpack .../254-python3-dev_3.10.6-1~22.04.1_amd64.deb ...
+#7 39.24 Unpacking python3-dev (3.10.6-1~22.04.1) ...
+#7 39.26 Selecting previously unselected package python3-numpy.
+#7 39.26 Preparing to unpack .../255-python3-numpy_1%3a1.21.5-1ubuntu22.04.1_amd64.deb ...
+#7 39.26 Unpacking python3-numpy (1:1.21.5-1ubuntu22.04.1) ...
+#7 39.45 Selecting previously unselected package python3-ply.
+#7 39.45 Preparing to unpack .../256-python3-ply_3.11-5_all.deb ...
+#7 39.45 Unpacking python3-ply (3.11-5) ...
+#7 39.47 Selecting previously unselected package python3-pythran.
+#7 39.47 Preparing to unpack .../257-python3-pythran_0.10.0+ds2-1_amd64.deb ...
+#7 39.48 Unpacking python3-pythran (0.10.0+ds2-1) ...
+#7 39.81 Selecting previously unselected package python3-scipy.
+#7 39.81 Preparing to unpack .../258-python3-scipy_1.8.0-1exp2ubuntu1_amd64.deb ...
+#7 39.81 Unpacking python3-scipy (1.8.0-1exp2ubuntu1) ...
+#7 40.17 Selecting previously unselected package python3-ufolib2.
+#7 40.17 Preparing to unpack .../259-python3-ufolib2_0.13.1+dfsg1-1_all.deb ...
+#7 40.18 Unpacking python3-ufolib2 (0.13.1+dfsg1-1) ...
+#7 40.19 Selecting previously unselected package python3-mpmath.
+#7 40.20 Preparing to unpack .../260-python3-mpmath_1.2.1-2_all.deb ...
+#7 40.20 Unpacking python3-mpmath (1.2.1-2) ...
+#7 40.23 Selecting previously unselected package python3-sympy.
+#7 40.24 Preparing to unpack .../261-python3-sympy_1.9-1_all.deb ...
+#7 40.24 Unpacking python3-sympy (1.9-1) ...
+#7 40.55 Selecting previously unselected package python3-fs.
+#7 40.56 Preparing to unpack .../262-python3-fs_2.4.12-1_all.deb ...
+#7 40.56 Unpacking python3-fs (2.4.12-1) ...
+#7 40.58 Selecting previously unselected package python3-lxml:amd64.
+#7 40.59 Preparing to unpack .../263-python3-lxml_4.8.0-1build1_amd64.deb ...
+#7 40.59 Unpacking python3-lxml:amd64 (4.8.0-1build1) ...
+#7 40.62 Selecting previously unselected package python3-lz4.
+#7 40.63 Preparing to unpack .../264-python3-lz4_3.1.3+dfsg-1build3_amd64.deb ...
+#7 40.63 Unpacking python3-lz4 (3.1.3+dfsg-1build3) ...
+#7 40.65 Selecting previously unselected package python3-unicodedata2.
+#7 40.65 Preparing to unpack .../265-python3-unicodedata2_14.0.0+ds-8_amd64.deb ...
+#7 40.65 Unpacking python3-unicodedata2 (14.0.0+ds-8) ...
+#7 40.67 Selecting previously unselected package unicode-data.
+#7 40.68 Preparing to unpack .../266-unicode-data_14.0.0-1.1_all.deb ...
+#7 40.68 Unpacking unicode-data (14.0.0-1.1) ...
+#7 40.80 Selecting previously unselected package python3-fonttools.
+#7 40.81 Preparing to unpack .../267-python3-fonttools_4.29.1-2build1_amd64.deb ...
+#7 40.81 Unpacking python3-fonttools (4.29.1-2build1) ...
+#7 40.87 Selecting previously unselected package python3-h5py-serial.
+#7 40.88 Preparing to unpack .../268-python3-h5py-serial_3.6.0-2build1_amd64.deb ...
+#7 40.88 Unpacking python3-h5py-serial (3.6.0-2build1) ...
+#7 40.92 Selecting previously unselected package python3-h5py.
+#7 40.92 Preparing to unpack .../269-python3-h5py_3.6.0-2build1_all.deb ...
+#7 40.92 Unpacking python3-h5py (3.6.0-2build1) ...
+#7 40.94 Selecting previously unselected package python3-kiwisolver.
+#7 40.94 Preparing to unpack .../270-python3-kiwisolver_1.3.2-1build1_amd64.deb ...
+#7 40.94 Unpacking python3-kiwisolver (1.3.2-1build1) ...
+#7 40.96 Selecting previously unselected package libopenjp2-7:amd64.
+#7 40.96 Preparing to unpack .../271-libopenjp2-7_2.4.0-6ubuntu0.3_amd64.deb ...
+#7 40.96 Unpacking libopenjp2-7:amd64 (2.4.0-6ubuntu0.3) ...
+#7 40.98 Selecting previously unselected package python3-pil:amd64.
+#7 40.98 Preparing to unpack .../272-python3-pil_9.0.1-1ubuntu0.3_amd64.deb ...
+#7 40.98 Unpacking python3-pil:amd64 (9.0.1-1ubuntu0.3) ...
+#7 41.02 Selecting previously unselected package python3-tk:amd64.
+#7 41.02 Preparing to unpack .../273-python3-tk_3.10.8-1~22.04_amd64.deb ...
+#7 41.03 Unpacking python3-tk:amd64 (3.10.8-1~22.04) ...
+#7 41.05 Selecting previously unselected package python3-pil.imagetk:amd64.
+#7 41.05 Preparing to unpack .../274-python3-pil.imagetk_9.0.1-1ubuntu0.3_amd64.deb ...
+#7 41.05 Unpacking python3-pil.imagetk:amd64 (9.0.1-1ubuntu0.3) ...
+#7 41.07 Selecting previously unselected package python3-matplotlib.
+#7 41.07 Preparing to unpack .../275-python3-matplotlib_3.5.1-2build1_amd64.deb ...
+#7 41.07 Unpacking python3-matplotlib (3.5.1-2build1) ...
+#7 41.20 Selecting previously unselected package python3-rich.
+#7 41.20 Preparing to unpack .../276-python3-rich_11.2.0-1_all.deb ...
+#7 41.21 Unpacking python3-rich (11.2.0-1) ...
+#7 41.24 Selecting previously unselected package python3-meshio.
+#7 41.24 Preparing to unpack .../277-python3-meshio_5.3.0-1_all.deb ...
+#7 41.24 Unpacking python3-meshio (5.3.0-1) ...
+#7 41.28 Selecting previously unselected package python3-setuptools.
+#7 41.28 Preparing to unpack .../278-python3-setuptools_59.6.0-1.2ubuntu0.22.04.3_all.deb ...
+#7 41.28 Unpacking python3-setuptools (59.6.0-1.2ubuntu0.22.04.3) ...
+#7 41.32 Selecting previously unselected package python3-wheel.
+#7 41.33 Preparing to unpack .../279-python3-wheel_0.37.1-2ubuntu0.22.04.1_all.deb ...
+#7 41.33 Unpacking python3-wheel (0.37.1-2ubuntu0.22.04.1) ...
+#7 41.35 Selecting previously unselected package python3-pip.
+#7 41.35 Preparing to unpack .../280-python3-pip_22.0.2+dfsg-1ubuntu0.6_all.deb ...
+#7 41.35 Unpacking python3-pip (22.0.2+dfsg-1ubuntu0.6) ...
+#7 41.47 Selecting previously unselected package sphinx-rtd-theme-common.
+#7 41.47 Preparing to unpack .../281-sphinx-rtd-theme-common_1.0.0+dfsg-1_all.deb ...
+#7 41.47 Unpacking sphinx-rtd-theme-common (1.0.0+dfsg-1) ...
+#7 41.49 Selecting previously unselected package python3-sphinx-rtd-theme.
+#7 41.50 Preparing to unpack .../282-python3-sphinx-rtd-theme_1.0.0+dfsg-1_all.deb ...
+#7 41.50 Unpacking python3-sphinx-rtd-theme (1.0.0+dfsg-1) ...
+#7 41.53 Selecting previously unselected package texinfo.
+#7 41.54 Preparing to unpack .../283-texinfo_6.8-4build1_amd64.deb ...
+#7 41.54 Unpacking texinfo (6.8-4build1) ...
+#7 41.64 Selecting previously unselected package texlive-fonts-recommended.
+#7 41.64 Preparing to unpack .../284-texlive-fonts-recommended_2021.20220204-1_all.deb ...
+#7 41.64 Unpacking texlive-fonts-recommended (2021.20220204-1) ...
+#7 42.27 Selecting previously unselected package libfontbox-java.
+#7 42.27 Preparing to unpack .../285-libfontbox-java_1%3a1.8.16-2_all.deb ...
+#7 42.27 Unpacking libfontbox-java (1:1.8.16-2) ...
+#7 42.30 Selecting previously unselected package libpdfbox-java.
+#7 42.31 Preparing to unpack .../286-libpdfbox-java_1%3a1.8.16-2_all.deb ...
+#7 42.31 Unpacking libpdfbox-java (1:1.8.16-2) ...
+#7 42.58 Selecting previously unselected package texlive-latex-recommended.
+#7 42.58 Preparing to unpack .../287-texlive-latex-recommended_2021.20220204-1_all.deb ...
+#7 42.59 Unpacking texlive-latex-recommended (2021.20220204-1) ...
+#7 43.62 Selecting previously unselected package texlive-pictures.
+#7 43.62 Preparing to unpack .../288-texlive-pictures_2021.20220204-1_all.deb ...
+#7 43.62 Unpacking texlive-pictures (2021.20220204-1) ...
+#7 44.64 Selecting previously unselected package texlive-latex-extra.
+#7 44.65 Preparing to unpack .../289-texlive-latex-extra_2021.20220204-1_all.deb ...
+#7 44.65 Unpacking texlive-latex-extra (2021.20220204-1) ...
+#7 46.03 Selecting previously unselected package libglvnd0:amd64.
+#7 46.04 Preparing to unpack .../290-libglvnd0_1.4.0-1_amd64.deb ...
+#7 46.04 Unpacking libglvnd0:amd64 (1.4.0-1) ...
+#7 46.06 Selecting previously unselected package libopengl0:amd64.
+#7 46.07 Preparing to unpack .../291-libopengl0_1.4.0-1_amd64.deb ...
+#7 46.07 Unpacking libopengl0:amd64 (1.4.0-1) ...
+#7 46.08 Selecting previously unselected package libglu1-mesa:amd64.
+#7 46.09 Preparing to unpack .../292-libglu1-mesa_9.0.2-1_amd64.deb ...
+#7 46.09 Unpacking libglu1-mesa:amd64 (9.0.2-1) ...
+#7 46.12 Setting up media-types (7.0.0) ...
+#7 46.13 Setting up libgraphite2-3:amd64 (1.3.14-1build2) ...
+#7 46.13 Setting up liblcms2-2:amd64 (2.12~rc1-2build2) ...
+#7 46.13 Setting up libpixman-1-0:amd64 (0.40.0-1ubuntu0.22.04.1) ...
+#7 46.14 Setting up libxapian30:amd64 (1.4.18-4) ...
+#7 46.14 Setting up gcc-11-base:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 46.14 Setting up libxau6:amd64 (1:1.0.9-1build5) ...
+#7 46.14 Setting up libpsl5:amd64 (0.21.0-1.2build2) ...
+#7 46.14 Setting up fonts-lato (2.0-2.1) ...
+#7 46.15 Setting up wget (1.21.2-2ubuntu1.1) ...
+#7 46.15 Setting up libdatrie1:amd64 (0.2.13-2) ...
+#7 46.15 Setting up libmagic-mgc (1:5.41-3ubuntu0.1) ...
+#7 46.15 Setting up libtexlua53:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 46.16 Setting up libglib2.0-0:amd64 (2.72.4-0ubuntu2.6) ...
+#7 46.16 No schema files found: doing nothing.
+#7 46.17 Setting up libglvnd0:amd64 (1.4.0-1) ...
+#7 46.17 Setting up fonts-lyx (2.3.6-1) ...
+#7 46.17 Setting up libtexluajit2:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 46.17 Setting up libbrotli1:amd64 (1.0.9-2build6) ...
+#7 46.17 Setting up libfontbox-java (1:1.8.16-2) ...
+#7 46.18 Setting up libsqlite3-0:amd64 (3.37.2-2ubuntu0.5) ...
+#7 46.18 Setting up liblab-gamut1:amd64 (2.42.2-6ubuntu0.1) ...
+#7 46.18 Setting up binutils-common:amd64 (2.38-4ubuntu2.8) ...
+#7 46.18 Setting up x11-common (1:7.7+23ubuntu2) ...
+#7 46.25 invoke-rc.d: could not determine current runlevel
+#7 46.26 invoke-rc.d: policy-rc.d denied execution of start.
+#7 46.26 Setting up libnghttp2-14:amd64 (1.43.0-1ubuntu0.2) ...
+#7 46.26 Setting up libmagic1:amd64 (1:5.41-3ubuntu0.1) ...
+#7 46.27 Setting up libdeflate0:amd64 (1.10-2) ...
+#7 46.27 Setting up linux-libc-dev:amd64 (5.15.0-153.163) ...
+#7 46.27 Setting up libctf-nobfd0:amd64 (2.38-4ubuntu2.8) ...
+#7 46.27 Setting up gettext-base (0.21-4ubuntu4) ...
+#7 46.28 Setting up libqhull-r8.0:amd64 (2020.2-4) ...
+#7 46.28 Setting up libzzip-0-13:amd64 (0.13.72+dfsg.1-1.1) ...
+#7 46.28 Setting up file (1:5.41-3ubuntu0.1) ...
+#7 46.28 Setting up libgomp1:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 46.28 Setting up perl-modules-5.34 (5.34.0-3ubuntu1.5) ...
+#7 46.29 Setting up libjbig0:amd64 (2.1-3.1ubuntu0.22.04.1) ...
+#7 46.29 Setting up libaec0:amd64 (1.0.6-1) ...
+#7 46.29 Setting up libopengl0:amd64 (1.4.0-1) ...
+#7 46.30 Setting up python-babel-localedata (2.8.0+dfsg.1-7) ...
+#7 46.30 Setting up libasan6:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 46.30 Setting up libsasl2-modules-db:amd64 (2.1.27+dfsg2-3ubuntu1.2) ...
+#7 46.30 Setting up tzdata (2025b-0ubuntu0.22.04.1) ...
+#7 46.37 
+#7 46.37 Current default time zone: 'Etc/UTC'
+#7 46.38 Local time is now:      Fri Sep 12 13:32:15 UTC 2025.
+#7 46.38 Universal Time is now:  Fri Sep 12 13:32:15 UTC 2025.
+#7 46.38 Run 'dpkg-reconfigure tzdata' if you wish to change it.
+#7 46.38 
+#7 46.38 Setting up unicode-data (14.0.0-1.1) ...
+#7 46.39 Setting up libgts-0.7-5:amd64 (0.7.6+darcs121130-5) ...
+#7 46.39 Setting up libxsimd-dev:amd64 (7.6.0-2) ...
+#7 46.39 Setting up autotools-dev (20220109.1) ...
+#7 46.39 Setting up libblas3:amd64 (3.10.0-2ubuntu1) ...
+#7 46.40 update-alternatives: using /usr/lib/x86_64-linux-gnu/blas/libblas.so.3 to provide /usr/lib/x86_64-linux-gnu/libblas.so.3 (libblas.so.3-x86_64-linux-gnu) in auto mode
+#7 46.40 Setting up libtirpc-dev:amd64 (1.3.2-2ubuntu0.1) ...
+#7 46.40 Setting up libuv1:amd64 (1.43.0-1ubuntu0.1) ...
+#7 46.40 Setting up rpcsvc-proto (1.4.2-0ubuntu6) ...
+#7 46.41 Setting up emacsen-common (3.0.4) ...
+#7 46.43 Setting up libx11-data (2:1.7.5-1ubuntu0.3) ...
+#7 46.44 Setting up make (4.3-4.1build1) ...
+#7 46.44 Setting up libmpfr6:amd64 (4.1.0-3build3) ...
+#7 46.44 Setting up librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2build4) ...
+#7 46.44 Setting up dh-elpa-helper (2.0.9ubuntu1) ...
+#7 46.45 Setting up libteckit0:amd64 (2.5.11+ds1-1) ...
+#7 46.45 Setting up libpathplan4:amd64 (2.42.2-6ubuntu0.1) ...
+#7 46.45 Setting up libapache-pom-java (18-1) ...
+#7 46.45 Setting up libann0 (1.1.2+doc-7build1) ...
+#7 46.46 Setting up liblzf1:amd64 (3.6-3) ...
+#7 46.46 Setting up libsigsegv2:amd64 (2.13-1ubuntu3) ...
+#7 46.46 Setting up xz-utils (5.2.5-2ubuntu1) ...
+#7 46.46 update-alternatives: using /usr/bin/xz to provide /usr/bin/lzma (lzma) in auto mode
+#7 46.46 update-alternatives: warning: skip creation of /usr/share/man/man1/lzma.1.gz because associated file /usr/share/man/man1/xz.1.gz (of link group lzma) doesn't exist
+#7 46.46 update-alternatives: warning: skip creation of /usr/share/man/man1/unlzma.1.gz because associated file /usr/share/man/man1/unxz.1.gz (of link group lzma) doesn't exist
+#7 46.46 update-alternatives: warning: skip creation of /usr/share/man/man1/lzcat.1.gz because associated file /usr/share/man/man1/xzcat.1.gz (of link group lzma) doesn't exist
+#7 46.46 update-alternatives: warning: skip creation of /usr/share/man/man1/lzmore.1.gz because associated file /usr/share/man/man1/xzmore.1.gz (of link group lzma) doesn't exist
+#7 46.46 update-alternatives: warning: skip creation of /usr/share/man/man1/lzless.1.gz because associated file /usr/share/man/man1/xzless.1.gz (of link group lzma) doesn't exist
+#7 46.46 update-alternatives: warning: skip creation of /usr/share/man/man1/lzdiff.1.gz because associated file /usr/share/man/man1/xzdiff.1.gz (of link group lzma) doesn't exist
+#7 46.46 update-alternatives: warning: skip creation of /usr/share/man/man1/lzcmp.1.gz because associated file /usr/share/man/man1/xzcmp.1.gz (of link group lzma) doesn't exist
+#7 46.47 update-alternatives: warning: skip creation of /usr/share/man/man1/lzgrep.1.gz because associated file /usr/share/man/man1/xzgrep.1.gz (of link group lzma) doesn't exist
+#7 46.47 update-alternatives: warning: skip creation of /usr/share/man/man1/lzegrep.1.gz because associated file /usr/share/man/man1/xzegrep.1.gz (of link group lzma) doesn't exist
+#7 46.47 update-alternatives: warning: skip creation of /usr/share/man/man1/lzfgrep.1.gz because associated file /usr/share/man/man1/xzfgrep.1.gz (of link group lzma) doesn't exist
+#7 46.47 Setting up libfribidi0:amd64 (1.0.8-2ubuntu3.1) ...
+#7 46.47 Setting up t1utils (1.41-4build2) ...
+#7 46.47 Setting up libquadmath0:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 46.48 Setting up libimagequant0:amd64 (2.17.0-1) ...
+#7 46.48 Setting up libpng16-16:amd64 (1.6.37-3build5) ...
+#7 46.48 Setting up libmpc3:amd64 (1.2.1-2build1) ...
+#7 46.48 Setting up libatomic1:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 46.49 Setting up libtcl8.6:amd64 (8.6.12+dfsg-1build1) ...
+#7 46.49 Setting up autopoint (0.21-4ubuntu4) ...
+#7 46.49 Setting up libjsoncpp25:amd64 (1.9.5-3) ...
+#7 46.49 Setting up fonts-dejavu-core (2.37-2build1) ...
+#7 46.50 Setting up ucf (3.0043) ...
+#7 46.58 Setting up libjpeg-turbo8:amd64 (2.1.2-0ubuntu1) ...
+#7 46.58 Setting up libltdl7:amd64 (2.4.6-15build2) ...
+#7 46.58 Setting up libkpathsea6:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 46.58 Setting up libsasl2-2:amd64 (2.1.27+dfsg2-3ubuntu1.2) ...
+#7 46.58 Setting up libssh-4:amd64 (0.9.6-2ubuntu0.22.04.4) ...
+#7 46.59 Setting up libgfortran5:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 46.59 Setting up libwebp7:amd64 (1.2.2-2ubuntu0.22.04.2) ...
+#7 46.59 Setting up libubsan1:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 46.59 Setting up libmd0:amd64 (1.0.4-1build1) ...
+#7 46.60 Setting up libnsl-dev:amd64 (1.3.0-2build2) ...
+#7 46.60 Setting up librhash0:amd64 (1.4.2-1ubuntu1) ...
+#7 46.60 Setting up libcrypt-dev:amd64 (1:4.4.27-1) ...
+#7 46.60 Setting up libmpdec3:amd64 (2.5.1-2build2) ...
+#7 46.61 Setting up fonts-lmodern (2.004.5-6.1) ...
+#7 46.61 Setting up libopenjp2-7:amd64 (2.4.0-6ubuntu0.3) ...
+#7 46.61 Setting up git-man (1:2.34.1-1ubuntu1.15) ...
+#7 46.61 Setting up libthai-data (0.1.29-1build1) ...
+#7 46.62 Setting up sgml-base (1.30) ...
+#7 46.64 Setting up cmake-data (3.22.1-1ubuntu1.22.04.2) ...
+#7 46.67 Setting up libcdt5:amd64 (2.42.2-6ubuntu0.1) ...
+#7 46.67 Setting up libcgraph6:amd64 (2.42.2-6ubuntu0.1) ...
+#7 46.67 Setting up libglu1-mesa:amd64 (9.0.2-1) ...
+#7 46.67 Setting up libjs-jquery (3.6.0+dfsg+~3.5.13-1) ...
+#7 46.68 Setting up libbinutils:amd64 (2.38-4ubuntu2.8) ...
+#7 46.68 Setting up libisl23:amd64 (0.24-2build1) ...
+#7 46.68 Setting up libc-dev-bin (2.35-0ubuntu3.10) ...
+#7 46.69 Setting up python-matplotlib-data (3.5.1-2build1) ...
+#7 46.69 Setting up openssl (3.0.2-0ubuntu1.19) ...
+#7 46.69 Setting up libwebpmux3:amd64 (1.2.2-2ubuntu0.22.04.2) ...
+#7 46.70 Setting up libbsd0:amd64 (0.11.5-1) ...
+#7 46.70 Setting up readline-common (8.1.2-1) ...
+#7 46.70 Setting up fonts-font-awesome (5.0.10+really4.7.0~dfsg-4.1) ...
+#7 46.71 Setting up sphinx-rtd-theme-common (1.0.0+dfsg-1) ...
+#7 46.71 Setting up xdg-utils (1.1.3-4.1ubuntu3~22.04.1) ...
+#7 46.71 update-alternatives: using /usr/bin/xdg-open to provide /usr/bin/open (open) in auto mode
+#7 46.71 update-alternatives: warning: skip creation of /usr/share/man/man1/open.1.gz because associated file /usr/share/man/man1/xdg-open.1.gz (of link group open) doesn't exist
+#7 46.72 Setting up libcc1-0:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 46.72 Setting up liblsan0:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 46.72 Setting up libsz2:amd64 (1.0.6-1) ...
+#7 46.72 Setting up libitm1:amd64 (12.3.0-1ubuntu1~22.04.2) ...
+#7 46.73 Setting up libsynctex2:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 46.73 Setting up libgdbm6:amd64 (1.23-1) ...
+#7 46.73 Setting up libjs-underscore (1.13.2~dfsg-2) ...
+#7 46.73 Setting up libicu70:amd64 (70.1-2) ...
+#7 46.74 Setting up libtsan0:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 46.74 Setting up libctf0:amd64 (2.38-4ubuntu2.8) ...
+#7 46.74 Setting up libjpeg8:amd64 (8c-2ubuntu10) ...
+#7 46.74 Setting up cpp-11 (11.4.0-1ubuntu1~22.04.2) ...
+#7 46.75 Setting up libpaper1:amd64 (1.1.28build2) ...
+#7 46.84 
+#7 46.84 Creating config file /etc/papersize with new version
+#7 46.86 Setting up libice6:amd64 (2:1.0.10-1build2) ...
+#7 46.86 Setting up libxdmcp6:amd64 (1:1.1.3-0ubuntu5) ...
+#7 46.86 Setting up liblapack3:amd64 (3.10.0-2ubuntu1) ...
+#7 46.87 update-alternatives: using /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3 to provide /usr/lib/x86_64-linux-gnu/liblapack.so.3 (liblapack.so.3-x86_64-linux-gnu) in auto mode
+#7 46.87 Setting up libxcb1:amd64 (1.14-3ubuntu3) ...
+#7 46.87 Setting up libopenblas0-pthread:amd64 (0.3.20+ds-1) ...
+#7 46.87 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 to provide /usr/lib/x86_64-linux-gnu/libblas.so.3 (libblas.so.3-x86_64-linux-gnu) in auto mode
+#7 46.88 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so.3 to provide /usr/lib/x86_64-linux-gnu/liblapack.so.3 (liblapack.so.3-x86_64-linux-gnu) in auto mode
+#7 46.88 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so.0 to provide /usr/lib/x86_64-linux-gnu/libopenblas.so.0 (libopenblas.so.0-x86_64-linux-gnu) in auto mode
+#7 46.88 Setting up libpdfbox-java (1:1.8.16-2) ...
+#7 46.88 Setting up libxcb-render0:amd64 (1.14-3ubuntu3) ...
+#7 46.88 Setting up fontconfig-config (2.13.1-4.2ubuntu5) ...
+#7 46.92 Setting up libwebpdemux2:amd64 (1.2.2-2ubuntu0.22.04.2) ...
+#7 46.92 Setting up libedit2:amd64 (3.1-20210910-1build1) ...
+#7 46.92 Setting up libreadline8:amd64 (8.1.2-1) ...
+#7 46.93 Setting up libcommons-parent-java (43-1) ...
+#7 46.93 Setting up libcommons-logging-java (1.2-2) ...
+#7 46.93 Setting up m4 (1.4.18-5ubuntu2) ...
+#7 46.93 Setting up libxcb-shm0:amd64 (1.14-3ubuntu3) ...
+#7 46.94 Setting up libpaper-utils (1.1.28build2) ...
+#7 46.94 Setting up libldap-2.5-0:amd64 (2.5.19+dfsg-0ubuntu0.22.04.1) ...
+#7 46.94 Setting up libpython3.10-stdlib:amd64 (3.10.12-1~22.04.11) ...
+#7 46.94 Setting up tex-common (6.17) ...
+#7 47.05 update-language: texlive-base not installed and configured, doing nothing!
+#7 47.09 Setting up libthai0:amd64 (0.1.29-1build1) ...
+#7 47.10 Setting up ca-certificates (20240203~22.04.1) ...
+#7 47.51 Updating certificates in /etc/ssl/certs...
+#7 48.05 146 added, 0 removed; done.
+#7 48.09 Setting up libjs-jquery-ui (1.13.1+dfsg-1) ...
+#7 48.10 Setting up libptexenc1:amd64 (2021.20210626.59705-1ubuntu0.2) ...
+#7 48.10 Setting up libfreetype6:amd64 (2.11.1+dfsg-1ubuntu0.3) ...
+#7 48.10 Setting up libgdbm-compat4:amd64 (1.23-1) ...
+#7 48.10 Setting up libjs-sphinxdoc (4.3.2-1) ...
+#7 48.10 Setting up libgvpr2:amd64 (2.42.2-6ubuntu0.1) ...
+#7 48.11 Setting up libgcc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 48.11 Setting up libopenblas0:amd64 (0.3.20+ds-1) ...
+#7 48.11 Setting up cpp (4:11.2.0-1ubuntu1) ...
+#7 48.12 Setting up xml-core (0.18+nmu1) ...
+#7 48.26 Setting up bison (2:3.8.2+dfsg-1build1) ...
+#7 48.27 update-alternatives: using /usr/bin/bison.yacc to provide /usr/bin/yacc (yacc) in auto mode
+#7 48.27 update-alternatives: warning: skip creation of /usr/share/man/man1/yacc.1.gz because associated file /usr/share/man/man1/bison.yacc.1.gz (of link group yacc) doesn't exist
+#7 48.27 Setting up libcurl4:amd64 (7.81.0-1ubuntu1.20) ...
+#7 48.27 Setting up libc6-dev:amd64 (2.35-0ubuntu3.10) ...
+#7 48.27 Setting up libx11-6:amd64 (2:1.7.5-1ubuntu0.3) ...
+#7 48.28 Setting up libharfbuzz0b:amd64 (2.7.4-1ubuntu3.2) ...
+#7 48.28 Setting up libtiff5:amd64 (4.3.0-6ubuntu0.11) ...
+#7 48.28 Setting up libfontconfig1:amd64 (2.13.1-4.2ubuntu5) ...
+#7 48.28 Setting up libsm6:amd64 (2:1.2.3-1build2) ...
+#7 48.28 Setting up libxml2:amd64 (2.9.13+dfsg-1ubuntu0.9) ...
+#7 48.29 Setting up libpython3-stdlib:amd64 (3.10.6-1~22.04.1) ...
+#7 48.29 Setting up liblbfgsb0:amd64 (3.0+dfsg.3-10) ...
+#7 48.29 Setting up binutils-x86-64-linux-gnu (2.38-4ubuntu2.8) ...
+#7 48.29 Setting up libopenblas-pthread-dev:amd64 (0.3.20+ds-1) ...
+#7 48.30 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so to provide /usr/lib/x86_64-linux-gnu/libblas.so (libblas.so-x86_64-linux-gnu) in auto mode
+#7 48.30 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so to provide /usr/lib/x86_64-linux-gnu/liblapack.so (liblapack.so-x86_64-linux-gnu) in auto mode
+#7 48.30 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so to provide /usr/lib/x86_64-linux-gnu/libopenblas.so (libopenblas.so-x86_64-linux-gnu) in auto mode
+#7 48.31 Setting up libpython3.10:amd64 (3.10.12-1~22.04.11) ...
+#7 48.31 Setting up fontconfig (2.13.1-4.2ubuntu5) ...
+#7 48.31 Regenerating fonts cache... done.
+#7 50.39 Setting up libperl5.34:amd64 (5.34.0-3ubuntu1.5) ...
+#7 50.40 Setting up flex (2.6.4-8build2) ...
+#7 50.42 Setting up gettext (0.21-4ubuntu4) ...
+#7 50.43 Setting up python3.10 (3.10.12-1~22.04.11) ...
+#7 51.12 Setting up libxpm4:amd64 (1:3.5.12-1ubuntu0.22.04.2) ...
+#7 51.12 Setting up libxrender1:amd64 (1:0.9.10-1build4) ...
+#7 51.12 Setting up libarchive13:amd64 (3.6.0-1ubuntu1.5) ...
+#7 51.13 Setting up libgfortran-11-dev:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 51.13 Setting up preview-latex-style (12.2-1ubuntu1) ...
+#7 51.13 Setting up libpango-1.0-0:amd64 (1.50.6+ds-2ubuntu1) ...
+#7 51.14 Setting up libxext6:amd64 (2:1.3.4-1build1) ...
+#7 51.14 Setting up libcurl3-gnutls:amd64 (7.81.0-1ubuntu1.20) ...
+#7 51.14 Setting up python3 (3.10.6-1~22.04.1) ...
+#7 51.22 Setting up binutils (2.38-4ubuntu2.8) ...
+#7 51.22 Setting up python3-markupsafe (2.0.1-2build1) ...
+#7 51.32 Setting up libcairo2:amd64 (1.16.0-5ubuntu2) ...
+#7 51.32 Setting up python3-tz (2022.1-1ubuntu0.22.04.1) ...
+#7 51.42 Setting up python3-six (1.16.0-3ubuntu1) ...
+#7 51.52 Setting up python3-roman (3.3-1) ...
+#7 51.62 Setting up libopenblas-dev:amd64 (0.3.20+ds-1) ...
+#7 51.62 Setting up python3-decorator (4.4.2-0ubuntu1) ...
+#7 51.72 Setting up perl (5.34.0-3ubuntu1.5) ...
+#7 51.73 Setting up libexpat1-dev:amd64 (2.4.7-1ubuntu0.6) ...
+#7 51.73 Setting up python3-pyparsing (2.4.7-1) ...
+#7 51.86 Setting up python3-certifi (2020.6.20-1) ...
+#7 51.96 Setting up python3-snowballstemmer (2.2.0-1build1) ...
+#7 52.15 Setting up python3-brotli (1.0.9-2build6) ...
+#7 52.25 Setting up libraqm0:amd64 (0.7.0-4ubuntu1) ...
+#7 52.25 Setting up sphinx-common (4.3.2-1) ...
+#7 52.25 Setting up python3-cycler (0.11.0-1) ...
+#7 52.35 Setting up libgd3:amd64 (2.3.0-2ubuntu2.3) ...
+#7 52.36 Setting up python3-kiwisolver (1.3.2-1build1) ...
+#7 52.36 Setting up python3-idna (3.3-1ubuntu0.1) ...
+#7 52.52 Setting up libxt6:amd64 (1:1.2.1-1) ...
+#7 52.52 Setting up libdpkg-perl (1.21.1ubuntu2.3) ...
+#7 52.52 Setting up python3-urllib3 (1.26.5-1~exp1ubuntu0.3) ...
+#7 52.66 Setting up libstdc++-11-dev:amd64 (11.4.0-1ubuntu1~22.04.2) ...
+#7 52.66 Setting up zlib1g-dev:amd64 (1:1.2.11.dfsg-2ubuntu9.2) ...
+#7 52.66 Setting up libllvm14:amd64 (1:14.0.0-1ubuntu1.1) ...
+#7 52.66 Setting up libhdf5-103-1:amd64 (1.10.7+repack-4ubuntu2) ...
+#7 52.67 Setting up gcc-11 (11.4.0-1ubuntu1~22.04.2) ...
+#7 52.67 Setting up libxslt1.1:amd64 (1.1.34-4ubuntu0.22.04.4) ...
+#7 52.67 Setting up cmake (3.22.1-1ubuntu1.22.04.2) ...
+#7 52.67 Setting up python3-dateutil (2.8.1-6) ...
+#7 52.80 Setting up libxss1:amd64 (1:1.2.3-1build2) ...
+#7 52.80 Setting up libpangoft2-1.0-0:amd64 (1.50.6+ds-2ubuntu1) ...
+#7 52.81 Setting up python3-mpmath (1.2.1-2) ...
+#7 53.13 Setting up libtext-unidecode-perl (1.30-1) ...
+#7 53.14 Setting up python3-lib2to3 (3.10.8-1~22.04) ...
+#7 53.22 Setting up python3-appdirs (1.4.4-2) ...
+#7 53.32 Setting up libpangocairo-1.0-0:amd64 (1.50.6+ds-2ubuntu1) ...
+#7 53.32 Setting up python3-imagesize (1.3.0-1) ...
+#7 53.42 Setting up libhdf5-hl-100:amd64 (1.10.7+repack-4ubuntu2) ...
+#7 53.43 Setting up python3-commonmark (0.9.1-3) ...
+#7 53.55 Setting up python3-pkg-resources (59.6.0-1.2ubuntu0.22.04.3) ...
+#7 53.70 Setting up python3-distutils (3.10.8-1~22.04) ...
+#7 53.80 Setting up python3-sympy (1.9-1) ...
+#7 59.32 Setting up python3-attr (21.2.0-1) ...
+#7 59.43 Setting up libxft2:amd64 (2.3.4-1) ...
+#7 59.43 Setting up libxmu6:amd64 (2:1.1.3-3) ...
+#7 59.44 Setting up libboost1.74-dev:amd64 (1.74.0-14ubuntu3) ...
+#7 59.44 Setting up python3-setuptools (59.6.0-1.2ubuntu0.22.04.3) ...
+#7 59.71 Setting up libxi6:amd64 (2:1.8-1build1) ...
+#7 59.71 Setting up libtool (2.4.6-15build2) ...
+#7 59.71 Setting up g++-11 (11.4.0-1ubuntu1~22.04.2) ...
+#7 59.72 Setting up python3-babel (2.8.0+dfsg.1-7) ...
+#7 59.72 update-alternatives: using /usr/bin/pybabel-python3 to provide /usr/bin/pybabel (pybabel) in auto mode
+#7 59.85 Setting up python3-colorama (0.4.4-1) ...
+#7 59.95 Setting up python3-lz4 (3.1.3+dfsg-1build3) ...
+#7 60.05 Setting up python3-alabaster (0.7.12-1) ...
+#7 60.15 Setting up python3-unicodedata2 (14.0.0+ds-8) ...
+#7 60.15 Setting up libtk8.6:amd64 (8.6.12-1build1) ...
+#7 60.16 Setting up python3-ply (3.11-5) ...
+#7 60.28 Setting up python3-gast (0.5.2-2) ...
+#7 60.38 Setting up libxml-namespacesupport-perl (1.12-1.1) ...
+#7 60.38 Setting up libclang1-14 (1:14.0.0-1ubuntu1.1) ...
+#7 60.39 Setting up libxaw7:amd64 (2:1.0.14-1) ...
+#7 60.39 Setting up python3-wheel (0.37.1-2ubuntu0.22.04.1) ...
+#7 60.50 Setting up gcc (4:11.2.0-1ubuntu1) ...
+#7 60.51 Setting up python3-fs (2.4.12-1) ...
+#7 60.67 Setting up liberror-perl (0.17029-1) ...
+#7 60.67 Setting up python3-beniget (0.4.1-2) ...
+#7 60.77 Setting up libxml-sax-base-perl (1.09-1.1) ...
+#7 60.77 Setting up python3-jinja2 (3.0.3-1ubuntu0.4) ...
+#7 60.92 Setting up python3-pygments (2.11.2+dfsg-2ubuntu0.1) ...
+#7 61.40 Setting up python3-packaging (21.3-1) ...
+#7 61.51 Setting up python3-chardet (4.0.0-1) ...
+#7 61.74 Setting up python3-requests (2.25.1+dfsg-2ubuntu0.3) ...
+#7 61.86 Setting up libgvc6 (2.42.2-6ubuntu0.1) ...
+#7 61.87 Setting up pkg-config (0.29.2-1ubuntu3) ...
+#7 61.89 Setting up libpython3.10-dev:amd64 (3.10.12-1~22.04.11) ...
+#7 61.89 Setting up libclang-cpp14 (1:14.0.0-1ubuntu1.1) ...
+#7 61.89 Setting up git (1:2.34.1-1ubuntu1.15) ...
+#7 61.90 Setting up python3-pip (22.0.2+dfsg-1ubuntu0.6) ...
+#7 62.76 Setting up python3-numpy (1:1.21.5-1ubuntu22.04.1) ...
+#7 63.89 Setting up gfortran-11 (11.4.0-1ubuntu1~22.04.2) ...
+#7 63.90 Setting up python3.10-dev (3.10.12-1~22.04.11) ...
+#7 63.90 Setting up g++ (4:11.2.0-1ubuntu1) ...
+#7 63.92 update-alternatives: using /usr/bin/g++ to provide /usr/bin/c++ (c++) in auto mode
+#7 63.92 update-alternatives: warning: skip creation of /usr/share/man/man1/c++.1.gz because associated file /usr/share/man/man1/g++.1.gz (of link group c++) doesn't exist
+#7 63.92 Setting up texlive-binaries (2021.20210626.59705-1ubuntu0.2) ...
+#7 63.92 update-alternatives: using /usr/bin/xdvi-xaw to provide /usr/bin/xdvi.bin (xdvi.bin) in auto mode
+#7 63.92 update-alternatives: using /usr/bin/bibtex.original to provide /usr/bin/bibtex (bibtex) in auto mode
+#7 63.92 update-alternatives: warning: skip creation of /usr/share/man/man1/bibtex.1.gz because associated file /usr/share/man/man1/bibtex.original.1.gz (of link group bibtex) doesn't exist
+#7 63.93 Setting up python3-lxml:amd64 (4.8.0-1build1) ...
+#7 64.06 Setting up libboost-dev:amd64 (1.74.0.3ubuntu7) ...
+#7 64.06 Setting up texlive-base (2021.20220204-1) ...
+#7 64.09 /usr/bin/ucfr
+#7 64.12 /usr/bin/ucfr
+#7 64.16 /usr/bin/ucfr
+#7 64.20 /usr/bin/ucfr
+#7 64.49 tl-paper: setting paper size for dvips to a4: /var/lib/texmf/dvips/config/config-paper.ps
+#7 64.67 tl-paper: setting paper size for dvipdfmx to a4: /var/lib/texmf/dvipdfmx/dvipdfmx-paper.cfg
+#7 64.85 tl-paper: setting paper size for xdvi to a4: /var/lib/texmf/xdvi/XDvi-paper
+#7 65.04 tl-paper: setting paper size for pdftex to a4: /var/lib/texmf/tex/generic/tex-ini-files/pdftexconfig.tex
+#7 65.47 Setting up graphviz (2.42.2-6ubuntu0.1) ...
+#7 65.47 Setting up tk8.6-blt2.5 (2.5.3+dfsg-4.1build2) ...
+#7 65.47 Setting up libpython3-dev:amd64 (3.10.6-1~22.04.1) ...
+#7 65.48 Setting up python3-rich (11.2.0-1) ...
+#7 65.68 Setting up blt (2.5.3+dfsg-4.1build2) ...
+#7 65.68 Setting up python3-h5py-serial (3.6.0-2build1) ...
+#7 65.86 Setting up python3-tk:amd64 (3.10.8-1~22.04) ...
+#7 65.94 Setting up python3-meshio (5.3.0-1) ...
+#7 66.12 Setting up libxml-sax-perl (1.02+dfsg-3) ...
+#7 66.17 update-perl-sax-parsers: Registering Perl SAX parser XML::SAX::PurePerl with priority 10...
+#7 66.22 update-perl-sax-parsers: Updating overall Perl SAX parser modules info file...
+#7 66.33 
+#7 66.33 Creating config file /etc/perl/XML/SAX/ParserDetails.ini with new version
+#7 66.36 Setting up gfortran (4:11.2.0-1ubuntu1) ...
+#7 66.36 update-alternatives: using /usr/bin/gfortran to provide /usr/bin/f95 (f95) in auto mode
+#7 66.36 update-alternatives: warning: skip creation of /usr/share/man/man1/f95.1.gz because associated file /usr/share/man/man1/gfortran.1.gz (of link group f95) doesn't exist
+#7 66.36 update-alternatives: using /usr/bin/gfortran to provide /usr/bin/f77 (f77) in auto mode
+#7 66.36 update-alternatives: warning: skip creation of /usr/share/man/man1/f77.1.gz because associated file /usr/share/man/man1/gfortran.1.gz (of link group f77) doesn't exist
+#7 66.36 Setting up doxygen (1.9.1-2ubuntu2) ...
+#7 66.37 Setting up texlive-latex-base (2021.20220204-1) ...
+#7 66.38 Setting up python3-dev (3.10.6-1~22.04.1) ...
+#7 66.38 Setting up texlive-latex-recommended (2021.20220204-1) ...
+#7 66.38 Setting up python3-h5py (3.6.0-2build1) ...
+#7 66.39 Setting up texlive-pictures (2021.20220204-1) ...
+#7 66.39 Setting up libxml-libxml-perl (2.0207+dfsg+really+2.0134-1) ...
+#7 66.42 update-perl-sax-parsers: Registering Perl SAX parser XML::LibXML::SAX::Parser with priority 50...
+#7 66.49 update-perl-sax-parsers: Registering Perl SAX parser XML::LibXML::SAX with priority 50...
+#7 66.55 update-perl-sax-parsers: Updating overall Perl SAX parser modules info file...
+#7 66.66 Replacing config file /etc/perl/XML/SAX/ParserDetails.ini with new version
+#7 66.69 Setting up python3-pythran (0.10.0+ds2-1) ...
+#7 66.94 Setting up texlive-fonts-recommended (2021.20220204-1) ...
+#7 66.94 Setting up python3-scipy (1.8.0-1exp2ubuntu1) ...
+#7 68.61 Setting up latexmk (1:4.76-1) ...
+#7 68.62 Setting up texlive-latex-extra (2021.20220204-1) ...
+#7 68.62 Setting up texinfo (6.8-4build1) ...
+#7 68.64 Running mktexlsr. This may take some time. ... done.
+#7 68.71 Setting up python3-fonttools (4.29.1-2build1) ...
+#7 69.22 Setting up python3-pil.imagetk:amd64 (9.0.1-1ubuntu0.3) ...
+#7 69.32 Setting up python3-ufolib2 (0.13.1+dfsg1-1) ...
+#7 69.45 Setting up python3-pil:amd64 (9.0.1-1ubuntu0.3) ...
+#7 69.67 Setting up python3-matplotlib (3.5.1-2build1) ...
+#7 70.48 Processing triggers for libc-bin (2.35-0ubuntu3.10) ...
+#7 70.50 Processing triggers for sgml-base (1.30) ...
+#7 70.51 Setting up docutils-common (0.17.1+dfsg-2) ...
+#7 70.60 Processing triggers for sgml-base (1.30) ...
+#7 70.61 Setting up python3-docutils (0.17.1+dfsg-2) ...
+#7 70.90 Setting up python3-sphinx (4.3.2-1) ...
+#7 71.34 Setting up python3-sphinx-rtd-theme (1.0.0+dfsg-1) ...
+#7 71.44 Setting up python3-breathe (4.33.1-3) ...
+#7 71.62 Processing triggers for ca-certificates (20240203~22.04.1) ...
+#7 71.63 Updating certificates in /etc/ssl/certs...
+#7 72.05 0 added, 0 removed; done.
+#7 72.05 Running hooks in /etc/ca-certificates/update.d...
+#7 72.05 done.
+#7 72.05 Processing triggers for tex-common (6.17) ...
+#7 72.13 Running updmap-sys. This may take some time... done.
+#7 72.39 Running mktexlsr /var/lib/texmf ... done.
+#7 72.46 Building format(s) --all.
+#7 72.46 	This may take some time... done.
+#7 80.30 Collecting cython
+#7 80.40   Downloading cython-3.1.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.4 MB)
+#7 80.51      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.4/3.4 MB 31.2 MB/s eta 0:00:00
+#7 80.57 Installing collected packages: cython
+#7 81.10 Successfully installed cython-3.1.3
+#7 81.10 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#7 DONE 82.4s
+
+#8 [ 4/48] RUN mkdir /usr/local/petsc
+#8 DONE 0.5s
+
+#9 [ 5/48] WORKDIR /usr/local/petsc
+#9 DONE 0.3s
+
+#10 [ 6/48] RUN git clone -b release https://gitlab.com/petsc/petsc.git .
+#10 0.193 Cloning into '.'...
+#10 DONE 32.8s
+
+#11 [ 7/48] RUN git pull
+#11 0.742 Already up to date.
+#11 DONE 0.7s
+
+#12 [ 8/48] RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich --download-fblaslapack                 --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch                    --download-cmake --with-debugging=1 --download-hdf5 --download-triangle
+#12 0.775 =============================================================================================
+#12 0.775                          Configuring PETSc to compile on your system
+#12 0.775 =============================================================================================
+#12 12.30 =============================================================================================
+#12 12.30   Trying to download
+#12 12.30   https://github.com/pmodels/mpich/releases/download/v4.3.0/mpich-4.3.0.tar.gz for MPICH
+#12 12.30 =============================================================================================
+#12 18.46 =============================================================================================
+#12 18.46                   Running configure on MPICH; this may take several minutes
+#12 18.46 =============================================================================================
+#12 73.31 =============================================================================================
+#12 73.31                      Running make on MPICH; this may take several minutes
+#12 73.31 =============================================================================================
+#12 248.6 =============================================================================================
+#12 248.6                  Running make install on MPICH; this may take several minutes
+#12 248.6 =============================================================================================
+#12 265.2 =============================================================================================
+#12 265.2            Trying to download https://bitbucket.org/petsc/pkg-triangle for TRIANGLE
+#12 265.2 =============================================================================================
+#12 266.2 =============================================================================================
+#12 266.2                       Compiling Triangle; this may take several minutes
+#12 266.2 =============================================================================================
+#12 266.6 =============================================================================================
+#12 266.6                       Installing Triangle; this may take several minutes
+#12 266.6 =============================================================================================
+#12 266.9 =============================================================================================
+#12 266.9   Trying to download
+#12 266.9   https://web.cels.anl.gov/projects/petsc/download/externalpackages/hdf5-1.14.3-p1.tar.bz2
+#12 266.9   for HDF5
+#12 266.9 =============================================================================================
+#12 273.4 =============================================================================================
+#12 273.4                    Running configure on HDF5; this may take several minutes
+#12 273.4 =============================================================================================
+#12 292.0 =============================================================================================
+#12 292.0                      Running make on HDF5; this may take several minutes
+#12 292.0 =============================================================================================
+#12 445.1 =============================================================================================
+#12 445.1                  Running make install on HDF5; this may take several minutes
+#12 445.1 =============================================================================================
+#12 448.0 =============================================================================================
+#12 448.0         Trying to download https://bitbucket.org/petsc/pkg-fblaslapack for FBLASLAPACK
+#12 448.0 =============================================================================================
+#12 450.1 =============================================================================================
+#12 450.1                      Compiling FBLASLAPACK; this may take several minutes
+#12 450.1 =============================================================================================
+#12 478.4 =============================================================================================
+#12 478.4   Trying to download
+#12 478.4   https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6.tar.gz for CMAKE
+#12 478.4 =============================================================================================
+#12 485.9 =============================================================================================
+#12 485.9                   Running configure on CMAKE; this may take several minutes
+#12 485.9 =============================================================================================
+#12 626.6 =============================================================================================
+#12 626.6                      Running make on CMAKE; this may take several minutes
+#12 626.6 =============================================================================================
+#12 984.8 =============================================================================================
+#12 984.8                  Running make install on CMAKE; this may take several minutes
+#12 984.8 =============================================================================================
+#12 989.0 =============================================================================================
+#12 989.0           Trying to download https://gitlab.inria.fr/scotch/scotch.git for PTSCOTCH
+#12 989.0 =============================================================================================
+#12 997.1 =============================================================================================
+#12 997.1                 Configuring PTSCOTCH with CMake; this may take several minutes
+#12 997.1 =============================================================================================
+#12 997.9 =============================================================================================
+#12 997.9                Compiling and installing PTSCOTCH; this may take several minutes
+#12 997.9 =============================================================================================
+#12 1044.2 =============================================================================================
+#12 1044.2       Trying to download https://github.com/Reference-ScaLAPACK/scalapack for SCALAPACK
+#12 1044.2 =============================================================================================
+#12 1046.1 =============================================================================================
+#12 1046.1                Configuring SCALAPACK with CMake; this may take several minutes
+#12 1046.1 =============================================================================================
+#12 1047.8 =============================================================================================
+#12 1047.8               Compiling and installing SCALAPACK; this may take several minutes
+#12 1047.8 =============================================================================================
+#12 1082.4                 **************************************************************************************************                Please register to use MUMPS at https://mumps-solver.org/index.php?page=dwnld#form                **************************************************************************************************
+#12 1082.4 =============================================================================================
+#12 1082.4            Trying to download https://mumps-solver.org/MUMPS_5.7.3.tar.gz for MUMPS
+#12 1082.4 =============================================================================================
+#12 1084.5 =============================================================================================
+#12 1084.5                         Compiling MUMPS; this may take several minutes
+#12 1084.5 =============================================================================================
+#12 1111.0 =============================================================================================
+#12 1111.0                        Installing MUMPS; this may take several minutes
+#12 1111.0 =============================================================================================
+#12 1113.6 =============================================================================================
+#12 1113.6                                   Generating Fortran binding
+#12 1113.6 =============================================================================================
+#12 1115.8 Compilers:
+#12 1115.8   C Compiler:         /usr/local/petsc/arch-linux-c-opt/bin/mpicc  -Wall -Wwrite-strings -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-stringop-overflow -fstack-protector -fvisibility=hidden -g3 -O0 
+#12 1115.8     Version: gcc (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0
+#12 1115.8   C++ Compiler:         /usr/local/petsc/arch-linux-c-opt/bin/mpicxx  -Wall -Wwrite-strings -Wno-strict-aliasing -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-psabi -fstack-protector -fvisibility=hidden -g -O0  -std=gnu++20 
+#12 1115.8     Version: g++ (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0
+#12 1115.8   Fortran Compiler:         /usr/local/petsc/arch-linux-c-opt/bin/mpif90  -Wall -ffree-line-length-none -ffree-line-length-0 -Wno-lto-type-mismatch -Wno-unused-dummy-argument -g -O0 
+#12 1115.8     Version: GNU Fortran (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0
+#12 1115.8 Linkers:
+#12 1115.8   Shared linker:   /usr/local/petsc/arch-linux-c-opt/bin/mpicc  -shared  -Wall -Wwrite-strings -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-stringop-overflow -fstack-protector -fvisibility=hidden -g3 -O0
+#12 1115.8   Dynamic linker:   /usr/local/petsc/arch-linux-c-opt/bin/mpicc  -shared  -Wall -Wwrite-strings -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-stringop-overflow -fstack-protector -fvisibility=hidden -g3 -O0
+#12 1115.8   Libraries linked against:   
+#12 1115.8 Intel instruction sets found on CPU:
+#12 1115.8   AVX2
+#12 1115.8 Intel instruction sets found on CPU:
+#12 1115.8   AVX2
+#12 1115.8 BlasLapack:
+#12 1115.8   Libraries:  -Wl,-rpath,/usr/local/petsc/arch-linux-c-opt/lib -L/usr/local/petsc/arch-linux-c-opt/lib -lflapack -lfblas
+#12 1115.8   uses 4 byte integers
+#12 1115.8 MPI:
+#12 1115.8   Version:    4
+#12 1115.8   Includes:   -I/usr/local/petsc/arch-linux-c-opt/include
+#12 1115.8   mpiexec: /usr/local/petsc/arch-linux-c-opt/bin/mpiexec
+#12 1115.8   Implementation: mpich4
+#12 1115.8   MPICH_NUMVERSION: 40300300
+#12 1115.8 MPICH:
+#12 1115.8   Version:    4.3.0
+#12 1115.8   Includes:   -I/usr/local/petsc/arch-linux-c-opt/include
+#12 1115.8 python:
+#12 1115.8   Executable: /usr/bin/python3
+#12 1115.8 pthread:
+#12 1115.8 cmake:
+#12 1115.8   Version:    3.31.6
+#12 1115.8   Executable: /usr/local/petsc/arch-linux-c-opt/bin/cmake
+#12 1115.8 fblaslapack:
+#12 1115.8 hdf5:
+#12 1115.8   Version:    1.14.3
+#12 1115.8   Includes:   -I/usr/local/petsc/arch-linux-c-opt/include
+#12 1115.8   Libraries:  -Wl,-rpath,/usr/local/petsc/arch-linux-c-opt/lib -L/usr/local/petsc/arch-linux-c-opt/lib -lhdf5_hl -lhdf5
+#12 1115.8 PTScotch:
+#12 1115.8   Version:    7.0.6
+#12 1115.8   Includes:   -I/usr/local/petsc/arch-linux-c-opt/include
+#12 1115.8   Libraries:  -Wl,-rpath,/usr/local/petsc/arch-linux-c-opt/lib -L/usr/local/petsc/arch-linux-c-opt/lib -lptesmumps -lptscotchparmetisv3 -lptscotch -lptscotcherr -lesmumps -lscotch -lscotcherr
+#12 1115.8 bison:
+#12 1115.8   Version:    3.8
+#12 1115.8   Executable: /usr/bin/bison
+#12 1115.8 MUMPS:
+#12 1115.8   Version:    5.7.3
+#12 1115.8   Includes:   -I/usr/local/petsc/arch-linux-c-opt/include
+#12 1115.8   Libraries:  -Wl,-rpath,/usr/local/petsc/arch-linux-c-opt/lib -L/usr/local/petsc/arch-linux-c-opt/lib -lzmumps -lmumps_common -lpord -lpthread
+#12 1115.8 scalapack:
+#12 1115.8   Libraries:  -Wl,-rpath,/usr/local/petsc/arch-linux-c-opt/lib -L/usr/local/petsc/arch-linux-c-opt/lib -lscalapack
+#12 1115.8 Triangle:
+#12 1115.8   Includes:   -I/usr/local/petsc/arch-linux-c-opt/include
+#12 1115.8   Libraries:  -Wl,-rpath,/usr/local/petsc/arch-linux-c-opt/lib -L/usr/local/petsc/arch-linux-c-opt/lib -ltriangle
+#12 1115.8 regex:
+#12 1115.8 PETSc:
+#12 1115.8   Language used to compile PETSc: C
+#12 1115.8   PETSC_ARCH: arch-linux-c-opt
+#12 1115.8   PETSC_DIR: /usr/local/petsc
+#12 1115.8   Prefix: <inplace installation>
+#12 1115.8   Scalar type: complex
+#12 1115.8   Precision: double
+#12 1115.8   Support for __float128
+#12 1115.8   Integer size: 4 bytes
+#12 1115.8   Single library: yes
+#12 1115.8   Shared libraries: yes
+#12 1115.8   Memory alignment from malloc(): 16 bytes
+#12 1115.8   Using GNU make: /usr/bin/make
+#12 1115.8 xxx=======================================================================================xxx
+#12 1115.8  Configure stage complete. Now build PETSc libraries with:
+#12 1115.8    make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt all
+#12 1115.8 xxx=======================================================================================xxx
+#12 DONE 1116.1s
+
+#13 [ 9/48] RUN make /usr/local/petsc arch-linux-c-opt all
+#13 0.559 /usr/bin/python3 ./config/gmakegen.py --petsc-arch=arch-linux-c-opt
+#13 0.738 /usr/bin/python3 /usr/local/petsc/config/gmakegentest.py --petsc-dir=/usr/local/petsc --petsc-arch=arch-linux-c-opt --testdir=./arch-linux-c-opt/tests --srcdir /usr/local/petsc/src --pkg-pkgs "sys vec mat dm ksp snes ts tao"
+#13 3.927 make: '/usr/local/petsc' is up to date.
+#13 3.927 make: 'arch-linux-c-opt' is up to date.
+#13 3.975 ==========================================
+#13 3.976  
+#13 3.978 See documentation/faq.html and documentation/bugreporting.html
+#13 3.979 for help with installation problems.  Please send EVERYTHING
+#13 3.980 printed out below when reporting problems.  Please check the
+#13 3.981 mailing list archives and consider subscribing.
+#13 3.982  
+#13 3.983   https://petsc.org/release/community/mailing/
+#13 3.984  
+#13 3.986 ==========================================
+#13 3.988 Starting make run on buildkitsandbox at Fri, 12 Sep 2025 13:52:06 +0000
+#13 3.990 Machine characteristics: Linux buildkitsandbox 6.11.0-1018-azure #18~24.04.1-Ubuntu SMP Sat Jun 28 04:46:03 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+#13 3.991 -----------------------------------------
+#13 3.992 Using PETSc directory: /usr/local/petsc
+#13 3.994 Using PETSc arch: arch-linux-c-opt
+#13 3.995 -----------------------------------------
+#13 3.997 PETSC_VERSION_RELEASE    1
+#13 3.997 PETSC_VERSION_MAJOR      3
+#13 3.997 PETSC_VERSION_MINOR      23
+#13 3.997 PETSC_VERSION_SUBMINOR   6
+#13 3.997 PETSC_VERSION_DATE       "unknown"
+#13 3.997 PETSC_VERSION_GIT        "unknown"
+#13 3.997 PETSC_VERSION_DATE_GIT   "unknown"
+#13 3.998 -----------------------------------------
+#13 4.000 Using configure Options: --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich --download-fblaslapack --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch --download-cmake --with-debugging=1 --download-hdf5 --download-triangle
+#13 4.001 Using configuration flags:
+#13 4.003 #define PETSC_ARCH "arch-linux-c-opt"
+#13 4.003 #define PETSC_ATTRIBUTEALIGNED(size) __attribute((aligned(size)))
+#13 4.003 #define PETSC_BLASLAPACK_UNDERSCORE 1
+#13 4.003 #define PETSC_CLANGUAGE_C 1
+#13 4.003 #define PETSC_CXX_RESTRICT __restrict
+#13 4.003 #define PETSC_DEPRECATED_ENUM_BASE(string_literal_why) __attribute__((deprecated(string_literal_why)))
+#13 4.003 #define PETSC_DEPRECATED_FUNCTION_BASE(string_literal_why) __attribute__((deprecated(string_literal_why)))
+#13 4.003 #define PETSC_DEPRECATED_MACRO_BASE(string_literal_why) PETSC_DEPRECATED_MACRO_BASE_(GCC warning string_literal_why)
+#13 4.003 #define PETSC_DEPRECATED_MACRO_BASE_(why) _Pragma(#why)
+#13 4.003 #define PETSC_DEPRECATED_OBJECT_BASE(string_literal_why) __attribute__((deprecated(string_literal_why)))
+#13 4.003 #define PETSC_DEPRECATED_TYPEDEF_BASE(string_literal_why) __attribute__((deprecated(string_literal_why)))
+#13 4.003 #define PETSC_DIR "/usr/local/petsc"
+#13 4.003 #define PETSC_DIR_SEPARATOR '/'
+#13 4.003 #define PETSC_FORTRAN_CHARLEN_T size_t
+#13 4.003 #define PETSC_FORTRAN_TYPE_INITIALIZE  = -2
+#13 4.003 #define PETSC_FUNCTION_NAME_C __func__
+#13 4.003 #define PETSC_FUNCTION_NAME_CXX __func__
+#13 4.003 #define PETSC_HAVE_ACCESS 1
+#13 4.003 #define PETSC_HAVE_ATOLL 1
+#13 4.003 #define PETSC_HAVE_ATTRIBUTEALIGNED 1
+#13 4.003 #define PETSC_HAVE_BUILTIN_EXPECT 1
+#13 4.003 #define PETSC_HAVE_BZERO 1
+#13 4.003 #define PETSC_HAVE_C99_COMPLEX 1
+#13 4.003 #define PETSC_HAVE_CLOCK 1
+#13 4.003 #define PETSC_HAVE_CMAKE 1
+#13 4.003 #define PETSC_HAVE_CXX 1
+#13 4.003 #define PETSC_HAVE_CXX_ATOMIC 1
+#13 4.003 #define PETSC_HAVE_CXX_COMPLEX 1
+#13 4.003 #define PETSC_HAVE_CXX_COMPLEX_FIX 1
+#13 4.003 #define PETSC_HAVE_CXX_DIALECT_CXX11 1
+#13 4.003 #define PETSC_HAVE_CXX_DIALECT_CXX14 1
+#13 4.003 #define PETSC_HAVE_CXX_DIALECT_CXX17 1
+#13 4.003 #define PETSC_HAVE_CXX_DIALECT_CXX20 1
+#13 4.003 #define PETSC_HAVE_DLADDR 1
+#13 4.003 #define PETSC_HAVE_DLCLOSE 1
+#13 4.003 #define PETSC_HAVE_DLERROR 1
+#13 4.003 #define PETSC_HAVE_DLFCN_H 1
+#13 4.003 #define PETSC_HAVE_DLOPEN 1
+#13 4.003 #define PETSC_HAVE_DLSYM 1
+#13 4.003 #define PETSC_HAVE_DOUBLE_ALIGN_MALLOC 1
+#13 4.003 #define PETSC_HAVE_DRAND48 1
+#13 4.003 #define PETSC_HAVE_DYNAMIC_LIBRARIES 1
+#13 4.003 #define PETSC_HAVE_ERF 1
+#13 4.003 #define PETSC_HAVE_EXECUTABLE_EXPORT 1
+#13 4.003 #define PETSC_HAVE_FBLASLAPACK 1
+#13 4.003 #define PETSC_HAVE_FCNTL_H 1
+#13 4.003 #define PETSC_HAVE_FENV_H 1
+#13 4.003 #define PETSC_HAVE_FE_VALUES 1
+#13 4.003 #define PETSC_HAVE_FLOAT_H 1
+#13 4.003 #define PETSC_HAVE_FORK 1
+#13 4.003 #define PETSC_HAVE_FORTRAN_FLUSH 1
+#13 4.003 #define PETSC_HAVE_FORTRAN_FREE_LINE_LENGTH_NONE 1
+#13 4.003 #define PETSC_HAVE_FORTRAN_TYPE_STAR 1
+#13 4.003 #define PETSC_HAVE_FORTRAN_UNDERSCORE 1
+#13 4.003 #define PETSC_HAVE_GETCWD 1
+#13 4.003 #define PETSC_HAVE_GETDOMAINNAME 1
+#13 4.003 #define PETSC_HAVE_GETHOSTBYNAME 1
+#13 4.003 #define PETSC_HAVE_GETHOSTNAME 1
+#13 4.003 #define PETSC_HAVE_GETPAGESIZE 1
+#13 4.003 #define PETSC_HAVE_GETRUSAGE 1
+#13 4.003 #define PETSC_HAVE_HDF5 1
+#13 4.003 #define PETSC_HAVE_IMMINTRIN_H 1
+#13 4.003 #define PETSC_HAVE_INTTYPES_H 1
+#13 4.003 #define PETSC_HAVE_ISINF 1
+#13 4.003 #define PETSC_HAVE_ISNAN 1
+#13 4.003 #define PETSC_HAVE_ISNORMAL 1
+#13 4.003 #define PETSC_HAVE_LGAMMA 1
+#13 4.003 #define PETSC_HAVE_LINUX 1
+#13 4.003 #define PETSC_HAVE_LOG2 1
+#13 4.003 #define PETSC_HAVE_LSEEK 1
+#13 4.003 #define PETSC_HAVE_MALLOC_H 1
+#13 4.003 #define PETSC_HAVE_MEMMOVE 1
+#13 4.003 #define PETSC_HAVE_MKSTEMP 1
+#13 4.003 #define PETSC_HAVE_MPICH 1
+#13 4.003 #define PETSC_HAVE_MPIIO 1
+#13 4.003 #define PETSC_HAVE_MPIX_STREAM 1
+#13 4.003 #define PETSC_HAVE_MPIX_THREADCOMM 1
+#13 4.003 #define PETSC_HAVE_MPI_COMBINER_CONTIGUOUS 1
+#13 4.003 #define PETSC_HAVE_MPI_COMBINER_DUP 1
+#13 4.003 #define PETSC_HAVE_MPI_COMBINER_NAMED 1
+#13 4.003 #define PETSC_HAVE_MPI_COUNT 1
+#13 4.003 #define PETSC_HAVE_MPI_F90MODULE 1
+#13 4.003 #define PETSC_HAVE_MPI_F90MODULE_VISIBILITY 1
+#13 4.003 #define PETSC_HAVE_MPI_FEATURE_DYNAMIC_WINDOW 1
+#13 4.003 #define PETSC_HAVE_MPI_GET_ACCUMULATE 1
+#13 4.003 #define PETSC_HAVE_MPI_GET_LIBRARY_VERSION 1
+#13 4.003 #define PETSC_HAVE_MPI_INIT_THREAD 1
+#13 4.003 #define PETSC_HAVE_MPI_INT64_T 1
+#13 4.003 #define PETSC_HAVE_MPI_LARGE_COUNT 1
+#13 4.003 #define PETSC_HAVE_MPI_LONG_DOUBLE 1
+#13 4.003 #define PETSC_HAVE_MPI_NEIGHBORHOOD_COLLECTIVES 1
+#13 4.003 #define PETSC_HAVE_MPI_NONBLOCKING_COLLECTIVES 1
+#13 4.003 #define PETSC_HAVE_MPI_ONE_SIDED 1
+#13 4.003 #define PETSC_HAVE_MPI_PERSISTENT_NEIGHBORHOOD_COLLECTIVES 1
+#13 4.003 #define PETSC_HAVE_MPI_PROCESS_SHARED_MEMORY 1
+#13 4.003 #define PETSC_HAVE_MPI_REDUCE_LOCAL 1
+#13 4.003 #define PETSC_HAVE_MPI_REDUCE_SCATTER_BLOCK 1
+#13 4.003 #define PETSC_HAVE_MPI_RGET 1
+#13 4.003 #define PETSC_HAVE_MPI_WIN_CREATE 1
+#13 4.003 #define PETSC_HAVE_MUMPS 1
+#13 4.003 #define PETSC_HAVE_NANOSLEEP 1
+#13 4.003 #define PETSC_HAVE_NETDB_H 1
+#13 4.003 #define PETSC_HAVE_NETINET_IN_H 1
+#13 4.003 #define PETSC_HAVE_NO_FINITE_MATH_ONLY 1
+#13 4.003 #define PETSC_HAVE_PACKAGES ":blaslapack:cmake:fblaslapack:hdf5:mathlib:mpi:mpich:mumps:pthread:ptscotch:regex:scalapack:triangle:"
+#13 4.003 #define PETSC_HAVE_POPEN 1
+#13 4.003 #define PETSC_HAVE_POSIX_MEMALIGN 1
+#13 4.003 #define PETSC_HAVE_PTHREAD 1
+#13 4.003 #define PETSC_HAVE_PTHREAD_MUTEX 1
+#13 4.003 #define PETSC_HAVE_PTSCOTCH 1
+#13 4.003 #define PETSC_HAVE_PWD_H 1
+#13 4.003 #define PETSC_HAVE_RAND 1
+#13 4.003 #define PETSC_HAVE_READLINK 1
+#13 4.003 #define PETSC_HAVE_REALPATH 1
+#13 4.003 #define PETSC_HAVE_REAL___FLOAT128 1
+#13 4.003 #define PETSC_HAVE_REGEX 1
+#13 4.003 #define PETSC_HAVE_RTLD_GLOBAL 1
+#13 4.003 #define PETSC_HAVE_RTLD_LAZY 1
+#13 4.003 #define PETSC_HAVE_RTLD_LOCAL 1
+#13 4.003 #define PETSC_HAVE_RTLD_NOW 1
+#13 4.003 #define PETSC_HAVE_SCALAPACK 1
+#13 4.003 #define PETSC_HAVE_SETJMP_H 1
+#13 4.003 #define PETSC_HAVE_SHMGET 1
+#13 4.003 #define PETSC_HAVE_SLEEP 1
+#13 4.003 #define PETSC_HAVE_SNPRINTF 1
+#13 4.003 #define PETSC_HAVE_SOCKET 1
+#13 4.003 #define PETSC_HAVE_SO_REUSEADDR 1
+#13 4.003 #define PETSC_HAVE_STDATOMIC_H 1
+#13 4.003 #define PETSC_HAVE_STDINT_H 1
+#13 4.003 #define PETSC_HAVE_STRCASECMP 1
+#13 4.003 #define PETSC_HAVE_STRINGS_H 1
+#13 4.003 #define PETSC_HAVE_STRUCT_SIGACTION 1
+#13 4.003 #define PETSC_HAVE_SYS_PARAM_H 1
+#13 4.003 #define PETSC_HAVE_SYS_PROCFS_H 1
+#13 4.003 #define PETSC_HAVE_SYS_RESOURCE_H 1
+#13 4.003 #define PETSC_HAVE_SYS_SOCKET_H 1
+#13 4.003 #define PETSC_HAVE_SYS_TIMES_H 1
+#13 4.003 #define PETSC_HAVE_SYS_TIME_H 1
+#13 4.003 #define PETSC_HAVE_SYS_TYPES_H 1
+#13 4.003 #define PETSC_HAVE_SYS_UTSNAME_H 1
+#13 4.003 #define PETSC_HAVE_SYS_WAIT_H 1
+#13 4.003 #define PETSC_HAVE_TAU_PERFSTUBS 1
+#13 4.003 #define PETSC_HAVE_TGAMMA 1
+#13 4.003 #define PETSC_HAVE_TIME 1
+#13 4.003 #define PETSC_HAVE_TIME_H 1
+#13 4.003 #define PETSC_HAVE_TRIANGLE 1
+#13 4.003 #define PETSC_HAVE_UNAME 1
+#13 4.003 #define PETSC_HAVE_UNISTD_H 1
+#13 4.003 #define PETSC_HAVE_USLEEP 1
+#13 4.003 #define PETSC_HAVE_VA_COPY 1
+#13 4.003 #define PETSC_HAVE_VSNPRINTF 1
+#13 4.003 #define PETSC_HAVE_XMMINTRIN_H 1
+#13 4.003 #define PETSC_HDF5_HAVE_PARALLEL 1
+#13 4.003 #define PETSC_INTPTR_T intptr_t
+#13 4.003 #define PETSC_INTPTR_T_FMT "#" PRIxPTR
+#13 4.003 #define PETSC_IS_COLORING_MAX USHRT_MAX
+#13 4.003 #define PETSC_IS_COLORING_VALUE_TYPE short
+#13 4.003 #define PETSC_IS_COLORING_VALUE_TYPE_F integer2
+#13 4.003 #define PETSC_LEVEL1_DCACHE_LINESIZE 64
+#13 4.003 #define PETSC_LIB_DIR "/usr/local/petsc/arch-linux-c-opt/lib"
+#13 4.003 #define PETSC_LIB_NAME_SUFFIX ""
+#13 4.003 #define PETSC_MAX_PATH_LEN 4096
+#13 4.003 #define PETSC_MEMALIGN 16
+#13 4.003 #define PETSC_MPICC_SHOW "gcc -fPIC -Wno-lto-type-mismatch -Wno-stringop-overflow -g -O0 -I/usr/local/petsc/arch-linux-c-opt/include -L/usr/local/petsc/arch-linux-c-opt/lib -Wl,-rpath -Wl,/usr/local/petsc/arch-linux-c-opt/lib -Wl,--enable-new-dtags -lmpi"
+#13 4.003 #define PETSC_MPIU_IS_COLORING_VALUE_TYPE MPI_UNSIGNED_SHORT
+#13 4.003 #define PETSC_OMAKE "/usr/bin/make --no-print-directory"
+#13 4.003 #define PETSC_PKG_MPICH_NUMVERSION 40300300
+#13 4.003 #define PETSC_PREFETCH_HINT_NTA _MM_HINT_NTA
+#13 4.003 #define PETSC_PREFETCH_HINT_T0 _MM_HINT_T0
+#13 4.003 #define PETSC_PREFETCH_HINT_T1 _MM_HINT_T1
+#13 4.003 #define PETSC_PREFETCH_HINT_T2 _MM_HINT_T2
+#13 4.003 #define PETSC_PYTHON_EXE "/usr/bin/python3"
+#13 4.003 #define PETSC_Prefetch(a,b,c) _mm_prefetch((const char*)(a),(c))
+#13 4.003 #define PETSC_REPLACE_DIR_SEPARATOR '\\'
+#13 4.003 #define PETSC_SIGNAL_CAST  
+#13 4.003 #define PETSC_SIZEOF_INT 4
+#13 4.003 #define PETSC_SIZEOF_LONG 8
+#13 4.003 #define PETSC_SIZEOF_LONG_LONG 8
+#13 4.003 #define PETSC_SIZEOF_SIZE_T 8
+#13 4.003 #define PETSC_SIZEOF_VOID_P 8
+#13 4.003 #define PETSC_SLSUFFIX "so"
+#13 4.003 #define PETSC_UINTPTR_T uintptr_t
+#13 4.003 #define PETSC_UINTPTR_T_FMT "#" PRIxPTR
+#13 4.003 #define PETSC_UNUSED __attribute((unused))
+#13 4.003 #define PETSC_USE_AVX512_KERNELS 1
+#13 4.003 #define PETSC_USE_BACKWARD_LOOP 1
+#13 4.003 #define PETSC_USE_COMPLEX 1
+#13 4.003 #define PETSC_USE_CTABLE 1
+#13 4.003 #define PETSC_USE_DEBUG 1
+#13 4.003 #define PETSC_USE_DMLANDAU_2D 1
+#13 4.003 #define PETSC_USE_FORTRAN_BINDINGS 1
+#13 4.003 #define PETSC_USE_INFO 1
+#13 4.003 #define PETSC_USE_ISATTY 1
+#13 4.003 #define PETSC_USE_LOG 1
+#13 4.003 #define PETSC_USE_PROC_FOR_SIZE 1
+#13 4.003 #define PETSC_USE_REAL_DOUBLE 1
+#13 4.003 #define PETSC_USE_SHARED_LIBRARIES 1
+#13 4.003 #define PETSC_USE_SINGLE_LIBRARY 1
+#13 4.003 #define PETSC_USE_SOCKET_VIEWER 1
+#13 4.003 #define PETSC_USE_VISIBILITY_C 1
+#13 4.003 #define PETSC_USE_VISIBILITY_CXX 1
+#13 4.003 #define PETSC_USING_64BIT_PTR 1
+#13 4.003 #define PETSC_USING_F2003 1
+#13 4.003 #define PETSC_USING_F90FREEFORM 1
+#13 4.003 #define PETSC_VERSION_BRANCH_GIT "release"
+#13 4.003 #define PETSC_VERSION_DATE_GIT "2025-09-09 19:59:29 +0000"
+#13 4.003 #define PETSC_VERSION_GIT "v3.23.6-38-g9372c96dc28"
+#13 4.003 #define PETSC__BSD_SOURCE 1
+#13 4.003 #define PETSC__DEFAULT_SOURCE 1
+#13 4.003 #define PETSC__GNU_SOURCE 1
+#13 4.004 -----------------------------------------
+#13 4.005 Using C compile: /usr/local/petsc/arch-linux-c-opt/bin/mpicc -o .o -c -Wall -Wwrite-strings -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-stringop-overflow -fstack-protector -fvisibility=hidden -g3 -O0  
+#13 4.007 mpicc -show: gcc -fPIC -Wno-lto-type-mismatch -Wno-stringop-overflow -g -O0 -I/usr/local/petsc/arch-linux-c-opt/include -L/usr/local/petsc/arch-linux-c-opt/lib -Wl,-rpath -Wl,/usr/local/petsc/arch-linux-c-opt/lib -Wl,--enable-new-dtags -lmpi
+#13 4.007 C compiler version: gcc (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0
+#13 4.007 Using C++ compile: /usr/local/petsc/arch-linux-c-opt/bin/mpicxx -o .o -c -Wall -Wwrite-strings -Wno-strict-aliasing -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-psabi -fstack-protector -fvisibility=hidden -g -O0  -std=gnu++20  -I/usr/local/petsc/include -I/usr/local/petsc/arch-linux-c-opt/include   
+#13 4.007 mpicxx -show: g++ -Wno-lto-type-mismatch -Wno-psabi -g -O0 -std=gnu++20 -fPIC -I/usr/local/petsc/arch-linux-c-opt/include -L/usr/local/petsc/arch-linux-c-opt/lib -lmpicxx -Wl,-rpath -Wl,/usr/local/petsc/arch-linux-c-opt/lib -Wl,--enable-new-dtags -lmpi
+#13 4.007 C++ compiler version: g++ (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0
+#13 4.008 Using Fortran compile: /usr/local/petsc/arch-linux-c-opt/bin/mpif90 -o .o -c -Wall -ffree-line-length-none -ffree-line-length-0 -Wno-lto-type-mismatch -Wno-unused-dummy-argument -g -O0   -I/usr/local/petsc/include -I/usr/local/petsc/arch-linux-c-opt/include   
+#13 4.008 mpif90 -show: gfortran -fPIC -ffree-line-length-none -ffree-line-length-0 -Wno-lto-type-mismatch -g -O0 -fallow-argument-mismatch -I/usr/local/petsc/arch-linux-c-opt/include -I/usr/local/petsc/arch-linux-c-opt/include -L/usr/local/petsc/arch-linux-c-opt/lib -lmpifort -Wl,-rpath -Wl,/usr/local/petsc/arch-linux-c-opt/lib -Wl,--enable-new-dtags -lmpi
+#13 4.008 Fortran compiler version: GNU Fortran (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0
+#13 4.011 -----------------------------------------
+#13 4.012 Using C/C++ linker: /usr/local/petsc/arch-linux-c-opt/bin/mpicc
+#13 4.013 Using C/C++ flags: -Wall -Wwrite-strings -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-stringop-overflow -fstack-protector -fvisibility=hidden -g3 -O0
+#13 4.015 Using Fortran linker: /usr/local/petsc/arch-linux-c-opt/bin/mpif90
+#13 4.015 Using Fortran flags: -Wall -ffree-line-length-none -ffree-line-length-0 -Wno-lto-type-mismatch -Wno-unused-dummy-argument -g -O0
+#13 4.016 -----------------------------------------
+#13 4.017 Using system modules: 
+#13 4.043 Using mpi.h: # 1 "/usr/local/petsc/arch-linux-c-opt/include/mpi.h" 1
+#13 4.045 -----------------------------------------
+#13 4.046 Using libraries: -Wl,-rpath,/usr/local/petsc/arch-linux-c-opt/lib -L/usr/local/petsc/arch-linux-c-opt/lib -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11 -lpetsc -lzmumps -lmumps_common -lpord -lpthread -lscalapack -lflapack -lfblas -lptesmumps -lptscotchparmetisv3 -lptscotch -lptscotcherr -lesmumps -lscotch -lscotcherr -lhdf5_hl -lhdf5 -ltriangle -lm -lmpifort -lmpi -lgfortran -lm -lgfortran -lm -lgcc_s -lquadmath -lstdc++
+#13 4.048 ------------------------------------------
+#13 4.049 Using mpiexec: /usr/local/petsc/arch-linux-c-opt/bin/mpiexec
+#13 4.050 ------------------------------------------
+#13 4.051 Using MAKE: /usr/bin/make
+#13 4.053 Default MAKEFLAGS: MAKE_NP:4 MAKE_LOAD:4.0 MAKEFLAGS: --no-print-directory -- PETSC_ARCH=arch-linux-c-opt PETSC_DIR=/usr/local/petsc
+#13 4.054 ==========================================
+#13 4.059 /usr/bin/make --print-directory -f gmakefile -j4 -l4.0 --output-sync=recurse V= libs
+#13 4.772          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/ij.o
+#13 4.868          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/inode2.o
+#13 4.934          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/fdaij.o
+#13 5.105          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/matmatmatmult.o
+#13 5.350          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/matptap.o
+#13 5.570          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/matrart.o
+#13 5.703          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/mattransposematmult.o
+#13 5.943          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/symtranspose.o
+#13 5.988          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/matmatmult.o
+#13 6.047          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/inode.o
+#13 6.303          CC arch-linux-c-opt/obj/src/mat/impls/baij/mpi/mmbaij.o
+#13 6.439          CC arch-linux-c-opt/obj/src/mat/impls/baij/mpi/mpiaijbaij.o
+#13 6.442          CC arch-linux-c-opt/obj/src/mat/impls/baij/mpi/mpb_baij.o
+#13 7.053          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/gmpre.o
+#13 7.149          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/gmreig.o
+#13 7.316          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/gmres2.o
+#13 7.467          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/gmres.o
+#13 7.613          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/iguess.o
+#13 7.882          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/itcl.o
+#13 8.042          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/itcreate.o
+#13 8.172          CC arch-linux-c-opt/obj/src/mat/impls/baij/mpi/mpibaij.o
+#13 8.366          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/itregis.o
+#13 8.486          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/itres.o
+#13 8.655          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/xmon.o
+#13 8.707          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/iterativ.o
+#13 9.009          FC arch-linux-c-opt/obj/src/sys/ftn-src/somefort.o
+#13 9.078          FC arch-linux-c-opt/obj/src/sys/ftn-src/f90_fwrap.o
+#13 9.307          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/itfunc.o
+#13 9.825         CXX arch-linux-c-opt/obj/ftn/sys/objects/device/interface/dcontextf.o
+#13 9.881         CXX arch-linux-c-opt/obj/ftn/sys/objects/device/interface/devicef.o
+#13 10.03         CXX arch-linux-c-opt/obj/ftn/sys/objects/device/interface/global_dcontextf.o
+#13 10.25         CXX arch-linux-c-opt/obj/src/sys/dll/cxx/demangle.o
+#13 10.79         CXX arch-linux-c-opt/obj/src/sys/objects/device/impls/host/hostcontext.o
+#13 11.16         CXX arch-linux-c-opt/obj/src/sys/objects/device/impls/host/hostdevice.o
+#13 12.04         CXX arch-linux-c-opt/obj/src/sys/objects/cxx/object_pool.o
+#13 12.53          FC arch-linux-c-opt/obj/src/sys/ftn-mod/petscsysmod.o
+#13 12.79         CXX arch-linux-c-opt/obj/src/sys/objects/device/interface/device.o
+#13 13.24         CXX arch-linux-c-opt/obj/src/sys/objects/device/interface/dcontext.o
+#13 13.39         CXX arch-linux-c-opt/obj/src/sys/objects/device/interface/global_dcontext.o
+#13 13.50          CC arch-linux-c-opt/obj/ftn/sys/classes/bag/bagf.o
+#13 13.61          CC arch-linux-c-opt/obj/ftn/sys/classes/bm/interfaces/bmf.o
+#13 13.70          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/impls/image/drawimagef.o
+#13 13.81          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/impls/null/drawnullf.o
+#13 13.89          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dclearf.o
+#13 14.00          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dcoorf.o
+#13 14.08          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dellipsef.o
+#13 14.19          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dflushf.o
+#13 14.29          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dlinef.o
+#13 14.37          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dmarkerf.o
+#13 14.47          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dmousef.o
+#13 14.55          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dpausef.o
+#13 14.65          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dpointf.o
+#13 14.77          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/drawf.o
+#13 14.83         CXX arch-linux-c-opt/obj/src/sys/objects/device/interface/memory.o
+#13 14.85          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/drawregf.o
+#13 14.95          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/drectf.o
+#13 15.02          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dsavef.o
+#13 15.05          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dtextf.o
+#13 15.15          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dtrif.o
+#13 15.19          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/interface/dviewpf.o
+#13 15.25          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/utils/axiscf.o
+#13 15.34          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/utils/barsf.o
+#13 15.36          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/utils/cmapf.o
+#13 15.45          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/utils/dscatterf.o
+#13 15.48         CXX arch-linux-c-opt/obj/src/sys/objects/device/interface/mark_dcontext.o
+#13 15.53          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/utils/histsf.o
+#13 15.57          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/utils/lgcf.o
+#13 15.63          CC arch-linux-c-opt/obj/ftn/sys/classes/draw/utils/lgf.o
+#13 15.65          CC arch-linux-c-opt/obj/ftn/sys/classes/random/interface/dlregisrandf.o
+#13 15.72          CC arch-linux-c-opt/obj/ftn/sys/classes/random/interface/randomcf.o
+#13 15.76          CC arch-linux-c-opt/obj/ftn/sys/classes/random/interface/randomf.o
+#13 15.82          CC arch-linux-c-opt/obj/ftn/sys/classes/random/interface/randregf.o
+#13 15.86          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/ascii/filevf.o
+#13 15.92          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/ascii/vcreateaf.o
+#13 15.97          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/binary/binvf.o
+#13 16.02          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/draw/draw/fdrawvf.o
+#13 16.07          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/draw/drawvf.o
+#13 16.11          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/glvis/glvisf.o
+#13 16.22          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/python/pythonviewerf.o
+#13 16.25          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/hdf5/hdf5vf.o
+#13 16.26          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/socket/sendf.o
+#13 16.29          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/string/stringvf.o
+#13 16.41          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/vtk/vtkvf.o
+#13 16.43          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/impls/vu/petscvuf.o
+#13 16.43          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/interface/dlregispetscf.o
+#13 16.47          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/interface/duplf.o
+#13 16.58          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/interface/flushf.o
+#13 16.60          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/interface/viewaf.o
+#13 16.60          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/interface/viewersf.o
+#13 16.69          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/interface/viewf.o
+#13 16.77          CC arch-linux-c-opt/obj/ftn/sys/dll/regf.o
+#13 16.79          CC arch-linux-c-opt/obj/ftn/sys/dll/dlf.o
+#13 16.82          CC arch-linux-c-opt/obj/ftn/sys/classes/viewer/interface/viewregf.o
+#13 16.89          CC arch-linux-c-opt/obj/ftn/sys/error/adebugf.o
+#13 16.94          CC arch-linux-c-opt/obj/ftn/sys/error/checkptrf.o
+#13 16.97          CC arch-linux-c-opt/obj/ftn/sys/error/errf.o
+#13 17.00          CC arch-linux-c-opt/obj/ftn/sys/error/errtracef.o
+#13 17.07          CC arch-linux-c-opt/obj/ftn/sys/error/fpf.o
+#13 17.12          CC arch-linux-c-opt/obj/ftn/sys/error/signalf.o
+#13 17.16          CC arch-linux-c-opt/obj/ftn/sys/fileio/fdirf.o
+#13 17.18          CC arch-linux-c-opt/obj/ftn/sys/fileio/fpathf.o
+#13 17.27          CC arch-linux-c-opt/obj/ftn/sys/fileio/fretrievef.o
+#13 17.30          CC arch-linux-c-opt/obj/ftn/sys/fileio/ftestf.o
+#13 17.33          CC arch-linux-c-opt/obj/ftn/sys/fileio/fwdf.o
+#13 17.36          CC arch-linux-c-opt/obj/ftn/sys/fileio/ghomef.o
+#13 17.46          CC arch-linux-c-opt/obj/ftn/sys/fileio/grpathf.o
+#13 17.48          CC arch-linux-c-opt/obj/ftn/sys/fileio/mpiuopenf.o
+#13 17.52          CC arch-linux-c-opt/obj/ftn/sys/fileio/mprintf.o
+#13 17.54          CC arch-linux-c-opt/obj/ftn/sys/fileio/rpathf.o
+#13 17.65          CC arch-linux-c-opt/obj/ftn/sys/fileio/sysiof.o
+#13 17.68          CC arch-linux-c-opt/obj/ftn/sys/info/verboseinfof.o
+#13 17.71          CC arch-linux-c-opt/obj/ftn/sys/logging/handler/interface/lhregf.o
+#13 17.75          CC arch-linux-c-opt/obj/ftn/sys/logging/handler/interface/loghandlerf.o
+#13 17.90          CC arch-linux-c-opt/obj/ftn/sys/logging/plogf.o
+#13 17.90          CC arch-linux-c-opt/obj/ftn/sys/memory/malf.o
+#13 17.90          CC arch-linux-c-opt/obj/ftn/sys/logging/state/logstatef.o
+#13 17.92          CC arch-linux-c-opt/obj/ftn/sys/memory/memf.o
+#13 18.07          CC arch-linux-c-opt/obj/ftn/sys/objects/device/util/deviceregf.o
+#13 18.09          CC arch-linux-c-opt/obj/ftn/sys/objects/destroyf.o
+#13 18.09          CC arch-linux-c-opt/obj/ftn/sys/objects/device/util/memoryf.o
+#13 18.09          CC arch-linux-c-opt/obj/ftn/sys/memory/mtrf.o
+#13 18.24          CC arch-linux-c-opt/obj/ftn/sys/objects/finitf.o
+#13 18.26          CC arch-linux-c-opt/obj/ftn/sys/objects/gcommf.o
+#13 18.27          CC arch-linux-c-opt/obj/ftn/sys/objects/gtypef.o
+#13 18.27          CC arch-linux-c-opt/obj/ftn/sys/objects/gcookief.o
+#13 18.43          CC arch-linux-c-opt/obj/ftn/sys/objects/initf.o
+#13 18.46          CC arch-linux-c-opt/obj/ftn/sys/objects/inheritf.o
+#13 18.46          CC arch-linux-c-opt/obj/ftn/sys/objects/olistf.o
+#13 18.59          CC arch-linux-c-opt/obj/ftn/sys/objects/optionsf.o
+#13 18.61          CC arch-linux-c-opt/obj/ftn/sys/objects/optionsyamlf.o
+#13 18.64          CC arch-linux-c-opt/obj/ftn/sys/objects/packagef.o
+#13 18.64          CC arch-linux-c-opt/obj/ftn/sys/objects/pgnamef.o
+#13 18.79          CC arch-linux-c-opt/obj/ftn/sys/objects/pinitf.o
+#13 18.79          CC arch-linux-c-opt/obj/ftn/sys/objects/pnamef.o
+#13 18.82          CC arch-linux-c-opt/obj/ftn/sys/objects/ptypef.o
+#13 18.83          CC arch-linux-c-opt/obj/ftn/sys/objects/prefixf.o
+#13 18.96          CC arch-linux-c-opt/obj/ftn/sys/objects/statef.o
+#13 18.98          CC arch-linux-c-opt/obj/ftn/sys/objects/subcommf.o
+#13 19.00          CC arch-linux-c-opt/obj/ftn/sys/objects/tagmf.o
+#13 19.01          CC arch-linux-c-opt/obj/ftn/sys/objects/versionf.o
+#13 19.15          CC arch-linux-c-opt/obj/ftn/sys/time/cputimef.o
+#13 19.16          CC arch-linux-c-opt/obj/ftn/sys/python/pythonsysf.o
+#13 19.17          CC arch-linux-c-opt/obj/ftn/sys/time/fdatef.o
+#13 19.19          CC arch-linux-c-opt/obj/ftn/sys/utils/archf.o
+#13 19.32          CC arch-linux-c-opt/obj/ftn/sys/utils/fhostf.o
+#13 19.33          CC arch-linux-c-opt/obj/ftn/sys/utils/fuserf.o
+#13 19.35          CC arch-linux-c-opt/obj/ftn/sys/utils/mathfitf.o
+#13 19.37          CC arch-linux-c-opt/obj/ftn/sys/utils/memcf.o
+#13 19.49          CC arch-linux-c-opt/obj/ftn/sys/utils/mpimesgf.o
+#13 19.50          CC arch-linux-c-opt/obj/ftn/sys/utils/mpishmf.o
+#13 19.52          CC arch-linux-c-opt/obj/ftn/sys/utils/mpitsf.o
+#13 19.55          CC arch-linux-c-opt/obj/ftn/sys/utils/mpiuf.o
+#13 19.66          CC arch-linux-c-opt/obj/ftn/sys/utils/pbarrierf.o
+#13 19.68          CC arch-linux-c-opt/obj/ftn/sys/utils/pdisplayf.o
+#13 19.69          CC arch-linux-c-opt/obj/ftn/sys/utils/psleepf.o
+#13 19.73          CC arch-linux-c-opt/obj/ftn/sys/utils/psplitf.o
+#13 19.84          CC arch-linux-c-opt/obj/ftn/sys/utils/segbufferf.o
+#13 19.86          CC arch-linux-c-opt/obj/ftn/sys/utils/serverf.o
+#13 19.89          CC arch-linux-c-opt/obj/ftn/sys/utils/sortdf.o
+#13 19.97          CC arch-linux-c-opt/obj/ftn/sys/utils/sortif.o
+#13 20.03          CC arch-linux-c-opt/obj/ftn/sys/utils/sortipf.o
+#13 20.04          CC arch-linux-c-opt/obj/ftn/sys/utils/sortsof.o
+#13 20.08          CC arch-linux-c-opt/obj/ftn/sys/utils/sseenabledf.o
+#13 20.18          CC arch-linux-c-opt/obj/ftn/sys/utils/strf.o
+#13 20.24          CC arch-linux-c-opt/obj/src/sys/classes/bag/ftn-custom/zbagf.o
+#13 20.27          CC arch-linux-c-opt/obj/src/sys/classes/bag/ftn-custom/zbagf90.o
+#13 20.50          CC arch-linux-c-opt/obj/src/sys/classes/bm/interfaces/bm.o
+#13 20.52          CC arch-linux-c-opt/obj/src/sys/classes/draw/impls/null/drawnull.o
+#13 20.59          CC arch-linux-c-opt/obj/src/sys/classes/bag/bag.o
+#13 20.63          CC arch-linux-c-opt/obj/src/sys/classes/draw/impls/image/drawimage.o
+#13 20.71          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dclear.o
+#13 20.78          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dcoor.o
+#13 20.79          CC arch-linux-c-opt/obj/src/sys/classes/draw/impls/tikz/tikz.o
+#13 20.81          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dellipse.o
+#13 20.89          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dflush.o
+#13 21.00          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dmarker.o
+#13 21.01          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dmouse.o
+#13 21.02          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dline.o
+#13 21.11          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dpause.o
+#13 21.20          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dpoint.o
+#13 21.29          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/drawregall.o
+#13 21.35          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/drawreg.o
+#13 21.40          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/drect.o
+#13 21.41          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/draw.o
+#13 21.58          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dsave.o
+#13 21.59          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dtext.o
+#13 21.65          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dtri.o
+#13 21.69          CC arch-linux-c-opt/obj/src/sys/classes/draw/interface/dviewp.o
+#13 21.80          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/axis.o
+#13 21.92          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/cmap.o
+#13 21.95          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/bars.o
+#13 22.04          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/axisc.o
+#13 22.10          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/ftn-custom/zzoomf.o
+#13 22.18          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/dscatter.o
+#13 22.29          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/image.o
+#13 22.32          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/lg.o
+#13 22.36          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/hists.o
+#13 22.48          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/zoom.o
+#13 22.51          CC arch-linux-c-opt/obj/src/sys/classes/random/impls/rand/rand.o
+#13 22.58          CC arch-linux-c-opt/obj/src/sys/classes/random/impls/rand48/rand48.o
+#13 22.66          CC arch-linux-c-opt/obj/src/sys/classes/draw/utils/lgc.o
+#13 22.67          CC arch-linux-c-opt/obj/src/sys/classes/random/impls/rander48/rander48.o
+#13 22.69          CC arch-linux-c-opt/obj/src/sys/classes/random/interface/dlregisrand.o
+#13 22.80          CC arch-linux-c-opt/obj/src/sys/classes/random/interface/random.o
+#13 22.87          CC arch-linux-c-opt/obj/src/sys/classes/random/interface/randreg.o
+#13 22.94          CC arch-linux-c-opt/obj/src/sys/classes/random/interface/randomc.o
+#13 23.01          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/ascii/ftn-custom/zfilevf.o
+#13 23.04          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/ascii/ftn-custom/zvcreatef.o
+#13 23.23          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/ascii/vcreatea.o
+#13 23.23          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/binary/ftn-custom/zbinvf90.o
+#13 23.33          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/ascii/filev.o
+#13 23.51          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/draw/ftn-custom/zdrawvf.o
+#13 23.55          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/draw/draw/fdrawv.o
+#13 23.72          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/draw/drawv.o
+#13 23.76          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/hdf5/ftn-custom/zhdf5f.o
+#13 23.99          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/python/pythonviewer.o
+#13 24.13          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/binary/binv.o
+#13 24.17          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/glvis/glvis.o
+#13 24.18          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/pyvista/pyvistaviewer.o
+#13 24.35          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/string/ftn-custom/zstringvf.o
+#13 24.44          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/string/stringv.o
+#13 24.45          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/socket/send.o
+#13 24.64          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/vtk/vtkv.o
+#13 24.66          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/dlregispetsc.o
+#13 24.69          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/hdf5/hdf5v.o
+#13 24.71          CC arch-linux-c-opt/obj/src/sys/classes/viewer/impls/vu/petscvu.o
+#13 24.83          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/flush.o
+#13 24.83          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/dupl.o
+#13 24.87          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/ftn-custom/zviewaf.o
+#13 25.05          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/viewers.o
+#13 25.06          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/viewa.o
+#13 25.07          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/view.o
+#13 25.23          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/viewregall.o
+#13 25.23          CC arch-linux-c-opt/obj/src/sys/classes/viewer/utils/btview.o
+#13 25.31          CC arch-linux-c-opt/obj/src/sys/classes/viewer/interface/viewreg.o
+#13 25.41          CC arch-linux-c-opt/obj/src/sys/dll/dl.o
+#13 25.45          CC arch-linux-c-opt/obj/src/sys/dll/dlimpl.o
+#13 25.59          CC arch-linux-c-opt/obj/src/sys/error/checkptr.o
+#13 25.64          CC arch-linux-c-opt/obj/src/sys/error/adebug.o
+#13 25.70          CC arch-linux-c-opt/obj/src/sys/dll/reg.o
+#13 25.77          CC arch-linux-c-opt/obj/src/sys/error/errabort.o
+#13 25.81          CC arch-linux-c-opt/obj/src/sys/error/errstop.o
+#13 25.89          CC arch-linux-c-opt/obj/src/sys/error/err.o
+#13 25.95          CC arch-linux-c-opt/obj/src/sys/error/errtrace.o
+#13 26.01          CC arch-linux-c-opt/obj/src/sys/error/ftn-custom/zerrf.o
+#13 26.03          CC arch-linux-c-opt/obj/src/sys/error/fp.o
+#13 26.08          CC arch-linux-c-opt/obj/src/sys/error/pstack.o
+#13 26.15          CC arch-linux-c-opt/obj/src/sys/error/signal.o
+#13 26.25          CC arch-linux-c-opt/obj/src/sys/fileio/fpath.o
+#13 26.27          CC arch-linux-c-opt/obj/src/sys/fileio/fdir.o
+#13 26.39          CC arch-linux-c-opt/obj/src/sys/fileio/ftest.o
+#13 26.43          CC arch-linux-c-opt/obj/src/sys/fileio/ftn-custom/zmpiuopenf.o
+#13 26.48          CC arch-linux-c-opt/obj/src/sys/fileio/ftn-custom/zmprintf.o
+#13 26.49          CC arch-linux-c-opt/obj/src/sys/fileio/fretrieve.o
+#13 26.59          CC arch-linux-c-opt/obj/src/sys/fileio/ftn-custom/zsysiof.o
+#13 26.62          CC arch-linux-c-opt/obj/src/sys/fileio/fwd.o
+#13 26.66          CC arch-linux-c-opt/obj/src/sys/fileio/ghome.o
+#13 26.73          CC arch-linux-c-opt/obj/src/sys/fileio/grpath.o
+#13 26.85          CC arch-linux-c-opt/obj/src/sys/fileio/rpath.o
+#13 26.88          CC arch-linux-c-opt/obj/src/sys/fileio/mpiuopen.o
+#13 26.91          CC arch-linux-c-opt/obj/src/sys/fileio/smatlab.o
+#13 27.03          CC arch-linux-c-opt/obj/src/sys/fileio/mprint.o
+#13 27.08          CC arch-linux-c-opt/obj/src/sys/ftn-custom/zsys.o
+#13 27.11          CC arch-linux-c-opt/obj/src/sys/ftn-custom/f90_cwrap.o
+#13 27.20          CC arch-linux-c-opt/obj/src/sys/ftn-custom/zsysf90.o
+#13 27.25          CC arch-linux-c-opt/obj/src/sys/fileio/sysio.o
+#13 27.31          CC arch-linux-c-opt/obj/src/sys/info/ftn-custom/zverboseinfof.o
+#13 27.31          CC arch-linux-c-opt/obj/src/sys/ftn-custom/zutils.o
+#13 27.42          CC arch-linux-c-opt/obj/src/sys/logging/ftn-custom/zplogf.o
+#13 27.50          CC arch-linux-c-opt/obj/src/sys/logging/handler/impls/legacy/loglegacy.o
+#13 27.56          CC arch-linux-c-opt/obj/src/sys/info/verboseinfo.o
+#13 27.89          CC arch-linux-c-opt/obj/src/sys/logging/handler/impls/perfstubs/logperfstubs.o
+#13 27.91          CC arch-linux-c-opt/obj/src/sys/logging/handler/impls/nested/lognested.o
+#13 28.12          CC arch-linux-c-opt/obj/src/sys/logging/handler/impls/trace/logtrace.o
+#13 28.12          CC arch-linux-c-opt/obj/src/sys/logging/handler/interface/lhreg.o
+#13 28.12          CC arch-linux-c-opt/obj/src/sys/logging/handler/impls/nested/xmlviewer.o
+#13 28.50          CC arch-linux-c-opt/obj/src/sys/logging/handler/interface/loghandler.o
+#13 28.72          CC arch-linux-c-opt/obj/src/sys/logging/state/logregistry.o
+#13 28.74          CC arch-linux-c-opt/obj/src/sys/logging/plog.o
+#13 28.87          CC arch-linux-c-opt/obj/src/sys/logging/state/logstate.o
+#13 28.90          CC arch-linux-c-opt/obj/src/sys/memory/ftn-custom/zmtrf.o
+#13 28.93          CC arch-linux-c-opt/obj/src/sys/logging/utils/stack.o
+#13 29.10          CC arch-linux-c-opt/obj/src/sys/memory/mhbw.o
+#13 29.11          CC arch-linux-c-opt/obj/src/sys/memory/mem.o
+#13 29.13          CC arch-linux-c-opt/obj/src/sys/memory/mal.o
+#13 29.45          CC arch-linux-c-opt/obj/src/sys/objects/destroy.o
+#13 29.62          CC arch-linux-c-opt/obj/src/sys/memory/mtr.o
+#13 29.67          CC arch-linux-c-opt/obj/src/sys/objects/device/util/devicereg.o
+#13 29.73          CC arch-linux-c-opt/obj/src/sys/objects/aoptions.o
+#13 29.82          CC arch-linux-c-opt/obj/src/sys/objects/device/util/memory.o
+#13 29.84          CC arch-linux-c-opt/obj/src/sys/logging/handler/impls/default/logdefault.o
+#13 29.89          CC arch-linux-c-opt/obj/src/sys/objects/finit.o
+#13 29.89          CC arch-linux-c-opt/obj/src/sys/objects/fcallback.o
+#13 30.00          CC arch-linux-c-opt/obj/src/sys/objects/ftn-custom/zgcommf.o
+#13 30.07          CC arch-linux-c-opt/obj/src/sys/objects/ftn-custom/zstartf.o
+#13 30.09          CC arch-linux-c-opt/obj/src/sys/objects/ftn-custom/zoptionsf.o
+#13 30.11          CC arch-linux-c-opt/obj/src/sys/objects/ftn-custom/zstart.o
+#13 30.26          CC arch-linux-c-opt/obj/src/sys/objects/gcomm.o
+#13 30.28          CC arch-linux-c-opt/obj/src/sys/objects/gcookie.o
+#13 30.29          CC arch-linux-c-opt/obj/src/sys/objects/gtype.o
+#13 30.42          CC arch-linux-c-opt/obj/src/sys/objects/garbage.o
+#13 30.52          CC arch-linux-c-opt/obj/src/sys/objects/olist.o
+#13 30.75          CC arch-linux-c-opt/obj/src/sys/objects/init.o
+#13 30.76          CC arch-linux-c-opt/obj/src/sys/objects/inherit.o
+#13 30.94          CC arch-linux-c-opt/obj/src/sys/objects/pgname.o
+#13 30.95          CC arch-linux-c-opt/obj/src/sys/objects/package.o
+#13 31.19          CC arch-linux-c-opt/obj/src/sys/objects/pname.o
+#13 31.32          CC arch-linux-c-opt/obj/src/sys/objects/optionsyaml.o
+#13 31.43          CC arch-linux-c-opt/obj/src/sys/objects/prefix.o
+#13 31.52          CC arch-linux-c-opt/obj/src/sys/objects/ptype.o
+#13 31.59          CC arch-linux-c-opt/obj/src/sys/objects/options.o
+#13 31.68          CC arch-linux-c-opt/obj/src/sys/objects/state.o
+#13 31.87          CC arch-linux-c-opt/obj/src/sys/objects/version.o
+#13 31.90          CC arch-linux-c-opt/obj/src/sys/objects/pinit.o
+#13 31.93          CC arch-linux-c-opt/obj/src/sys/objects/subcomm.o
+#13 31.99          CC arch-linux-c-opt/obj/src/sys/perfstubs/pstimer.o
+#13 32.06          CC arch-linux-c-opt/obj/src/sys/objects/tagm.o
+#13 32.10          CC arch-linux-c-opt/obj/src/sys/time/cputime.o
+#13 32.17          CC arch-linux-c-opt/obj/src/sys/time/fdate.o
+#13 32.19          CC arch-linux-c-opt/obj/src/sys/python/pythonsys.o
+#13 32.23          CC arch-linux-c-opt/obj/src/sys/totalview/tv_data_display.o
+#13 32.28          CC arch-linux-c-opt/obj/src/sys/utils/arch.o
+#13 32.36          CC arch-linux-c-opt/obj/src/sys/utils/ftn-custom/zsortsof.o
+#13 32.40          CC arch-linux-c-opt/obj/src/sys/utils/fhost.o
+#13 32.41          CC arch-linux-c-opt/obj/src/sys/utils/ftn-custom/zstrf.o
+#13 32.45          CC arch-linux-c-opt/obj/src/sys/utils/fuser.o
+#13 32.53          CC arch-linux-c-opt/obj/src/sys/utils/mathclose.o
+#13 32.56          CC arch-linux-c-opt/obj/src/sys/utils/matheq.o
+#13 32.61          CC arch-linux-c-opt/obj/src/sys/utils/mathfit.o
+#13 32.62          CC arch-linux-c-opt/obj/src/sys/utils/mathinf.o
+#13 32.70          CC arch-linux-c-opt/obj/src/sys/utils/memc.o
+#13 32.76          CC arch-linux-c-opt/obj/src/sys/utils/mpilong.o
+#13 32.91          CC arch-linux-c-opt/obj/src/sys/utils/mpishm.o
+#13 32.92          CC arch-linux-c-opt/obj/src/sys/utils/mpitr.o
+#13 32.99          CC arch-linux-c-opt/obj/src/sys/utils/mpimesg.o
+#13 33.10          CC arch-linux-c-opt/obj/src/sys/utils/pbarrier.o
+#13 33.24          CC arch-linux-c-opt/obj/src/sys/utils/mpiu.o
+#13 33.29          CC arch-linux-c-opt/obj/src/sys/utils/pdisplay.o
+#13 33.29          CC arch-linux-c-opt/obj/src/sys/utils/mpits.o
+#13 33.30          CC arch-linux-c-opt/obj/src/sys/utils/psleep.o
+#13 33.52          CC arch-linux-c-opt/obj/src/sys/utils/segbuffer.o
+#13 33.54          CC arch-linux-c-opt/obj/src/sys/utils/server.o
+#13 33.54          CC arch-linux-c-opt/obj/src/sys/utils/sortd.o
+#13 33.59          CC arch-linux-c-opt/obj/src/sys/utils/psplit.o
+#13 33.77          CC arch-linux-c-opt/obj/src/sys/utils/sortip.o
+#13 33.79          CC arch-linux-c-opt/obj/src/sys/utils/sseenabled.o
+#13 34.04          CC arch-linux-c-opt/obj/src/sys/utils/sortso.o
+#13 34.09          CC arch-linux-c-opt/obj/src/sys/utils/sorti.o
+#13 34.14          CC arch-linux-c-opt/obj/src/sys/utils/str.o
+#13 34.24          CC arch-linux-c-opt/obj/ftn/vec/is/ao/impls/basic/aobasicf.o
+#13 34.28          CC arch-linux-c-opt/obj/ftn/vec/is/ao/impls/mapping/aomappingf.o
+#13 34.34          CC arch-linux-c-opt/obj/ftn/vec/is/ao/impls/memscalable/aomemscalablef.o
+#13 34.47          CC arch-linux-c-opt/obj/ftn/vec/is/ao/interface/aoregf.o
+#13 34.47          CC arch-linux-c-opt/obj/ftn/vec/is/ao/interface/aof.o
+#13 34.54          CC arch-linux-c-opt/obj/ftn/vec/is/is/impls/block/blockf.o
+#13 34.65          CC arch-linux-c-opt/obj/ftn/vec/is/is/impls/general/generalf.o
+#13 34.67          CC arch-linux-c-opt/obj/ftn/vec/is/is/impls/stride/stridef.o
+#13 34.78          CC arch-linux-c-opt/obj/ftn/vec/is/is/interface/indexf.o
+#13 34.83          CC arch-linux-c-opt/obj/ftn/vec/is/is/interface/isregallf.o
+#13 34.85          CC arch-linux-c-opt/obj/ftn/vec/is/is/interface/isregf.o
+#13 34.97          CC arch-linux-c-opt/obj/ftn/vec/is/is/utils/isblockf.o
+#13 35.04          CC arch-linux-c-opt/obj/ftn/vec/is/is/utils/iscompf.o
+#13 35.05          CC arch-linux-c-opt/obj/ftn/vec/is/is/utils/iscoloringf.o
+#13 35.17          CC arch-linux-c-opt/obj/ftn/vec/is/is/utils/isdifff.o
+#13 35.24          CC arch-linux-c-opt/obj/ftn/vec/is/sf/impls/window/sfwindowf.o
+#13 35.35          CC arch-linux-c-opt/obj/ftn/vec/is/section/interface/sectionf.o
+#13 35.35          CC arch-linux-c-opt/obj/ftn/vec/is/sf/interface/dlregissff.o
+#13 35.49          CC arch-linux-c-opt/obj/ftn/vec/is/sf/interface/sff.o
+#13 35.52          CC arch-linux-c-opt/obj/ftn/vec/is/sf/utils/sfcoordf.o
+#13 35.56          CC arch-linux-c-opt/obj/ftn/vec/is/sf/utils/sfutilsf.o
+#13 35.71          CC arch-linux-c-opt/obj/ftn/vec/is/utils/hdf5/hdf5iof.o
+#13 35.75          CC arch-linux-c-opt/obj/ftn/vec/is/utils/isltogf.o
+#13 35.75          CC arch-linux-c-opt/obj/ftn/vec/is/utils/kdtreef.o
+#13 35.92          CC arch-linux-c-opt/obj/ftn/vec/is/utils/psortf.o
+#13 35.92          CC arch-linux-c-opt/obj/ftn/vec/is/utils/pmapf.o
+#13 35.95          CC arch-linux-c-opt/obj/ftn/vec/pf/impls/string/cstringf.o
+#13 36.12          CC arch-linux-c-opt/obj/ftn/vec/vec/impls/mpi/commonmpvecf.o
+#13 36.13          CC arch-linux-c-opt/obj/ftn/vec/pf/interface/pff.o
+#13 36.15          CC arch-linux-c-opt/obj/ftn/vec/vec/impls/mpi/pbvecf.o
+#13 36.30          CC arch-linux-c-opt/obj/ftn/vec/vec/impls/mpi/vmpicrf.o
+#13 36.31          CC arch-linux-c-opt/obj/ftn/vec/vec/impls/nest/vecnestf.o
+#13 36.33          CC arch-linux-c-opt/obj/ftn/vec/vec/impls/seq/bvec2f.o
+#13 36.48          CC arch-linux-c-opt/obj/ftn/vec/vec/impls/seq/vseqcrf.o
+#13 36.49          CC arch-linux-c-opt/obj/ftn/vec/vec/impls/shared/shvecf.o
+#13 36.51          CC arch-linux-c-opt/obj/ftn/vec/vec/interface/dlregisvecf.o
+#13 36.69          CC arch-linux-c-opt/obj/ftn/vec/vec/interface/veccreatef.o
+#13 36.71          CC arch-linux-c-opt/obj/ftn/vec/vec/interface/vecregallf.o
+#13 36.73          CC arch-linux-c-opt/obj/ftn/vec/vec/interface/rvectorf.o
+#13 36.90          CC arch-linux-c-opt/obj/ftn/vec/vec/interface/vecregf.o
+#13 36.92          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/combf.o
+#13 36.98          CC arch-linux-c-opt/obj/ftn/vec/vec/interface/vectorf.o
+#13 37.08          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/tagger/impls/absolutef.o
+#13 37.12          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/projectionf.o
+#13 37.17          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/tagger/impls/andf.o
+#13 37.26          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/tagger/impls/cdff.o
+#13 37.30          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/tagger/impls/orf.o
+#13 37.35          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/tagger/impls/relativef.o
+#13 37.43          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/tagger/interface/dlregistaggerf.o
+#13 37.52          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/tagger/interface/taggerf.o
+#13 37.54          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/tagger/interface/taggerregif.o
+#13 37.60          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/veciof.o
+#13 37.72          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/vecsf.o
+#13 37.76          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/vinvf.o
+#13 37.80          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/vscatf.o
+#13 37.91          CC arch-linux-c-opt/obj/ftn/vec/vec/utils/vsectionf.o
+#13 38.05          CC arch-linux-c-opt/obj/src/vec/is/ao/impls/basic/aobasic.o
+#13 38.11          CC arch-linux-c-opt/obj/src/vec/is/ao/impls/mapping/aomapping.o
+#13 38.33          CC arch-linux-c-opt/obj/src/vec/is/ao/interface/aoreg.o
+#13 38.34          CC arch-linux-c-opt/obj/src/vec/is/ao/interface/ao.o
+#13 38.39          CC arch-linux-c-opt/obj/src/vec/is/ao/impls/memscalable/aomemscalable.o
+#13 38.50          CC arch-linux-c-opt/obj/src/vec/is/is/impls/ftn-custom/zblockf90.o
+#13 38.77          CC arch-linux-c-opt/obj/src/vec/is/is/impls/block/block.o
+#13 38.84          CC arch-linux-c-opt/obj/src/vec/is/is/impls/stride/stride.o
+#13 38.94          CC arch-linux-c-opt/obj/src/vec/is/is/interface/ftn-custom/zindexf90.o
+#13 38.99          CC arch-linux-c-opt/obj/src/vec/is/is/impls/general/general.o
+#13 39.16          CC arch-linux-c-opt/obj/src/vec/is/is/interface/isreg.o
+#13 39.18          CC arch-linux-c-opt/obj/src/vec/is/is/interface/isregall.o
+#13 39.34          CC arch-linux-c-opt/obj/src/vec/is/is/utils/ftn-custom/ziscoloringf90.o
+#13 39.50          CC arch-linux-c-opt/obj/src/vec/is/is/utils/isblock.o
+#13 39.61          FC arch-linux-c-opt/obj/src/vec/ftn-mod/petscvecmod.o
+#13 39.78          CC arch-linux-c-opt/obj/src/vec/is/is/utils/iscomp.o
+#13 39.94          CC arch-linux-c-opt/obj/src/vec/is/is/utils/iscoloring.o
+#13 39.96          CC arch-linux-c-opt/obj/src/vec/is/section/interface/ftn-custom/zvsectionisf90.o
+#13 40.05          CC arch-linux-c-opt/obj/src/vec/is/is/interface/index.o
+#13 40.20          CC arch-linux-c-opt/obj/src/vec/is/is/utils/isdiff.o
+#13 40.37          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/allgather/sfallgather.o
+#13 40.44          CC arch-linux-c-opt/obj/src/vec/is/section/interface/hdf5/sectionhdf5.o
+#13 40.69          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/alltoall/sfalltoall.o
+#13 40.70          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/gather/sfgather.o
+#13 40.71          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/allgatherv/sfallgatherv.o
+#13 40.96          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/gatherv/sfgatherv.o
+#13 41.05          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/neighbor/sfneighbor.o
+#13 41.24          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/sfmpi.o
+#13 41.27          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/sfbasic.o
+#13 41.51          CC arch-linux-c-opt/obj/src/vec/is/sf/interface/dlregissf.o
+#13 41.56          CC arch-linux-c-opt/obj/src/vec/is/section/interface/section.o
+#13 41.72          CC arch-linux-c-opt/obj/src/vec/is/sf/interface/ftn-custom/zsf.o
+#13 41.94          CC arch-linux-c-opt/obj/src/vec/is/sf/interface/sfregi.o
+#13 42.14          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/window/sfwindow.o
+#13 42.26          CC arch-linux-c-opt/obj/src/vec/is/sf/interface/sftype.o
+#13 42.33          CC arch-linux-c-opt/obj/src/vec/is/sf/utils/ftn-custom/zsfutilsf90.o
+#13 42.55          CC arch-linux-c-opt/obj/src/vec/is/sf/utils/sfcoord.o
+#13 42.74          CC arch-linux-c-opt/obj/src/vec/is/utils/ftn-custom/zisltogf.o
+#13 42.91          CC arch-linux-c-opt/obj/src/vec/is/sf/interface/sf.o
+#13 42.91          CC arch-linux-c-opt/obj/src/vec/is/utils/ftn-custom/zisltogf90.o
+#13 43.04          CC arch-linux-c-opt/obj/src/vec/is/sf/utils/sfutils.o
+#13 43.08          CC arch-linux-c-opt/obj/src/vec/is/utils/ftn-custom/zvsectionisf.o
+#13 43.30          CC arch-linux-c-opt/obj/src/vec/is/utils/isio.o
+#13 43.30          CC arch-linux-c-opt/obj/src/vec/is/utils/hdf5/hdf5io.o
+#13 43.63          CC arch-linux-c-opt/obj/src/vec/is/utils/pmap.o
+#13 43.66          CC arch-linux-c-opt/obj/src/vec/is/utils/kdtree.o
+#13 43.91          CC arch-linux-c-opt/obj/src/vec/pf/impls/constant/const.o
+#13 44.01          CC arch-linux-c-opt/obj/src/vec/is/utils/isltog.o
+#13 44.07          CC arch-linux-c-opt/obj/src/vec/is/utils/psort.o
+#13 44.15          CC arch-linux-c-opt/obj/src/vec/pf/impls/string/cstring.o
+#13 44.26          CC arch-linux-c-opt/obj/src/vec/pf/interface/pfall.o
+#13 44.35          CC arch-linux-c-opt/obj/src/vec/pf/interface/pf.o
+#13 44.42          CC arch-linux-c-opt/obj/src/vec/vec/impls/mpi/commonmpvec.o
+#13 44.80          CC arch-linux-c-opt/obj/src/vec/vec/impls/mpi/pvec2.o
+#13 44.85          CC arch-linux-c-opt/obj/src/vec/vec/impls/mpi/pbvec.o
+#13 44.99          CC arch-linux-c-opt/obj/src/vec/vec/impls/mpi/vmpicr.o
+#13 45.15          CC arch-linux-c-opt/obj/src/vec/vec/impls/mpi/pdvec.o
+#13 45.27          CC arch-linux-c-opt/obj/src/vec/vec/impls/seq/bvec1.o
+#13 45.48          CC arch-linux-c-opt/obj/src/vec/vec/impls/seq/bvec3.o
+#13 45.69          CC arch-linux-c-opt/obj/src/vec/vec/impls/seq/bvec2.o
+#13 45.76          CC arch-linux-c-opt/obj/src/vec/vec/impls/nest/vecnest.o
+#13 45.89          CC arch-linux-c-opt/obj/src/vec/vec/impls/seq/vseqcr.o
+#13 45.99          CC arch-linux-c-opt/obj/src/vec/vec/impls/shared/shvec.o
+#13 45.99          CC arch-linux-c-opt/obj/src/vec/vec/impls/seq/dvec2.o
+#13 46.17          CC arch-linux-c-opt/obj/src/vec/vec/interface/ftn-custom/zvectorf.o
+#13 46.18          CC arch-linux-c-opt/obj/src/vec/vec/interface/ftn-custom/zvectorf90.o
+#13 46.21          CC arch-linux-c-opt/obj/src/vec/vec/interface/dlregisvec.o
+#13 46.44          CC arch-linux-c-opt/obj/src/vec/vec/interface/veccreate.o
+#13 46.51          CC arch-linux-c-opt/obj/src/vec/vec/interface/vecreg.o
+#13 46.64          CC arch-linux-c-opt/obj/src/vec/vec/interface/vecregall.o
+#13 47.14          CC arch-linux-c-opt/obj/src/vec/vec/utils/comb.o
+#13 47.32          CC arch-linux-c-opt/obj/src/vec/vec/utils/ftn-custom/zvsectionf90.o
+#13 47.68          CC arch-linux-c-opt/obj/src/vec/vec/interface/vector.o
+#13 47.89          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/impls/absolute.o
+#13 48.08          CC arch-linux-c-opt/obj/src/vec/vec/interface/rvector.o
+#13 48.11          CC arch-linux-c-opt/obj/src/vec/vec/utils/projection.o
+#13 48.14          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/impls/and.o
+#13 48.35          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/impls/andor.o
+#13 48.39          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/impls/or.o
+#13 48.59          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/impls/relative.o
+#13 48.62          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/impls/cdf.o
+#13 48.62          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/impls/simple.o
+#13 48.72          CC arch-linux-c-opt/obj/src/vec/is/sf/impls/basic/sfpack.o
+#13 48.79          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/interface/dlregistagger.o
+#13 48.83          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/interface/taggerregi.o
+#13 48.97          CC arch-linux-c-opt/obj/src/vec/vec/utils/vecglvis.o
+#13 49.01          CC arch-linux-c-opt/obj/src/vec/vec/utils/tagger/interface/tagger.o
+#13 49.03          CC arch-linux-c-opt/obj/src/vec/vec/utils/vecs.o
+#13 49.10          CC arch-linux-c-opt/obj/src/vec/vec/utils/vecio.o
+#13 49.33          CC arch-linux-c-opt/obj/src/vec/vec/utils/vecstash.o
+#13 49.44          CC arch-linux-c-opt/obj/src/vec/vec/utils/vsection.o
+#13 49.63          CC arch-linux-c-opt/obj/ftn/mat/graphops/coarsen/impls/misk/miskf.o
+#13 49.71          CC arch-linux-c-opt/obj/src/vec/vec/utils/vscat.o
+#13 49.84          CC arch-linux-c-opt/obj/ftn/mat/graphops/coarsen/interface/coarsenf.o
+#13 49.93          CC arch-linux-c-opt/obj/ftn/mat/graphops/color/interface/matcoloringf.o
+#13 50.03          CC arch-linux-c-opt/obj/ftn/mat/graphops/color/utils/weightsf.o
+#13 50.13          CC arch-linux-c-opt/obj/ftn/mat/graphops/order/sorderf.o
+#13 50.21          CC arch-linux-c-opt/obj/ftn/mat/graphops/order/spectralf.o
+#13 50.32          CC arch-linux-c-opt/obj/src/vec/vec/utils/vinv.o
+#13 50.34          CC arch-linux-c-opt/obj/ftn/mat/graphops/partition/impls/hierarchical/hierarchicalf.o
+#13 50.39          CC arch-linux-c-opt/obj/ftn/mat/graphops/partition/impls/scotch/scotchf.o
+#13 50.54          CC arch-linux-c-opt/obj/ftn/mat/impls/adj/mpi/mpiadjf.o
+#13 50.55          CC arch-linux-c-opt/obj/ftn/mat/graphops/partition/partitionf.o
+#13 50.59          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/mpi/aijperm/mpiaijpermf.o
+#13 50.73          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/mpi/aijsell/mpiaijsellf.o
+#13 50.75          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/mpi/crl/mcrlf.o
+#13 50.79          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/mpi/fdmpiaijf.o
+#13 50.95          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/mpi/mumps/mumpsf.o
+#13 50.98          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/mpi/mpiaijf.o
+#13 51.01          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/seq/aijf.o
+#13 51.15          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/seq/aijperm/aijpermf.o
+#13 51.17          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/seq/aijsell/aijsellf.o
+#13 51.19          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/seq/crl/crlf.o
+#13 51.35          CC arch-linux-c-opt/obj/ftn/mat/impls/aij/seq/inodef.o
+#13 51.38          CC arch-linux-c-opt/obj/ftn/mat/impls/baij/mpi/mpibaijf.o
+#13 51.41          CC arch-linux-c-opt/obj/ftn/mat/impls/baij/seq/baijf.o
+#13 51.42          FC arch-linux-c-opt/obj/src/mat/ftn-mod/petscmatmod.o
+#13 51.55          CC arch-linux-c-opt/obj/ftn/mat/impls/blockmat/seq/blockmatf.o
+#13 51.57          CC arch-linux-c-opt/obj/ftn/mat/impls/cdiagonal/cdiagonalf.o
+#13 51.61          CC arch-linux-c-opt/obj/ftn/mat/impls/centering/centeringf.o
+#13 51.63          CC arch-linux-c-opt/obj/ftn/mat/impls/composite/mcompositef.o
+#13 51.75          CC arch-linux-c-opt/obj/ftn/mat/impls/dense/mpi/mpidensef.o
+#13 51.80          CC arch-linux-c-opt/obj/ftn/mat/impls/dense/seq/densef.o
+#13 51.81          CC arch-linux-c-opt/obj/ftn/mat/impls/diagonal/diagonalf.o
+#13 51.83          CC arch-linux-c-opt/obj/ftn/mat/impls/fft/fftf.o
+#13 51.98          CC arch-linux-c-opt/obj/ftn/mat/impls/is/matisf.o
+#13 52.00          CC arch-linux-c-opt/obj/ftn/mat/impls/kaij/kaijf.o
+#13 52.01          CC arch-linux-c-opt/obj/ftn/mat/impls/localref/mlocalreff.o
+#13 52.04          CC arch-linux-c-opt/obj/ftn/mat/impls/lrc/lrcf.o
+#13 52.20          CC arch-linux-c-opt/obj/ftn/mat/impls/mffd/mffddeff.o
+#13 52.20          CC arch-linux-c-opt/obj/ftn/mat/impls/maij/maijf.o
+#13 52.23          CC arch-linux-c-opt/obj/ftn/mat/impls/mffd/wpf.o
+#13 52.23          CC arch-linux-c-opt/obj/ftn/mat/impls/mffd/mffdf.o
+#13 52.39          CC arch-linux-c-opt/obj/ftn/mat/impls/normal/normmf.o
+#13 52.41          CC arch-linux-c-opt/obj/ftn/mat/impls/nest/matnestf.o
+#13 52.42          CC arch-linux-c-opt/obj/ftn/mat/impls/preallocator/matpreallocatorf.o
+#13 52.42          CC arch-linux-c-opt/obj/ftn/mat/impls/normal/normmhf.o
+#13 52.61          CC arch-linux-c-opt/obj/ftn/mat/impls/python/pythonmatf.o
+#13 52.61          CC arch-linux-c-opt/obj/ftn/mat/impls/sbaij/seq/srof.o
+#13 52.62          CC arch-linux-c-opt/obj/ftn/mat/impls/sbaij/mpi/mpisbaijf.o
+#13 52.63          CC arch-linux-c-opt/obj/ftn/mat/impls/sbaij/seq/sbaijf.o
+#13 52.80          CC arch-linux-c-opt/obj/ftn/mat/impls/scatter/mscatterf.o
+#13 52.80          CC arch-linux-c-opt/obj/ftn/mat/impls/scalapack/matscalapackf.o
+#13 52.82          CC arch-linux-c-opt/obj/ftn/mat/impls/sell/mpi/mpisellf.o
+#13 52.84          CC arch-linux-c-opt/obj/ftn/mat/impls/sell/seq/sellf.o
+#13 52.98          CC arch-linux-c-opt/obj/ftn/mat/impls/submat/submatf.o
+#13 53.00          CC arch-linux-c-opt/obj/ftn/mat/impls/shell/shellf.o
+#13 53.02          CC arch-linux-c-opt/obj/ftn/mat/impls/transpose/htransmf.o
+#13 53.04          CC arch-linux-c-opt/obj/ftn/mat/impls/transpose/transmf.o
+#13 53.18          CC arch-linux-c-opt/obj/ftn/mat/interface/dlregismatf.o
+#13 53.20          CC arch-linux-c-opt/obj/ftn/mat/interface/matnullf.o
+#13 53.24          CC arch-linux-c-opt/obj/ftn/mat/interface/matproductf.o
+#13 53.25          CC arch-linux-c-opt/obj/ftn/mat/interface/matregf.o
+#13 53.41          CC arch-linux-c-opt/obj/ftn/mat/matfd/fdmatrixf.o
+#13 53.45          CC arch-linux-c-opt/obj/ftn/mat/utils/bandwidthf.o
+#13 53.45          CC arch-linux-c-opt/obj/ftn/mat/utils/axpyf.o
+#13 53.65          CC arch-linux-c-opt/obj/ftn/mat/utils/getcolvf.o
+#13 53.65          CC arch-linux-c-opt/obj/ftn/mat/utils/gcreatef.o
+#13 53.66          CC arch-linux-c-opt/obj/ftn/mat/utils/multequalf.o
+#13 53.70          CC arch-linux-c-opt/obj/ftn/mat/interface/matrixf.o
+#13 53.84          CC arch-linux-c-opt/obj/ftn/mat/utils/zerodiagf.o
+#13 53.86          CC arch-linux-c-opt/obj/ftn/mat/utils/pheapf.o
+#13 53.86          CC arch-linux-c-opt/obj/ftn/mat/utils/veccreatematdensef.o
+#13 53.90          CC arch-linux-c-opt/obj/src/mat/ftn-custom/zmat.o
+#13 54.28          CC arch-linux-c-opt/obj/src/mat/graphops/coarsen/impls/mis/mis.o
+#13 54.33          CC arch-linux-c-opt/obj/src/mat/graphops/coarsen/impls/misk/misk.o
+#13 54.35          CC arch-linux-c-opt/obj/src/mat/graphops/coarsen/interface/coarsen.o
+#13 54.50          CC arch-linux-c-opt/obj/src/mat/graphops/coarsen/interface/scoarsen.o
+#13 54.69          CC arch-linux-c-opt/obj/src/mat/graphops/coarsen/impls/hem/hem.o
+#13 54.84          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/minpack/color.o
+#13 54.86          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/greedy/greedy.o
+#13 54.86          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/jp/jp.o
+#13 54.89          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/minpack/degr.o
+#13 55.05          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/minpack/dsm.o
+#13 55.05          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/minpack/numsrt.o
+#13 55.05          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/minpack/ido.o
+#13 55.10          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/minpack/seq.o
+#13 55.24          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/minpack/setr.o
+#13 55.25          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/minpack/slo.o
+#13 55.30          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/natural/natural.o
+#13 55.33          CC arch-linux-c-opt/obj/src/mat/graphops/color/impls/power/power.o
+#13 55.47          CC arch-linux-c-opt/obj/src/mat/graphops/color/interface/matcoloringregi.o
+#13 55.55          CC arch-linux-c-opt/obj/src/mat/graphops/color/utils/bipartite.o
+#13 55.58          CC arch-linux-c-opt/obj/src/mat/graphops/color/interface/matcoloring.o
+#13 55.63          CC arch-linux-c-opt/obj/src/mat/graphops/color/utils/valid.o
+#13 55.75          CC arch-linux-c-opt/obj/src/mat/graphops/order/degree.o
+#13 55.80          CC arch-linux-c-opt/obj/src/mat/graphops/order/fn1wd.o
+#13 55.84          CC arch-linux-c-opt/obj/src/mat/graphops/order/fndsep.o
+#13 55.90          CC arch-linux-c-opt/obj/src/mat/graphops/color/utils/weights.o
+#13 55.96          CC arch-linux-c-opt/obj/src/mat/graphops/order/fnroot.o
+#13 56.01          CC arch-linux-c-opt/obj/src/mat/graphops/order/gen1wd.o
+#13 56.05          CC arch-linux-c-opt/obj/src/mat/graphops/order/gennd.o
+#13 56.11          CC arch-linux-c-opt/obj/src/mat/graphops/order/genqmd.o
+#13 56.17          CC arch-linux-c-opt/obj/src/mat/graphops/order/genrcm.o
+#13 56.22          CC arch-linux-c-opt/obj/src/mat/graphops/order/qmdmrg.o
+#13 56.25          CC arch-linux-c-opt/obj/src/mat/graphops/order/qmdqt.o
+#13 56.32          CC arch-linux-c-opt/obj/src/mat/graphops/order/qmdrch.o
+#13 56.38          CC arch-linux-c-opt/obj/src/mat/graphops/order/qmdupd.o
+#13 56.43          CC arch-linux-c-opt/obj/src/mat/graphops/order/rcm.o
+#13 56.46          CC arch-linux-c-opt/obj/src/mat/graphops/order/rootls.o
+#13 56.58          CC arch-linux-c-opt/obj/src/mat/graphops/order/sp1wd.o
+#13 56.66          CC arch-linux-c-opt/obj/src/mat/graphops/order/spectral.o
+#13 56.67          CC arch-linux-c-opt/obj/src/mat/graphops/order/spnd.o
+#13 56.73          CC arch-linux-c-opt/obj/src/mat/graphops/order/sorder.o
+#13 56.80          CC arch-linux-c-opt/obj/src/mat/graphops/order/spqmd.o
+#13 56.86          CC arch-linux-c-opt/obj/src/mat/graphops/order/sprcm.o
+#13 56.91          CC arch-linux-c-opt/obj/src/mat/graphops/order/sregis.o
+#13 56.94          CC arch-linux-c-opt/obj/src/mat/graphops/order/wbm.o
+#13 57.05          CC arch-linux-c-opt/obj/src/mat/graphops/partition/ftn-custom/zpartitionf.o
+#13 57.28          CC arch-linux-c-opt/obj/src/mat/graphops/partition/spartition.o
+#13 57.36          CC arch-linux-c-opt/obj/src/mat/graphops/partition/impls/hierarchical/hierarchical.o
+#13 57.44          CC arch-linux-c-opt/obj/src/mat/graphops/partition/impls/scotch/scotch.o
+#13 57.47          CC arch-linux-c-opt/obj/src/mat/graphops/partition/partition.o
+#13 57.53          CC arch-linux-c-opt/obj/src/mat/impls/adj/mpi/ftn-custom/zmpiadjf.o
+#13 57.77          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/aijperm/mpiaijperm.o
+#13 57.81          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/aijsell/mpiaijsell.o
+#13 57.90          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/crl/mcrl.o
+#13 58.23          CC arch-linux-c-opt/obj/src/mat/impls/adj/mpi/mpiadj.o
+#13 58.26          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mpb_aij.o
+#13 58.27          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mmaij.o
+#13 58.46          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/fdmpiaij.o
+#13 58.56          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mpiaijpc.o
+#13 58.62          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mpimatmatmatmult.o
+#13 58.92          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mpimattransposematmult.o
+#13 59.95          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mpimatmatmult.o
+#13 60.20          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mpiov.o
+#13 60.27          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mpiptap.o
+#13 61.49          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/aijfact.o
+#13 61.85          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mumps/mumps.o
+#13 61.94          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/aijperm/aijperm.o
+#13 62.02          CC arch-linux-c-opt/obj/src/mat/impls/aij/mpi/mpiaij.o
+#13 62.28          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/aijsell/aijsell.o
+#13 62.45          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/bas/basfactor.o
+#13 62.53          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/aij.o
+#13 62.58          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/bas/spbas.o
+#13 62.66          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/crl/crl.o
+#13 62.77          CC arch-linux-c-opt/obj/src/mat/impls/baij/mpi/ftn-custom/zmpibaijf.o
+#13 62.90          CC arch-linux-c-opt/obj/src/mat/impls/aij/seq/hdf5/aijhdf5.o
+#13 63.19          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/aijbaij.o
+#13 63.52          CC arch-linux-c-opt/obj/src/mat/impls/baij/mpi/baijov.o
+#13 64.29          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact.o
+#13 64.34          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact11.o
+#13 64.66          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baij2.o
+#13 64.92          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact13.o
+#13 65.13          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact2.o
+#13 65.18          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact3.o
+#13 65.41          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baij.o
+#13 65.43          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact4.o
+#13 66.30          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact9.o
+#13 66.33          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact7.o
+#13 66.54          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolv.o
+#13 66.63          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijfact5.o
+#13 66.80          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat1.o
+#13 66.81          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat11.o
+#13 67.13          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat14.o
+#13 67.29          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat2.o
+#13 67.32          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat3.o
+#13 67.48          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat15.o
+#13 67.64          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat4.o
+#13 67.82          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat5.o
+#13 67.88          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat6.o
+#13 68.09          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvnat7.o
+#13 68.10          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtran1.o
+#13 68.31          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtran2.o
+#13 68.39          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtran3.o
+#13 68.62          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtran4.o
+#13 68.64          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtran5.o
+#13 68.88          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtran6.o
+#13 69.01          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtran7.o
+#13 69.10          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtrannat1.o
+#13 69.17          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtrann.o
+#13 69.37          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtrannat2.o
+#13 69.51          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtrannat3.o
+#13 69.61          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtrannat4.o
+#13 69.71          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtrannat5.o
+#13 69.79          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/dgedi.o
+#13 69.90          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/dgefa.o
+#13 69.93          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtrannat6.o
+#13 70.05          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/dgefa2.o
+#13 70.09          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/dgefa3.o
+#13 70.11          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/baijsolvtrannat7.o
+#13 70.12          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/dgefa4.o
+#13 70.24          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/dgefa5.o
+#13 70.28          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/dgefa6.o
+#13 70.31          CC arch-linux-c-opt/obj/src/mat/impls/baij/seq/dgefa7.o
+#13 70.52          CC arch-linux-c-opt/obj/src/mat/impls/centering/centering.o
+#13 70.61          CC arch-linux-c-opt/obj/src/mat/impls/cdiagonal/cdiagonal.o
+#13 70.84          CC arch-linux-c-opt/obj/src/mat/impls/blockmat/seq/blockmat.o
+#13 70.96          CC arch-linux-c-opt/obj/src/mat/impls/composite/mcomposite.o
+#13 71.05          CC arch-linux-c-opt/obj/src/mat/impls/dense/mpi/mmdense.o
+#13 71.34          CC arch-linux-c-opt/obj/src/mat/impls/dense/seq/hdf5/densehdf5.o
+#13 71.54          CC arch-linux-c-opt/obj/src/mat/impls/diagonal/diagonal.o
+#13 71.68          CC arch-linux-c-opt/obj/src/mat/impls/dummy/matdummy.o
+#13 71.79          CC arch-linux-c-opt/obj/src/mat/impls/fft/fft.o
+#13 72.13          CC arch-linux-c-opt/obj/src/mat/impls/dense/mpi/mpidense.o
+#13 72.47          CC arch-linux-c-opt/obj/src/mat/impls/localref/mlocalref.o
+#13 72.76          CC arch-linux-c-opt/obj/src/mat/impls/kaij/kaij.o
+#13 72.87          CC arch-linux-c-opt/obj/src/mat/impls/lrc/lrc.o
+#13 73.07          CC arch-linux-c-opt/obj/src/mat/impls/mffd/ftn-custom/zmffdf.o
+#13 73.09          CC arch-linux-c-opt/obj/src/mat/impls/dense/seq/dense.o
+#13 73.36          CC arch-linux-c-opt/obj/src/mat/impls/mffd/mffddef.o
+#13 73.56          CC arch-linux-c-opt/obj/src/mat/impls/mffd/mfregis.o
+#13 73.73          CC arch-linux-c-opt/obj/src/mat/impls/mffd/mffd.o
+#13 73.83          CC arch-linux-c-opt/obj/src/mat/impls/mffd/wp.o
+#13 73.93          CC arch-linux-c-opt/obj/src/mat/impls/nest/ftn-custom/zmatnestf.o
+#13 74.13          CC arch-linux-c-opt/obj/src/mat/impls/is/matis.o
+#13 74.27          CC arch-linux-c-opt/obj/src/mat/impls/maij/maij.o
+#13 74.39          CC arch-linux-c-opt/obj/src/mat/impls/normal/normm.o
+#13 74.54          CC arch-linux-c-opt/obj/src/mat/impls/normal/normmh.o
+#13 74.64          CC arch-linux-c-opt/obj/src/mat/impls/python/pythonmat.o
+#13 74.69          CC arch-linux-c-opt/obj/src/mat/impls/preallocator/matpreallocator.o
+#13 75.11          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/mpi/mpiaijsbaij.o
+#13 75.11          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/mpi/mmsbaij.o
+#13 75.17          CC arch-linux-c-opt/obj/src/mat/impls/nest/matnest.o
+#13 75.67          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/aijsbaij.o
+#13 75.83          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/mpi/sbaijov.o
+#13 76.42          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/mpi/mpisbaij.o
+#13 76.60          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaij.o
+#13 76.77          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact.o
+#13 77.17          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaij2.o
+#13 77.19          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact10.o
+#13 77.65          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact11.o
+#13 77.70          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact3.o
+#13 77.78          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact12.o
+#13 78.16          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact4.o
+#13 78.31          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact5.o
+#13 78.41          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact6.o
+#13 78.84          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact7.o
+#13 78.90          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact2.o
+#13 78.98          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact8.o
+#13 79.22          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sbaijfact9.o
+#13 79.28          CC arch-linux-c-opt/obj/src/mat/impls/sbaij/seq/sro.o
+#13 79.29          CC arch-linux-c-opt/obj/src/mat/impls/scatter/mscatter.o
+#13 79.62          CC arch-linux-c-opt/obj/src/mat/impls/sell/mpi/mmsell.o
+#13 79.64          CC arch-linux-c-opt/obj/src/mat/impls/sell/seq/fdsell.o
+#13 79.89          CC arch-linux-c-opt/obj/src/mat/impls/shell/ftn-custom/zshellf.o
+#13 80.22          CC arch-linux-c-opt/obj/src/mat/impls/scalapack/matscalapack.o
+#13 80.34          CC arch-linux-c-opt/obj/src/mat/impls/sell/mpi/mpisell.o
+#13 80.58          CC arch-linux-c-opt/obj/src/mat/impls/shell/shellcnv.o
+#13 80.60          CC arch-linux-c-opt/obj/src/mat/impls/sell/seq/sell.o
+#13 80.70          CC arch-linux-c-opt/obj/src/mat/impls/submat/submat.o
+#13 80.94          CC arch-linux-c-opt/obj/src/mat/impls/shell/shell.o
+#13 81.08          CC arch-linux-c-opt/obj/src/mat/impls/transpose/htransm.o
+#13 81.08          CC arch-linux-c-opt/obj/src/mat/impls/transpose/transm.o
+#13 81.09          CC arch-linux-c-opt/obj/src/mat/interface/dlregismat.o
+#13 81.14          CC arch-linux-c-opt/obj/src/mat/interface/ftn-custom/zmatnullf.o
+#13 81.28          CC arch-linux-c-opt/obj/src/mat/interface/ftn-custom/zmatrixf.o
+#13 81.32          CC arch-linux-c-opt/obj/src/mat/interface/ftn-custom/zmatrixf90.o
+#13 81.46          CC arch-linux-c-opt/obj/src/mat/interface/matnull.o
+#13 81.59          CC arch-linux-c-opt/obj/src/mat/interface/matregis.o
+#13 81.63          CC arch-linux-c-opt/obj/src/mat/interface/matreg.o
+#13 81.84          CC arch-linux-c-opt/obj/src/mat/interface/matproduct.o
+#13 81.85          CC arch-linux-c-opt/obj/src/mat/matfd/ftn-custom/zfdmatrixf.o
+#13 82.09          CC arch-linux-c-opt/obj/src/mat/matfd/fdmatrix.o
+#13 82.12          CC arch-linux-c-opt/obj/src/mat/utils/bandwidth.o
+#13 82.31          CC arch-linux-c-opt/obj/src/mat/utils/compressedrow.o
+#13 82.33          CC arch-linux-c-opt/obj/src/mat/utils/axpy.o
+#13 82.37          CC arch-linux-c-opt/obj/src/mat/utils/convert.o
+#13 82.53          CC arch-linux-c-opt/obj/src/mat/utils/freespace.o
+#13 82.68          CC arch-linux-c-opt/obj/src/mat/utils/getcolv.o
+#13 82.85          CC arch-linux-c-opt/obj/src/mat/utils/isltog.o
+#13 82.92          CC arch-linux-c-opt/obj/src/mat/utils/matio.o
+#13 83.05          CC arch-linux-c-opt/obj/src/mat/utils/gcreate.o
+#13 83.16          CC arch-linux-c-opt/obj/src/mat/utils/matstashspace.o
+#13 83.46          CC arch-linux-c-opt/obj/src/mat/utils/matstash.o
+#13 83.50          CC arch-linux-c-opt/obj/src/mat/utils/overlapsplit.o
+#13 83.61          CC arch-linux-c-opt/obj/src/mat/utils/multequal.o
+#13 83.69          CC arch-linux-c-opt/obj/src/mat/utils/pheap.o
+#13 83.70          CC arch-linux-c-opt/obj/src/mat/utils/veccreatematdense.o
+#13 83.85          CC arch-linux-c-opt/obj/src/mat/utils/zerodiag.o
+#13 83.93          CC arch-linux-c-opt/obj/src/mat/utils/zerorows.o
+#13 84.08          CC arch-linux-c-opt/obj/ftn/dm/dt/dualspace/impls/lagrange/dspacelagrangef.o
+#13 84.15          CC arch-linux-c-opt/obj/ftn/dm/dt/dualspace/impls/refined/dualspacerefinedf.o
+#13 84.30          CC arch-linux-c-opt/obj/ftn/dm/dt/dualspace/impls/simple/dspacesimplef.o
+#13 84.38          CC arch-linux-c-opt/obj/ftn/dm/dt/dualspace/impls/sum/dualspacesumf.o
+#13 84.60          CC arch-linux-c-opt/obj/ftn/dm/dt/fe/impls/vector/fevectorf.o
+#13 84.61          CC arch-linux-c-opt/obj/ftn/dm/dt/dualspace/interface/dualspacef.o
+#13 84.83          CC arch-linux-c-opt/obj/ftn/dm/dt/fe/interface/fegeomf.o
+#13 84.94          CC arch-linux-c-opt/obj/ftn/dm/dt/fe/interface/fef.o
+#13 85.13          CC arch-linux-c-opt/obj/ftn/dm/dt/fv/interface/fvf.o
+#13 85.18          CC arch-linux-c-opt/obj/ftn/dm/dt/interface/dtaltvf.o
+#13 85.45          CC arch-linux-c-opt/obj/ftn/dm/dt/interface/dtdsf.o
+#13 85.45          CC arch-linux-c-opt/obj/src/mat/interface/matrix.o
+#13 85.49          CC arch-linux-c-opt/obj/ftn/dm/dt/interface/dtf.o
+#13 85.68          CC arch-linux-c-opt/obj/ftn/dm/dt/interface/dtweakformf.o
+#13 85.70          CC arch-linux-c-opt/obj/ftn/dm/dt/space/impls/point/spacepointf.o
+#13 85.74          CC arch-linux-c-opt/obj/ftn/dm/dt/interface/dtprobf.o
+#13 85.89          CC arch-linux-c-opt/obj/ftn/dm/dt/space/impls/poly/spacepolyf.o
+#13 85.92          CC arch-linux-c-opt/obj/ftn/dm/dt/space/impls/ptrimmed/spaceptrimmedf.o
+#13 85.96          CC arch-linux-c-opt/obj/ftn/dm/dt/space/impls/subspace/spacesubspacef.o
+#13 86.12          CC arch-linux-c-opt/obj/ftn/dm/dt/space/impls/sum/spacesumf.o
+#13 86.14          CC arch-linux-c-opt/obj/ftn/dm/dt/space/impls/tensor/spacetensorf.o
+#13 86.23          CC arch-linux-c-opt/obj/ftn/dm/dt/space/interface/spacef.o
+#13 86.32          CC arch-linux-c-opt/obj/ftn/dm/field/impls/da/dmfielddaf.o
+#13 86.35          CC arch-linux-c-opt/obj/ftn/dm/field/impls/ds/dmfielddsf.o
+#13 86.46          CC arch-linux-c-opt/obj/ftn/dm/field/impls/shell/dmfieldshellf.o
+#13 86.52          CC arch-linux-c-opt/obj/ftn/dm/field/interface/dlregisdmfieldf.o
+#13 86.60          CC arch-linux-c-opt/obj/ftn/dm/field/interface/dmfieldf.o
+#13 86.70          CC arch-linux-c-opt/obj/ftn/dm/impls/composite/packf.o
+#13 86.72          CC arch-linux-c-opt/obj/ftn/dm/impls/da/da1f.o
+#13 86.84          CC arch-linux-c-opt/obj/ftn/dm/impls/da/da2f.o
+#13 86.94          CC arch-linux-c-opt/obj/ftn/dm/impls/da/da3f.o
+#13 86.95          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dacornf.o
+#13 87.06          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dacreatef.o
+#13 87.15          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dadistf.o
+#13 87.16          CC arch-linux-c-opt/obj/ftn/dm/impls/da/daddf.o
+#13 87.32          CC arch-linux-c-opt/obj/ftn/dm/impls/da/daf.o
+#13 87.37          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dagetarrayf.o
+#13 87.37          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dageometryf.o
+#13 87.55          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dagetelemf.o
+#13 87.58          CC arch-linux-c-opt/obj/ftn/dm/impls/da/daghostf.o
+#13 87.61          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dagtolf.o
+#13 87.76          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dagtonaf.o
+#13 87.79          CC arch-linux-c-opt/obj/ftn/dm/impls/da/daindexf.o
+#13 87.83          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dainterpf.o
+#13 87.99          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dapff.o
+#13 88.02          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dalocalf.o
+#13 88.06          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dapreallocatef.o
+#13 88.19          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dascatterf.o
+#13 88.24          CC arch-linux-c-opt/obj/ftn/dm/impls/da/dasubf.o
+#13 88.30          CC arch-linux-c-opt/obj/ftn/dm/impls/da/daviewf.o
+#13 88.39          CC arch-linux-c-opt/obj/ftn/dm/impls/da/fddaf.o
+#13 88.46          CC arch-linux-c-opt/obj/ftn/dm/impls/da/gr1f.o
+#13 88.52          CC arch-linux-c-opt/obj/ftn/dm/impls/da/grvtkf.o
+#13 88.66          CC arch-linux-c-opt/obj/ftn/dm/impls/forest/forestf.o
+#13 88.73          CC arch-linux-c-opt/obj/ftn/dm/impls/network/networkcreatef.o
+#13 88.86          CC arch-linux-c-opt/obj/ftn/dm/impls/network/networkf.o
+#13 88.92          CC arch-linux-c-opt/obj/ftn/dm/impls/network/networkmonitorf.o
+#13 89.00          CC arch-linux-c-opt/obj/ftn/dm/impls/network/networkviewf.o
+#13 89.08          CC arch-linux-c-opt/obj/ftn/dm/impls/patch/patchcreatef.o
+#13 89.13          CC arch-linux-c-opt/obj/ftn/dm/impls/patch/patchf.o
+#13 89.28          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/hdf5/plexhdf5f.o
+#13 89.36          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexcgnsf.o
+#13 89.37          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexcheckinterfacef.o
+#13 89.62          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexcreatef.o
+#13 89.64          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexexodusiif.o
+#13 89.70          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexdistributef.o
+#13 89.89          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexextrudef.o
+#13 89.99          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexf.o
+#13 90.00          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexfemf.o
+#13 90.18          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexfluentf.o
+#13 90.24          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexfvmf.o
+#13 90.29          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexgeneratef.o
+#13 90.50          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexgmshf.o
+#13 90.51          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexgeometryf.o
+#13 90.55          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexindicesf.o
+#13 90.75          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexinterpolatef.o
+#13 90.83          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexmetricf.o
+#13 90.83          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexnaturalf.o
+#13 91.00          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexorientf.o
+#13 91.10          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexpartitionf.o
+#13 91.10          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexplyf.o
+#13 91.26          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexpointf.o
+#13 91.27          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexpreallocatef.o
+#13 91.52          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexprojectf.o
+#13 91.54          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexrefinef.o
+#13 91.71          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexsectionf.o
+#13 91.78          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexreorderf.o
+#13 91.93          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexsfcf.o
+#13 92.07          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexsubmeshf.o
+#13 92.17          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plextreef.o
+#13 92.31          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/plexvtkf.o
+#13 92.35          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/pointqueuef.o
+#13 92.50          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/transform/impls/extrude/plextrcohesivef.o
+#13 92.61          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/transform/impls/extrude/plextrextrudef.o
+#13 92.72          CC arch-linux-c-opt/obj/ftn/dm/impls/plex/transform/interface/plextransformf.o
+#13 92.81          CC arch-linux-c-opt/obj/ftn/dm/impls/product/productutilsf.o
+#13 92.89          CC arch-linux-c-opt/obj/ftn/dm/impls/redundant/dmredundantf.o
+#13 93.01          CC arch-linux-c-opt/obj/ftn/dm/impls/shell/dmshellf.o
+#13 93.11          CC arch-linux-c-opt/obj/ftn/dm/impls/sliced/slicedf.o
+#13 93.20          CC arch-linux-c-opt/obj/ftn/dm/impls/stag/stag1df.o
+#13 93.31          CC arch-linux-c-opt/obj/ftn/dm/impls/stag/stag2df.o
+#13 93.34          CC arch-linux-c-opt/obj/ftn/dm/impls/stag/stag3df.o
+#13 93.47          CC arch-linux-c-opt/obj/ftn/dm/impls/stag/stagmultif.o
+#13 93.51          CC arch-linux-c-opt/obj/ftn/dm/impls/stag/stagdaf.o
+#13 93.67          CC arch-linux-c-opt/obj/ftn/dm/impls/stag/stagstencilf.o
+#13 93.75          CC arch-linux-c-opt/obj/ftn/dm/impls/stag/stagutilsf.o
+#13 93.88          CC arch-linux-c-opt/obj/ftn/dm/impls/swarm/data_bucketf.o
+#13 93.89          CC arch-linux-c-opt/obj/ftn/dm/impls/swarm/swarm_migratef.o
+#13 94.07          CC arch-linux-c-opt/obj/ftn/dm/impls/swarm/swarmpic_sortf.o
+#13 94.13          CC arch-linux-c-opt/obj/ftn/dm/impls/swarm/swarmf.o
+#13 94.28          CC arch-linux-c-opt/obj/ftn/dm/impls/swarm/swarmpic_viewf.o
+#13 94.35          CC arch-linux-c-opt/obj/ftn/dm/interface/dlregisdmdmf.o
+#13 94.37          CC arch-linux-c-opt/obj/ftn/dm/impls/swarm/swarmpicf.o
+#13 94.52          CC arch-linux-c-opt/obj/ftn/dm/interface/dmcoordinatesf.o
+#13 94.59          CC arch-linux-c-opt/obj/ftn/dm/interface/dmgeneratef.o
+#13 94.73          CC arch-linux-c-opt/obj/ftn/dm/interface/dmgeommodelf.o
+#13 94.84          CC arch-linux-c-opt/obj/ftn/dm/interface/dmgetf.o
+#13 94.89          CC arch-linux-c-opt/obj/ftn/dm/interface/dmf.o
+#13 94.94          CC arch-linux-c-opt/obj/ftn/dm/interface/dmif.o
+#13 95.06          CC arch-linux-c-opt/obj/ftn/dm/interface/dmperiodicityf.o
+#13 95.19          CC arch-linux-c-opt/obj/ftn/dm/label/impls/ephemeral/dmlabelephf.o
+#13 95.19          CC arch-linux-c-opt/obj/ftn/dm/label/dmlabelf.o
+#13 95.33          CC arch-linux-c-opt/obj/ftn/dm/label/impls/ephemeral/plex/dmlabelephplexf.o
+#13 95.38          CC arch-linux-c-opt/obj/ftn/dm/partitioner/impls/matpart/partmatpartf.o
+#13 95.51          CC arch-linux-c-opt/obj/ftn/dm/partitioner/impls/shell/partshellf.o
+#13 95.57          CC arch-linux-c-opt/obj/ftn/dm/partitioner/interface/partitionerf.o
+#13 95.69          CC arch-linux-c-opt/obj/ftn/dm/partitioner/interface/partitionerregf.o
+#13 96.16          CC arch-linux-c-opt/obj/src/dm/dt/dualspace/impls/refined/dualspacerefined.o
+#13 96.62          CC arch-linux-c-opt/obj/src/dm/dt/dualspace/impls/simple/dspacesimple.o
+#13 96.78          CC arch-linux-c-opt/obj/src/dm/dt/dualspace/impls/lagrange/dspacelagrange.o
+#13 97.12          CC arch-linux-c-opt/obj/src/dm/dt/dualspace/impls/sum/dualspacesum.o
+#13 97.66          CC arch-linux-c-opt/obj/src/dm/dt/fe/impls/composite/fecomposite.o
+#13 97.69          CC arch-linux-c-opt/obj/src/dm/dt/dualspace/interface/dualspace.o
+#13 97.77          CC arch-linux-c-opt/obj/src/dm/dt/fe/impls/basic/febasic.o
+#13 98.21          CC arch-linux-c-opt/obj/src/dm/dt/fe/impls/vector/fevector.o
+#13 98.25          CC arch-linux-c-opt/obj/src/dm/dt/fe/interface/fegeom.o
+#13 98.84          CC arch-linux-c-opt/obj/src/dm/dt/fe/interface/fe.o
+#13 99.20          CC arch-linux-c-opt/obj/src/dm/dt/interface/dtaltv.o
+#13 99.47          CC arch-linux-c-opt/obj/src/dm/dt/fv/interface/fv.o
+#13 99.57          CC arch-linux-c-opt/obj/src/dm/dt/interface/dt.o
+#13 99.76          CC arch-linux-c-opt/obj/src/dm/dt/interface/dtprob.o
+#13 99.99          CC arch-linux-c-opt/obj/src/dm/dt/interface/ftn-custom/zdsf.o
+#13 100.2          CC arch-linux-c-opt/obj/src/dm/dt/interface/ftn-custom/zdtdsf90.o
+#13 100.4          CC arch-linux-c-opt/obj/src/dm/dt/interface/ftn-custom/zdtf90.o
+#13 100.5          CC arch-linux-c-opt/obj/src/dm/dt/interface/dtweakform.o
+#13 100.7          CC arch-linux-c-opt/obj/src/dm/dt/interface/dtds.o
+#13 100.9          CC arch-linux-c-opt/obj/src/dm/dt/space/impls/point/spacepoint.o
+#13 101.1          CC arch-linux-c-opt/obj/src/dm/dt/space/impls/poly/spacepoly.o
+#13 101.3          CC arch-linux-c-opt/obj/src/dm/dt/space/impls/ptrimmed/spaceptrimmed.o
+#13 101.5          CC arch-linux-c-opt/obj/src/dm/dt/space/impls/subspace/spacesubspace.o
+#13 101.8          CC arch-linux-c-opt/obj/src/dm/dt/space/impls/sum/spacesum.o
+#13 101.9          CC arch-linux-c-opt/obj/src/dm/dt/space/impls/tensor/spacetensor.o
+#13 102.1          CC arch-linux-c-opt/obj/src/dm/dt/space/impls/wxy/spacewxy.o
+#13 102.4          CC arch-linux-c-opt/obj/src/dm/field/impls/da/dmfieldda.o
+#13 102.4          CC arch-linux-c-opt/obj/src/dm/dt/space/interface/space.o
+#13 102.6          CC arch-linux-c-opt/obj/src/dm/field/interface/dlregisdmfield.o
+#13 102.7          CC arch-linux-c-opt/obj/src/dm/field/impls/shell/dmfieldshell.o
+#13 102.9          CC arch-linux-c-opt/obj/src/dm/field/interface/dmfieldregi.o
+#13 103.0          CC arch-linux-c-opt/obj/src/dm/field/impls/ds/dmfieldds.o
+#13 103.1          CC arch-linux-c-opt/obj/src/dm/impls/composite/ftn-custom/zfddaf.o
+#13 103.2          CC arch-linux-c-opt/obj/src/dm/field/interface/dmfield.o
+#13 103.5          CC arch-linux-c-opt/obj/src/dm/impls/composite/packm.o
+#13 104.0          CC arch-linux-c-opt/obj/src/dm/impls/da/da1.o
+#13 104.0          CC arch-linux-c-opt/obj/src/dm/impls/composite/pack.o
+#13 104.5          CC arch-linux-c-opt/obj/src/dm/impls/da/da2.o
+#13 104.6          CC arch-linux-c-opt/obj/src/dm/impls/da/da3.o
+#13 104.6          CC arch-linux-c-opt/obj/src/dm/impls/da/da.o
+#13 105.0          CC arch-linux-c-opt/obj/src/dm/impls/da/dacorn.o
+#13 105.1          CC arch-linux-c-opt/obj/src/dm/impls/da/dadd.o
+#13 105.1          CC arch-linux-c-opt/obj/src/dm/impls/da/dacreate.o
+#13 105.4          CC arch-linux-c-opt/obj/src/dm/impls/da/dadestroy.o
+#13 105.5          CC arch-linux-c-opt/obj/src/dm/impls/da/dadist.o
+#13 105.5          CC arch-linux-c-opt/obj/src/dm/impls/da/dageometry.o
+#13 105.6          FC arch-linux-c-opt/obj/src/dm/ftn-mod/petscdmmod.o
+#13 105.9          CC arch-linux-c-opt/obj/src/dm/impls/da/daghost.o
+#13 105.9          CC arch-linux-c-opt/obj/src/dm/impls/da/dagetarray.o
+#13 106.0          CC arch-linux-c-opt/obj/src/dm/impls/da/dagetelem.o
+#13 106.0          CC arch-linux-c-opt/obj/src/dm/impls/da/dagtol.o
+#13 106.3          CC arch-linux-c-opt/obj/src/dm/impls/da/dagtona.o
+#13 106.3          CC arch-linux-c-opt/obj/src/dm/impls/da/daindex.o
+#13 106.5          CC arch-linux-c-opt/obj/src/dm/impls/da/dalocal.o
+#13 106.7          CC arch-linux-c-opt/obj/src/dm/impls/da/dapf.o
+#13 106.7          CC arch-linux-c-opt/obj/src/dm/impls/da/daltol.o
+#13 106.9          CC arch-linux-c-opt/obj/src/dm/impls/da/dainterp.o
+#13 106.9          CC arch-linux-c-opt/obj/src/dm/impls/da/dapreallocate.o
+#13 107.1          CC arch-linux-c-opt/obj/src/dm/impls/da/dareg.o
+#13 107.1          CC arch-linux-c-opt/obj/src/dm/impls/da/dascatter.o
+#13 107.3          CC arch-linux-c-opt/obj/src/dm/impls/da/daview.o
+#13 107.3          CC arch-linux-c-opt/obj/src/dm/impls/da/ftn-custom/zda1f90.o
+#13 107.5          CC arch-linux-c-opt/obj/src/dm/impls/da/dasub.o
+#13 107.6          CC arch-linux-c-opt/obj/src/dm/impls/da/ftn-custom/zdasubf.o
+#13 107.7          CC arch-linux-c-opt/obj/src/dm/impls/da/ftn-custom/zdaf.o
+#13 108.0          CC arch-linux-c-opt/obj/src/dm/impls/da/gr1.o
+#13 108.3          CC arch-linux-c-opt/obj/src/dm/impls/da/grglvis.o
+#13 108.3          CC arch-linux-c-opt/obj/src/dm/impls/da/fdda.o
+#13 108.4          CC arch-linux-c-opt/obj/src/dm/impls/da/gr2.o
+#13 108.4          CC arch-linux-c-opt/obj/src/dm/impls/da/grvtk.o
+#13 108.8          CC arch-linux-c-opt/obj/src/dm/impls/network/networkmonitor.o
+#13 109.0          CC arch-linux-c-opt/obj/src/dm/impls/network/networkcreate.o
+#13 109.2          CC arch-linux-c-opt/obj/src/dm/impls/forest/forest.o
+#13 109.4          CC arch-linux-c-opt/obj/src/dm/impls/network/networkview.o
+#13 109.6          CC arch-linux-c-opt/obj/src/dm/impls/patch/patch.o
+#13 109.6          CC arch-linux-c-opt/obj/src/dm/impls/patch/patchcreate.o
+#13 109.7          CC arch-linux-c-opt/obj/src/dm/impls/plex/ftn-custom/zplexf90.o
+#13 109.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/ftn-custom/zplexfemf90.o
+#13 109.9          CC arch-linux-c-opt/obj/src/dm/impls/network/network.o
+#13 110.2          CC arch-linux-c-opt/obj/src/dm/impls/plex/generators/triangle/trigenerate.o
+#13 110.4          CC arch-linux-c-opt/obj/src/dm/impls/plex/hdf5/plexhdf5xdmf.o
+#13 110.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexadapt.o
+#13 110.9          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexceed.o
+#13 111.2          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexcgns.o
+#13 111.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexcheckinterface.o
+#13 111.6          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexcoarsen.o
+#13 111.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/hdf5/plexhdf5.o
+#13 112.2          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexdd.o
+#13 112.7          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexegads.o
+#13 113.1          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexexodusii.o
+#13 113.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexdistribute.o
+#13 113.6          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexextrude.o
+#13 114.3          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexfluent.o
+#13 114.4          CC arch-linux-c-opt/obj/src/dm/impls/plex/plex.o
+#13 114.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexcreate.o
+#13 114.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexfvm.o
+#13 114.9          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexgenerate.o
+#13 115.7          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexglvis.o
+#13 116.1          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexgeometry.o
+#13 116.2          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexgmsh.o
+#13 116.2          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexindices.o
+#13 116.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexfem.o
+#13 116.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexnatural.o
+#13 117.0          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexmetric.o
+#13 117.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexinterpolate.o
+#13 117.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexply.o
+#13 117.7          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexorient.o
+#13 117.9          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexpartition.o
+#13 118.1          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexpoint.o
+#13 118.3          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexpreallocate.o
+#13 118.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexproject.o
+#13 118.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexrefine.o
+#13 118.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexreorder.o
+#13 118.9          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexsection.o
+#13 119.4          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexsfc.o
+#13 119.9          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexvtk.o
+#13 120.2          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexvtu.o
+#13 120.3          CC arch-linux-c-opt/obj/src/dm/impls/plex/pointqueue.o
+#13 120.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/plextree.o
+#13 120.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/plexsubmesh.o
+#13 120.9          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/extrude/plextrcohesive.o
+#13 120.9          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/filter/plextrfilter.o
+#13 121.1          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/extrude/plextrextrude.o
+#13 121.3          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/refine/1d/plexref1d.o
+#13 121.3          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/refine/alfeld/plexrefalfeld.o
+#13 121.5          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/refine/bl/plexrefbl.o
+#13 121.7          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/refine/regular/plexrefregular.o
+#13 121.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/refine/tobox/plexreftobox.o
+#13 121.9          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/impls/refine/sbr/plexrefsbr.o
+#13 122.0          CC arch-linux-c-opt/obj/src/dm/impls/product/product.o
+#13 122.2          CC arch-linux-c-opt/obj/src/dm/impls/product/productutils.o
+#13 122.5          CC arch-linux-c-opt/obj/src/dm/impls/shell/ftn-custom/zdmshellf.o
+#13 122.5          CC arch-linux-c-opt/obj/src/dm/impls/redundant/dmredundant.o
+#13 122.8          CC arch-linux-c-opt/obj/src/dm/impls/shell/dmshell.o
+#13 122.8          CC arch-linux-c-opt/obj/src/dm/impls/plex/transform/interface/plextransform.o
+#13 123.0          CC arch-linux-c-opt/obj/src/dm/impls/sliced/sliced.o
+#13 123.3          CC arch-linux-c-opt/obj/src/dm/impls/stag/stag.o
+#13 123.3          CC arch-linux-c-opt/obj/src/dm/impls/stag/stag1d.o
+#13 123.5          CC arch-linux-c-opt/obj/src/dm/impls/stag/stag2d.o
+#13 123.7          CC arch-linux-c-opt/obj/src/dm/impls/stag/stagintern.o
+#13 123.8          CC arch-linux-c-opt/obj/src/dm/impls/stag/stagda.o
+#13 124.0          CC arch-linux-c-opt/obj/src/dm/impls/stag/stag3d.o
+#13 124.2          CC arch-linux-c-opt/obj/src/dm/impls/stag/stagstencil.o
+#13 124.4          CC arch-linux-c-opt/obj/src/dm/impls/stag/stagmulti.o
+#13 124.6          CC arch-linux-c-opt/obj/src/dm/impls/swarm/ftn-custom/zswarmf90.o
+#13 124.7          CC arch-linux-c-opt/obj/src/dm/impls/swarm/data_ex.o
+#13 124.8          CC arch-linux-c-opt/obj/src/dm/impls/swarm/data_bucket.o
+#13 124.9          CC arch-linux-c-opt/obj/src/dm/impls/stag/stagutils.o
+#13 125.3          CC arch-linux-c-opt/obj/src/dm/impls/swarm/swarmpic_da.o
+#13 125.4          CC arch-linux-c-opt/obj/src/dm/impls/swarm/swarm_migrate.o
+#13 125.6          CC arch-linux-c-opt/obj/src/dm/impls/swarm/swarmpic.o
+#13 125.9          CC arch-linux-c-opt/obj/src/dm/impls/swarm/swarmpic_sort.o
+#13 126.0          CC arch-linux-c-opt/obj/src/dm/impls/swarm/swarmpic_plex.o
+#13 126.1          CC arch-linux-c-opt/obj/src/dm/impls/swarm/swarm.o
+#13 126.2          CC arch-linux-c-opt/obj/src/dm/impls/swarm/swarmpic_view.o
+#13 126.5          CC arch-linux-c-opt/obj/src/dm/interface/dmceed.o
+#13 126.5          CC arch-linux-c-opt/obj/src/dm/interface/dlregisdmdm.o
+#13 126.9          CC arch-linux-c-opt/obj/src/dm/interface/dmgeommodel.o
+#13 126.9          CC arch-linux-c-opt/obj/src/dm/interface/dmgenerate.o
+#13 127.1          CC arch-linux-c-opt/obj/src/dm/interface/dmcoordinates.o
+#13 127.3          CC arch-linux-c-opt/obj/src/dm/interface/dmglvis.o
+#13 127.4          CC arch-linux-c-opt/obj/src/dm/interface/dmget.o
+#13 127.7          CC arch-linux-c-opt/obj/src/dm/interface/dmi.o
+#13 127.9          CC arch-linux-c-opt/obj/src/dm/interface/ftn-custom/zdmf.o
+#13 127.9          CC arch-linux-c-opt/obj/src/dm/interface/dmperiodicity.o
+#13 127.9          CC arch-linux-c-opt/obj/src/dm/interface/dmregall.o
+#13 128.1          CC arch-linux-c-opt/obj/src/dm/label/ftn-custom/zdmlabel.o
+#13 128.3          CC arch-linux-c-opt/obj/src/dm/label/impls/ephemeral/dmlabeleph.o
+#13 128.4          CC arch-linux-c-opt/obj/src/dm/label/impls/ephemeral/plex/dmlabelephplex.o
+#13 128.5          CC arch-linux-c-opt/obj/src/dm/partitioner/impls/chaco/partchaco.o
+#13 128.6          CC arch-linux-c-opt/obj/src/dm/partitioner/impls/gather/partgather.o
+#13 128.8          CC arch-linux-c-opt/obj/src/dm/partitioner/impls/matpart/partmatpart.o
+#13 128.9          CC arch-linux-c-opt/obj/src/dm/partitioner/impls/parmetis/partparmetis.o
+#13 129.2          CC arch-linux-c-opt/obj/src/dm/partitioner/impls/shell/partshell.o
+#13 129.2          CC arch-linux-c-opt/obj/src/dm/partitioner/impls/ptscotch/partptscotch.o
+#13 129.5          CC arch-linux-c-opt/obj/src/dm/label/dmlabel.o
+#13 129.5          CC arch-linux-c-opt/obj/src/dm/partitioner/impls/simple/partsimple.o
+#13 129.6          CC arch-linux-c-opt/obj/src/dm/partitioner/interface/partitioner.o
+#13 129.7          CC arch-linux-c-opt/obj/src/dm/partitioner/interface/partitionerreg.o
+#13 129.8          CC arch-linux-c-opt/obj/ftn/ksp/ksp/guess/impls/fischer/fischerf.o
+#13 129.8          CC arch-linux-c-opt/obj/src/dm/interface/dm.o
+#13 129.9          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/bcgsl/bcgslf.o
+#13 130.0          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/cg/cgtypef.o
+#13 130.1          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/cg/gltr/gltrf.o
+#13 130.1          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/cheby/chebyf.o
+#13 130.2          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/fcg/fcgf.o
+#13 130.3          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/fcg/pipefcg/pipefcgf.o
+#13 130.3          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/fetidp/fetidpf.o
+#13 130.4          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gcr/gcrf.o
+#13 130.5          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gmres/borthog2f.o
+#13 130.5          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gcr/pipegcr/pipegcrf.o
+#13 130.6          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gmres/borthogf.o
+#13 130.6          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gmres/fgmres/modpcff.o
+#13 130.7          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gmres/gmpref.o
+#13 130.8          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gmres/gmresf.o
+#13 130.8          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gmres/lgmres/lgmresf.o
+#13 130.9          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/gmres/pipefgmres/pipefgmresf.o
+#13 131.0          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/minres/minresf.o
+#13 131.0          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/lsqr/lsqrf.o
+#13 131.1          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/python/pythonkspf.o
+#13 131.2          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/qcg/qcgf.o
+#13 131.2          CC arch-linux-c-opt/obj/ftn/ksp/ksp/impls/rich/richscalef.o
+#13 131.3          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/dlregiskspf.o
+#13 131.4          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/dmkspf.o
+#13 131.5          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/eigef.o
+#13 131.6          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/iguessf.o
+#13 131.6          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/itclf.o
+#13 131.7          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/itcreatef.o
+#13 131.8          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/iterativf.o
+#13 131.8          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/itfuncf.o
+#13 131.9          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/itresf.o
+#13 132.0          CC arch-linux-c-opt/obj/ftn/ksp/ksp/interface/xmonf.o
+#13 132.1          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/dm/dmprojectf.o
+#13 132.1          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/bfgs/bfgsf.o
+#13 132.2          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/brdn/badbrdnf.o
+#13 132.3          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/brdn/brdnf.o
+#13 132.3          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/dense/denseqnf.o
+#13 132.4          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/dfp/dfpf.o
+#13 132.5          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/diagbrdn/diagbrdnf.o
+#13 132.5          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/lmvmutilsf.o
+#13 132.6          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/sr1/sr1f.o
+#13 132.7          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/symbrdn/symbadbrdnf.o
+#13 132.8          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/lmvm/symbrdn/symbrdnf.o
+#13 132.9          CC arch-linux-c-opt/obj/ftn/ksp/ksp/utils/schurm/schurmf.o
+#13 132.9          FC arch-linux-c-opt/obj/src/ksp/ftn-mod/petsckspmod.o
+#13 132.9          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/asm/asmf.o
+#13 133.0          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/bddc/bddcf.o
+#13 133.1          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/bjacobi/bjacobif.o
+#13 133.1          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/deflation/deflationf.o
+#13 133.1          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/composite/compositef.o
+#13 133.2          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/eisens/eisenf.o
+#13 133.3          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/factor/cholesky/choleskyf.o
+#13 133.3          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/factor/factorf.o
+#13 133.4          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/fieldsplit/fieldsplitf.o
+#13 133.4          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/galerkin/galerkinf.o
+#13 133.5          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/gamg/aggf.o
+#13 133.6          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/gamg/classicalf.o
+#13 133.6          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/gamg/gamgf.o
+#13 133.6          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/gasm/gasmf.o
+#13 133.7          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/hmg/hmgf.o
+#13 133.8          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/is/pcisf.o
+#13 133.8          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/jacobi/jacobif.o
+#13 133.8          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/ksp/pckspf.o
+#13 133.9          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/lmvm/lmvmpcf.o
+#13 134.0          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/mat/pcmatf.o
+#13 134.0          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/mg/mgf.o
+#13 134.1          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/mg/mgfuncf.o
+#13 134.1          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/mpi/pcmpif.o
+#13 134.2          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/patch/pcpatchf.o
+#13 134.3          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/redistribute/redistributef.o
+#13 134.3          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/python/pythonpcf.o
+#13 134.3          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/redundant/redundantf.o
+#13 134.4          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/shell/shellpcf.o
+#13 134.5          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/sor/sorf.o
+#13 134.5          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/telescope/telescopef.o
+#13 134.5          CC arch-linux-c-opt/obj/ftn/ksp/pc/impls/wb/wbf.o
+#13 134.7          CC arch-linux-c-opt/obj/ftn/ksp/pc/interface/pcsetf.o
+#13 134.8          CC arch-linux-c-opt/obj/ftn/ksp/pc/interface/preconf.o
+#13 135.0          CC arch-linux-c-opt/obj/src/ksp/ksp/guess/impls/fischer/fischer.o
+#13 135.0          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/bcgs/bcgs.o
+#13 135.1          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/bcgs/fbcgs/fbcgs.o
+#13 135.1          CC arch-linux-c-opt/obj/src/ksp/ksp/guess/impls/pod/pod.o
+#13 135.4          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/bcgs/pipebcgs/pipebcgs.o
+#13 135.4          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/bcgs/fbcgsr/fbcgsr.o
+#13 135.5          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/bcgs/qmrcgs/qmrcgs.o
+#13 135.7          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/bcgsl/bcgsl.o
+#13 135.8          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/cgeig.o
+#13 135.8          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/bicg/bicg.o
+#13 136.0          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/cg.o
+#13 136.1          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/cgls.o
+#13 136.1          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/cgtype.o
+#13 136.2          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/cgne/cgne.o
+#13 136.4          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/gltr/gltr.o
+#13 136.4          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/groppcg/groppcg.o
+#13 136.5          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/nash/nash.o
+#13 136.5          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/pipecg/pipecg.o
+#13 136.8          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/pipecgrr/pipecgrr.o
+#13 136.9          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/pipeprcg/pipeprcg.o
+#13 137.0          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/pipelcg/pipelcg.o
+#13 137.0          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/pipecg2/pipecg2.o
+#13 137.1          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cg/stcg/stcg.o
+#13 137.2          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cheby/betas.o
+#13 137.2          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cgs/cgs.o
+#13 137.5          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cr/cr.o
+#13 137.6          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cr/pipecr/pipecr.o
+#13 137.8          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/fcg/fcg.o
+#13 137.9          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/cheby/cheby.o
+#13 138.0          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/fcg/pipefcg/pipefcg.o
+#13 138.2          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gcr/gcr.o
+#13 138.3          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/borthog.o
+#13 138.4          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gcr/pipegcr/pipegcr.o
+#13 138.5          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/fetidp/fetidp.o
+#13 138.5          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/borthog2.o
+#13 138.6          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/fgmres/ftn-custom/zmodpcff.o
+#13 138.7          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/ftn-custom/zgmres2f.o
+#13 138.7          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/fgmres/fgmres.o
+#13 138.8          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/fgmres/modpcf.o
+#13 139.1          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/lgmres/lgmres.o
+#13 139.1          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/pgmres/pgmres.o
+#13 139.2          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/gmres/pipefgmres/pipefgmres.o
+#13 139.2          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/ibcgs/ibcgs.o
+#13 139.5          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/lcd/lcd.o
+#13 139.6          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/preonly/preonly.o
+#13 139.6          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/lsqr/lsqr.o
+#13 139.7          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/python/pythonksp.o
+#13 139.8          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/minres/minres.o
+#13 140.0          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/qcg/qcg.o
+#13 140.0          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/rich/rich.o
+#13 140.0          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/rich/richscale.o
+#13 140.2          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/symmlq/symmlq.o
+#13 140.4          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/tfqmr/tfqmr.o
+#13 140.4          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/tcqmr/tcqmr.o
+#13 140.4          CC arch-linux-c-opt/obj/src/ksp/ksp/impls/tsirm/tsirm.o
+#13 140.6          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/dlregisksp.o
+#13 140.6          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/ftn-custom/zdmkspf.o
+#13 140.8          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/eige.o
+#13 140.8          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/ftn-custom/zitfuncf90.o
+#13 140.9          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/dmksp.o
+#13 140.9          CC arch-linux-c-opt/obj/src/ksp/ksp/interface/ftn-custom/zitfuncf.o
+#13 141.1          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/kspmatregi.o
+#13 141.2          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/brdn/badbrdn.o
+#13 141.2          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/bfgs/bfgs.o
+#13 141.5          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/brdn/brdn.o
+#13 141.6          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/dense/cd_utils.o
+#13 141.7          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/dm/dmproject.o
+#13 141.8          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/dfp/dfp.o
+#13 142.0          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/diagbrdn/diagbrdn.o
+#13 142.1          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/dense/denseqn.o
+#13 142.1          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/lmvmimpl.o
+#13 142.3          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/lmvmutils.o
+#13 142.4          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/sr1/sr1.o
+#13 142.5          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/symbrdn/symbadbrdn.o
+#13 142.7          CC arch-linux-c-opt/obj/src/ksp/pc/impls/asm/ftn-custom/zasmf.o
+#13 142.7          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/lmvm/symbrdn/symbrdn.o
+#13 143.3          CC arch-linux-c-opt/obj/src/ksp/ksp/utils/schurm/schurm.o
+#13 143.4          CC arch-linux-c-opt/obj/src/ksp/pc/impls/asm/asm.o
+#13 143.5          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bddc/bddcfetidp.o
+#13 143.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bddc/bddcnullspace.o
+#13 144.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bddc/bddcgraph.o
+#13 144.5          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bddc/bddc.o
+#13 144.5          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bddc/bddcscalingbasic.o
+#13 144.7          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bjacobi/ftn-custom/zbjacobif.o
+#13 145.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/composite/composite.o
+#13 145.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bjacobi/bjacobi.o
+#13 145.6          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bddc/bddcschurs.o
+#13 145.6          CC arch-linux-c-opt/obj/src/ksp/pc/impls/cp/cp.o
+#13 145.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/deflation/deflationspace.o
+#13 145.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/deflation/deflation.o
+#13 146.0          CC arch-linux-c-opt/obj/src/ksp/pc/impls/eisens/eisen.o
+#13 146.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/factor/cholesky/cholesky.o
+#13 146.3          CC arch-linux-c-opt/obj/src/ksp/pc/impls/factor/factimpl.o
+#13 146.5          CC arch-linux-c-opt/obj/src/ksp/pc/impls/factor/icc/icc.o
+#13 146.6          CC arch-linux-c-opt/obj/src/ksp/pc/impls/factor/ilu/ilu.o
+#13 146.7          CC arch-linux-c-opt/obj/src/ksp/pc/impls/factor/factor.o
+#13 146.8          CC arch-linux-c-opt/obj/src/ksp/pc/impls/factor/lu/lu.o
+#13 146.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/factor/qr/qr.o
+#13 147.0          CC arch-linux-c-opt/obj/src/ksp/pc/impls/fieldsplit/ftn-custom/zfieldsplitf.o
+#13 147.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/galerkin/galerkin.o
+#13 147.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/gamg/classical.o
+#13 148.0          CC arch-linux-c-opt/obj/src/ksp/pc/impls/gamg/agg.o
+#13 148.4          CC arch-linux-c-opt/obj/src/ksp/pc/impls/fieldsplit/fieldsplit.o
+#13 148.6          CC arch-linux-c-opt/obj/src/ksp/pc/impls/gamg/geo.o
+#13 148.8          CC arch-linux-c-opt/obj/src/ksp/pc/impls/gasm/ftn-custom/zgasmf.o
+#13 148.8          CC arch-linux-c-opt/obj/src/ksp/pc/impls/gamg/util.o
+#13 148.8          CC arch-linux-c-opt/obj/src/ksp/pc/impls/bddc/bddcprivate.o
+#13 149.0          CC arch-linux-c-opt/obj/src/ksp/pc/impls/gamg/gamg.o
+#13 149.3          CC arch-linux-c-opt/obj/src/ksp/pc/impls/is/nn/nn.o
+#13 149.3          CC arch-linux-c-opt/obj/src/ksp/pc/impls/hmg/hmg.o
+#13 149.5          CC arch-linux-c-opt/obj/src/ksp/pc/impls/is/pcis.o
+#13 149.5          CC arch-linux-c-opt/obj/src/ksp/pc/impls/kaczmarz/kaczmarz.o
+#13 149.7          CC arch-linux-c-opt/obj/src/ksp/pc/impls/jacobi/jacobi.o
+#13 149.8          CC arch-linux-c-opt/obj/src/ksp/pc/impls/gasm/gasm.o
+#13 149.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/ksp/pcksp.o
+#13 149.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/lmvm/lmvmpc.o
+#13 150.0          CC arch-linux-c-opt/obj/src/ksp/pc/impls/lsc/lsc.o
+#13 150.1          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mg/ftn-custom/zmgf.o
+#13 150.1          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mat/pcmat.o
+#13 150.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mg/fmg.o
+#13 150.3          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mg/ftn-custom/zmgfuncf.o
+#13 150.5          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mg/mgadapt.o
+#13 150.5          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mg/gdsw.o
+#13 150.7          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mg/mgfunc.o
+#13 150.7          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mg/smg.o
+#13 150.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/none/none.o
+#13 151.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mg/mg.o
+#13 151.4          CC arch-linux-c-opt/obj/src/ksp/pc/impls/pbjacobi/pbjacobi.o
+#13 151.4          CC arch-linux-c-opt/obj/src/ksp/pc/impls/mpi/pcmpi.o
+#13 151.4          CC arch-linux-c-opt/obj/src/ksp/pc/impls/python/pythonpc.o
+#13 151.7          CC arch-linux-c-opt/obj/src/ksp/pc/impls/shell/ftn-custom/zshellpcf.o
+#13 151.8          CC arch-linux-c-opt/obj/src/ksp/pc/impls/redistribute/redistribute.o
+#13 151.9          CC arch-linux-c-opt/obj/src/ksp/pc/impls/redundant/redundant.o
+#13 152.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/shell/shellpc.o
+#13 152.2          CC arch-linux-c-opt/obj/src/ksp/pc/impls/sor/sor.o
+#13 152.3          CC arch-linux-c-opt/obj/src/ksp/pc/impls/svd/svd.o
+#13 152.6          CC arch-linux-c-opt/obj/src/ksp/pc/impls/patch/pcpatch.o
+#13 152.8          CC arch-linux-c-opt/obj/src/ksp/pc/impls/telescope/telescope_coarsedm.o
+#13 153.0          CC arch-linux-c-opt/obj/src/ksp/pc/impls/telescope/telescope.o
+#13 153.0          CC arch-linux-c-opt/obj/src/ksp/pc/impls/vpbjacobi/vpbjacobi.o
+#13 153.1          CC arch-linux-c-opt/obj/src/ksp/pc/impls/telescope/telescope_dmda.o
+#13 153.2          CC arch-linux-c-opt/obj/src/ksp/pc/interface/pcregis.o
+#13 153.3          CC arch-linux-c-opt/obj/src/ksp/pc/interface/pcset.o
+#13 153.4          CC arch-linux-c-opt/obj/src/ksp/pc/impls/wb/wb.o
+#13 153.5          CC arch-linux-c-opt/obj/ftn/snes/impls/al/alf.o
+#13 153.6          CC arch-linux-c-opt/obj/ftn/snes/impls/composite/snescompositef.o
+#13 153.8          CC arch-linux-c-opt/obj/ftn/snes/impls/fas/fasf.o
+#13 153.9          CC arch-linux-c-opt/obj/ftn/snes/impls/fas/fasfuncf.o
+#13 154.0          CC arch-linux-c-opt/obj/ftn/snes/impls/fas/fasgalerkinf.o
+#13 154.1          CC arch-linux-c-opt/obj/src/ksp/pc/interface/precon.o
+#13 154.1          CC arch-linux-c-opt/obj/ftn/snes/impls/gs/snesgsf.o
+#13 154.2          CC arch-linux-c-opt/obj/ftn/snes/impls/ms/msf.o
+#13 154.3          CC arch-linux-c-opt/obj/ftn/snes/impls/multiblock/multiblockf.o
+#13 154.3          CC arch-linux-c-opt/obj/ftn/snes/impls/nasm/nasmf.o
+#13 154.4          CC arch-linux-c-opt/obj/ftn/snes/impls/ncg/snesncgf.o
+#13 154.5          CC arch-linux-c-opt/obj/ftn/snes/impls/ngmres/snesngmresf.o
+#13 154.5          CC arch-linux-c-opt/obj/ftn/snes/impls/ntrdc/ntrdcf.o
+#13 154.6          CC arch-linux-c-opt/obj/ftn/snes/impls/patch/snespatchf.o
+#13 154.7          CC arch-linux-c-opt/obj/ftn/snes/impls/python/pythonsnesf.o
+#13 154.7          CC arch-linux-c-opt/obj/ftn/snes/impls/qn/qnf.o
+#13 154.8          CC arch-linux-c-opt/obj/ftn/snes/impls/shell/snesshellf.o
+#13 154.9          CC arch-linux-c-opt/obj/ftn/snes/impls/tr/trf.o
+#13 155.0          CC arch-linux-c-opt/obj/ftn/snes/impls/vi/rs/virsf.o
+#13 155.0          CC arch-linux-c-opt/obj/ftn/snes/impls/vi/ss/vissf.o
+#13 155.1          CC arch-linux-c-opt/obj/ftn/snes/impls/vi/vif.o
+#13 155.2          CC arch-linux-c-opt/obj/ftn/snes/interface/dlregissnesf.o
+#13 155.3          CC arch-linux-c-opt/obj/ftn/snes/interface/snesf.o
+#13 155.3          CC arch-linux-c-opt/obj/ftn/snes/interface/snesj2f.o
+#13 155.4          CC arch-linux-c-opt/obj/ftn/snes/interface/snesobf.o
+#13 155.5          CC arch-linux-c-opt/obj/ftn/snes/interface/snespcf.o
+#13 155.6          CC arch-linux-c-opt/obj/ftn/snes/interface/snesutf.o
+#13 155.6          CC arch-linux-c-opt/obj/ftn/snes/linesearch/impls/bt/linesearchbtf.o
+#13 155.8          CC arch-linux-c-opt/obj/ftn/snes/mf/snesmfjf.o
+#13 155.8          CC arch-linux-c-opt/obj/ftn/snes/linesearch/interface/linesearchf.o
+#13 155.8          CC arch-linux-c-opt/obj/ftn/snes/utils/convestf.o
+#13 156.0          CC arch-linux-c-opt/obj/ftn/snes/utils/dm/dminterpolatesnesf.o
+#13 156.0          CC arch-linux-c-opt/obj/ftn/snes/utils/dm/dmadaptf.o
+#13 156.1          CC arch-linux-c-opt/obj/ftn/snes/utils/dmplexsnesf.o
+#13 156.2          CC arch-linux-c-opt/obj/ftn/snes/utils/dmsnesf.o
+#13 156.6          CC arch-linux-c-opt/obj/src/snes/impls/al/al.o
+#13 156.7          CC arch-linux-c-opt/obj/src/snes/impls/composite/snescomposite.o
+#13 156.8          CC arch-linux-c-opt/obj/src/snes/impls/fas/fas.o
+#13 157.0          CC arch-linux-c-opt/obj/src/snes/impls/fas/fasgalerkin.o
+#13 157.1          CC arch-linux-c-opt/obj/src/snes/impls/gs/gssecant.o
+#13 157.2          FC arch-linux-c-opt/obj/src/snes/ftn-mod/petscsnesmod.o
+#13 157.2          CC arch-linux-c-opt/obj/src/snes/impls/fas/fasfunc.o
+#13 157.4          CC arch-linux-c-opt/obj/src/snes/impls/gs/snesgs.o
+#13 157.5          CC arch-linux-c-opt/obj/src/snes/impls/ksponly/ksponly.o
+#13 157.6          CC arch-linux-c-opt/obj/src/snes/impls/ls/ls.o
+#13 157.7          CC arch-linux-c-opt/obj/src/snes/impls/nasm/aspin.o
+#13 157.8          CC arch-linux-c-opt/obj/src/snes/impls/ms/ms.o
+#13 158.0          CC arch-linux-c-opt/obj/src/snes/impls/multiblock/multiblock.o
+#13 158.1          CC arch-linux-c-opt/obj/src/snes/impls/ngmres/anderson.o
+#13 158.2          CC arch-linux-c-opt/obj/src/snes/impls/ncg/snesncg.o
+#13 158.3          CC arch-linux-c-opt/obj/src/snes/impls/nasm/nasm.o
+#13 158.3          CC arch-linux-c-opt/obj/src/snes/impls/ngmres/ngmresfunc.o
+#13 158.5          CC arch-linux-c-opt/obj/src/snes/impls/python/pythonsnes.o
+#13 158.6          CC arch-linux-c-opt/obj/src/snes/impls/ngmres/snesngmres.o
+#13 158.7          CC arch-linux-c-opt/obj/src/snes/impls/ntrdc/ntrdc.o
+#13 158.8          CC arch-linux-c-opt/obj/src/snes/impls/patch/snespatch.o
+#13 158.9          CC arch-linux-c-opt/obj/src/snes/impls/richardson/snesrichardson.o
+#13 159.0          CC arch-linux-c-opt/obj/src/snes/impls/shell/ftn-custom/zsnesshellf.o
+#13 159.0          CC arch-linux-c-opt/obj/src/snes/impls/qn/qn.o
+#13 159.1          CC arch-linux-c-opt/obj/src/snes/impls/shell/snesshell.o
+#13 159.4          CC arch-linux-c-opt/obj/src/snes/impls/vi/ss/viss.o
+#13 159.6          CC arch-linux-c-opt/obj/src/snes/impls/vi/rs/virs.o
+#13 159.7          CC arch-linux-c-opt/obj/src/snes/impls/vi/vi.o
+#13 159.7          CC arch-linux-c-opt/obj/src/snes/interface/dlregissnes.o
+#13 159.9          CC arch-linux-c-opt/obj/src/snes/impls/tr/tr.o
+#13 159.9          CC arch-linux-c-opt/obj/src/snes/interface/ftn-custom/zsnesf90.o
+#13 159.9          CC arch-linux-c-opt/obj/src/snes/interface/ftn-custom/zsnesf.o
+#13 160.2          CC arch-linux-c-opt/obj/src/snes/interface/snesj.o
+#13 160.2          CC arch-linux-c-opt/obj/src/snes/interface/snesj2.o
+#13 160.2          CC arch-linux-c-opt/obj/src/snes/interface/snesob.o
+#13 160.4          CC arch-linux-c-opt/obj/src/snes/interface/snesregi.o
+#13 160.4          CC arch-linux-c-opt/obj/src/snes/interface/snespc.o
+#13 160.6          CC arch-linux-c-opt/obj/src/snes/linesearch/impls/basic/linesearchbasic.o
+#13 160.7          CC arch-linux-c-opt/obj/src/snes/interface/snesut.o
+#13 160.7          CC arch-linux-c-opt/obj/src/snes/linesearch/impls/bisection/linesearchbisection.o
+#13 161.0          CC arch-linux-c-opt/obj/src/snes/linesearch/impls/cp/linesearchcp.o
+#13 161.0          CC arch-linux-c-opt/obj/src/snes/linesearch/impls/l2/linesearchl2.o
+#13 161.1          CC arch-linux-c-opt/obj/src/snes/linesearch/impls/bt/linesearchbt.o
+#13 161.2          CC arch-linux-c-opt/obj/src/snes/linesearch/impls/shell/ftn-custom/zlinesearchshellf.o
+#13 161.3          CC arch-linux-c-opt/obj/src/snes/linesearch/impls/nleqerr/linesearchnleqerr.o
+#13 161.3          CC arch-linux-c-opt/obj/src/snes/linesearch/impls/shell/linesearchshell.o
+#13 161.4          CC arch-linux-c-opt/obj/src/snes/linesearch/interface/ftn-custom/zlinesearchf.o
+#13 161.5          CC arch-linux-c-opt/obj/src/snes/linesearch/interface/linesearchregi.o
+#13 161.7          CC arch-linux-c-opt/obj/src/snes/mf/snesmfj.o
+#13 162.1          CC arch-linux-c-opt/obj/src/snes/utils/convest.o
+#13 162.1          CC arch-linux-c-opt/obj/src/snes/linesearch/interface/linesearch.o
+#13 162.5          CC arch-linux-c-opt/obj/src/snes/interface/snes.o
+#13 162.8          CC arch-linux-c-opt/obj/src/snes/utils/dmdasnes.o
+#13 162.8          CC arch-linux-c-opt/obj/src/snes/utils/dm/dmadapt.o
+#13 162.9          CC arch-linux-c-opt/obj/src/snes/utils/dm/dminterpolatesnes.o
+#13 163.1          CC arch-linux-c-opt/obj/src/snes/utils/dmlocalsnes.o
+#13 163.3          CC arch-linux-c-opt/obj/src/snes/utils/ftn-custom/zdmlocalsnesf.o
+#13 163.4          CC arch-linux-c-opt/obj/src/snes/utils/ftn-custom/zdmdasnesf.o
+#13 163.4          CC arch-linux-c-opt/obj/src/snes/utils/dmsnes.o
+#13 163.5          CC arch-linux-c-opt/obj/src/snes/utils/ftn-custom/zdmsnesf.o
+#13 163.6          CC arch-linux-c-opt/obj/src/snes/utils/dmplexsnes.o
+#13 163.6          CC arch-linux-c-opt/obj/ftn/ts/adapt/impls/dsp/adaptdspf.o
+#13 163.7          CC arch-linux-c-opt/obj/ftn/ts/adapt/impls/history/adapthistf.o
+#13 163.9          CC arch-linux-c-opt/obj/ftn/ts/event/tseventf.o
+#13 163.9          CC arch-linux-c-opt/obj/ftn/ts/adapt/interface/tsadaptf.o
+#13 164.0          CC arch-linux-c-opt/obj/ftn/ts/impls/arkimex/arkimexf.o
+#13 164.1          CC arch-linux-c-opt/obj/ftn/ts/impls/bdf/bdff.o
+#13 164.1          CC arch-linux-c-opt/obj/ftn/ts/impls/eimex/eimexf.o
+#13 164.2          CC arch-linux-c-opt/obj/ftn/ts/impls/explicit/rk/rkf.o
+#13 164.3          CC arch-linux-c-opt/obj/ftn/ts/impls/explicit/ssp/sspf.o
+#13 164.3          CC arch-linux-c-opt/obj/ftn/ts/impls/glee/gleef.o
+#13 164.4          CC arch-linux-c-opt/obj/ftn/ts/impls/implicit/alpha/alpha1f.o
+#13 164.5          CC arch-linux-c-opt/obj/ftn/ts/impls/implicit/alpha/alpha2f.o
+#13 164.5          CC arch-linux-c-opt/obj/ftn/ts/impls/implicit/discgrad/tsdiscgradf.o
+#13 164.6          CC arch-linux-c-opt/obj/ftn/ts/impls/implicit/glle/glleadaptf.o
+#13 164.7          CC arch-linux-c-opt/obj/ftn/ts/impls/implicit/glle/gllef.o
+#13 164.8          CC arch-linux-c-opt/obj/ftn/ts/impls/implicit/irk/irkf.o
+#13 164.8          CC arch-linux-c-opt/obj/ftn/ts/impls/implicit/theta/thetaf.o
+#13 165.0          CC arch-linux-c-opt/obj/ftn/ts/impls/pseudo/posindepf.o
+#13 165.0          CC arch-linux-c-opt/obj/ftn/ts/impls/multirate/mprkf.o
+#13 165.1          CC arch-linux-c-opt/obj/ftn/ts/impls/python/pythontsf.o
+#13 165.2          CC arch-linux-c-opt/obj/ftn/ts/impls/rosw/roswf.o
+#13 165.2          CC arch-linux-c-opt/obj/ftn/ts/impls/symplectic/basicsymplectic/basicsymplecticf.o
+#13 165.3          CC arch-linux-c-opt/obj/ftn/ts/interface/dlregistsf.o
+#13 165.4          CC arch-linux-c-opt/obj/ftn/ts/interface/sensitivity/tssenf.o
+#13 165.5          CC arch-linux-c-opt/obj/ftn/ts/interface/tscreatef.o
+#13 165.6          CC arch-linux-c-opt/obj/ftn/ts/interface/tseigf.o
+#13 165.8          CC arch-linux-c-opt/obj/ftn/ts/interface/tsf.o
+#13 165.9          CC arch-linux-c-opt/obj/ftn/ts/interface/tsmonf.o
+#13 166.0          CC arch-linux-c-opt/obj/ftn/ts/interface/tsrhssplitf.o
+#13 166.0          CC arch-linux-c-opt/obj/ftn/ts/interface/tsregf.o
+#13 166.3          CC arch-linux-c-opt/obj/ftn/ts/trajectory/impls/memory/trajmemoryf.o
+#13 166.3          CC arch-linux-c-opt/obj/ftn/ts/trajectory/interface/trajf.o
+#13 166.5          CC arch-linux-c-opt/obj/ftn/ts/utils/dmdatsf.o
+#13 166.5          CC arch-linux-c-opt/obj/ftn/ts/utils/dmlocaltsf.o
+#13 166.7          CC arch-linux-c-opt/obj/ftn/ts/utils/dmnetworktsf.o
+#13 166.8          CC arch-linux-c-opt/obj/ftn/ts/utils/dmplexlandau/plexlandf.o
+#13 166.9          CC arch-linux-c-opt/obj/ftn/ts/utils/dmplextsf.o
+#13 167.0          CC arch-linux-c-opt/obj/ftn/ts/utils/tsconvestf.o
+#13 167.1          CC arch-linux-c-opt/obj/src/ts/adapt/impls/basic/adaptbasic.o
+#13 167.1          CC arch-linux-c-opt/obj/src/ts/adapt/impls/cfl/adaptcfl.o
+#13 167.4          CC arch-linux-c-opt/obj/src/ts/adapt/impls/glee/adaptglee.o
+#13 167.5          CC arch-linux-c-opt/obj/src/ts/adapt/impls/dsp/adaptdsp.o
+#13 167.6          CC arch-linux-c-opt/obj/src/ts/adapt/impls/none/adaptnone.o
+#13 167.8          CC arch-linux-c-opt/obj/src/ts/adapt/impls/history/adapthist.o
+#13 167.9          FC arch-linux-c-opt/obj/src/ts/ftn-mod/petsctsmod.o
+#13 168.3          CC arch-linux-c-opt/obj/src/ts/event/tsevent.o
+#13 168.3          CC arch-linux-c-opt/obj/src/ts/adapt/interface/tsadapt.o
+#13 168.3          CC arch-linux-c-opt/obj/src/ts/impls/arkimex/fsarkimex.o
+#13 168.6          CC arch-linux-c-opt/obj/src/ts/impls/explicit/euler/euler.o
+#13 168.7          CC arch-linux-c-opt/obj/src/ts/impls/eimex/eimex.o
+#13 168.8          CC arch-linux-c-opt/obj/src/ts/impls/bdf/bdf.o
+#13 168.8          CC arch-linux-c-opt/obj/src/ts/impls/arkimex/arkimex.o
+#13 169.1          CC arch-linux-c-opt/obj/src/ts/impls/explicit/rk/mrk.o
+#13 169.2          CC arch-linux-c-opt/obj/src/ts/impls/explicit/ssp/ssp.o
+#13 169.4          CC arch-linux-c-opt/obj/src/ts/impls/glee/glee.o
+#13 169.5          CC arch-linux-c-opt/obj/src/ts/impls/explicit/rk/rk.o
+#13 169.6          CC arch-linux-c-opt/obj/src/ts/impls/implicit/alpha/alpha1.o
+#13 169.8          CC arch-linux-c-opt/obj/src/ts/impls/implicit/alpha/alpha2.o
+#13 169.9          CC arch-linux-c-opt/obj/src/ts/impls/implicit/discgrad/tsdiscgrad.o
+#13 169.9          CC arch-linux-c-opt/obj/src/ts/impls/implicit/glle/glleadapt.o
+#13 170.3          CC arch-linux-c-opt/obj/src/ts/impls/implicit/glle/glle.o
+#13 170.4          CC arch-linux-c-opt/obj/src/ts/impls/mimex/mimex.o
+#13 170.4          CC arch-linux-c-opt/obj/src/ts/impls/implicit/irk/irk.o
+#13 170.7          CC arch-linux-c-opt/obj/src/ts/impls/python/pythonts.o
+#13 170.7          CC arch-linux-c-opt/obj/src/ts/impls/implicit/theta/theta.o
+#13 170.8          CC arch-linux-c-opt/obj/src/ts/impls/pseudo/posindep.o
+#13 171.0          CC arch-linux-c-opt/obj/src/ts/impls/multirate/mprk.o
+#13 171.1          CC arch-linux-c-opt/obj/src/ts/interface/dlregists.o
+#13 171.1          CC arch-linux-c-opt/obj/src/ts/impls/symplectic/basicsymplectic/basicsymplectic.o
+#13 171.3          CC arch-linux-c-opt/obj/src/ts/interface/ftn-custom/ztsf.o
+#13 171.3          CC arch-linux-c-opt/obj/src/ts/impls/rosw/rosw.o
+#13 171.5          CC arch-linux-c-opt/obj/src/ts/interface/tscreate.o
+#13 171.6          CC arch-linux-c-opt/obj/src/ts/interface/tseig.o
+#13 171.9          CC arch-linux-c-opt/obj/src/ts/interface/tshistory.o
+#13 172.0          CC arch-linux-c-opt/obj/src/ts/interface/sensitivity/tssen.o
+#13 172.1          CC arch-linux-c-opt/obj/src/ts/interface/tsreg.o
+#13 172.3          CC arch-linux-c-opt/obj/src/ts/interface/tsregall.o
+#13 172.4          CC arch-linux-c-opt/obj/src/ts/interface/tsmon.o
+#13 172.5          CC arch-linux-c-opt/obj/src/ts/interface/tsrhssplit.o
+#13 172.5          CC arch-linux-c-opt/obj/src/ts/trajectory/impls/basic/trajbasic.o
+#13 172.8          CC arch-linux-c-opt/obj/src/ts/trajectory/impls/singlefile/singlefile.o
+#13 172.8          CC arch-linux-c-opt/obj/src/ts/trajectory/impls/visualization/trajvisualization.o
+#13 173.1          CC arch-linux-c-opt/obj/src/ts/trajectory/utils/reconstruct.o
+#13 173.1          CC arch-linux-c-opt/obj/src/ts/trajectory/impls/memory/trajmemory.o
+#13 173.6          CC arch-linux-c-opt/obj/src/ts/trajectory/interface/traj.o
+#13 173.7          CC arch-linux-c-opt/obj/src/ts/utils/dmdats.o
+#13 173.7          CC arch-linux-c-opt/obj/src/ts/interface/ts.o
+#13 173.7          CC arch-linux-c-opt/obj/src/ts/utils/dmlocalts.o
+#13 174.0          CC arch-linux-c-opt/obj/src/ts/utils/dmnetworkts.o
+#13 174.3          CC arch-linux-c-opt/obj/src/ts/utils/dmplexts.o
+#13 174.4          CC arch-linux-c-opt/obj/src/ts/utils/dmts.o
+#13 174.5          CC arch-linux-c-opt/obj/src/ts/utils/tsconvest.o
+#13 174.7          CC arch-linux-c-opt/obj/ftn/tao/interface/dlregistaof.o
+#13 174.7          CC arch-linux-c-opt/obj/ftn/tao/interface/fdifff.o
+#13 174.9          CC arch-linux-c-opt/obj/ftn/tao/interface/taosolver_boundsf.o
+#13 175.0          CC arch-linux-c-opt/obj/ftn/tao/interface/taosolver_fgf.o
+#13 175.1          CC arch-linux-c-opt/obj/src/ts/utils/dmplexlandau/plexland.o
+#13 175.1          CC arch-linux-c-opt/obj/ftn/tao/interface/taosolver_hjf.o
+#13 175.3          CC arch-linux-c-opt/obj/ftn/tao/linesearch/interface/dlregis_taolinesearchf.o
+#13 175.3          CC arch-linux-c-opt/obj/ftn/tao/interface/taosolverf.o
+#13 175.4          CC arch-linux-c-opt/obj/ftn/tao/linesearch/interface/taolinesearchf.o
+#13 175.5          CC arch-linux-c-opt/obj/ftn/tao/matrix/submatfreef.o
+#13 175.5          CC arch-linux-c-opt/obj/ftn/tao/python/pythontaof.o
+#13 175.6          CC arch-linux-c-opt/obj/ftn/tao/shell/taoshellf.o
+#13 175.7          CC arch-linux-c-opt/obj/ftn/tao/util/tao_utilf.o
+#13 175.8          CC arch-linux-c-opt/obj/src/tao/interface/dlregistao.o
+#13 175.9          CC arch-linux-c-opt/obj/src/tao/interface/fdiff.o
+#13 176.2          CC arch-linux-c-opt/obj/src/tao/interface/taosolver_bounds.o
+#13 176.4          CC arch-linux-c-opt/obj/src/tao/interface/taosolver_fg.o
+#13 176.6          CC arch-linux-c-opt/obj/src/tao/interface/taosolverregi.o
+#13 176.8          CC arch-linux-c-opt/obj/src/tao/interface/taosolver_hj.o
+#13 176.9          CC arch-linux-c-opt/obj/src/tao/linesearch/interface/dlregis_taolinesearch.o
+#13 176.9          CC arch-linux-c-opt/obj/src/tao/interface/taosolver.o
+#13 177.2          CC arch-linux-c-opt/obj/src/tao/matrix/submatfree.o
+#13 177.3          CC arch-linux-c-opt/obj/src/tao/matrix/adamat.o
+#13 177.4          CC arch-linux-c-opt/obj/src/tao/linesearch/interface/taolinesearch.o
+#13 177.5          CC arch-linux-c-opt/obj/src/tao/python/pythontao.o
+#13 177.5          CC arch-linux-c-opt/obj/src/tao/shell/taoshell.o
+#13 177.7          CC arch-linux-c-opt/obj/src/tao/snes/taosnes.o
+#13 177.8          CC arch-linux-c-opt/obj/src/tao/util/tao_util.o
+#13 177.9          FC arch-linux-c-opt/obj/src/sys/classes/bag/ftn-src/bagenum.o
+#13 178.0          FC arch-linux-c-opt/obj/src/sys/objects/ftn-src/optionenum.o
+#13 233.3          FC arch-linux-c-opt/obj/src/tao/ftn-mod/petsctaomod.o
+#13 238.2     CLINKER arch-linux-c-opt/lib/libpetsc.so.3.23.6
+#13 238.2 =========================================
+#13 238.2 Now to check if the libraries are working do:
+#13 238.2 make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt check
+#13 238.2 =========================================
+#13 DONE 238.7s
+
+#14 [10/48] RUN make check
+#14 0.122 Running PETSc check examples to verify correct installation
+#14 0.124 Using PETSC_DIR=/usr/local/petsc and PETSC_ARCH=arch-linux-c-opt
+#14 0.694 C/C++ example src/snes/tutorials/ex19 run successfully with 1 MPI process
+#14 1.163 C/C++ example src/snes/tutorials/ex19 run successfully with 2 MPI processes
+#14 1.444 C/C++ example src/snes/tutorials/ex19 run successfully with MUMPS
+#14 1.854 C/C++ example src/vec/vec/tests/ex47 run successfully with HDF5
+#14 13.26 Fortran example src/snes/tutorials/ex5f run successfully with 1 MPI process
+#14 13.29 Completed PETSc check examples
+#14 DONE 13.3s
+
+#15 [11/48] RUN pip3 install src/binding/petsc4py
+#15 0.385 Processing ./src/binding/petsc4py
+#15 0.518   Installing build dependencies: started
+#15 6.234   Installing build dependencies: finished with status 'done'
+#15 6.238   Getting requirements to build wheel: started
+#15 6.527   Getting requirements to build wheel: finished with status 'done'
+#15 6.656   Installing backend dependencies: started
+#15 8.206   Installing backend dependencies: finished with status 'done'
+#15 8.210   Preparing metadata (pyproject.toml): started
+#15 8.545   Preparing metadata (pyproject.toml): finished with status 'done'
+#15 8.549 Requirement already satisfied: numpy<2 in /usr/lib/python3/dist-packages (from petsc4py==3.23.6) (1.21.5)
+#15 8.550 Building wheels for collected packages: petsc4py
+#15 8.551   Building wheel for petsc4py (pyproject.toml): started
+#15 184.1   Building wheel for petsc4py (pyproject.toml): still running...
+#15 207.3   Building wheel for petsc4py (pyproject.toml): finished with status 'done'
+#15 207.3   Created wheel for petsc4py: filename=petsc4py-3.23.6-cp310-cp310-linux_x86_64.whl size=10392587 sha256=080c396fe4db69abd034873b70bb63f107b52d45fa67cb5f79f594e4684dd760
+#15 207.3   Stored in directory: /tmp/pip-ephem-wheel-cache-yv3gb3tp/wheels/6c/23/1f/e33b8e274edfa6311b55e31d6ed254615c943b4ed70a198b0b
+#15 207.3 Successfully built petsc4py
+#15 207.3 Installing collected packages: petsc4py
+#15 207.5 Successfully installed petsc4py-3.23.6
+#15 207.5 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#15 DONE 207.7s
+
+#16 [12/48] WORKDIR /workspace
+#16 DONE 0.0s
+
+#17 [13/48] RUN mkdir /usr/local/gmsh
+#17 DONE 0.1s
+
+#18 [14/48] RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz
+#18 0.049 --2025-09-12 13:59:42--  http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz
+#18 0.049 Resolving gmsh.info (gmsh.info)... 139.165.160.20
+#18 0.307 Connecting to gmsh.info (gmsh.info)|139.165.160.20|:80... connected.
+#18 0.438 HTTP request sent, awaiting response... 200 OK
+#18 0.575 Length: 38289969 (37M) [application/x-gzip]
+#18 0.575 Saving to: 'gmsh-stable-Linux64.tgz'
+#18 0.575 
+#18 0.575      0K .......... .......... .......... .......... ..........  0%  190K 3m17s
+#18 0.839     50K .......... .......... .......... .......... ..........  0%  383K 2m27s
+#18 0.969    100K .......... .......... .......... .......... ..........  0% 20.0M 98s
+#18 0.972    150K .......... .......... .......... .......... ..........  0% 22.7M 74s
+#18 0.974    200K .......... .......... .......... .......... ..........  0%  379K 79s
+#18 1.107    250K .......... .......... .......... .......... ..........  0% 11.1M 66s
+#18 1.110    300K .......... .......... .......... .......... ..........  0% 22.9M 57s
+#18 1.112    350K .......... .......... .......... .......... ..........  1% 21.3M 50s
+#18 1.115    400K .......... .......... .......... .......... ..........  1%  421K 54s
+#18 1.234    450K .......... .......... .......... .......... ..........  1% 14.1M 49s
+#18 1.237    500K .......... .......... .......... .......... ..........  1% 17.4M 45s
+#18 1.240    550K .......... .......... .......... .......... ..........  1% 18.4M 41s
+#18 1.243    600K .......... .......... .......... .......... ..........  1% 25.1M 38s
+#18 1.244    650K .......... .......... .......... .......... ..........  1% 24.2M 35s
+#18 1.247    700K .......... .......... .......... .......... ..........  2% 23.4M 33s
+#18 1.249    750K .......... .......... .......... .......... ..........  2% 29.2M 31s
+#18 1.250    800K .......... .......... .......... .......... ..........  2% 25.9M 29s
+#18 1.253    850K .......... .......... .......... .......... ..........  2%  434K 32s
+#18 1.367    900K .......... .......... .......... .......... ..........  2% 8.80M 31s
+#18 1.373    950K .......... .......... .......... .......... ..........  2% 12.9M 29s
+#18 1.377   1000K .......... .......... .......... .......... ..........  2% 26.4M 28s
+#18 1.378   1050K .......... .......... .......... .......... ..........  2% 22.0M 27s
+#18 1.381   1100K .......... .......... .......... .......... ..........  3% 17.0M 25s
+#18 1.384   1150K .......... .......... .......... .......... ..........  3% 24.5M 24s
+#18 1.386   1200K .......... .......... .......... .......... ..........  3% 22.8M 23s
+#18 1.388   1250K .......... .......... .......... .......... ..........  3% 24.3M 23s
+#18 1.390   1300K .......... .......... .......... .......... ..........  3% 23.0M 22s
+#18 1.392   1350K .......... .......... .......... .......... ..........  3% 21.2M 21s
+#18 1.394   1400K .......... .......... .......... .......... ..........  3% 27.2M 20s
+#18 1.396   1450K .......... .......... .......... .......... ..........  4% 22.1M 20s
+#18 1.398   1500K .......... .......... .......... .......... ..........  4% 17.2M 19s
+#18 1.401   1550K .......... .......... .......... .......... ..........  4% 21.7M 19s
+#18 1.403   1600K .......... .......... .......... .......... ..........  4% 25.7M 18s
+#18 1.405   1650K .......... .......... .......... .......... ..........  4% 16.2M 17s
+#18 1.408   1700K .......... .......... .......... .......... ..........  4% 24.0M 17s
+#18 1.410   1750K .......... .......... .......... .......... ..........  4%  565K 18s
+#18 1.499   1800K .......... .......... .......... .......... ..........  4% 10.2M 18s
+#18 1.503   1850K .......... .......... .......... .......... ..........  5% 20.7M 17s
+#18 1.506   1900K .......... .......... .......... .......... ..........  5% 23.2M 17s
+#18 1.508   1950K .......... .......... .......... .......... ..........  5% 33.7M 17s
+#18 1.509   2000K .......... .......... .......... .......... ..........  5% 23.4M 16s
+#18 1.511   2050K .......... .......... .......... .......... ..........  5% 24.6M 16s
+#18 1.513   2100K .......... .......... .......... .......... ..........  5% 25.8M 15s
+#18 1.516   2150K .......... .......... .......... .......... ..........  5% 21.1M 15s
+#18 1.518   2200K .......... .......... .......... .......... ..........  6% 28.2M 15s
+#18 1.519   2250K .......... .......... .......... .......... ..........  6% 25.5M 14s
+#18 1.521   2300K .......... .......... .......... .......... ..........  6% 27.1M 14s
+#18 1.523   2350K .......... .......... .......... .......... ..........  6% 19.3M 14s
+#18 1.526   2400K .......... .......... .......... .......... ..........  6% 24.8M 14s
+#18 1.528   2450K .......... .......... .......... .......... ..........  6% 22.3M 13s
+#18 1.530   2500K .......... .......... .......... .......... ..........  6% 29.3M 13s
+#18 1.532   2550K .......... .......... .......... .......... ..........  6% 21.0M 13s
+#18 1.534   2600K .......... .......... .......... .......... ..........  7% 22.4M 13s
+#18 1.536   2650K .......... .......... .......... .......... ..........  7% 24.0M 12s
+#18 1.538   2700K .......... .......... .......... .......... ..........  7% 29.3M 12s
+#18 1.540   2750K .......... .......... .......... .......... ..........  7% 18.5M 12s
+#18 1.542   2800K .......... .......... .......... .......... ..........  7% 31.9M 12s
+#18 1.544   2850K .......... .......... .......... .......... ..........  7% 23.4M 12s
+#18 1.546   2900K .......... .......... .......... .......... ..........  7% 23.9M 11s
+#18 1.548   2950K .......... .......... .......... .......... ..........  8% 20.2M 11s
+#18 1.550   3000K .......... .......... .......... .......... ..........  8% 24.6M 11s
+#18 1.552   3050K .......... .......... .......... .......... ..........  8% 27.1M 11s
+#18 1.554   3100K .......... .......... .......... .......... ..........  8% 24.1M 11s
+#18 1.556   3150K .......... .......... .......... .......... ..........  8% 23.4M 11s
+#18 1.558   3200K .......... .......... .......... .......... ..........  8% 29.0M 10s
+#18 1.561   3250K .......... .......... .......... .......... ..........  8% 22.7M 10s
+#18 1.562   3300K .......... .......... .......... .......... ..........  8% 19.8M 10s
+#18 1.565   3350K .......... .......... .......... .......... ..........  9% 29.4M 10s
+#18 1.566   3400K .......... .......... .......... .......... ..........  9% 21.5M 10s
+#18 1.569   3450K .......... .......... .......... .......... ..........  9% 27.7M 10s
+#18 1.570   3500K .......... .......... .......... .......... ..........  9% 29.7M 10s
+#18 1.572   3550K .......... .......... .......... .......... ..........  9%  847K 10s
+#18 1.631   3600K .......... .......... .......... .......... ..........  9% 20.1M 10s
+#18 1.633   3650K .......... .......... .......... .......... ..........  9% 26.7M 10s
+#18 1.635   3700K .......... .......... .......... .......... .......... 10% 20.5M 10s
+#18 1.638   3750K .......... .......... .......... .......... .......... 10% 27.2M 9s
+#18 1.639   3800K .......... .......... .......... .......... .......... 10% 20.5M 9s
+#18 1.642   3850K .......... .......... .......... .......... .......... 10% 30.5M 9s
+#18 1.643   3900K .......... .......... .......... .......... .......... 10% 24.2M 9s
+#18 1.645   3950K .......... .......... .......... .......... .......... 10% 31.8M 9s
+#18 1.647   4000K .......... .......... .......... .......... .......... 10% 26.1M 9s
+#18 1.649   4050K .......... .......... .......... .......... .......... 10% 28.1M 9s
+#18 1.651   4100K .......... .......... .......... .......... .......... 11% 25.6M 9s
+#18 1.652   4150K .......... .......... .......... .......... .......... 11% 28.0M 9s
+#18 1.654   4200K .......... .......... .......... .......... .......... 11% 21.2M 8s
+#18 1.657   4250K .......... .......... .......... .......... .......... 11% 27.6M 8s
+#18 1.658   4300K .......... .......... .......... .......... .......... 11% 25.6M 8s
+#18 1.660   4350K .......... .......... .......... .......... .......... 11% 24.1M 8s
+#18 1.662   4400K .......... .......... .......... .......... .......... 11% 23.5M 8s
+#18 1.664   4450K .......... .......... .......... .......... .......... 12% 26.6M 8s
+#18 1.666   4500K .......... .......... .......... .......... .......... 12% 30.2M 8s
+#18 1.668   4550K .......... .......... .......... .......... .......... 12% 25.4M 8s
+#18 1.670   4600K .......... .......... .......... .......... .......... 12% 24.7M 8s
+#18 1.672   4650K .......... .......... .......... .......... .......... 12% 26.3M 8s
+#18 1.674   4700K .......... .......... .......... .......... .......... 12% 23.5M 8s
+#18 1.676   4750K .......... .......... .......... .......... .......... 12% 20.4M 7s
+#18 1.678   4800K .......... .......... .......... .......... .......... 12% 24.8M 7s
+#18 1.680   4850K .......... .......... .......... .......... .......... 13% 20.1M 7s
+#18 1.682   4900K .......... .......... .......... .......... .......... 13% 26.3M 7s
+#18 1.684   4950K .......... .......... .......... .......... .......... 13% 20.9M 7s
+#18 1.687   5000K .......... .......... .......... .......... .......... 13% 24.5M 7s
+#18 1.689   5050K .......... .......... .......... .......... .......... 13% 31.1M 7s
+#18 1.690   5100K .......... .......... .......... .......... .......... 13% 19.3M 7s
+#18 1.693   5150K .......... .......... .......... .......... .......... 13% 24.8M 7s
+#18 1.695   5200K .......... .......... .......... .......... .......... 14% 28.1M 7s
+#18 1.696   5250K .......... .......... .......... .......... .......... 14% 25.6M 7s
+#18 1.699   5300K .......... .......... .......... .......... .......... 14% 24.6M 7s
+#18 1.700   5350K .......... .......... .......... .......... .......... 14% 20.3M 7s
+#18 1.703   5400K .......... .......... .......... .......... .......... 14% 32.1M 7s
+#18 1.704   5450K .......... .......... .......... .......... .......... 14% 22.5M 7s
+#18 1.706   5500K .......... .......... .......... .......... .......... 14% 25.3M 6s
+#18 1.708   5550K .......... .......... .......... .......... .......... 14% 24.3M 6s
+#18 1.710   5600K .......... .......... .......... .......... .......... 15% 28.2M 6s
+#18 1.712   5650K .......... .......... .......... .......... .......... 15% 23.2M 6s
+#18 1.714   5700K .......... .......... .......... .......... .......... 15% 23.1M 6s
+#18 1.716   5750K .......... .......... .......... .......... .......... 15% 20.6M 6s
+#18 1.719   5800K .......... .......... .......... .......... .......... 15% 26.0M 6s
+#18 1.721   5850K .......... .......... .......... .......... .......... 15% 24.5M 6s
+#18 1.723   5900K .......... .......... .......... .......... .......... 15% 28.8M 6s
+#18 1.724   5950K .......... .......... .......... .......... .......... 16% 26.2M 6s
+#18 1.726   6000K .......... .......... .......... .......... .......... 16% 18.1M 6s
+#18 1.729   6050K .......... .......... .......... .......... .......... 16% 32.2M 6s
+#18 1.730   6100K .......... .......... .......... .......... .......... 16% 26.1M 6s
+#18 1.732   6150K .......... .......... .......... .......... .......... 16% 20.7M 6s
+#18 1.734   6200K .......... .......... .......... .......... .......... 16% 37.4M 6s
+#18 1.736   6250K .......... .......... .......... .......... .......... 16% 28.2M 6s
+#18 1.738   6300K .......... .......... .......... .......... .......... 16% 22.0M 6s
+#18 1.740   6350K .......... .......... .......... .......... .......... 17% 25.9M 6s
+#18 1.742   6400K .......... .......... .......... .......... .......... 17% 27.7M 6s
+#18 1.744   6450K .......... .......... .......... .......... .......... 17% 16.7M 6s
+#18 1.746   6500K .......... .......... .......... .......... .......... 17% 28.3M 6s
+#18 1.748   6550K .......... .......... .......... .......... .......... 17% 22.9M 5s
+#18 1.751   6600K .......... .......... .......... .......... .......... 17% 25.1M 5s
+#18 1.752   6650K .......... .......... .......... .......... .......... 17% 26.8M 5s
+#18 1.754   6700K .......... .......... .......... .......... .......... 18% 26.7M 5s
+#18 1.756   6750K .......... .......... .......... .......... .......... 18% 26.4M 5s
+#18 1.758   6800K .......... .......... .......... .......... .......... 18% 27.4M 5s
+#18 1.759   6850K .......... .......... .......... .......... .......... 18% 30.9M 5s
+#18 1.761   6900K .......... .......... .......... .......... .......... 18% 20.8M 5s
+#18 1.763   6950K .......... .......... .......... .......... .......... 18% 33.6M 5s
+#18 1.765   7000K .......... .......... .......... .......... .......... 18% 26.6M 5s
+#18 1.767   7050K .......... .......... .......... .......... .......... 18% 19.9M 5s
+#18 1.769   7100K .......... .......... .......... .......... .......... 19% 26.0M 5s
+#18 1.771   7150K .......... .......... .......... .......... .......... 19% 20.7M 5s
+#18 1.773   7200K .......... .......... .......... .......... .......... 19% 17.1M 5s
+#18 1.776   7250K .......... .......... .......... .......... .......... 19% 23.7M 5s
+#18 1.778   7300K .......... .......... .......... .......... .......... 19% 21.3M 5s
+#18 1.780   7350K .......... .......... .......... .......... .......... 19% 18.8M 5s
+#18 1.783   7400K .......... .......... .......... .......... .......... 19% 18.5M 5s
+#18 1.786   7450K .......... .......... .......... .......... .......... 20% 20.3M 5s
+#18 1.788   7500K .......... .......... .......... .......... .......... 20% 1.82M 5s
+#18 1.815   7550K .......... .......... .......... .......... .......... 20% 24.6M 5s
+#18 1.817   7600K .......... .......... .......... .......... .......... 20% 21.7M 5s
+#18 1.819   7650K .......... .......... .......... .......... .......... 20% 22.9M 5s
+#18 1.821   7700K .......... .......... .......... .......... .......... 20% 20.9M 5s
+#18 1.824   7750K .......... .......... .......... .......... .......... 20% 21.4M 5s
+#18 1.826   7800K .......... .......... .......... .......... .......... 20% 28.4M 5s
+#18 1.828   7850K .......... .......... .......... .......... .......... 21% 24.7M 5s
+#18 1.830   7900K .......... .......... .......... .......... .......... 21% 28.2M 5s
+#18 1.831   7950K .......... .......... .......... .......... .......... 21% 26.2M 5s
+#18 1.833   8000K .......... .......... .......... .......... .......... 21% 23.0M 5s
+#18 1.835   8050K .......... .......... .......... .......... .......... 21% 25.1M 5s
+#18 1.837   8100K .......... .......... .......... .......... .......... 21% 25.6M 5s
+#18 1.839   8150K .......... .......... .......... .......... .......... 21% 24.1M 5s
+#18 1.842   8200K .......... .......... .......... .......... .......... 22% 23.7M 4s
+#18 1.843   8250K .......... .......... .......... .......... .......... 22% 19.0M 4s
+#18 1.846   8300K .......... .......... .......... .......... .......... 22% 40.2M 4s
+#18 1.847   8350K .......... .......... .......... .......... .......... 22% 18.9M 4s
+#18 1.850   8400K .......... .......... .......... .......... .......... 22% 29.9M 4s
+#18 1.852   8450K .......... .......... .......... .......... .......... 22% 21.2M 4s
+#18 1.854   8500K .......... .......... .......... .......... .......... 22% 17.0M 4s
+#18 1.857   8550K .......... .......... .......... .......... .......... 22% 23.1M 4s
+#18 1.859   8600K .......... .......... .......... .......... .......... 23% 22.1M 4s
+#18 1.861   8650K .......... .......... .......... .......... .......... 23% 23.0M 4s
+#18 1.863   8700K .......... .......... .......... .......... .......... 23% 22.3M 4s
+#18 1.865   8750K .......... .......... .......... .......... .......... 23% 21.4M 4s
+#18 1.867   8800K .......... .......... .......... .......... .......... 23% 25.0M 4s
+#18 1.870   8850K .......... .......... .......... .......... .......... 23% 18.1M 4s
+#18 1.872   8900K .......... .......... .......... .......... .......... 23% 12.7M 4s
+#18 1.876   8950K .......... .......... .......... .......... .......... 24% 15.7M 4s
+#18 1.879   9000K .......... .......... .......... .......... .......... 24% 18.7M 4s
+#18 1.882   9050K .......... .......... .......... .......... .......... 24% 17.3M 4s
+#18 1.884   9100K .......... .......... .......... .......... .......... 24% 20.9M 4s
+#18 1.887   9150K .......... .......... .......... .......... .......... 24% 14.5M 4s
+#18 1.890   9200K .......... .......... .......... .......... .......... 24% 14.5M 4s
+#18 1.894   9250K .......... .......... .......... .......... .......... 24% 19.3M 4s
+#18 1.896   9300K .......... .......... .......... .......... .......... 25% 23.5M 4s
+#18 1.898   9350K .......... .......... .......... .......... .......... 25% 16.0M 4s
+#18 1.901   9400K .......... .......... .......... .......... .......... 25% 23.9M 4s
+#18 1.903   9450K .......... .......... .......... .......... .......... 25% 16.0M 4s
+#18 1.906   9500K .......... .......... .......... .......... .......... 25% 19.6M 4s
+#18 1.909   9550K .......... .......... .......... .......... .......... 25% 14.8M 4s
+#18 1.912   9600K .......... .......... .......... .......... .......... 25% 31.1M 4s
+#18 1.914   9650K .......... .......... .......... .......... .......... 25% 17.1M 4s
+#18 1.917   9700K .......... .......... .......... .......... .......... 26% 20.6M 4s
+#18 1.919   9750K .......... .......... .......... .......... .......... 26% 31.3M 4s
+#18 1.921   9800K .......... .......... .......... .......... .......... 26% 20.6M 4s
+#18 1.923   9850K .......... .......... .......... .......... .......... 26% 18.8M 4s
+#18 1.925   9900K .......... .......... .......... .......... .......... 26% 20.8M 4s
+#18 1.928   9950K .......... .......... .......... .......... .......... 26% 24.9M 4s
+#18 1.930  10000K .......... .......... .......... .......... .......... 26% 21.7M 4s
+#18 1.932  10050K .......... .......... .......... .......... .......... 27% 31.7M 4s
+#18 1.934  10100K .......... .......... .......... .......... .......... 27% 24.5M 4s
+#18 1.935  10150K .......... .......... .......... .......... .......... 27% 28.7M 4s
+#18 1.938  10200K .......... .......... .......... .......... .......... 27% 20.0M 4s
+#18 1.940  10250K .......... .......... .......... .......... .......... 27% 22.7M 4s
+#18 1.942  10300K .......... .......... .......... .......... .......... 27% 20.8M 4s
+#18 1.944  10350K .......... .......... .......... .......... .......... 27% 26.1M 4s
+#18 1.946  10400K .......... .......... .......... .......... .......... 27% 28.8M 4s
+#18 1.948  10450K .......... .......... .......... .......... .......... 28% 23.5M 4s
+#18 1.950  10500K .......... .......... .......... .......... .......... 28% 25.0M 4s
+#18 1.952  10550K .......... .......... .......... .......... .......... 28% 18.9M 3s
+#18 1.954  10600K .......... .......... .......... .......... .......... 28% 4.99M 3s
+#18 1.964  10650K .......... .......... .......... .......... .......... 28% 22.3M 3s
+#18 1.966  10700K .......... .......... .......... .......... .......... 28% 22.0M 3s
+#18 1.969  10750K .......... .......... .......... .......... .......... 28% 21.2M 3s
+#18 1.971  10800K .......... .......... .......... .......... .......... 29% 26.4M 3s
+#18 1.973  10850K .......... .......... .......... .......... .......... 29% 28.6M 3s
+#18 1.974  10900K .......... .......... .......... .......... .......... 29% 22.6M 3s
+#18 1.977  10950K .......... .......... .......... .......... .......... 29% 24.9M 3s
+#18 1.978  11000K .......... .......... .......... .......... .......... 29% 24.3M 3s
+#18 1.981  11050K .......... .......... .......... .......... .......... 29% 23.5M 3s
+#18 1.983  11100K .......... .......... .......... .......... .......... 29% 29.7M 3s
+#18 1.984  11150K .......... .......... .......... .......... .......... 29% 16.8M 3s
+#18 1.987  11200K .......... .......... .......... .......... .......... 30% 32.6M 3s
+#18 1.989  11250K .......... .......... .......... .......... .......... 30% 20.3M 3s
+#18 1.991  11300K .......... .......... .......... .......... .......... 30% 25.2M 3s
+#18 1.993  11350K .......... .......... .......... .......... .......... 30% 21.7M 3s
+#18 1.995  11400K .......... .......... .......... .......... .......... 30% 28.8M 3s
+#18 1.997  11450K .......... .......... .......... .......... .......... 30% 19.0M 3s
+#18 1.999  11500K .......... .......... .......... .......... .......... 30% 29.1M 3s
+#18 2.001  11550K .......... .......... .......... .......... .......... 31% 23.7M 3s
+#18 2.003  11600K .......... .......... .......... .......... .......... 31% 27.8M 3s
+#18 2.005  11650K .......... .......... .......... .......... .......... 31% 19.5M 3s
+#18 2.007  11700K .......... .......... .......... .......... .......... 31% 28.5M 3s
+#18 2.009  11750K .......... .......... .......... .......... .......... 31% 22.2M 3s
+#18 2.011  11800K .......... .......... .......... .......... .......... 31% 18.9M 3s
+#18 2.015  11850K .......... .......... .......... .......... .......... 31% 11.8M 3s
+#18 2.018  11900K .......... .......... .......... .......... .......... 31% 19.1M 3s
+#18 2.021  11950K .......... .......... .......... .......... .......... 32% 21.2M 3s
+#18 2.023  12000K .......... .......... .......... .......... .......... 32% 34.9M 3s
+#18 2.024  12050K .......... .......... .......... .......... .......... 32% 4.81M 3s
+#18 2.035  12100K .......... .......... .......... .......... .......... 32% 19.2M 3s
+#18 2.037  12150K .......... .......... .......... .......... .......... 32% 26.8M 3s
+#18 2.039  12200K .......... .......... .......... .......... .......... 32% 23.7M 3s
+#18 2.041  12250K .......... .......... .......... .......... .......... 32% 20.9M 3s
+#18 2.043  12300K .......... .......... .......... .......... .......... 33% 27.0M 3s
+#18 2.045  12350K .......... .......... .......... .......... .......... 33% 24.2M 3s
+#18 2.047  12400K .......... .......... .......... .......... .......... 33% 24.0M 3s
+#18 2.049  12450K .......... .......... .......... .......... .......... 33% 27.7M 3s
+#18 2.051  12500K .......... .......... .......... .......... .......... 33% 23.6M 3s
+#18 2.053  12550K .......... .......... .......... .......... .......... 33% 16.1M 3s
+#18 2.056  12600K .......... .......... .......... .......... .......... 33% 27.0M 3s
+#18 2.058  12650K .......... .......... .......... .......... .......... 33% 20.7M 3s
+#18 2.060  12700K .......... .......... .......... .......... .......... 34% 17.8M 3s
+#18 2.063  12750K .......... .......... .......... .......... .......... 34% 22.9M 3s
+#18 2.065  12800K .......... .......... .......... .......... .......... 34% 23.8M 3s
+#18 2.067  12850K .......... .......... .......... .......... .......... 34% 28.1M 3s
+#18 2.069  12900K .......... .......... .......... .......... .......... 34% 20.1M 3s
+#18 2.071  12950K .......... .......... .......... .......... .......... 34% 26.7M 3s
+#18 2.073  13000K .......... .......... .......... .......... .......... 34% 27.0M 3s
+#18 2.075  13050K .......... .......... .......... .......... .......... 35% 24.1M 3s
+#18 2.077  13100K .......... .......... .......... .......... .......... 35% 27.6M 3s
+#18 2.079  13150K .......... .......... .......... .......... .......... 35% 22.0M 3s
+#18 2.081  13200K .......... .......... .......... .......... .......... 35% 25.5M 3s
+#18 2.083  13250K .......... .......... .......... .......... .......... 35% 23.7M 3s
+#18 2.085  13300K .......... .......... .......... .......... .......... 35% 30.0M 3s
+#18 2.087  13350K .......... .......... .......... .......... .......... 35% 22.1M 3s
+#18 2.090  13400K .......... .......... .......... .......... .......... 35% 19.0M 3s
+#18 2.092  13450K .......... .......... .......... .......... .......... 36% 21.6M 3s
+#18 2.094  13500K .......... .......... .......... .......... .......... 36% 3.64M 3s
+#18 2.107  13550K .......... .......... .......... .......... .......... 36% 29.0M 3s
+#18 2.109  13600K .......... .......... .......... .......... .......... 36% 35.1M 3s
+#18 2.110  13650K .......... .......... .......... .......... .......... 36% 26.8M 3s
+#18 2.112  13700K .......... .......... .......... .......... .......... 36% 21.1M 3s
+#18 2.114  13750K .......... .......... .......... .......... .......... 36% 30.9M 3s
+#18 2.116  13800K .......... .......... .......... .......... .......... 37% 18.4M 3s
+#18 2.118  13850K .......... .......... .......... .......... .......... 37% 40.1M 3s
+#18 2.120  13900K .......... .......... .......... .......... .......... 37% 28.6M 3s
+#18 2.121  13950K .......... .......... .......... .......... .......... 37% 28.1M 3s
+#18 2.123  14000K .......... .......... .......... .......... .......... 37% 25.9M 3s
+#18 2.125  14050K .......... .......... .......... .......... .......... 37% 32.8M 3s
+#18 2.126  14100K .......... .......... .......... .......... .......... 37% 23.0M 3s
+#18 2.129  14150K .......... .......... .......... .......... .......... 37% 21.7M 3s
+#18 2.131  14200K .......... .......... .......... .......... .......... 38% 21.8M 3s
+#18 2.133  14250K .......... .......... .......... .......... .......... 38% 27.4M 3s
+#18 2.135  14300K .......... .......... .......... .......... .......... 38% 18.7M 3s
+#18 2.137  14350K .......... .......... .......... .......... .......... 38% 25.1M 2s
+#18 2.139  14400K .......... .......... .......... .......... .......... 38% 23.1M 2s
+#18 2.142  14450K .......... .......... .......... .......... .......... 38% 22.7M 2s
+#18 2.144  14500K .......... .......... .......... .......... .......... 38% 23.4M 2s
+#18 2.146  14550K .......... .......... .......... .......... .......... 39% 31.9M 2s
+#18 2.148  14600K .......... .......... .......... .......... .......... 39% 30.2M 2s
+#18 2.149  14650K .......... .......... .......... .......... .......... 39% 26.6M 2s
+#18 2.151  14700K .......... .......... .......... .......... .......... 39% 38.0M 2s
+#18 2.152  14750K .......... .......... .......... .......... .......... 39% 34.3M 2s
+#18 2.153  14800K .......... .......... .......... .......... .......... 39% 25.0M 2s
+#18 2.155  14850K .......... .......... .......... .......... .......... 39% 30.5M 2s
+#18 2.157  14900K .......... .......... .......... .......... .......... 39% 2.70M 2s
+#18 2.175  14950K .......... .......... .......... .......... .......... 40% 19.3M 2s
+#18 2.178  15000K .......... .......... .......... .......... .......... 40% 27.5M 2s
+#18 2.179  15050K .......... .......... .......... .......... .......... 40% 21.1M 2s
+#18 2.182  15100K .......... .......... .......... .......... .......... 40% 29.1M 2s
+#18 2.183  15150K .......... .......... .......... .......... .......... 40% 27.2M 2s
+#18 2.186  15200K .......... .......... .......... .......... .......... 40% 21.9M 2s
+#18 2.187  15250K .......... .......... .......... .......... .......... 40% 31.3M 2s
+#18 2.189  15300K .......... .......... .......... .......... .......... 41% 25.6M 2s
+#18 2.191  15350K .......... .......... .......... .......... .......... 41% 37.9M 2s
+#18 2.192  15400K .......... .......... .......... .......... .......... 41% 24.8M 2s
+#18 2.194  15450K .......... .......... .......... .......... .......... 41% 25.8M 2s
+#18 2.196  15500K .......... .......... .......... .......... .......... 41% 29.6M 2s
+#18 2.198  15550K .......... .......... .......... .......... .......... 41% 27.3M 2s
+#18 2.199  15600K .......... .......... .......... .......... .......... 41% 29.4M 2s
+#18 2.201  15650K .......... .......... .......... .......... .......... 41% 29.9M 2s
+#18 2.203  15700K .......... .......... .......... .......... .......... 42% 29.4M 2s
+#18 2.204  15750K .......... .......... .......... .......... .......... 42% 34.3M 2s
+#18 2.206  15800K .......... .......... .......... .......... .......... 42% 29.8M 2s
+#18 2.207  15850K .......... .......... .......... .......... .......... 42% 28.4M 2s
+#18 2.209  15900K .......... .......... .......... .......... .......... 42% 28.4M 2s
+#18 2.211  15950K .......... .......... .......... .......... .......... 42% 32.5M 2s
+#18 2.212  16000K .......... .......... .......... .......... .......... 42% 32.7M 2s
+#18 2.214  16050K .......... .......... .......... .......... .......... 43% 31.0M 2s
+#18 2.215  16100K .......... .......... .......... .......... .......... 43% 27.1M 2s
+#18 2.217  16150K .......... .......... .......... .......... .......... 43% 27.6M 2s
+#18 2.219  16200K .......... .......... .......... .......... .......... 43% 26.8M 2s
+#18 2.221  16250K .......... .......... .......... .......... .......... 43% 22.3M 2s
+#18 2.223  16300K .......... .......... .......... .......... .......... 43% 28.1M 2s
+#18 2.225  16350K .......... .......... .......... .......... .......... 43% 29.7M 2s
+#18 2.226  16400K .......... .......... .......... .......... .......... 43% 24.1M 2s
+#18 2.228  16450K .......... .......... .......... .......... .......... 44% 2.33M 2s
+#18 2.250  16500K .......... .......... .......... .......... .......... 44% 30.9M 2s
+#18 2.251  16550K .......... .......... .......... .......... .......... 44% 27.2M 2s
+#18 2.253  16600K .......... .......... .......... .......... .......... 44% 23.3M 2s
+#18 2.255  16650K .......... .......... .......... .......... .......... 44% 18.9M 2s
+#18 2.258  16700K .......... .......... .......... .......... .......... 44% 23.7M 2s
+#18 2.259  16750K .......... .......... .......... .......... .......... 44% 34.7M 2s
+#18 2.261  16800K .......... .......... .......... .......... .......... 45% 26.5M 2s
+#18 2.263  16850K .......... .......... .......... .......... .......... 45% 28.9M 2s
+#18 2.264  16900K .......... .......... .......... .......... .......... 45% 20.8M 2s
+#18 2.267  16950K .......... .......... .......... .......... .......... 45% 27.7M 2s
+#18 2.269  17000K .......... .......... .......... .......... .......... 45% 28.5M 2s
+#18 2.270  17050K .......... .......... .......... .......... .......... 45% 33.2M 2s
+#18 2.272  17100K .......... .......... .......... .......... .......... 45% 23.1M 2s
+#18 2.274  17150K .......... .......... .......... .......... .......... 45% 20.1M 2s
+#18 2.276  17200K .......... .......... .......... .......... .......... 46% 26.7M 2s
+#18 2.278  17250K .......... .......... .......... .......... .......... 46% 27.1M 2s
+#18 2.280  17300K .......... .......... .......... .......... .......... 46% 18.6M 2s
+#18 2.283  17350K .......... .......... .......... .......... .......... 46% 21.8M 2s
+#18 2.285  17400K .......... .......... .......... .......... .......... 46% 22.5M 2s
+#18 2.287  17450K .......... .......... .......... .......... .......... 46% 33.5M 2s
+#18 2.288  17500K .......... .......... .......... .......... .......... 46% 22.2M 2s
+#18 2.291  17550K .......... .......... .......... .......... .......... 47% 29.4M 2s
+#18 2.292  17600K .......... .......... .......... .......... .......... 47% 28.5M 2s
+#18 2.294  17650K .......... .......... .......... .......... .......... 47% 23.9M 2s
+#18 2.296  17700K .......... .......... .......... .......... .......... 47% 34.7M 2s
+#18 2.297  17750K .......... .......... .......... .......... .......... 47% 14.0M 2s
+#18 2.301  17800K .......... .......... .......... .......... .......... 47%  130M 2s
+#18 2.301  17850K .......... .......... .......... .......... .......... 47% 23.6M 2s
+#18 2.303  17900K .......... .......... .......... .......... .......... 48% 2.84M 2s
+#18 2.321  17950K .......... .......... .......... .......... .......... 48% 21.9M 2s
+#18 2.323  18000K .......... .......... .......... .......... .......... 48% 29.9M 2s
+#18 2.324  18050K .......... .......... .......... .......... .......... 48% 31.2M 2s
+#18 2.326  18100K .......... .......... .......... .......... .......... 48% 23.3M 2s
+#18 2.328  18150K .......... .......... .......... .......... .......... 48% 21.2M 2s
+#18 2.330  18200K .......... .......... .......... .......... .......... 48% 27.9M 2s
+#18 2.332  18250K .......... .......... .......... .......... .......... 48% 24.6M 2s
+#18 2.334  18300K .......... .......... .......... .......... .......... 49% 22.7M 2s
+#18 2.336  18350K .......... .......... .......... .......... .......... 49% 25.8M 2s
+#18 2.338  18400K .......... .......... .......... .......... .......... 49% 24.4M 2s
+#18 2.341  18450K .......... .......... .......... .......... .......... 49% 25.7M 2s
+#18 2.342  18500K .......... .......... .......... .......... .......... 49% 28.0M 2s
+#18 2.344  18550K .......... .......... .......... .......... .......... 49% 30.2M 2s
+#18 2.345  18600K .......... .......... .......... .......... .......... 49% 28.0M 2s
+#18 2.347  18650K .......... .......... .......... .......... .......... 50% 28.0M 2s
+#18 2.349  18700K .......... .......... .......... .......... .......... 50% 24.6M 2s
+#18 2.351  18750K .......... .......... .......... .......... .......... 50% 27.2M 2s
+#18 2.353  18800K .......... .......... .......... .......... .......... 50% 18.7M 2s
+#18 2.355  18850K .......... .......... .......... .......... .......... 50% 87.2M 2s
+#18 2.356  18900K .......... .......... .......... .......... .......... 50% 29.8M 2s
+#18 2.358  18950K .......... .......... .......... .......... .......... 50% 24.3M 2s
+#18 2.359  19000K .......... .......... .......... .......... .......... 50% 27.8M 2s
+#18 2.361  19050K .......... .......... .......... .......... .......... 51% 31.5M 2s
+#18 2.363  19100K .......... .......... .......... .......... .......... 51% 27.5M 2s
+#18 2.365  19150K .......... .......... .......... .......... .......... 51% 30.8M 2s
+#18 2.366  19200K .......... .......... .......... .......... .......... 51% 24.6M 2s
+#18 2.368  19250K .......... .......... .......... .......... .......... 51% 32.7M 2s
+#18 2.370  19300K .......... .......... .......... .......... .......... 51% 26.5M 2s
+#18 2.371  19350K .......... .......... .......... .......... .......... 51% 2.59M 2s
+#18 2.390  19400K .......... .......... .......... .......... .......... 52% 27.5M 2s
+#18 2.392  19450K .......... .......... .......... .......... .......... 52% 31.3M 2s
+#18 2.394  19500K .......... .......... .......... .......... .......... 52% 26.4M 2s
+#18 2.396  19550K .......... .......... .......... .......... .......... 52% 28.4M 2s
+#18 2.398  19600K .......... .......... .......... .......... .......... 52% 26.6M 2s
+#18 2.399  19650K .......... .......... .......... .......... .......... 52% 25.7M 2s
+#18 2.401  19700K .......... .......... .......... .......... .......... 52% 28.4M 2s
+#18 2.403  19750K .......... .......... .......... .......... .......... 52% 24.8M 2s
+#18 2.405  19800K .......... .......... .......... .......... .......... 53% 24.0M 2s
+#18 2.407  19850K .......... .......... .......... .......... .......... 53% 30.0M 2s
+#18 2.408  19900K .......... .......... .......... .......... .......... 53% 34.1M 2s
+#18 2.410  19950K .......... .......... .......... .......... .......... 53% 22.7M 2s
+#18 2.412  20000K .......... .......... .......... .......... .......... 53% 25.1M 2s
+#18 2.414  20050K .......... .......... .......... .......... .......... 53% 30.3M 2s
+#18 2.415  20100K .......... .......... .......... .......... .......... 53% 28.1M 2s
+#18 2.417  20150K .......... .......... .......... .......... .......... 54% 30.0M 2s
+#18 2.419  20200K .......... .......... .......... .......... .......... 54% 24.1M 2s
+#18 2.421  20250K .......... .......... .......... .......... .......... 54% 30.3M 2s
+#18 2.423  20300K .......... .......... .......... .......... .......... 54% 31.1M 2s
+#18 2.424  20350K .......... .......... .......... .......... .......... 54% 25.6M 2s
+#18 2.426  20400K .......... .......... .......... .......... .......... 54% 25.3M 2s
+#18 2.428  20450K .......... .......... .......... .......... .......... 54% 34.5M 2s
+#18 2.429  20500K .......... .......... .......... .......... .......... 54% 26.7M 2s
+#18 2.432  20550K .......... .......... .......... .......... .......... 55% 23.2M 2s
+#18 2.433  20600K .......... .......... .......... .......... .......... 55% 37.1M 2s
+#18 2.435  20650K .......... .......... .......... .......... .......... 55% 29.3M 2s
+#18 2.437  20700K .......... .......... .......... .......... .......... 55% 21.2M 1s
+#18 2.439  20750K .......... .......... .......... .......... .......... 55% 28.3M 1s
+#18 2.440  20800K .......... .......... .......... .......... .......... 55% 28.5M 1s
+#18 2.442  20850K .......... .......... .......... .......... .......... 55% 2.35M 1s
+#18 2.463  20900K .......... .......... .......... .......... .......... 56% 31.2M 1s
+#18 2.464  20950K .......... .......... .......... .......... .......... 56% 28.4M 1s
+#18 2.466  21000K .......... .......... .......... .......... .......... 56% 24.8M 1s
+#18 2.468  21050K .......... .......... .......... .......... .......... 56% 28.7M 1s
+#18 2.470  21100K .......... .......... .......... .......... .......... 56% 24.9M 1s
+#18 2.472  21150K .......... .......... .......... .......... .......... 56% 34.5M 1s
+#18 2.473  21200K .......... .......... .......... .......... .......... 56% 22.8M 1s
+#18 2.475  21250K .......... .......... .......... .......... .......... 56% 34.3M 1s
+#18 2.477  21300K .......... .......... .......... .......... .......... 57% 26.3M 1s
+#18 2.478  21350K .......... .......... .......... .......... .......... 57% 26.3M 1s
+#18 2.480  21400K .......... .......... .......... .......... .......... 57% 36.8M 1s
+#18 2.482  21450K .......... .......... .......... .......... .......... 57% 25.2M 1s
+#18 2.484  21500K .......... .......... .......... .......... .......... 57% 27.6M 1s
+#18 2.485  21550K .......... .......... .......... .......... .......... 57% 29.8M 1s
+#18 2.487  21600K .......... .......... .......... .......... .......... 57% 26.6M 1s
+#18 2.489  21650K .......... .......... .......... .......... .......... 58% 33.8M 1s
+#18 2.490  21700K .......... .......... .......... .......... .......... 58% 26.2M 1s
+#18 2.492  21750K .......... .......... .......... .......... .......... 58% 38.7M 1s
+#18 2.494  21800K .......... .......... .......... .......... .......... 58% 23.9M 1s
+#18 2.495  21850K .......... .......... .......... .......... .......... 58% 29.1M 1s
+#18 2.497  21900K .......... .......... .......... .......... .......... 58% 32.2M 1s
+#18 2.499  21950K .......... .......... .......... .......... .......... 58% 20.7M 1s
+#18 2.501  22000K .......... .......... .......... .......... .......... 58% 36.5M 1s
+#18 2.502  22050K .......... .......... .......... .......... .......... 59% 27.5M 1s
+#18 2.504  22100K .......... .......... .......... .......... .......... 59% 26.7M 1s
+#18 2.506  22150K .......... .......... .......... .......... .......... 59% 34.4M 1s
+#18 2.507  22200K .......... .......... .......... .......... .......... 59% 32.2M 1s
+#18 2.509  22250K .......... .......... .......... .......... .......... 59% 27.4M 1s
+#18 2.511  22300K .......... .......... .......... .......... .......... 59% 23.9M 1s
+#18 2.513  22350K .......... .......... .......... .......... .......... 59% 2.36M 1s
+#18 2.534  22400K .......... .......... .......... .......... .......... 60% 24.4M 1s
+#18 2.535  22450K .......... .......... .......... .......... .......... 60% 30.7M 1s
+#18 2.537  22500K .......... .......... .......... .......... .......... 60% 25.7M 1s
+#18 2.539  22550K .......... .......... .......... .......... .......... 60% 24.7M 1s
+#18 2.541  22600K .......... .......... .......... .......... .......... 60% 29.2M 1s
+#18 2.543  22650K .......... .......... .......... .......... .......... 60% 22.9M 1s
+#18 2.545  22700K .......... .......... .......... .......... .......... 60% 22.8M 1s
+#18 2.547  22750K .......... .......... .......... .......... .......... 60% 29.9M 1s
+#18 2.548  22800K .......... .......... .......... .......... .......... 61% 30.6M 1s
+#18 2.550  22850K .......... .......... .......... .......... .......... 61% 25.3M 1s
+#18 2.552  22900K .......... .......... .......... .......... .......... 61% 24.9M 1s
+#18 2.554  22950K .......... .......... .......... .......... .......... 61% 29.1M 1s
+#18 2.556  23000K .......... .......... .......... .......... .......... 61% 26.8M 1s
+#18 2.557  23050K .......... .......... .......... .......... .......... 61% 19.4M 1s
+#18 2.560  23100K .......... .......... .......... .......... .......... 61% 21.4M 1s
+#18 2.562  23150K .......... .......... .......... .......... .......... 62% 26.1M 1s
+#18 2.564  23200K .......... .......... .......... .......... .......... 62% 24.6M 1s
+#18 2.566  23250K .......... .......... .......... .......... .......... 62% 35.0M 1s
+#18 2.567  23300K .......... .......... .......... .......... .......... 62% 37.3M 1s
+#18 2.569  23350K .......... .......... .......... .......... .......... 62% 27.9M 1s
+#18 2.571  23400K .......... .......... .......... .......... .......... 62% 22.4M 1s
+#18 2.573  23450K .......... .......... .......... .......... .......... 62% 41.1M 1s
+#18 2.574  23500K .......... .......... .......... .......... .......... 62% 25.7M 1s
+#18 2.576  23550K .......... .......... .......... .......... .......... 63% 25.9M 1s
+#18 2.578  23600K .......... .......... .......... .......... .......... 63% 28.2M 1s
+#18 2.579  23650K .......... .......... .......... .......... .......... 63% 34.0M 1s
+#18 2.581  23700K .......... .......... .......... .......... .......... 63% 26.7M 1s
+#18 2.583  23750K .......... .......... .......... .......... .......... 63% 27.6M 1s
+#18 2.584  23800K .......... .......... .......... .......... .......... 63% 2.45M 1s
+#18 2.604  23850K .......... .......... .......... .......... .......... 63% 24.7M 1s
+#18 2.606  23900K .......... .......... .......... .......... .......... 64% 31.2M 1s
+#18 2.608  23950K .......... .......... .......... .......... .......... 64% 28.9M 1s
+#18 2.610  24000K .......... .......... .......... .......... .......... 64% 27.2M 1s
+#18 2.611  24050K .......... .......... .......... .......... .......... 64% 23.3M 1s
+#18 2.613  24100K .......... .......... .......... .......... .......... 64% 27.0M 1s
+#18 2.615  24150K .......... .......... .......... .......... .......... 64% 25.7M 1s
+#18 2.617  24200K .......... .......... .......... .......... .......... 64% 39.6M 1s
+#18 2.618  24250K .......... .......... .......... .......... .......... 64% 28.7M 1s
+#18 2.620  24300K .......... .......... .......... .......... .......... 65% 25.5M 1s
+#18 2.622  24350K .......... .......... .......... .......... .......... 65% 27.9M 1s
+#18 2.624  24400K .......... .......... .......... .......... .......... 65% 31.3M 1s
+#18 2.625  24450K .......... .......... .......... .......... .......... 65% 28.9M 1s
+#18 2.627  24500K .......... .......... .......... .......... .......... 65% 29.0M 1s
+#18 2.629  24550K .......... .......... .......... .......... .......... 65% 26.4M 1s
+#18 2.631  24600K .......... .......... .......... .......... .......... 65% 38.8M 1s
+#18 2.632  24650K .......... .......... .......... .......... .......... 66% 29.4M 1s
+#18 2.633  24700K .......... .......... .......... .......... .......... 66% 30.1M 1s
+#18 2.635  24750K .......... .......... .......... .......... .......... 66% 25.3M 1s
+#18 2.637  24800K .......... .......... .......... .......... .......... 66% 28.8M 1s
+#18 2.639  24850K .......... .......... .......... .......... .......... 66% 29.0M 1s
+#18 2.640  24900K .......... .......... .......... .......... .......... 66% 29.3M 1s
+#18 2.642  24950K .......... .......... .......... .......... .......... 66% 25.1M 1s
+#18 2.644  25000K .......... .......... .......... .......... .......... 66% 27.6M 1s
+#18 2.646  25050K .......... .......... .......... .......... .......... 67% 33.0M 1s
+#18 2.647  25100K .......... .......... .......... .......... .......... 67% 25.1M 1s
+#18 2.649  25150K .......... .......... .......... .......... .......... 67% 26.0M 1s
+#18 2.651  25200K .......... .......... .......... .......... .......... 67% 2.21M 1s
+#18 2.673  25250K .......... .......... .......... .......... .......... 67% 26.2M 1s
+#18 2.675  25300K .......... .......... .......... .......... .......... 67% 34.6M 1s
+#18 2.677  25350K .......... .......... .......... .......... .......... 67% 23.6M 1s
+#18 2.679  25400K .......... .......... .......... .......... .......... 68% 32.3M 1s
+#18 2.680  25450K .......... .......... .......... .......... .......... 68% 27.5M 1s
+#18 2.682  25500K .......... .......... .......... .......... .......... 68% 27.0M 1s
+#18 2.684  25550K .......... .......... .......... .......... .......... 68% 32.2M 1s
+#18 2.685  25600K .......... .......... .......... .......... .......... 68% 21.6M 1s
+#18 2.687  25650K .......... .......... .......... .......... .......... 68% 50.1M 1s
+#18 2.688  25700K .......... .......... .......... .......... .......... 68% 24.8M 1s
+#18 2.690  25750K .......... .......... .......... .......... .......... 68% 26.7M 1s
+#18 2.692  25800K .......... .......... .......... .......... .......... 69% 21.5M 1s
+#18 2.694  25850K .......... .......... .......... .......... .......... 69% 26.9M 1s
+#18 2.696  25900K .......... .......... .......... .......... .......... 69% 30.3M 1s
+#18 2.698  25950K .......... .......... .......... .......... .......... 69% 29.7M 1s
+#18 2.700  26000K .......... .......... .......... .......... .......... 69% 27.6M 1s
+#18 2.701  26050K .......... .......... .......... .......... .......... 69% 33.8M 1s
+#18 2.703  26100K .......... .......... .......... .......... .......... 69% 25.5M 1s
+#18 2.705  26150K .......... .......... .......... .......... .......... 70% 29.9M 1s
+#18 2.706  26200K .......... .......... .......... .......... .......... 70% 27.8M 1s
+#18 2.708  26250K .......... .......... .......... .......... .......... 70% 30.3M 1s
+#18 2.710  26300K .......... .......... .......... .......... .......... 70% 31.2M 1s
+#18 2.711  26350K .......... .......... .......... .......... .......... 70% 28.7M 1s
+#18 2.713  26400K .......... .......... .......... .......... .......... 70% 30.9M 1s
+#18 2.715  26450K .......... .......... .......... .......... .......... 70% 37.8M 1s
+#18 2.716  26500K .......... .......... .......... .......... .......... 71% 28.8M 1s
+#18 2.718  26550K .......... .......... .......... .......... .......... 71% 27.8M 1s
+#18 2.719  26600K .......... .......... .......... .......... .......... 71% 34.4M 1s
+#18 2.721  26650K .......... .......... .......... .......... .......... 71% 2.22M 1s
+#18 2.743  26700K .......... .......... .......... .......... .......... 71% 20.1M 1s
+#18 2.745  26750K .......... .......... .......... .......... .......... 71% 37.3M 1s
+#18 2.746  26800K .......... .......... .......... .......... .......... 71% 29.0M 1s
+#18 2.748  26850K .......... .......... .......... .......... .......... 71% 26.6M 1s
+#18 2.750  26900K .......... .......... .......... .......... .......... 72% 28.1M 1s
+#18 2.752  26950K .......... .......... .......... .......... .......... 72% 21.3M 1s
+#18 2.754  27000K .......... .......... .......... .......... .......... 72% 25.8M 1s
+#18 2.756  27050K .......... .......... .......... .......... .......... 72% 12.4M 1s
+#18 2.760  27100K .......... .......... .......... .......... .......... 72% 18.1M 1s
+#18 2.762  27150K .......... .......... .......... .......... .......... 72% 18.3M 1s
+#18 2.765  27200K .......... .......... .......... .......... .......... 72% 15.2M 1s
+#18 2.768  27250K .......... .......... .......... .......... .......... 73% 26.5M 1s
+#18 2.770  27300K .......... .......... .......... .......... .......... 73% 16.4M 1s
+#18 2.773  27350K .......... .......... .......... .......... .......... 73% 10.1M 1s
+#18 2.778  27400K .......... .......... .......... .......... .......... 73% 8.40M 1s
+#18 2.784  27450K .......... .......... .......... .......... .......... 73% 14.0M 1s
+#18 2.787  27500K .......... .......... .......... .......... .......... 73% 12.2M 1s
+#18 2.791  27550K .......... .......... .......... .......... .......... 73% 11.2M 1s
+#18 2.796  27600K .......... .......... .......... .......... .......... 73% 12.7M 1s
+#18 2.800  27650K .......... .......... .......... .......... .......... 74% 12.3M 1s
+#18 2.803  27700K .......... .......... .......... .......... .......... 74% 12.4M 1s
+#18 2.807  27750K .......... .......... .......... .......... .......... 74% 15.5M 1s
+#18 2.811  27800K .......... .......... .......... .......... .......... 74% 17.5M 1s
+#18 2.813  27850K .......... .......... .......... .......... .......... 74% 18.6M 1s
+#18 2.817  27900K .......... .......... .......... .......... .......... 74% 22.2M 1s
+#18 2.818  27950K .......... .......... .......... .......... .......... 74% 21.9M 1s
+#18 2.820  28000K .......... .......... .......... .......... .......... 75% 17.3M 1s
+#18 2.823  28050K .......... .......... .......... .......... .......... 75% 15.0M 1s
+#18 2.827  28100K .......... .......... .......... .......... .......... 75% 12.9M 1s
+#18 2.830  28150K .......... .......... .......... .......... .......... 75% 35.4M 1s
+#18 2.832  28200K .......... .......... .......... .......... .......... 75% 33.4M 1s
+#18 2.833  28250K .......... .......... .......... .......... .......... 75% 47.5M 1s
+#18 2.834  28300K .......... .......... .......... .......... .......... 75% 42.6M 1s
+#18 2.835  28350K .......... .......... .......... .......... .......... 75% 45.1M 1s
+#18 2.836  28400K .......... .......... .......... .......... .......... 76% 40.5M 1s
+#18 2.838  28450K .......... .......... .......... .......... .......... 76% 39.0M 1s
+#18 2.839  28500K .......... .......... .......... .......... .......... 76% 41.8M 1s
+#18 2.840  28550K .......... .......... .......... .......... .......... 76% 58.7M 1s
+#18 2.841  28600K .......... .......... .......... .......... .......... 76% 54.0M 1s
+#18 2.842  28650K .......... .......... .......... .......... .......... 76% 47.0M 1s
+#18 2.843  28700K .......... .......... .......... .......... .......... 76% 41.8M 1s
+#18 2.844  28750K .......... .......... .......... .......... .......... 77% 47.5M 1s
+#18 2.845  28800K .......... .......... .......... .......... .......... 77% 60.4M 1s
+#18 2.846  28850K .......... .......... .......... .......... .......... 77% 36.0M 1s
+#18 2.847  28900K .......... .......... .......... .......... .......... 77% 34.7M 1s
+#18 2.849  28950K .......... .......... .......... .......... .......... 77% 37.3M 1s
+#18 2.850  29000K .......... .......... .......... .......... .......... 77% 8.12M 1s
+#18 2.856  29050K .......... .......... .......... .......... .......... 77% 18.1M 1s
+#18 2.859  29100K .......... .......... .......... .......... .......... 77% 37.9M 1s
+#18 2.860  29150K .......... .......... .......... .......... .......... 78% 31.0M 1s
+#18 2.861  29200K .......... .......... .......... .......... .......... 78% 49.2M 1s
+#18 2.863  29250K .......... .......... .......... .......... .......... 78% 32.7M 1s
+#18 2.864  29300K .......... .......... .......... .......... .......... 78% 32.4M 1s
+#18 2.866  29350K .......... .......... .......... .......... .......... 78% 24.0M 1s
+#18 2.868  29400K .......... .......... .......... .......... .......... 78% 24.2M 1s
+#18 2.870  29450K .......... .......... .......... .......... .......... 78% 29.9M 1s
+#18 2.871  29500K .......... .......... .......... .......... .......... 79% 17.0M 1s
+#18 2.874  29550K .......... .......... .......... .......... .......... 79% 18.0M 1s
+#18 2.877  29600K .......... .......... .......... .......... .......... 79% 23.8M 1s
+#18 2.879  29650K .......... .......... .......... .......... .......... 79% 22.2M 1s
+#18 2.882  29700K .......... .......... .......... .......... .......... 79% 17.3M 1s
+#18 2.884  29750K .......... .......... .......... .......... .......... 79% 22.8M 1s
+#18 2.886  29800K .......... .......... .......... .......... .......... 79% 21.5M 1s
+#18 2.888  29850K .......... .......... .......... .......... .......... 79% 17.8M 1s
+#18 2.891  29900K .......... .......... .......... .......... .......... 80% 21.6M 1s
+#18 2.894  29950K .......... .......... .......... .......... .......... 80% 20.3M 1s
+#18 2.896  30000K .......... .......... .......... .......... .......... 80% 3.43M 1s
+#18 2.910  30050K .......... .......... .......... .......... .......... 80% 33.8M 1s
+#18 2.911  30100K .......... .......... .......... .......... .......... 80% 21.1M 1s
+#18 2.914  30150K .......... .......... .......... .......... .......... 80% 27.2M 1s
+#18 2.915  30200K .......... .......... .......... .......... .......... 80% 24.1M 1s
+#18 2.917  30250K .......... .......... .......... .......... .......... 81% 22.2M 1s
+#18 2.920  30300K .......... .......... .......... .......... .......... 81% 22.3M 1s
+#18 2.922  30350K .......... .......... .......... .......... .......... 81% 22.5M 1s
+#18 2.925  30400K .......... .......... .......... .......... .......... 81% 19.9M 1s
+#18 2.927  30450K .......... .......... .......... .......... .......... 81% 19.1M 1s
+#18 2.929  30500K .......... .......... .......... .......... .......... 81% 19.5M 1s
+#18 2.932  30550K .......... .......... .......... .......... .......... 81% 16.7M 1s
+#18 2.934  30600K .......... .......... .......... .......... .......... 81% 20.5M 1s
+#18 2.937  30650K .......... .......... .......... .......... .......... 82% 23.7M 1s
+#18 2.939  30700K .......... .......... .......... .......... .......... 82% 19.5M 1s
+#18 2.941  30750K .......... .......... .......... .......... .......... 82% 20.4M 1s
+#18 2.944  30800K .......... .......... .......... .......... .......... 82% 20.8M 1s
+#18 2.946  30850K .......... .......... .......... .......... .......... 82% 21.6M 0s
+#18 2.948  30900K .......... .......... .......... .......... .......... 82% 18.8M 0s
+#18 2.951  30950K .......... .......... .......... .......... .......... 82% 20.8M 0s
+#18 2.953  31000K .......... .......... .......... .......... .......... 83% 20.2M 0s
+#18 2.956  31050K .......... .......... .......... .......... .......... 83% 18.8M 0s
+#18 2.958  31100K .......... .......... .......... .......... .......... 83% 22.2M 0s
+#18 2.961  31150K .......... .......... .......... .......... .......... 83% 33.7M 0s
+#18 2.962  31200K .......... .......... .......... .......... .......... 83% 40.1M 0s
+#18 2.963  31250K .......... .......... .......... .......... .......... 83% 29.6M 0s
+#18 2.965  31300K .......... .......... .......... .......... .......... 83% 31.5M 0s
+#18 2.966  31350K .......... .......... .......... .......... .......... 83% 40.9M 0s
+#18 2.968  31400K .......... .......... .......... .......... .......... 84% 31.0M 0s
+#18 2.969  31450K .......... .......... .......... .......... .......... 84% 5.63M 0s
+#18 2.978  31500K .......... .......... .......... .......... .......... 84% 30.3M 0s
+#18 2.979  31550K .......... .......... .......... .......... .......... 84% 30.6M 0s
+#18 2.981  31600K .......... .......... .......... .......... .......... 84% 33.2M 0s
+#18 2.983  31650K .......... .......... .......... .......... .......... 84% 35.9M 0s
+#18 2.984  31700K .......... .......... .......... .......... .......... 84% 27.8M 0s
+#18 2.986  31750K .......... .......... .......... .......... .......... 85% 28.5M 0s
+#18 2.987  31800K .......... .......... .......... .......... .......... 85% 34.3M 0s
+#18 2.990  31850K .......... .......... .......... .......... .......... 85% 36.4M 0s
+#18 2.990  31900K .......... .......... .......... .......... .......... 85% 34.5M 0s
+#18 2.992  31950K .......... .......... .......... .......... .......... 85% 28.4M 0s
+#18 2.993  32000K .......... .......... .......... .......... .......... 85% 23.4M 0s
+#18 2.995  32050K .......... .......... .......... .......... .......... 85% 13.9M 0s
+#18 2.999  32100K .......... .......... .......... .......... .......... 85% 14.6M 0s
+#18 3.002  32150K .......... .......... .......... .......... .......... 86% 24.6M 0s
+#18 3.004  32200K .......... .......... .......... .......... .......... 86% 33.4M 0s
+#18 3.006  32250K .......... .......... .......... .......... .......... 86% 13.7M 0s
+#18 3.009  32300K .......... .......... .......... .......... .......... 86% 53.1M 0s
+#18 3.010  32350K .......... .......... .......... .......... .......... 86% 43.5M 0s
+#18 3.011  32400K .......... .......... .......... .......... .......... 86% 48.4M 0s
+#18 3.012  32450K .......... .......... .......... .......... .......... 86% 64.3M 0s
+#18 3.013  32500K .......... .......... .......... .......... .......... 87% 23.9M 0s
+#18 3.015  32550K .......... .......... .......... .......... .......... 87%  225M 0s
+#18 3.015  32600K .......... .......... .......... .......... .......... 87%  216M 0s
+#18 3.016  32650K .......... .......... .......... .......... .......... 87%  243M 0s
+#18 3.016  32700K .......... .......... .......... .......... .......... 87%  193M 0s
+#18 3.016  32750K .......... .......... .......... .......... .......... 87%  243M 0s
+#18 3.016  32800K .......... .......... .......... .......... .......... 87%  238M 0s
+#18 3.016  32850K .......... .......... .......... .......... .......... 87%  219M 0s
+#18 3.017  32900K .......... .......... .......... .......... .......... 88%  216M 0s
+#18 3.017  32950K .......... .......... .......... .......... .......... 88%  194M 0s
+#18 3.017  33000K .......... .......... .......... .......... .......... 88% 1.30M 0s
+#18 3.055  33050K .......... .......... .......... .......... .......... 88% 54.0M 0s
+#18 3.056  33100K .......... .......... .......... .......... .......... 88% 67.1M 0s
+#18 3.056  33150K .......... .......... .......... .......... .......... 88% 74.5M 0s
+#18 3.057  33200K .......... .......... .......... .......... .......... 88% 80.3M 0s
+#18 3.058  33250K .......... .......... .......... .......... .......... 89%  130M 0s
+#18 3.058  33300K .......... .......... .......... .......... .......... 89% 68.6M 0s
+#18 3.059  33350K .......... .......... .......... .......... .......... 89% 70.9M 0s
+#18 3.059  33400K .......... .......... .......... .......... .......... 89% 95.8M 0s
+#18 3.060  33450K .......... .......... .......... .......... .......... 89%  122M 0s
+#18 3.060  33500K .......... .......... .......... .......... .......... 89% 93.5M 0s
+#18 3.061  33550K .......... .......... .......... .......... .......... 89%  138M 0s
+#18 3.061  33600K .......... .......... .......... .......... .......... 89%  206M 0s
+#18 3.061  33650K .......... .......... .......... .......... .......... 90%  174M 0s
+#18 3.062  33700K .......... .......... .......... .......... .......... 90%  142M 0s
+#18 3.062  33750K .......... .......... .......... .......... .......... 90%  205M 0s
+#18 3.062  33800K .......... .......... .......... .......... .......... 90%  195M 0s
+#18 3.062  33850K .......... .......... .......... .......... .......... 90%  181M 0s
+#18 3.063  33900K .......... .......... .......... .......... .......... 90%  180M 0s
+#18 3.063  33950K .......... .......... .......... .......... .......... 90%  208M 0s
+#18 3.063  34000K .......... .......... .......... .......... .......... 91%  207M 0s
+#18 3.063  34050K .......... .......... .......... .......... .......... 91%  172M 0s
+#18 3.064  34100K .......... .......... .......... .......... .......... 91%  175M 0s
+#18 3.064  34150K .......... .......... .......... .......... .......... 91% 80.4M 0s
+#18 3.065  34200K .......... .......... .......... .......... .......... 91% 72.5M 0s
+#18 3.065  34250K .......... .......... .......... .......... .......... 91% 73.2M 0s
+#18 3.066  34300K .......... .......... .......... .......... .......... 91% 75.3M 0s
+#18 3.067  34350K .......... .......... .......... .......... .......... 91% 84.2M 0s
+#18 3.067  34400K .......... .......... .......... .......... .......... 92%  232M 0s
+#18 3.067  34450K .......... .......... .......... .......... .......... 92%  218M 0s
+#18 3.068  34500K .......... .......... .......... .......... .......... 92%  948K 0s
+#18 3.121  34550K .......... .......... .......... .......... .......... 92%  102M 0s
+#18 3.121  34600K .......... .......... .......... .......... .......... 92% 22.3M 0s
+#18 3.123  34650K .......... .......... .......... .......... .......... 92% 99.1M 0s
+#18 3.124  34700K .......... .......... .......... .......... .......... 92% 86.7M 0s
+#18 3.124  34750K .......... .......... .......... .......... .......... 93% 92.2M 0s
+#18 3.125  34800K .......... .......... .......... .......... .......... 93%  104M 0s
+#18 3.125  34850K .......... .......... .......... .......... .......... 93% 82.5M 0s
+#18 3.126  34900K .......... .......... .......... .......... .......... 93% 86.7M 0s
+#18 3.127  34950K .......... .......... .......... .......... .......... 93%  158M 0s
+#18 3.127  35000K .......... .......... .......... .......... .......... 93%  192M 0s
+#18 3.127  35050K .......... .......... .......... .......... .......... 93% 85.8M 0s
+#18 3.128  35100K .......... .......... .......... .......... .......... 94%  110M 0s
+#18 3.128  35150K .......... .......... .......... .......... .......... 94%  107M 0s
+#18 3.128  35200K .......... .......... .......... .......... .......... 94% 32.4M 0s
+#18 3.130  35250K .......... .......... .......... .......... .......... 94%  103M 0s
+#18 3.130  35300K .......... .......... .......... .......... .......... 94% 76.0M 0s
+#18 3.131  35350K .......... .......... .......... .......... .......... 94% 54.6M 0s
+#18 3.132  35400K .......... .......... .......... .......... .......... 94%  113M 0s
+#18 3.133  35450K .......... .......... .......... .......... .......... 94%  184M 0s
+#18 3.133  35500K .......... .......... .......... .......... .......... 95%  219M 0s
+#18 3.133  35550K .......... .......... .......... .......... .......... 95% 69.9M 0s
+#18 3.133  35600K .......... .......... .......... .......... .......... 95%  127M 0s
+#18 3.134  35650K .......... .......... .......... .......... .......... 95%  227M 0s
+#18 3.134  35700K .......... .......... .......... .......... .......... 95% 82.2M 0s
+#18 3.135  35750K .......... .......... .......... .......... .......... 95%  112M 0s
+#18 3.135  35800K .......... .......... .......... .......... .......... 95%  217M 0s
+#18 3.135  35850K .......... .......... .......... .......... .......... 96%  181M 0s
+#18 3.136  35900K .......... .......... .......... .......... .......... 96%  222M 0s
+#18 3.136  35950K .......... .......... .......... .......... .......... 96%  210M 0s
+#18 3.136  36000K .......... .......... .......... .......... .......... 96%  170M 0s
+#18 3.136  36050K .......... .......... .......... .......... .......... 96%  948K 0s
+#18 3.190  36100K .......... .......... .......... .......... .......... 96%  166M 0s
+#18 3.190  36150K .......... .......... .......... .......... .......... 96%  159M 0s
+#18 3.190  36200K .......... .......... .......... .......... .......... 96%  133M 0s
+#18 3.190  36250K .......... .......... .......... .......... .......... 97% 83.0M 0s
+#18 3.191  36300K .......... .......... .......... .......... .......... 97%  184M 0s
+#18 3.191  36350K .......... .......... .......... .......... .......... 97% 80.4M 0s
+#18 3.192  36400K .......... .......... .......... .......... .......... 97% 70.9M 0s
+#18 3.192  36450K .......... .......... .......... .......... .......... 97% 64.4M 0s
+#18 3.193  36500K .......... .......... .......... .......... .......... 97% 53.8M 0s
+#18 3.194  36550K .......... .......... .......... .......... .......... 97% 71.9M 0s
+#18 3.195  36600K .......... .......... .......... .......... .......... 98%  213M 0s
+#18 3.195  36650K .......... .......... .......... .......... .......... 98% 83.3M 0s
+#18 3.196  36700K .......... .......... .......... .......... .......... 98%  157M 0s
+#18 3.196  36750K .......... .......... .......... .......... .......... 98%  184M 0s
+#18 3.196  36800K .......... .......... .......... .......... .......... 98%  219M 0s
+#18 3.196  36850K .......... .......... .......... .......... .......... 98%  123M 0s
+#18 3.197  36900K .......... .......... .......... .......... .......... 98% 69.7M 0s
+#18 3.198  36950K .......... .......... .......... .......... .......... 98%  187M 0s
+#18 3.198  37000K .......... .......... .......... .......... .......... 99%  176M 0s
+#18 3.198  37050K .......... .......... .......... .......... .......... 99% 67.6M 0s
+#18 3.198  37100K .......... .......... .......... .......... .......... 99%  205M 0s
+#18 3.199  37150K .......... .......... .......... .......... .......... 99%  120M 0s
+#18 3.199  37200K .......... .......... .......... .......... .......... 99%  105M 0s
+#18 3.200  37250K .......... .......... .......... .......... .......... 99%  223M 0s
+#18 3.200  37300K .......... .......... .......... .......... .......... 99%  152M 0s
+#18 3.200  37350K .......... .......... .......... .......... ..        100% 87.8M=2.6s
+#18 3.201 
+#18 3.201 2025-09-12 13:59:45 (13.9 MB/s) - 'gmsh-stable-Linux64.tgz' saved [38289969/38289969]
+#18 3.201 
+#18 DONE 3.2s
+
+#19 [15/48] RUN tar -xf gmsh-stable-Linux64.tgz -C /usr/local/gmsh --strip-components=1
+#19 DONE 0.8s
+
+#20 [16/48] WORKDIR /workspace
+#20 DONE 0.0s
+
+#21 [17/48] RUN mkdir /usr/local/extrae
+#21 DONE 0.0s
+
+#22 [18/48] RUN mkdir /usr/local/extrae/libunwind
+#22 DONE 0.1s
+
+#23 [19/48] RUN mkdir /usr/local/extrae/papi
+#23 DONE 0.1s
+
+#24 [20/48] RUN mkdir /usr/local/extrae/libxml2
+#24 DONE 0.1s
+
+#25 [21/48] RUN mkdir /usr/local/extrae/binutils
+#25 DONE 0.1s
+
+#26 [22/48] RUN git clone https://github.com/libunwind/libunwind.git
+#26 0.044 Cloning into 'libunwind'...
+#26 DONE 1.1s
+
+#27 [23/48] WORKDIR libunwind
+#27 DONE 0.0s
+
+#28 [24/48] RUN autoreconf -i         && ./configure --prefix=/usr/local/extrae/libunwind 	&& make && make install
+#28 0.045 /bin/sh: 1: autoreconf: not found
+#28 ERROR: process "/bin/sh -c autoreconf -i         && ./configure --prefix=$EXTRAE_DIR/libunwind \t&& make && make install" did not complete successfully: exit code: 127
+------
+ > [24/48] RUN autoreconf -i         && ./configure --prefix=/usr/local/extrae/libunwind 	&& make && make install:
+0.045 /bin/sh: 1: autoreconf: not found
+------
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - NoEmptyContinuation: Empty continuation line (line 68)
+dockerfile:125
+--------------------
+ 124 |     WORKDIR libunwind
+ 125 | >>> RUN autoreconf -i \
+ 126 | >>>         && ./configure --prefix=$EXTRAE_DIR/libunwind \
+ 127 | >>> 	&& make && make install
+ 128 |     
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c autoreconf -i         && ./configure --prefix=$EXTRAE_DIR/libunwind \t&& make && make install" did not complete successfully: exit code: 127
+✅ Docker image built and pushed successfully
+
 ## Compile PETGEM Log
 [CC] src/csem_kernel.c
 [CC] src/common.c
@@ -11,6 +4692,7 @@
 [CC] src/solver.c
 [CC] src/postprocessing.c
 [LD] build/csem_kernel
+✅ PETGEM compiled successfully
 
 ## Documentation Log
 >>> [CLEAN] Cleaning documentation
@@ -303,10 +4985,11 @@ Total functions: 75
 Documented functions: 75
 Documentation Coverage: 100.00%
 Generated badge: ./docs/doc_coverage_badge.svg
+✅ Documentation generated successfully
 
 ## Test Log
 Info    : Running 'gmsh tests/canonical_model/mesh.geo -3' [Gmsh 4.14.1, 1 node, max. 1 thread]
-Info    : Started on Fri Sep 12 13:16:25 2025
+Info    : Started on Fri Sep 12 14:04:11 2025
 Info    : Reading 'tests/canonical_model/mesh.geo'...
 Info    : Done reading 'tests/canonical_model/mesh.geo'
 Info    : Meshing 1D...
@@ -346,7 +5029,7 @@ Info    : [ 90%] Meshing curve 34 (Line)
 Info    : [100%] Meshing curve 35 (Line)
 Info    : [100%] Meshing curve 36 (Line)
 Info    : [100%] Meshing curve 37 (Line)
-Info    : Done meshing 1D (Wall 0.00686555s, CPU 0.008885s)
+Info    : Done meshing 1D (Wall 0.00456106s, CPU 0.005183s)
 Info    : Meshing 2D...
 Info    : [  0%] Meshing surface 1 (Plane, Frontal-Delaunay)
 Info    : [ 10%] Meshing surface 2 (Plane, Frontal-Delaunay)
@@ -369,17 +5052,17 @@ Info    : [ 90%] Meshing surface 18 (Plane, Frontal-Delaunay)
 Info    : [ 90%] Meshing surface 19 (Plane, Frontal-Delaunay)
 Info    : [100%] Meshing surface 20 (Plane, Frontal-Delaunay)
 Info    : [100%] Meshing surface 21 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.100257s, CPU 0.129851s)
+Info    : Done meshing 2D (Wall 0.0965381s, CPU 0.131328s)
 Info    : Meshing 3D...
 Info    : 3D Meshing 4 volumes with 1 connected component
 Info    : Tetrahedrizing 3030 nodes...
-Info    : Done tetrahedrizing 3038 nodes (Wall 0.0383661s, CPU 0.03516s)
+Info    : Done tetrahedrizing 3038 nodes (Wall 0.038165s, CPU 0.036007s)
 Info    : Reconstructing mesh...
 Info    :  - Creating surface mesh
 Info    :  - Identifying boundary edges
 Info    :  - Recovering boundary
 Info    :  - Added 8 Steiner points
-Info    : Done reconstructing mesh (Wall 0.0888441s, CPU 0.07809s)
+Info    : Done reconstructing mesh (Wall 0.0874918s, CPU 0.080616s)
 Info    : Found volume 1
 Info    : Found volume 4
 Info    : Found volume 3
@@ -405,9 +5088,9 @@ Info    : It. 8500 - 8481 nodes created - worst tet radius 1.00789 (nodes remove
 Info    : 3D refinement terminated (11739 nodes total):
 Info    :  - 3 Delaunay cavities modified for star shapeness
 Info    :  - 19 nodes could not be inserted
-Info    :  - 69767 tetrahedra created in 0.408712 sec. (170699 tets/s)
+Info    :  - 69767 tetrahedra created in 0.419209 sec. (166425 tets/s)
 Info    : 18 node relocations
-Info    : Done meshing 3D (Wall 0.726546s, CPU 0.709373s)
+Info    : Done meshing 3D (Wall 0.738306s, CPU 0.726578s)
 Info    : Optimizing mesh...
 Info    : Optimizing volume 1
 Info    : Optimization starts (volume = 2.695e+10) with worst = 0.0126867 / average = 0.76209:
@@ -421,8 +5104,8 @@ Info    : 0.60 < quality < 0.70 :       551 elements
 Info    : 0.70 < quality < 0.80 :       826 elements
 Info    : 0.80 < quality < 0.90 :      1062 elements
 Info    : 0.90 < quality < 1.00 :       555 elements
-Info    : 76 edge swaps, 3 node relocations (volume = 2.695e+10): worst = 0.258139 / average = 0.776045 (Wall 0.00139255s, CPU 0.001392s)
-Info    : 78 edge swaps, 3 node relocations (volume = 2.695e+10): worst = 0.300235 / average = 0.776415 (Wall 0.00173741s, CPU 0.001737s)
+Info    : 76 edge swaps, 3 node relocations (volume = 2.695e+10): worst = 0.258139 / average = 0.776045 (Wall 0.00144899s, CPU 0.001449s)
+Info    : 78 edge swaps, 3 node relocations (volume = 2.695e+10): worst = 0.300235 / average = 0.776415 (Wall 0.0018605s, CPU 0.00186s)
 Info    : No ill-shaped tets in the mesh :-)
 Info    : 0.00 < quality < 0.10 :         0 elements
 Info    : 0.10 < quality < 0.20 :         0 elements
@@ -446,7 +5129,7 @@ Info    : 0.60 < quality < 0.70 :         2 elements
 Info    : 0.70 < quality < 0.80 :         0 elements
 Info    : 0.80 < quality < 0.90 :         0 elements
 Info    : 0.90 < quality < 1.00 :         0 elements
-Info    : 1 edge swaps, 5 node relocations (volume = 1.925e+09): worst = 0.145936 / average = 0.523745 (Wall 0.000377988s, CPU 0.000377s)
+Info    : 1 edge swaps, 5 node relocations (volume = 1.925e+09): worst = 0.145936 / average = 0.523745 (Wall 0.000354279s, CPU 0.000354s)
 Info    : No ill-shaped tets in the mesh :-)
 Info    : 0.00 < quality < 0.10 :         0 elements
 Info    : 0.10 < quality < 0.20 :        12 elements
@@ -470,8 +5153,8 @@ Info    : 0.60 < quality < 0.70 :      4188 elements
 Info    : 0.70 < quality < 0.80 :      7209 elements
 Info    : 0.80 < quality < 0.90 :      9877 elements
 Info    : 0.90 < quality < 1.00 :      5157 elements
-Info    : 665 edge swaps, 32 node relocations (volume = 1.925e+10): worst = 0.208316 / average = 0.766761 (Wall 0.0131225s, CPU 0.01306s)
-Info    : 672 edge swaps, 34 node relocations (volume = 1.925e+10): worst = 0.265054 / average = 0.76689 (Wall 0.0160241s, CPU 0.015962s)
+Info    : 665 edge swaps, 32 node relocations (volume = 1.925e+10): worst = 0.208316 / average = 0.766761 (Wall 0.0141876s, CPU 0.014188s)
+Info    : 672 edge swaps, 34 node relocations (volume = 1.925e+10): worst = 0.265054 / average = 0.76689 (Wall 0.0170651s, CPU 0.017039s)
 Info    : No ill-shaped tets in the mesh :-)
 Info    : 0.00 < quality < 0.10 :         0 elements
 Info    : 0.10 < quality < 0.20 :         0 elements
@@ -495,8 +5178,8 @@ Info    : 0.60 < quality < 0.70 :      4396 elements
 Info    : 0.70 < quality < 0.80 :      8026 elements
 Info    : 0.80 < quality < 0.90 :     10775 elements
 Info    : 0.90 < quality < 1.00 :      5639 elements
-Info    : 748 edge swaps, 21 node relocations (volume = 1.925e+10): worst = 0.211918 / average = 0.7679 (Wall 0.0146659s, CPU 0.014665s)
-Info    : 757 edge swaps, 23 node relocations (volume = 1.925e+10): worst = 0.211918 / average = 0.767986 (Wall 0.0179345s, CPU 0.017921s)
+Info    : 748 edge swaps, 21 node relocations (volume = 1.925e+10): worst = 0.211918 / average = 0.7679 (Wall 0.0143915s, CPU 0.014299s)
+Info    : 757 edge swaps, 23 node relocations (volume = 1.925e+10): worst = 0.211918 / average = 0.767986 (Wall 0.0176623s, CPU 0.01757s)
 Info    : No ill-shaped tets in the mesh :-)
 Info    : 0.00 < quality < 0.10 :         0 elements
 Info    : 0.10 < quality < 0.20 :         0 elements
@@ -508,13 +5191,14 @@ Info    : 0.60 < quality < 0.70 :      4434 elements
 Info    : 0.70 < quality < 0.80 :      8026 elements
 Info    : 0.80 < quality < 0.90 :     10853 elements
 Info    : 0.90 < quality < 1.00 :      5615 elements
-Info    : Done optimizing mesh (Wall 0.102774s, CPU 0.098523s)
+Info    : Done optimizing mesh (Wall 0.104037s, CPU 0.100976s)
 Info    : 11797 nodes 75048 elements
 Info    : Writing 'tests/canonical_model/mesh.msh'...
 Info    : Done writing 'tests/canonical_model/mesh.msh'
-Info    : Stopped on Fri Sep 12 13:16:26 2025 (From start: Wall 1.04062s, CPU 1.0539s)
+Info    : Stopped on Fri Sep 12 14:04:12 2025 (From start: Wall 1.05352s, CPU 1.07495s)
 Created tests/canonical_model/params_nord1.txt
 Created tests/canonical_model/params_nord2.txt
+✅ PETGEM test preprocessing completed
 
 ---
-🎉 CI workflow completed at Fri Sep 12 13:16:38 UTC 2025
+🎉 CI workflow completed at Fri Sep 12 14:04:25 UTC 2025
