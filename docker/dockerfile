@@ -99,8 +99,8 @@ WORKDIR /workspace
 RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
 RUN tar -xf binutils-2.42.tar.gz
 WORKDIR binutils-2.42
-#RUN ./configure --prefix=$EXTRAE_DIR/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
-#RUN make && make install && cp libiberty/pic/libiberty.a $EXTRAE_DIR/binutils/lib 
+RUN ./configure --prefix=$EXTRAE_DIR/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
+RUN make && make install && cp libiberty/pic/libiberty.a $EXTRAE_DIR/binutils/lib 
 
 # Install libxml2
 #WORKDIR /workspace
