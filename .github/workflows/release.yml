@@ -1,0 +1,53 @@
+# ========================
+# Workflow name displayed in GitHub Actions
+# ========================
+name: PETGEM Release
+
+# ========================
+# Events that trigger this workflow
+# ========================
+on:
+  push:
+    branches:
+      - master  # Trigger release workflow when merging into master
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from VERSION.h
+        id: get_version
+        run: |
+          MAJOR=$(grep "#define VERSION_MAJOR" include/VERSION.h | awk '{print $3}')
+          MINOR=$(grep "#define VERSION_MINOR" include/VERSION.h | awk '{print $3}')
+          PATCH=$(grep "#define VERSION_PATCH" include/VERSION.h | awk '{print $3}')
+          VERSION_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag -a ${{ steps.get_version.outputs.VERSION_TAG }} -m "Release ${{ steps.get_version.outputs.VERSION_TAG }}"
+          git push origin ${{ steps.get_version.outputs.VERSION_TAG }}
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.VERSION_TAG }}
+          name: PETGEM Release ${{ steps.get_version.outputs.VERSION_TAG }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build release Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/dockerfile.release
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:${{ steps.get_version.outputs.VERSION_TAG }}
