@@ -20,7 +20,7 @@ env:
 # === Jobs definition ===
 jobs:
   # === First job: build docker image ===
-   docker-build:
+  docker-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +43,8 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+
 
   # # === Second job: compile PETGEM ===
   # compile-petgem:
