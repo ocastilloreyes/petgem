@@ -60,8 +60,6 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -e PETSC_DIR=$PETSC_DIR \
-            -e PETSC_ARCH=$PETSC_ARCH \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
             make USE_EXTRAE=0
 
