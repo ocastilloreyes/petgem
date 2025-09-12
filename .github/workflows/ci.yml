@@ -117,7 +117,7 @@ jobs:
           name: test-logs
           path: test_petgem.log
 
-  ci-report:
+    ci-report:
     runs-on: ubuntu-latest
     needs: [compile-petgem, compile-docs, test-petgem]
     steps:
@@ -139,13 +139,44 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y pandoc wkhtmltopdf
           pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.html
-          pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf
+          pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf --pdf-engine=wkhtmltopdf
+      - name: Generate CI Dashboard
+        run: |
+          cat > ci-reports/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>PETGEM CI Reports</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; color: #333; }
+              h1 { color: #0a5275; }
+              ul { line-height: 1.8; }
+              a { color: #0a5275; text-decoration: none; font-weight: bold; }
+              a:hover { text-decoration: underline; }
+              .badge { margin-top: 20px; }
+            </style>
+          </head>
+          <body>
+            <h1>PETGEM CI Reports</h1>
+            <ul>
+              <li><a href="ci_summary_report.html">📊 CI Summary Report (HTML)</a></li>
+              <li><a href="ci_summary_report.pdf">📄 CI Summary Report (PDF)</a></li>
+              <li><a href="doc_coverage_badge.svg">🟢 Documentation Coverage Badge</a></li>
+            </ul>
+            <div class="badge">
+              <h3>Live Badge:</h3>
+              <img src="doc_coverage_badge.svg" alt="Documentation Coverage Badge"/>
+            </div>
+          </body>
+          </html>
+          EOF
       - name: Upload CI Report as artifact
         uses: actions/upload-artifact@v4
         with:
           name: ci-execution-report
           path: ci-reports/
-      - name: Deploy reports (badge + CI report) to GitHub Pages
+      - name: Deploy reports (badge + CI report + dashboard) to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
