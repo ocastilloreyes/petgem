@@ -110,20 +110,19 @@ RUN ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python
 RUN make && make install 
 
 # Install extrae
-
-WORKDIR /workspace
-RUN git clone https://github.com/bsc-performance-tools/extrae.git 
-WORKDIR extrae
-RUN git submodule update --init --recursive
-RUN autoreconf -f -i 
-RUN ./configure --prefix=$EXTRAE_DIR \
-        --with-mpi=$PETSC_DIR/$PETSC_ARCH/ \
-        --with-papi=$EXTRAE_DIR/papi \
-        --with-xml-prefix=$EXTRAE_DIR/libxml2 \
-        --with-unwind=$EXTRAE_DIR/libunwind \
-        --with-binutils=$EXTRAE_DIR/binutils \
-        --without-dyninst
-RUN make && make install
+#WORKDIR /workspace
+#RUN git clone https://github.com/bsc-performance-tools/extrae.git 
+#WORKDIR extrae
+#RUN git submodule update --init --recursive
+#RUN autoreconf -f -i 
+#RUN ./configure --prefix=$EXTRAE_DIR \
+#        --with-mpi=$PETSC_DIR/$PETSC_ARCH/ \
+#        --with-papi=$EXTRAE_DIR/papi \
+#        --with-xml-prefix=$EXTRAE_DIR/libxml2 \
+#        --with-unwind=$EXTRAE_DIR/libunwind \
+#        --with-binutils=$EXTRAE_DIR/binutils \
+#        --without-dyninst
+#RUN make && make install
 
 # ------------------------------------------------------------------------------- #
 # Define entry point and clean system                                             #
@@ -131,6 +130,6 @@ RUN make && make install
 WORKDIR /workspace
 
 # Clean up unnecessary directories and files
-RUN rm -rf extrae libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz gmsh-stable-Linux64.tgz
+RUN rm -rf libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz gmsh-stable-Linux64.tgz
 
 CMD [ "bash" ]
