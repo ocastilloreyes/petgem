@@ -20,31 +20,29 @@ env:
 # === Jobs definition ===
 jobs:
   # === First job: build docker image ===
-  docker-build:
+   docker-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/Dockerfile
-          push: false
-          tags: petgem-ci-env:latest
-          load: true
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Save Docker image as artifact (no gzip)
-        run: docker save petgem-ci-env:latest -o petgem-ci-env.tar
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: petgem-ci-env
-          path: petgem-ci-env.tar
 
   # # === Second job: compile PETGEM ===
   # compile-petgem:

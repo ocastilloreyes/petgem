@@ -114,7 +114,7 @@ WORKDIR /workspace
 RUN git clone https://github.com/bsc-performance-tools/extrae.git 
 WORKDIR extrae
 RUN git submodule update --init --recursive
-RUN autoreconf -f -i
+RUN autoreconf -f -i 
 RUN ./configure --prefix=$EXTRAE_DIR \
         --with-mpi=$PETSC_DIR/$PETSC_ARCH/ \
         --with-papi=$EXTRAE_DIR/papi \
