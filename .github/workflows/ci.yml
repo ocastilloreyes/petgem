@@ -22,7 +22,6 @@ jobs:
   # === First job: build docker image ===
   docker-build:
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -39,14 +38,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Save Docker image as artifact
-        run: docker save petgem-ci-env:latest | gzip > petgem-ci-env.tar.gz
+      - name: Save Docker image as artifact (no gzip)
+        run: docker save petgem-ci-env:latest -o petgem-ci-env.tar
 
       - uses: actions/upload-artifact@v4
         with:
           name: petgem-ci-env
-          path: petgem-ci-env.tar.gz
-
+          path: petgem-ci-env.tar
 
   # # === Second job: compile PETGEM ===
   # compile-petgem:
