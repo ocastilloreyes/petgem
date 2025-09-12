@@ -1,42 +1,47 @@
+# ========================
 # Workflow name displayed in GitHub Actions
+# ========================
 name: PETGEM CI
 
+# ========================
 # Events that trigger this workflow
+# ========================
 on:
   push:
     branches:
-      - develop  # Trigger CI on pushes to 'develop' branch
+      - develop
   pull_request:
     branches:
-      - develop  # Trigger CI on PRs targeting 'develop'
+      - develop
 
-# Global environment variables accessible by all jobs
+# ========================
+# Setup enviroment
+# ========================
 env:
-  PETSC_DIR: /usr/local/petsc             # PETSc installation directory
-  PETSC_ARCH: arch-linux-c-opt            # PETSc architecture/config
-  GMSH_DIR: /usr/local/gmsh/bin           # GMSH executable directory
-  PETGEM_TEST_DIR: tests/canonical_model  # Directory with PETGEM test models
+  PETSC_DIR: /usr/local/petsc
+  PETSC_ARCH: arch-linux-c-opt
+  GMSH_DIR: /usr/local/gmsh/bin
+  EXTRAE_DIR: /usr/local/extrae
+  PETGEM_TEST_DIR: tests/canonical_model
 
-# === JOB: docker-build ===
-# Build and push the Docker image for the CI environment
 jobs:
-  # === JOB: docker-build ===
+  # ========================
+  # Build Docker image
+  # ========================
   docker-build:
     runs-on: ubuntu-latest
+    outputs:
+      image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
     steps:
-      # Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Setup QEMU for cross-platform Docker builds
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # Setup Docker Buildx for advanced caching and multi-platform builds
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Log in to GitHub Container Registry
       - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
@@ -44,116 +49,106 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build Docker image and push to GHCR
-      - name: Build Docker image and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
+        id: build-image
         with:
           context: .
           file: ./docker/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-          load: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-# === JOB: compile-petgem ===
-# Compile the PETGEM code using the Docker image
+      - name: Set image output
+        run: echo "image=ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest" >> $GITHUB_OUTPUT
+
+  # ========================
+  # Compile PETGEM source
+  # ========================
   compile-src:
     runs-on: ubuntu-latest
-    needs: docker-build  # Wait for Docker image build to complete
+    needs: docker-build
     steps:
       - uses: actions/checkout@v4
 
-      # Pull the CI Docker image
-      - name: Pull Docker image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-
-      # Compile PETGEM inside Docker and capture log
       - name: Compile PETGEM
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
+            -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
-            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            make USE_EXTRAE=0 
+            -e PETSC_DIR=$PETSC_DIR \
+            -e PETSC_ARCH=$PETSC_ARCH \
+            ${{ needs.docker-build.outputs.image }} \
+            make USE_EXTRAE=0
 
-# === JOB: compile-docs ===
-# Generate project documentation and badge inside Docker
+  # ========================
+  # Compile documentation
+  # ========================
   compile-docs:
     runs-on: ubuntu-latest
     needs: docker-build
     steps:
       - uses: actions/checkout@v4
 
-      # Pull Docker image
-      - name: Pull Docker image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-
-      # Generate docs and coverage badge
       - name: Generate documentation and badge
         run: |
           docker run --rm \
-            -v "${{ github.workspace }}":/app \
-            -w /app \
-            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            -e PETSC_DIR=$PETSC_DIR \
+            -e PETSC_ARCH=$PETSC_ARCH \
+            ${{ needs.docker-build.outputs.image }} \
             bash -c "make docs"
- 
-# === JOB: test-petgem ===
-# Run PETGEM test preprocessing scripts inside Docker
+
+  # ========================
+  # Run PETGEM tests
+  # ========================
   test-csem-kernel:
     runs-on: ubuntu-latest
     needs: compile-src
     steps:
       - uses: actions/checkout@v4
 
-      # Pull Docker image
-      - name: Pull Docker image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-
-      # Run test preprocessing and capture log
       - name: Run PETGEM tests
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
+            -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
-            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            -e PETSC_DIR=$PETSC_DIR \
+            -e PETSC_ARCH=$PETSC_ARCH \
+            -e GMSH_DIR=$GMSH_DIR \
+            ${{ needs.docker-build.outputs.image }} \
             bash -c "gmsh ${PETGEM_TEST_DIR}/mesh.geo -3 && \
                      python3 ${PETGEM_TEST_DIR}/generate_resistivity_model.py && \
-                     python3 ${PETGEM_TEST_DIR}/generate_params_file.py" 
-          
-  # === JOB: publish-report ===
-  # Generate a dynamic HTML report using GitHub Actions API
+                     python3 ${PETGEM_TEST_DIR}/generate_params_file.py"
+
+  # ========================
+  # Publish CI report
+  # ========================
   publish-report:
     runs-on: ubuntu-latest
     needs: [docker-build, compile-src, compile-docs, test-csem-kernel]
     steps:
-      # Checkout repository
       - uses: actions/checkout@v4
 
-      # Install jq to parse JSON
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      # Prepare report folder
       - name: Prepare report folder
         run: mkdir -p ci-report
 
-      # Generate dynamic CI report
       - name: Generate CI report
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           WORKFLOW_RUN_ID=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs --jq '.workflow_runs[0].id')
           JOBS_JSON=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs/$WORKFLOW_RUN_ID/jobs)
-          
           echo "<html><head><title>PETGEM CI Report</title></head><body>" > ci-report/index.html
-          echo "<h1>PETGEM CI Report</h1>" >> ci-report/index.html
-          echo "<ul>" >> ci-report/index.html
+          echo "<h1>PETGEM CI Report</h1><ul>" >> ci-report/index.html
           echo "$JOBS_JSON" | jq -r '.jobs[] | "<li>\(.name): \(.status) / \(.conclusion)</li>"' >> ci-report/index.html
-          echo "</ul>" >> ci-report/index.html
-          echo "</body></html>" >> ci-report/index.html
+          echo "</ul></body></html>" >> ci-report/index.html
 
-      # Publish to GitHub Pages ensuring index.html is at branch root
       - name: Publish report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -162,9 +157,8 @@ jobs:
           publish_branch: gh-pages
           user_name: github-actions
           user_email: github-actions@github.com
-          keep_files: false   # ensures old files are removed, preventing index.html conflicts
+          keep_files: false
 
-      # Print the URL of the published report
       - name: Print GitHub Pages URL
         run: |
           REPO_NAME=$(basename $GITHUB_REPOSITORY)

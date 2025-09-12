@@ -1,176 +1,126 @@
-# # Obtain a clean Ubuntu distribution
-# FROM ubuntu:22.04
+# =============================================================================== #
+# STAGE 1: Builder (all dependencies + compilation + Python packages)             #
+# =============================================================================== #
+FROM ubuntu:22.04 AS builder
 
-# # ------------------------------------------------------------------------------- #
-# # Set the working directory                                                       #
-# # ------------------------------------------------------------------------------- #
-# WORKDIR /workspace
-
-# # ------------------------------------------------------------------------------- #
-# # Install first level dependencies                                                #
-# # ------------------------------------------------------------------------------- #
-# RUN apt-get update && apt-get install -y gcc gfortran g++ make cmake vim 
-# RUN apt-get update && apt-get install -y flex bison libtool git wget python3
-# RUN apt-get update && apt-get install -y autopoint pkg-config gettext libglu1
-
-# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y tzdata 
-# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texinfo 
-# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y doxygen 
-# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y latexmk 
-# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-base 
-# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-latex-extra 
-# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y texlive-fonts-recommended  
-
-# RUN apt-get update && apt-get install -y python3-breathe
-# RUN apt-get update && apt-get install -y python3-meshio python3-h5py
-# RUN apt-get update && apt-get install -y python3-numpy python3-distutils
-# RUN apt-get update && apt-get install -y python3-pip python3-matplotlib
-# RUN apt-get update && apt-get install -y python3-sphinx python3-sphinx-rtd-theme
-# RUN apt-get update && pip3 install cython 
-
-
-# ------------------------------------------------------------------------------- #
-# Obtain a clean Ubuntu distribution                                              #
-# ------------------------------------------------------------------------------- #      
-FROM ubuntu:22.04
-
-# ------------------------------------------------------------------------------- #
-# Set the working directory                                                       #
-# ------------------------------------------------------------------------------- #
-WORKDIR /workspace
-
-# Prevent tzdata prompts and set noninteractive mode
-# ------------------------------------------------------------------------------- #
-# Set noninteractive mode                                                         #
-# ------------------------------------------------------------------------------- #
 ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /workspace
 
-# ------------------------------------------------------------------------------- #
-# Install all dependencies in one layer
-# ------------------------------------------------------------------------------- #
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        gcc gfortran g++ make cmake vim \
-        flex bison libtool git wget \
-        autoconf automake autopoint pkg-config gettext libtool-bin \
-        python3 python3-pip python3-distutils \
-        libglu1 tzdata \
-        texinfo doxygen latexmk \
-        texlive-latex-base texlive-latex-extra texlive-fonts-recommended \
-        python3-breathe python3-meshio python3-h5py python3-numpy python3-matplotlib \
-        python3-sphinx python3-sphinx-rtd-theme && \
-    
-    # Install Cython via pip
-    pip3 install --no-cache-dir cython && \
-    
-    # Clean up
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# ---------------------------
+# Install build & runtime dependencies
+# ---------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential gcc gfortran g++ make cmake vim \
+    flex bison libtool git wget autoconf automake autopoint pkg-config gettext libtool-bin \
+    python3 python3-pip python3-distutils \
+    libglu1 libxcursor1 tzdata libxinerama1 \
+    texinfo doxygen latexmk \
+    texlive-latex-base texlive-latex-extra texlive-fonts-recommended \
+    python3-breathe python3-meshio python3-h5py python3-numpy python3-matplotlib \
+    python3-sphinx python3-sphinx-rtd-theme \
+    && pip3 install --no-cache-dir cython \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# ------------------------------------------------------------------------------- #
-# Install PETSc                                                                   #
-# ------------------------------------------------------------------------------- #
-RUN mkdir /usr/local/petsc
-WORKDIR /usr/local/petsc
-
-# Get PETSc, configure and compile
-RUN git clone -b release https://gitlab.com/petsc/petsc.git .
-
-# Obtain new release fixes (since a prior clone or pull)
-RUN git pull 
-
-# Set PETSc environment variables
-ENV PETSC_ARCH=arch-linux-c-opt
+# ---------------------------
+# PETSc
+# ---------------------------
 ENV PETSC_DIR=/usr/local/petsc
+ENV PETSC_ARCH=arch-linux-c-opt
+WORKDIR /usr/local/petsc
+RUN git clone -b release https://gitlab.com/petsc/petsc.git . \
+    && git pull \
+    && ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran \
+       --download-mpich --download-fblaslapack \
+       --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch \
+       --download-cmake --with-debugging=1 --download-hdf5 --download-triangle \
+    && make $PETSC_DIR $PETSC_ARCH all \
+    && make check \
+    && pip3 install src/binding/petsc4py
 
-# Configure/compile/check PETSc
-RUN ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran --download-mpich --download-fblaslapack \
-                --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch    \
-                --download-cmake --with-debugging=1 --download-hdf5 --download-triangle
-
-# Build PETSc
-RUN make $PETSC_DIR $PETSC_ARCH all 
-RUN make check
-
-# Install Python wrapper
-RUN pip3 install src/binding/petsc4py
-ENV PATH="$PETSC_DIR/${PETSC_ARCH}/bin:${PATH}"
-
-# ------------------------------------------------------------------------------- #
-# Install gmsh                                                                    #
-# ------------------------------------------------------------------------------- #
-WORKDIR /workspace
+# ---------------------------
+# GMSH
+# ---------------------------
 ENV GMSH_DIR=/usr/local/gmsh
-RUN mkdir $GMSH_DIR
-
-# Download binaries
-RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz
-RUN tar -xf gmsh-stable-Linux64.tgz -C $GMSH_DIR --strip-components=1
-ENV PATH="$GMSH_DIR/bin:${PATH}"
-
-# ------------------------------------------------------------------------------- #
-# Install Extrae and its dependencies                                             #
-# ------------------------------------------------------------------------------- #
+RUN mkdir -p $GMSH_DIR
 WORKDIR /workspace
+RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz \
+    && tar -xf gmsh-stable-Linux64.tgz -C $GMSH_DIR --strip-components=1
+
+# ---------------------------
+# Extrae dependencies
+# ---------------------------
 ENV EXTRAE_DIR=/usr/local/extrae
-RUN mkdir $EXTRAE_DIR
-RUN mkdir $EXTRAE_DIR/libunwind
-RUN mkdir $EXTRAE_DIR/papi
-RUN mkdir $EXTRAE_DIR/libxml2
-RUN mkdir $EXTRAE_DIR/binutils
+RUN mkdir -p $EXTRAE_DIR/libunwind $EXTRAE_DIR/papi $EXTRAE_DIR/libxml2 $EXTRAE_DIR/binutils
 
-# Install libunwind
-RUN git clone https://github.com/libunwind/libunwind.git 
-WORKDIR libunwind
-RUN autoreconf -i \
-        && ./configure --prefix=$EXTRAE_DIR/libunwind \
-	&& make && make install
-
-# Install PAPI (HW counters)
+# libunwind
 WORKDIR /workspace
-RUN git clone https://github.com/icl-utk-edu/papi 
-WORKDIR papi/src        
-RUN ./configure --prefix=$EXTRAE_DIR/papi CC=gcc F77=gfortran \
-        && make && make install
+RUN git clone https://github.com/libunwind/libunwind.git \
+    && cd libunwind \
+    && autoreconf -i \
+    && ./configure --prefix=$EXTRAE_DIR/libunwind \
+    && make && make install
 
-# Install binutils
+# PAPI
 WORKDIR /workspace
-RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
-RUN tar -xf binutils-2.42.tar.gz
-WORKDIR binutils-2.42
-RUN ./configure --prefix=$EXTRAE_DIR/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error"
-RUN make && make install && cp libiberty/pic/libiberty.a $EXTRAE_DIR/binutils/lib 
+RUN git clone https://github.com/icl-utk-edu/papi \
+    && cd papi/src \
+    && ./configure --prefix=$EXTRAE_DIR/papi CC=gcc F77=gfortran \
+    && make && make install
 
-# Install libxml2
+# binutils
 WORKDIR /workspace
-RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
-WORKDIR libxml2
-RUN ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python
-RUN make && make install 
+RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz \
+    && tar -xf binutils-2.42.tar.gz \
+    && cd binutils-2.42 \
+    && ./configure --prefix=$EXTRAE_DIR/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error" \
+    && make && make install && cp libiberty/pic/libiberty.a $EXTRAE_DIR/binutils/lib
 
-# Install extrae
+# libxml2
 WORKDIR /workspace
-RUN git clone https://github.com/bsc-performance-tools/extrae.git 
-WORKDIR extrae
-RUN git submodule update --init --recursive
-RUN autoreconf -f -i 
-RUN ./configure --prefix=$EXTRAE_DIR \
+RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
+    && cd libxml2 \
+    && ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python \
+    && make && make install
+
+# Extrae
+WORKDIR /workspace
+RUN git clone https://github.com/bsc-performance-tools/extrae.git \
+    && cd extrae \
+    && git submodule update --init --recursive \
+    && autoreconf -f -i \
+    && ./configure --prefix=$EXTRAE_DIR \
         --with-mpi=$PETSC_DIR/$PETSC_ARCH/ \
         --with-papi=$EXTRAE_DIR/papi \
         --with-xml-prefix=$EXTRAE_DIR/libxml2 \
         --with-unwind=$EXTRAE_DIR/libunwind \
         --with-binutils=$EXTRAE_DIR/binutils \
-        --without-dyninst --disable-openmp
-RUN make -j1 && make install
+        --without-dyninst --disable-openmp \
+    && make -j1 && make install
 
-# ------------------------------------------------------------------------------- #
-# Define entry point and clean system                                             #
-# ------------------------------------------------------------------------------- #
+# Cleanup unnecessary files
+RUN rm -rf /workspace/*
+
+# =============================================================================== #
+# STAGE 2: Runtime image                                                        #
+# =============================================================================== #
+FROM ubuntu:22.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /workspace
 
-# Clean up unnecessary directories and files
-RUN rm -rf libunwind papi binutils-2.42 binutils-2.42.tar.gz libxml2 gmsh-stable-Linux64.tgz extrae
+# Copy all built binaries and Python packages from builder
+COPY --from=builder /usr/local/petsc /usr/local/petsc
+COPY --from=builder /usr/local/gmsh /usr/local/gmsh
+COPY --from=builder /usr/local/extrae /usr/local/extrae
+COPY --from=builder /usr/lib/python3 /usr/lib/python3
+COPY --from=builder /usr/local/lib/python3.10 /usr/local/lib/python3.10
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-RUN apt-get update && apt-get install -y libgl1 libxcursor1 libxinerama1
+# Environment variables
+ENV PETSC_DIR=/usr/local/petsc
+ENV PETSC_ARCH=arch-linux-c-opt
+ENV GMSH_DIR=/usr/local/gmsh/bin
+ENV EXTRAE_DIR=/usr/local/extrae
+ENV PATH="$PETSC_DIR/$PETSC_ARCH/bin:$GMSH_DIR:$EXTRAE_DIR/bin:$PATH"
 
-CMD [ "bash" ]
+CMD ["bash"]
