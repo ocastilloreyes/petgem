@@ -103,17 +103,17 @@ RUN ./configure --prefix=$EXTRAE_DIR/binutils --enable-shared CFLAGS="-g -O2 -Wn
 RUN make && make install && cp libiberty/pic/libiberty.a $EXTRAE_DIR/binutils/lib 
 
 # Install libxml2
-#WORKDIR /workspace
-#RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
-#WORKDIR libxml2
-#RUN ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python
-#RUN make && make install 
+WORKDIR /workspace
+RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git 
+WORKDIR libxml2
+RUN ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python
+RUN make && make install 
 
 # Install extrae
-#WORKDIR /workspace
-#RUN git clone https://github.com/bsc-performance-tools/extrae.git 
-#WORKDIR extrae
-#RUN git submodule update --init --recursive
+WORKDIR /workspace
+RUN git clone https://github.com/bsc-performance-tools/extrae.git 
+WORKDIR extrae
+RUN git submodule update --init --recursive
 #RUN autoreconf -f -i
 #RUN ./configure --prefix=$EXTRAE_DIR \
 #        --with-mpi=$PETSC_DIR/$PETSC_ARCH/ \
