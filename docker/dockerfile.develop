@@ -36,7 +36,6 @@ RUN git clone -b release https://gitlab.com/petsc/petsc.git . \
     && make $PETSC_DIR $PETSC_ARCH all \
     && make check \
     && pip3 install src/binding/petsc4py
-
 ENV PATH="$PETSC_DIR/${PETSC_ARCH}/bin:${PATH}"
 
 # ---------------------------
