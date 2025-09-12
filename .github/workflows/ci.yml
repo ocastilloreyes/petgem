@@ -20,7 +20,7 @@ env:
 # === Jobs definition ===
 jobs:
   # === First job: build docker image ===
-    docker-build:
+  docker-build:
     runs-on: ubuntu-latest
     
     steps:
