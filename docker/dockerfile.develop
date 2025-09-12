@@ -37,6 +37,8 @@ RUN git clone -b release https://gitlab.com/petsc/petsc.git . \
     && make check \
     && pip3 install src/binding/petsc4py
 
+ENV PATH="$PETSC_DIR/${PETSC_ARCH}/bin:${PATH}"
+
 # ---------------------------
 # GMSH
 # ---------------------------
@@ -45,6 +47,7 @@ RUN mkdir -p $GMSH_DIR
 WORKDIR /workspace
 RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz \
     && tar -xf gmsh-stable-Linux64.tgz -C $GMSH_DIR --strip-components=1
+ENV PATH="$GMSH_DIR/bin:${PATH}"
 
 # ---------------------------
 # Extrae dependencies
