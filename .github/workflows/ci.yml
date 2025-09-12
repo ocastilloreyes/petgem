@@ -98,47 +98,26 @@ jobs:
           publish_dir: ./public
           keep_files: true
 
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Compile PETGEM
-  #       run: |
-  #         docker run --rm \
-  #           -v ${{ github.workspace }}:/workspace \
-  #           -w /workspace \
-  #           -e PETSC_DIR=$PETSC_DIR \
-  #           -e PETSC_ARCH=$PETSC_ARCH \
-  #           petgem-ci-env:latest \
-  #           make USE_EXTRAE=0
+  # === Fourth job: Testing PETGEM ===
+  test-petgem:
+    runs-on: ubuntu-latest
+    needs: compile-petgem
+    steps:
+      - uses: actions/checkout@v4
 
-  # # === Third job: compile documentation ===
-  # compile-docs:
-  #   runs-on: ubuntu-latest
-  #   needs: docker-build
+      - name: Pull Docker image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-  #   steps:
-  #     - uses: actions/checkout@v4
+      - name: Preprocess mesh
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            bash -c "gmsh ${PETGEM_TEST_DIR}/mesh.geo -3 && \
+              python3 ${PETGEM_TEST_DIR}/generate_params_file.py"
 
-  #     - name: Generate documentation and badge
-  #       run: |
-  #         docker run --rm \
-  #           -v "${{ github.workspace }}":/app \
-  #           -w /app \
-  #           petgem-ci-env:latest \
-  #           bash -c "make docs && \
-  #             python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./docs/doc_coverage_badge.svg"
-      
-  #     - name: Prepare badge
-  #       run: |
-  #         mkdir -p ./public
-  #         mv ./docs/doc_coverage_badge.svg ./public/
 
-  #     - name: Deploy badge to GitHub Pages
-  #       uses: peaceiris/actions-gh-pages@v3
-  #       with:
-  #         github_token: ${{ secrets.GITHUB_TOKEN }}
-  #         publish_branch: gh-pages
-  #         publish_dir: ./public
-  #         keep_files: true
 
   # # === Fourth job: testing PETGEM ===
   # test-petgem:
