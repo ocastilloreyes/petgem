@@ -56,7 +56,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/Dockerfile
+          file: ./docker/dockerfile.develop
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
           load: false
