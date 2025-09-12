@@ -44,12 +44,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # === Second job: compile PETGEM ===
+  compile-petgem:
+    runs-on: ubuntu-latest
+    needs: docker-build
 
+    steps:
+      - uses: actions/checkout@v4
 
-  # # === Second job: compile PETGEM ===
-  # compile-petgem:
-  #   runs-on: ubuntu-latest
-  #   needs: docker-build
+      - name: Pull Docker image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+
+      - name: Compile PETGEM
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e PETSC_DIR=$PETSC_DIR \
+            -e PETSC_ARCH=$PETSC_ARCH \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            make USE_EXTRAE=0
 
   #   steps:
   #     - uses: actions/checkout@v4

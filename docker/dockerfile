@@ -130,6 +130,6 @@ RUN make && make install
 WORKDIR /workspace
 
 # Clean up unnecessary directories and files
-RUN rm -rf libunwind libxml2 papi binutils-2.42 binutils-2.42.tar.gz gmsh-stable-Linux64.tgz
+RUN rm -rf libunwind papi binutils-2.42 binutils-2.42.tar.gz libxml2 gmsh-stable-Linux64.tgz
 
 CMD [ "bash" ]
