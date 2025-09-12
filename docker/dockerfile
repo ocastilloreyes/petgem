@@ -55,9 +55,7 @@ RUN make check
 
 # Install Python wrapper
 RUN pip3 install src/binding/petsc4py
-
-# Add alias for mpirun command
-RUN echo 'alias mpirun=${PETSC_DIR}/\${PETSC_ARCH}/bin/mpirun' >> ~/.bashrc
+ENV PATH="$PETSC_DIR/${PETSC_ARCH}/bin:${PATH}"
 
 # ------------------------------------------------------------------------------- #
 # Install gmsh                                                                    #

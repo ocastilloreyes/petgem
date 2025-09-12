@@ -9,10 +9,11 @@ on:
       - develop
 
 jobs:
-  build_test_and_report:
+  # === First job: build docker image ===
+  build-docker:
     runs-on: ubuntu-latest
 
-    # === Define environment ===
+    # Define environment 
     env:
       PETSC_DIR: /usr/local/petsc
       PETSC_ARCH: arch-linux-c-opt
@@ -20,7 +21,7 @@ jobs:
       PETGEM_TEST_DIR: tests/canonical_model
 
     steps:
-      # === Step 1: SETUP & BUILD ===
+      # Step 1: Setup and build
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -41,85 +42,73 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # === Step 2: INITIALIZE REPORT ===
-      - name: Initialize CI report
-        run: |
-          echo "# PETGEM CI/CD Execution Report" > ci_summary_report.md
-          echo "" >> ci_summary_report.md
-          echo "## Run Details" >> ci_summary_report.md
-          echo "- **Trigger:** ${{ github.event_name }}" >> ci_summary_report.md
-          echo "- **Commit:** \`${{ github.sha }}\`" >> ci_summary_report.md
-          echo "- **Timestamp:** $(date -u)" >> ci_summary_report.md
-          echo "" >> ci_summary_report.md
-          echo "## Pipeline Status" >> ci_summary_report.md
+      # # === Step 3: COMPILE PETGEM ===
+      # - name: Compile PETGEM
+      #   run: |
+      #     docker run --rm \
+      #       -v ${{ github.workspace }}:/workspace \
+      #       -w /workspace \
+      #       -e PETSC_DIR=$PETSC_DIR \
+      #       -e PETSC_ARCH=$PETSC_ARCH \
+      #       petgem-ci-env:latest \
+      #       make USE_EXTRAE=0
 
-      # === Step 3: COMPILE PETGEM ===
-      - name: Compile PETGEM
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            -e PETSC_DIR=$PETSC_DIR \
-            -e PETSC_ARCH=$PETSC_ARCH \
-            petgem-ci-env:latest \
-            make USE_EXTRAE=0
+      # # === Step 4: DOCUMENTATION & BADGE ===
+      # - name: Generate documentation and badge
+      #   run: |
+      #     docker run --rm \
+      #       --workdir /app \
+      #       -v "${{ github.workspace }}":/app \
+      #       petgem-ci-env:latest \
+      #       bash -c "make docs && \
+      #         python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./docs/doc_coverage_badge.svg"
+      #     DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
+      #     echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
 
-      # === Step 4: DOCUMENTATION & BADGE ===
-      - name: Generate documentation and badge
-        run: |
-          docker run --rm \
-            --workdir /app \
-            -v "${{ github.workspace }}":/app \
-            petgem-ci-env:latest \
-            bash -c "make docs && \
-              python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ --badge --badge_path ./docs/doc_coverage_badge.svg"
-          DOC_COVERAGE=$(python3 ./scripts/coverage_doc/coverage_doc.py ./docs/doxygen/xml/ | grep "Documentation Coverage:" | awk '{print $3}')
-          echo "✅ **Documentation:** Generated (Coverage: ${DOC_COVERAGE})" >> ci_summary_report.md
+      # - name: Prepare badge for GitHub pages deployment
+      #   run: |
+      #     mkdir -p ./public
+      #     mv ./docs/doc_coverage_badge.svg ./public/
 
-      - name: Prepare badge for GitHub pages deployment
-        run: |
-          mkdir -p ./public
-          mv ./docs/doc_coverage_badge.svg ./public/
-
-      - name: Deploy documentation badge to GitHub pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: ./public
-          keep_files: true
-          cname: ''
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
+      # - name: Deploy documentation badge to GitHub pages
+      #   uses: peaceiris/actions-gh-pages@v3
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     publish_branch: gh-pages
+      #     publish_dir: ./public
+      #     keep_files: true
+      #     cname: ''
+      #     user_name: 'github-actions[bot]'
+      #     user_email: 'github-actions[bot]@users.noreply.github.com'
       
-      # === Step 5: UNIT TEST ===
-      - name: Preprocessing mesh for testing PETGEM
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            petgem-ci-env:latest \
-            bash -c "gmsh ${PETGEM_TEST_DIR}/mesh.geo -3 && \
-              python3 ${PETGEM_TEST_DIR}/generate_params_file.py"
+      # # === Step 5: UNIT TEST ===
+      # - name: Preprocessing mesh for testing PETGEM
+      #   run: |
+      #     docker run --rm \
+      #       -v ${{ github.workspace }}:/workspace \
+      #       -w /workspace \
+      #       petgem-ci-env:latest \
+      #       bash -c "gmsh ${PETGEM_TEST_DIR}/mesh.geo -3 && \
+      #         python3 ${PETGEM_TEST_DIR}/generate_params_file.py"
 
-      - name: Preprocessing resistivity model for testing PETGEM
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            petgem-ci-env:latest \
-            bash -c "python3 ${PETGEM_TEST_DIR}/generate_resistivity_model.py"
+      # - name: Preprocessing resistivity model for testing PETGEM
+      #   run: |
+      #     docker run --rm \
+      #       -v ${{ github.workspace }}:/workspace \
+      #       -w /workspace \
+      #       petgem-ci-env:latest \
+      #       bash -c "python3 ${PETGEM_TEST_DIR}/generate_resistivity_model.py"
 
     
 
-         #   $PETSC_DIR/$PETSC_ARCH/bin/mpirun -n 1 build/./kernel -options_file data/options.txt > output.txt
+      #    #   $PETSC_DIR/$PETSC_ARCH/bin/mpirun -n 1 build/./kernel -options_file data/options.txt > output.txt
 
               
 
 
 
 
-      #- name: Run unit tests and update report
+      # #- name: Run unit tests and update report
       #  run: |
       #    docker run --rm \
       #      --workdir /app \
