@@ -1,32 +1,46 @@
+# Workflow name displayed in GitHub Actions
 name: PETGEM CI
 
+# Events that trigger this workflow
 on:
   push:
     branches:
-      - develop
+      - develop  # Trigger CI on pushes to 'develop' branch
   pull_request:
     branches:
-      - develop
+      - develop  # Trigger CI on PRs targeting 'develop'
 
+# Global environment variables accessible by all jobs
 env:
-  PETSC_DIR: /usr/local/petsc
-  PETSC_ARCH: arch-linux-c-opt
-  GMSH_DIR: /usr/local/gmsh/bin
-  PETGEM_TEST_DIR: tests/canonical_model
+  PETSC_DIR: /usr/local/petsc             # PETSc installation directory
+  PETSC_ARCH: arch-linux-c-opt            # PETSc architecture/config
+  GMSH_DIR: /usr/local/gmsh/bin           # GMSH executable directory
+  PETGEM_TEST_DIR: tests/canonical_model  # Directory with PETGEM test models
 
+# === JOB: docker-build ===
+# Build and push the Docker image for the CI environment
 jobs:
   docker-build:
     runs-on: ubuntu-latest
     steps:
+      # Checkout the repository
       - uses: actions/checkout@v4
+
+      # Setup QEMU for cross-platform Docker builds
       - uses: docker/setup-qemu-action@v3
+
+      # Setup Docker Buildx for advanced caching and multi-platform builds
       - uses: docker/setup-buildx-action@v3
+
+      # Log in to GitHub Container Registry
       - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build and push Docker image, capture logs
       - name: Build & Push Docker image
         run: |
           echo "### Starting Docker build for PETGEM CI image" | tee docker_build.log
@@ -42,19 +56,27 @@ jobs:
           else
             echo "❌ Docker build failed" | tee -a docker_build.log
           fi
+
+      # Upload Docker build log for later use in CI report
       - name: Upload Docker build log
         uses: actions/upload-artifact@v4
         with:
           name: docker-build-logs
           path: docker_build.log
 
+# === JOB: compile-petgem ===
+# Compile the PETGEM code using the Docker image
   compile-petgem:
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: docker-build  # Wait for Docker image build to complete
     steps:
       - uses: actions/checkout@v4
+
+      # Pull the CI Docker image
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+
+      # Compile PETGEM inside Docker and capture log
       - name: Compile PETGEM
         run: |
           docker run --rm \
@@ -67,18 +89,26 @@ jobs:
           else
             echo "❌ PETGEM compilation failed" | tee -a compile_petgem.log
           fi
+
+      # Upload compilation log
       - uses: actions/upload-artifact@v4
         with:
           name: compile-logs
           path: compile_petgem.log
 
+# === JOB: compile-docs ===
+# Generate project documentation and badge inside Docker
   compile-docs:
     runs-on: ubuntu-latest
     needs: docker-build
     steps:
       - uses: actions/checkout@v4
+
+      # Pull Docker image
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+
+      # Generate docs and coverage badge
       - name: Generate documentation and badge
         run: |
           docker run --rm \
@@ -94,18 +124,26 @@ jobs:
           fi
           mkdir -p ci-reports
           mv ./docs/doc_coverage_badge.svg ./ci-reports/
+
+      # Upload documentation log
       - uses: actions/upload-artifact@v4
         with:
           name: docs-logs
           path: docs.log
 
+# === JOB: test-petgem ===
+# Run PETGEM test preprocessing scripts inside Docker
   test-petgem:
     runs-on: ubuntu-latest
     needs: compile-petgem
     steps:
       - uses: actions/checkout@v4
+
+      # Pull Docker image
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+
+      # Run test preprocessing and capture log
       - name: Run PETGEM tests
         run: |
           docker run --rm \
@@ -120,18 +158,22 @@ jobs:
           else
             echo "❌ PETGEM test preprocessing failed" | tee -a test_petgem.log
           fi
+
+      # Upload test logs
       - uses: actions/upload-artifact@v4
         with:
           name: test-logs
           path: test_petgem.log
 
+# === JOB: ci-report ===
+# Collect logs from all jobs, generate Markdown, HTML/PDF reports, and deploy
   ci-report:
     runs-on: ubuntu-latest
     needs: [docker-build, compile-petgem, compile-docs, test-petgem]
     steps:
       - uses: actions/checkout@v4
 
-      # === Download logs from all previous jobs ===
+      # Download logs from all previous jobs
       - name: Download Docker build logs
         uses: actions/download-artifact@v4
         with:
@@ -153,35 +195,42 @@ jobs:
           name: test-logs
           path: ci-logs
 
-      # === Build Markdown CI report ===
+      # Build consolidated Markdown CI report
       - name: Build Markdown CI report
         run: |
           mkdir -p ci-reports
           echo "# PETGEM CI Summary Report" > ci-reports/ci_summary_report.md
           echo "" >> ci-reports/ci_summary_report.md
 
-          # Docker build log
+          # Append Docker build log
           if [ -f ci-logs/docker_build.log ]; then
             echo "## Docker Build Log" >> ci-reports/ci_summary_report.md
             cat ci-logs/docker_build.log >> ci-reports/ci_summary_report.md
             echo "" >> ci-reports/ci_summary_report.md
           fi
 
-          # Compile log
+          # Append compile log
           if [ -f ci-logs/compile_petgem.log ]; then
             echo "## Compile PETGEM Log" >> ci-reports/ci_summary_report.md
             cat ci-logs/compile_petgem.log >> ci-reports/ci_summary_report.md
             echo "" >> ci-reports/ci_summary_report.md
           fi
 
-          # Docs log
+          # Append docs log
           if [ -f ci-logs/docs.log ]; then
             echo "## Documentation Log" >> ci-reports/ci_summary_report.md
             cat ci-logs/docs.log >> ci-reports/ci_summary_report.md
             echo "" >> ci-reports/ci_summary_report.md
           fi
 
-          # Test log
+          # Append documentation coverage badge
+          if [ -f ci-reports/doc_coverage_badge.svg ]; then
+            echo "## Documentation Coverage" >> ci-reports/ci_summary_report.md
+            echo "![Doc Coverage](doc_coverage_badge.svg)" >> ci-reports/ci_summary_report.md
+            echo "" >> ci-reports/ci_summary_report.md
+          fi
+
+          # Append test log
           if [ -f ci-logs/test_petgem.log ]; then
             echo "## Test Log" >> ci-reports/ci_summary_report.md
             cat ci-logs/test_petgem.log >> ci-reports/ci_summary_report.md
@@ -191,14 +240,14 @@ jobs:
           echo "---" >> ci-reports/ci_summary_report.md
           echo "🎉 CI workflow completed at $(date)" >> ci-reports/ci_summary_report.md
 
-      # === Convert Markdown to HTML/PDF ===
+      # Convert Markdown report to HTML and PDF
       - name: Convert Markdown to HTML/PDF
         run: |
           sudo apt-get update && sudo apt-get install -y pandoc wkhtmltopdf
           pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.html
           pandoc ci-reports/ci_summary_report.md -o ci-reports/ci_summary_report.pdf --pdf-engine=wkhtmltopdf
 
-      # === Generate dashboard index.html ===
+      # Generate simple HTML dashboard
       - name: Generate CI Dashboard
         run: |
           cat > ci-reports/index.html <<'EOF'
@@ -213,7 +262,7 @@ jobs:
               ul { line-height: 1.8; }
               a { color: #0a5275; text-decoration: none; font-weight: bold; }
               a:hover { text-decoration: underline; }
-              .badge { margin-top: 20px; }
+              .badge { margin-top: 20px; display: block; }
             </style>
           </head>
           <body>
@@ -221,25 +270,26 @@ jobs:
             <ul>
               <li><a href="ci_summary_report.html">📊 CI Summary Report (HTML)</a></li>
               <li><a href="ci_summary_report.pdf">📄 CI Summary Report (PDF)</a></li>
-              <li><a href="doc_coverage_badge.svg">🟢 Documentation Coverage Badge</a></li>
             </ul>
+
+            <!-- Display the documentation coverage badge inline -->
             <div class="badge">
-              <h3>Live Badge:</h3>
-              <img src="doc_coverage_badge.svg" alt="Documentation Coverage Badge"/>
+              <h2>Documentation Coverage</h2>
+              <img src="doc_coverage_badge.svg" alt="Documentation Coverage Badge">
             </div>
           </body>
           </html>
           EOF
 
-      # === Upload CI reports as artifact ===
+      # Upload CI report artifacts
       - name: Upload CI Report as artifact
         uses: actions/upload-artifact@v4
         with:
           name: ci-execution-report
           path: ci-reports/
 
-      # === Deploy reports to GitHub Pages ===
-      - name: Deploy reports to GitHub Pages
+      # Deploy reports to GitHub Pages
+      - name: Deploy reports to GitHub pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -247,8 +297,8 @@ jobs:
           publish_dir: ci-reports
           destination_dir: ci-reports
 
-      # === Show URL ===
-      - name: Show GitHub Pages URL
+      # Show dashboard URL in Actions log
+      - name: Show GitHub pages URL
         run: |
           echo "✅ CI reports deployed! Access the dashboard at:"
           echo "https://ocastilloreyes.github.io/petgem/ci-reports/"
