@@ -117,7 +117,7 @@ jobs:
           name: test-logs
           path: test_petgem.log
 
-    ci-report:
+  ci-report:
     runs-on: ubuntu-latest
     needs: [compile-petgem, compile-docs, test-petgem]
     steps:
