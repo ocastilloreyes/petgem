@@ -144,10 +144,39 @@ jobs:
         run: |
           WORKFLOW_RUN_ID=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs --jq '.workflow_runs[0].id')
           JOBS_JSON=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs/$WORKFLOW_RUN_ID/jobs)
-          echo "<html><head><title>PETGEM CI Report</title></head><body>" > ci-report/index.html
-          echo "<h1>PETGEM CI Report</h1><ul>" >> ci-report/index.html
-          echo "$JOBS_JSON" | jq -r '.jobs[] | "<li>\(.name): \(.status) / \(.conclusion)</li>"' >> ci-report/index.html
-          echo "</ul></body></html>" >> ci-report/index.html
+
+          BRANCH=${GITHUB_REF##*/}
+          DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          COMMIT_SHA=${GITHUB_SHA::7}
+
+          echo "<html><head><title>PETGEM CI Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; color: #333; }
+            h1 { color: #004080; display: flex; align-items: center; }
+            h1 img { height: 50px; margin-right: 15px; }
+            .meta { margin-bottom: 20px; font-size: 14px; color: #555; }
+            table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background-color: #004080; color: white; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+            a { color: #004080; text-decoration: none; font-weight: bold; }
+            a:hover { text-decoration: underline; }
+            .success { color: green; font-weight: bold; }
+            .failure { color: red; font-weight: bold; }
+            .in_progress { color: orange; font-weight: bold; }
+          </style>
+          </head><body>" > ci-report/index.html
+
+          echo "<h1><img src='../docs/source/_static/petgem_logo.png' alt='PETGEM Logo'/> PETGEM CI Report</h1>" >> ci-report/index.html
+          echo "<div class='meta'>Branch: <b>$BRANCH</b> | Date: <b>$DATE</b> | Commit: <code>$COMMIT_SHA</code></div>" >> ci-report/index.html
+
+          echo "<table><tr><th>Job</th><th>Status</th><th>Conclusion</th></tr>" >> ci-report/index.html
+          echo "$JOBS_JSON" | jq -r '.jobs[] | 
+            "<tr><td><a href=\"" + .html_url + "\">" + .name + "</a></td>
+             <td>\(.status)</td>
+             <td><span class=\"" + (.conclusion // "in_progress") + "\">" + (.conclusion // "in_progress") + "</span></td></tr>"' \
+            >> ci-report/index.html
+          echo "</table></body></html>" >> ci-report/index.html
 
       - name: Publish report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
