@@ -115,7 +115,7 @@ jobs:
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
       # Run test preprocessing and capture log
-      - name: Run PETGEM tests
+      - name: Run preprocessing data
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
@@ -124,6 +124,24 @@ jobs:
             bash -c "gmsh ${PETGEM_TEST_DIR}/mesh.geo -3 && \
                      python3 ${PETGEM_TEST_DIR}/generate_resistivity_model.py && \
                      python3 ${PETGEM_TEST_DIR}/generate_params_file.py"
+
+      - name: Run PETGEM p=1 examples to verify correct installation
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            bash -c "mpirun -n 1 build/./csem-kernel -options_file ${PETGEM_TEST_DIR}/params_nord1.txt && \
+                     mpirun -n 2 build/./csem-kernel -options_file ${PETGEM_TEST_DIR}/params_nord1.txt"
+
+      - name: Run PETGEM p=2 examples to verify correct installation
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            bash -c "mpirun -n 1 build/./csem-kernel -options_file ${PETGEM_TEST_DIR}/params_nord2.txt && \
+                     mpirun -n 2 build/./csem-kernel -options_file ${PETGEM_TEST_DIR}/params_nord2.txt "
 
   # Job: publish CI report
   publish-report:

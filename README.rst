@@ -1,11 +1,11 @@
-.. image:: docs/source/_static/petgem_logo.png
-   :alt: PETGEM Logo
-   :align: center
-   :width: 100px
+.. raw:: html
 
-==================================
-PETGEM: Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling
-==================================
+   <div style="display: flex; align-items: center; margin-bottom: 20px;">
+       <img src="_static/petgem_logo.png" alt="PETGEM Logo" width="100px" style="margin-right: 20px;">
+       <div>
+           <h1>PETGEM: Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling</h1>
+       </div>
+   </div>
 
 .. image:: https://img.shields.io/github/actions/workflow/status/ocastilloreyes/petgem/ci-develop.yml?branch=develop
    :target: https://github.com/ocastilloreyes/petgem/actions
@@ -29,23 +29,23 @@ PETGEM: Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling
 
 **PETGEM** (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is a high-performance open-source software designed for 
 the simulation of electromagnetic (EM) fields in geophysical exploration.  
-It is developed and maintained by researchers at the **Universitat Politècnica de Catalunya (UPC)** and the **Barcelona Supercomputing Center (BSC)**.
+It is developed and maintained by researchers at the `Universitat Politècnica de Catalunya (UPC) <https://www.ac.upc.edu/en?set_language=en>`_ and the `Barcelona Supercomputing Center (BSC) <https://www.bsc.es/es/discover-bsc/organisation/scientific-structure/geophysical-applications>`_.
 
 Key features include:
 
-* Parallel and scalable solver for large-scale 3D EM forward modeling.
-* Support for tetrahedral meshes and high-order edge finite element formulations.
-* Optimized for **HPC clusters and exascale architectures**.
-* Flexible **C kernel** for performance.
+- Parallel and scalable solver for large-scale 3D EM forward modeling
+- Support for tetrahedral meshes and high-order edge finite element formulations
+- Optimized for **HPC clusters and exascale architectures**
+- Flexible **C kernel** for performance
 
 Dependencies
 ------------
 
 PETGEM requires the following main dependencies:
 
-* `PETSc <https://petsc.org/>`_ (with MPI, BLAS/LAPACK, MUMPS, HDF5)
-* `Gmsh <http://gmsh.info/>`_
-* Python 3.x packages:
+- `PETSc <https://petsc.org/>`_ (with MPI, BLAS/LAPACK, MUMPS, HDF5, petsc4py)
+- `Gmsh <http://gmsh.info/>`_
+- Python 3.x packages:
    - numpy
    - matplotlib
    - h5py
@@ -91,20 +91,19 @@ Citing PETGEM
 
 If you use **PETGEM** in your research, please cite the following articles:
 
-* Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019).
+- Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019).
   *Parallel 3-D marine controlled-source electromagnetic modelling using high-order
   tetrahedral Nédélec elements*. Geophysical Journal International, Volume 219,
   Issue 1, October 2019, Pages 39–65, https://doi.org/10.1093/gji/ggz285
 
-* Castillo-Reyes, O., de la Puente, J., Cela, J. M. (2018). *PETGEM: A parallel
+- Castillo-Reyes, O., de la Puente, J., Cela, J. M. (2018). *PETGEM: A parallel
   code for 3D CSEM forward modeling using edge finite elements*. Computers &
   Geosciences, vol 119: 123-136. ISSN 0098-3004,  Elsevier.
   https://doi.org/10.1016/j.cageo.2018.07.005
 
 For additional publications, you may consult:
 
-* `Google Scholar profile <https://scholar.google.es/citations?user=ifjbBssAAAAJ&hl=es&oi=ao>`_  
-* `Publication list <docs/source/publications.rst>`_ (detailed bibliography)
+- `Google Scholar profile <https://scholar.google.es/citations?user=ifjbBssAAAAJ&hl=es&oi=ao>`_  
 
 License
 -------

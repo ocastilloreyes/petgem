@@ -1,13 +1,47 @@
-###############
-What is PETGEM?
-###############
+############
+About PETGEM
+############
 
-Electromagnetic methods (EM) are an established tool in geophysics, with application in many areas such as hydrocarbon and mineral exploration, reservoir monitoring, CO2 storage characterization, geothermal reservoir imaging and many others. In particular, the marine Controlled-Source Electromagnetic method (CSEM) and the 3D magnetotelluric (MT) method have become important techniques for reducing ambiguities in data interpretation in exploration geophysics. In order to be able to predict the EM signature of a given geological structure, modelling tools provide us with synthetic results which we can then compare to real data. In particular, if the geology is structurally complex, one might need to use methods able to cope with such complexity in a natural way by means of, e.g., an unstructured mesh representing its geometry. Among the modelling methods for EM based upon 3D unstructured meshes, the High-order Nédélec Finite Elements (FE), a type of Edge Finite Elements, offer a good trade-off between accuracy and number of degrees of freedom, i.e. size of the problem.
+Overview
+--------
+PETGEM (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is an HPC-ready software suite
+designed for simulating electromagnetic wave propagation in 3D subsurface models. PETGEM supports
+MPI parallelism, unstructured tetrahedral meshes, and high-order vector finite element methods.
 
-In the multi-core and many-core era, parallelization is a crucial issue. Nédélec FE offer good scalability potential. Its low DOF number make them potentially fast, which is crucial in the future goal of solving inverse problems which might involve over 100,000 realizations (e.g. within a inversion routine). However, the state of the art shows a relative scarcity of robust high-order edge-based codes to simulate these problems.
+Key Features
+------------
+- High-order vector finite element method for controlled-source EM problems
+- Support for unstructured tetrahedral meshes
+- Parallel computing with MPI and PETSc
+- Python bindings for pre- and post-processing
+- Integration with mesh generators (`Gmsh <http://gmsh.info/>`_) and performance tools (`Extrae <https://tools.bsc.es/extrae>`_)
 
-On top of that, Parallel Edge-based Tool for Geophysical Electromagnetic Modelling (PETGEM) is a C tool for the scalable solution of the EM modeling on tetrahedral meshes, as these are the easiest to scale-up to very large domains or arbitrary shape. It supports distributed-memory paralelism through `petsc <https://PETSc.org/release/>`_ library.
+Applications
+------------
+PETGEM is suitable for:
 
-As a result, PETGEM tool allow users to specify high-order edge-based variational forms of H(curl) for the simulation of electromagnetic fields in realistic 3D active-source (e.g. CSEM) and 3D passive-source (e.g. MT) surveys with accuracy, reliability and efficiency.
+- Geothermal reservoir exploration
+- Oil & gas subsurface imaging
+- Environmental EM surveys
+- Academic research in geophysics
 
-PETGEM is developed as open-source under BSD-3 license at Computer Applications in Science & Engineering (CASE) of the Barcelona Supercomputing Center (BSC). Requests and contributions are welcome.
+References
+----------
+For more information, see:
+
+- `PETGEM GitHub repository <https://github.com/ocastilloreyes/petgem/>`_
+- Publications using PETGEM: 
+	- Rulff, P., Deleersnyder, W., Castillo-Reyes, O., Carrizo Mascarell, M., King, J. *An evaluation of computational methods in electromagnetic geophysics and their potential for groundwater system imaging.* EGU General Assembly 2025. `DOI: 10.5194/egusphere-egu25-5895 <https://doi.org/10.5194/egusphere-egu25-5895>`_
+	- Castillo-Reyes, O., Orihuela García, X., Piña Suárez, X. *Designing a mockup and refactoring code for HPC geo-electromagnetic applications.*  2024 IEEE International Conference on Engineering Veracruz (ICEV). `DOI: 10.1109/ICEV63254.2024.10765935 <https://doi.org/10.1109/ICEV63254.2024.10765935>`_
+	- Castillo-Reyes, O., Ledesma-Prol, R.M., Corbo-Camargo, F., Rojas, O. *Geothermal resources in Latin-America and their exploration using electromagnetic methods.* Geothermal Energy. `DOI: 10.1186/s40517-024-00314-5 <https://doi.org/10.1186/s40517-024-00314-5>`_
+	- Castillo-Reyes, O., Queralt, P., Piñas-Varas, P., Ledo, J., Rojas, O. *Electromagnetic subsurface imaging in the presence of metallic structures: A review of numerical strategies.*  Surveys in Geophysics. `DOI: 10.1007/s10712-024-09855-7 <https://doi.org/10.1007/s10712-024-09855-7>`_
+	- Rulff, P., Castillo-Reyes, O., Koyan, P., Martin, T., Deleersnyder, W., Carrizo Mascarell, M. *Geoelectrical and electromagnetic imaging methods applied to groundwater systems: recent advances and future potentials.*  EGU General Assembly 2024. `DOI: 10.5194/egusphere-egu24-654 <https://doi.org/10.5194/egusphere-egu24-654>`_
+	- Castillo-Reyes, O., Rulff, P., Um, E., Amor-Martin, A. *Meshing strategies for 3D geo-electromagnetic modeling in the presence of metallic infrastructure.*  Computational Geosciences. `DOI: 10.1007/s10596-023-10247-w <https://doi.org/10.1007/s10596-023-10247-w>`_
+	- Castillo-Reyes, O., Hu, X., Wang, B., Wang, Y., Guo, Z. *Electromagnetic imaging and deep learning for transition to renewable energies: a technology review.* Frontiers in Earth Science. `DOI: 10.3389/feart.2023.1159910 <https://doi.org/10.3389/feart.2023.1159910>`_
+	- Castillo-Reyes, O., Amor-Martin, A., Botella, A., Pierre, A., García-Castillo, L.E. *Tailored meshing for parallel 3D electromagnetic modeling using high-order edge elements.* Journal of Computational Science. `DOI: 10.1016/j.jocs.2022.101813 <https://doi.org/10.1016/j.jocs.2022.101813>`_
+	- Castillo-Reyes, O., de la Puente, J., Cela, J.M. *HPC geophysical electromagnetics: A synthetic VTI model with complex bathymetry.* Energies, vol. 15:1272. `DOI: 10.3390/en15041272 <https://doi.org/10.3390/en15041272>`_
+	- Castillo-Reyes, O., Modesto, D., Queralt, P., Marcuello, A., Ledo, J., Amor-Martin, A., de la Puente, J., García-Castillo, L.E. *3D magnetotelluric modeling using high-order tetrahedral Nédélec elements on massively parallel computing platforms.* Computers & Geosciences. `DOI: 10.1016/j.cageo.2021.105030 <https://doi.org/10.1016/j.cageo.2021.105030>`_
+	- Werthmüller, D., Rochlitz, R., Castillo-Reyes, O., Heagy, L. *Towards an open-source landscape for 3-D CSEM modelling.* Geophysical Journal International. `DOI: 10.1093/gji/ggab238 <https://doi.org/10.1093/gji/ggab238>`_
+	- Castillo-Reyes, O., Queralt, P., Marcuello, A., Ledo, J. *Land CSEM simulations and experimental test using metallic casing in a geothermal exploration context: Vallès Basin (NE Spain) case study.* IEEE Transactions on Geoscience and Remote Sensing. `DOI: 10.1109/TGRS.2021.3069042 <https://doi.org/10.1109/TGRS.2021.3069042>`_
+	- Castillo-Reyes, O., de la Puente, García-Castillo, L.E., Cela, J.M. *Parallel 3D marine controlled-source electromagnetic modeling using high-order tetrahedral Nédélec elements.* Geophysical Journal International. `DOI: 10.1093/gji/ggz285 <https://doi.org/10.1093/gji/ggz285>`_
+	- Castillo-Reyes, O., de la Puente, Cela, J.M. *PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements.* Computers & Geosciences. `DOI: 10.1016/j.cageo.2018.07.005 <https://doi.org/10.1016/j.cageo.2018.07.005>`_
