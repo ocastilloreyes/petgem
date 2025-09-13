@@ -138,6 +138,9 @@ jobs:
       - name: Prepare report folder
         run: mkdir -p ci-report
 
+      - name: Copy PETGEM logo to report folder
+        run: cp docs/source/_static/petgem_logo.png ci-report/
+
       - name: Generate CI report
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -167,7 +170,7 @@ jobs:
           </style>
           </head><body>" > ci-report/index.html
 
-          echo "<h1><img src='../docs/source/_static/petgem_logo.png' alt='PETGEM Logo'/> PETGEM CI Report</h1>" >> ci-report/index.html
+          echo "<h1><img src='petgem_logo.png' alt='PETGEM Logo'/> CI Report</h1>" >> ci-report/index.html
           echo "<div class='meta'>Branch: <b>$BRANCH</b> | Date: <b>$DATE</b> | Commit: <code>$COMMIT_SHA</code></div>" >> ci-report/index.html
 
           echo "<table><tr><th>Job</th><th>Status</th><th>Conclusion</th></tr>" >> ci-report/index.html
