@@ -1,161 +1,129 @@
-.. image:: https://raw.githubusercontent.com/ocastilloreyes/petgem/master/doc/source/_static/figures/petgem_logo.png
-   :target: https://github.com/ocastilloreyes/petgem
+.. image:: docs/source/_static/petgem_logo.png
+   :alt: PETGEM Logo
    :align: center
-   :alt: petgem logo
+   :width: 300px
 
-----
+==================================
+PETGEM: Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling
+==================================
 
-.. |doc_badge| image:: https://Longue.github.io/petgem/doc_coverage_badge.svg
-   :alt: Documentation Coverage
-   :target: https://petgem.readthedocs.io/en/latest/
+.. image:: https://img.shields.io/github/actions/workflow/status/ocastilloreyes/petgem/ci.yml?branch=develop
+   :target: https://github.com/ocastilloreyes/petgem/actions
+   :alt: CI Status
 
-.. |coverage_badge| image:: https://coveralls.io/repos/github/ocastilloreyes/petgem/badge.svg?branch=develop
-   :alt: Coveralls
-   :target: https://coveralls.io/github/ocastilloreyes/petgem?branch=develop
+.. image:: https://img.shields.io/badge/docs-latest-blue.svg
+   :target: https://petgem.readthedocs.io/en/latest/index.html
+   :alt: Documentation
 
-.. |release_badge| image:: https://img.shields.io/github/v/release/ocastilloreyes/petgem
-   :alt: GitHub release (latest by date)
-   :target: https://github.com/ocastilloreyes/petgem/releases
-
-.. |ubuntu_badge| image:: https://img.shields.io/static/v1?label=Ubuntu&logo=Ubuntu&logoColor=white&message=support&color=success
-   :alt: Ubuntu support
-   :target: https://ubuntu.com/
-
-.. |license_badge| image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
-   :alt: petgem-license
+.. image:: https://img.shields.io/github/license/ocastilloreyes/petgem
    :target: https://opensource.org/licenses/BSD-3-Clause
+   :alt: License: BSD 3-Clause
 
-=========================================================================================
-|doc_badge| |coverage_badge| |release_badge| |ubuntu_badge| |license_badge|
-=========================================================================================
-
-Parallel Edge-based Tool for Geophysical Electromagnetic Modelling
-------------------------------------------------------------------
-**petgem** is a Python code for the scalable solution of electromagnetic diffusion fields on tetrahedral
-meshes, as these are the easiest to scale-up to very large domains or
-arbitrary shape. It supports distributed-memory parallelism through
-petsc4py package. **petgem** allow users to specify high-order edge-based variational
-forms of H(curl) for the simulation of electromagnetic fields in realistic
-3D CSEM/MT surveys with accuracy, reliability and efficiency.
+.. image:: https://img.shields.io/github/v/release/ocastilloreyes/petgem
+   :target: https://github.com/ocastilloreyes/petgem/releases
+   :alt: Latest Release
 
 
+Summary
+-------
 
-Installation
-------------
+**PETGEM** (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is a high-performance open-source software designed for 
+the simulation of electromagnetic (EM) fields in geophysical exploration.  
+It is developed and maintained by researchers at the **Universitat Politècnica de Catalunya (UPC)** and the **Barcelona Supercomputing Center (BSC)**.
 
+Key features include:
 
-
-
-
-
-Usage
------
-
-
-
-
-
-
-Publications
--------------
-
-
-
-
-
-
-Contributing
-------------
-
-
-
-
-
-
-More information
-----------------
-For more information regarding installation, usage, contributing and bug reports see:
-
-- **Website**: https://petgem.bsc.es/
-- **Documentation**: https://petgem.bsc.es/
-- **Installation**: https://petgem.bsc.es/
-- **Source Code**: https://github.com/ocastilloreyes/petgem
-- **Pypi site**: https://pypi.org/project/petgem/
-- **Examples**: https://github.com/ocastilloreyes/petgem
-
-The documentation source is in the doc/ directory. The following steps summarize how to generate **petgem** documentation.
-
-Move to the **petgem** doc directory:
-
-  $ cd doc
-
-Generate the **petgem** documentation in HTML format by typing:
-
-  $ make html
-
-Or, if you prefer the PDF format by typing:
-
-  $ make latexpdf
-
-Requests and contributions are welcome.
-
-
-
-
+* Parallel and scalable solver for large-scale 3D EM forward modeling.
+* Support for tetrahedral meshes and high-order edge finite element formulations.
+* Optimized for **HPC clusters and exascale architectures**.
+* Flexible **C kernel** for performance.
 
 
 Dependencies
 ------------
 
--  A matching version of PETSc\_
+PETGEM requires the following main dependencies:
 
--  Python\_ (versions 3.5.2, 3.6.3, 3.6.9, 3.12.0, 3.14.0, and 3.17.0 have been tested).
+* `PETSc <https://petsc.org/>`_ (with MPI, BLAS/LAPACK, MUMPS, HDF5)
+* `Gmsh <http://gmsh.info/>`_
+* Python 3.x packages:
+  - numpy
+  - matplotlib
+  - h5py
+  - meshio
+  - sphinx (for documentation)
 
--  A recent NumPy\_ release.
-
--  A recent Scipy\_ release.
-
-- A recent Singleton-decorator\_ release.
-
-- A recent Sphinx\_ release.
-
-- A recent texlive\_ release.
-
-- A recent Petsc4py\_ release.
-
-- A recent Mpi4py\_ release.
-
-- A recent h5py\_ release.
+For a fully reproducible environment, a Docker image is provided (see below).
 
 
+Docker support
+--------------
+
+You can build and run PETGEM inside Docker for a consistent development and testing environment.
+
+.. code-block:: bash
+
+   # Clone repository
+   git clone https://github.com/ocastilloreyes/petgem.git
+   cd petgem
+
+   # Build Docker image
+   docker build -t petgem-env -f docker/dockerfile.release .
+
+   # Run PETGEM inside container
+   docker run --rm -it -v $(pwd):/workspace -w /workspace petgem-env bash
+
+   # Compile code
+   make USE_EXTRAE=0
+
+   # Run a test model
+   gmsh tests/canonical_model/mesh.geo -3
+   python3 tests/canonical_model/generate_resistivity_model.py
+   python3 tests/canonical_model/generate_params_file.py
 
 
+Documentation
+-------------
+
+Full user and developer documentation is available at:
+
+📖 https://petgem.readthedocs.io/en/latest/index.html
 
 
-Citation
---------
-If you publish results for which you used **petgem**, please give credit by citing
-`Castillo-Reyes, O. et al. (2019) <https://doi.org/10.1093/gji/ggz285>`_:
+Citing PETGEM
+-------------
+
+If you use **PETGEM** in your research, please cite the following articles:
+
+* `Castillo-Reyes, O. et al. (2019) <https://doi.org/10.1093/gji/ggz285>`_:
 
   Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019).
   *Parallel 3-D marine controlled-source electromagnetic modelling using high-order
   tetrahedral Nédélec elements*. Geophysical Journal International, Volume 219,
   Issue 1, October 2019, Pages 39–65, https://doi.org/10.1093/gji/ggz285
 
-and `Castillo-Reyes, O. et al. (2018) <https://doi.org/10.1016/j.cageo.2018.07.005>`_:
+* `Castillo-Reyes, O. et al. (2018) <https://doi.org/10.1016/j.cageo.2018.07.005>`_:
 
   Castillo-Reyes, O., de la Puente, J., Cela, J. M. (2018). *PETGEM: A parallel
   code for 3D CSEM forward modeling using edge finite elements*. Computers &
   Geosciences, vol 119: 123-136. ISSN 0098-3004,  Elsevier.
   https://doi.org/10.1016/j.cageo.2018.07.005
 
+For additional publications, you may consult:
 
-
-
+* `Google Scholar profile <https://scholar.google.es/citations?user=ifjbBssAAAAJ&hl=es&oi=ao>`_  
+* `Publication list <docs/source/publications.rst>`_ (detailed bibliography)
 
 
 License
 -------
+
+This project is distributed under the **BSD 3-Clause License**.  
+See the `LICENSE <LICENSE>`_ file for details.
+
+
+
+
 **petgem** is developed as open-source under BSD-3 license at Computer Applications
 in Science & Engineering of the Barcelona Supercomputing Center - Centro Nacional
 de Supercomputación. Please, see the CONDITIONS OF USE described in the LICENSE.rst file.
