@@ -30,7 +30,9 @@ References
 For more information, see:
 
 - `PETGEM GitHub repository <https://github.com/ocastilloreyes/petgem/>`_
-- Publications using PETGEM: 
+
+- Publications using PETGEM:
+
 	- Rulff, P., Deleersnyder, W., Castillo-Reyes, O., Carrizo Mascarell, M., King, J. *An evaluation of computational methods in electromagnetic geophysics and their potential for groundwater system imaging.* EGU General Assembly 2025. `DOI: 10.5194/egusphere-egu25-5895 <https://doi.org/10.5194/egusphere-egu25-5895>`_
 	- Castillo-Reyes, O., Orihuela García, X., Piña Suárez, X. *Designing a mockup and refactoring code for HPC geo-electromagnetic applications.*  2024 IEEE International Conference on Engineering Veracruz (ICEV). `DOI: 10.1109/ICEV63254.2024.10765935 <https://doi.org/10.1109/ICEV63254.2024.10765935>`_
 	- Castillo-Reyes, O., Ledesma-Prol, R.M., Corbo-Camargo, F., Rojas, O. *Geothermal resources in Latin-America and their exploration using electromagnetic methods.* Geothermal Energy. `DOI: 10.1186/s40517-024-00314-5 <https://doi.org/10.1186/s40517-024-00314-5>`_

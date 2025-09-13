@@ -44,8 +44,10 @@ Dependencies
 PETGEM requires the following main dependencies:
 
 - `PETSc <https://petsc.org/>`_ (with MPI, BLAS/LAPACK, MUMPS, HDF5, petsc4py)
+
 - `Gmsh <http://gmsh.info/>`_
-- Python 3.x packages:
+
+- Python 3.x packages
    - numpy
    - matplotlib
    - h5py
