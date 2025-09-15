@@ -33,22 +33,31 @@ PETGEM provides a ready-to-use Docker environment:
    python3 tests/canonical_model/generate_resistivity_model.py
    python3 tests/canonical_model/generate_params_file.py
 
+Makefile usage
+--------------
+PETGEM provides a Makefile to simplify building and generating documentation.
 
-Makefile options
-----------------
-- Build PETGEM kernels:
+**Common Makefile Targets:**
 
-.. code-block:: bash
+.. list-table::
+   :header-rows: 1
 
-    make all
+   * - Target
+     - Description
+   * - all
+     - Build the PETGEM kernels (default)
+   * - clean
+     - Remove object files and executables
+   * - docs
+     - Generate all documentation
+   * - clean_doc
+     - Clean documentation
+   * - help
+     - Show Makefile help message
 
-- Clean build:
+**Optional Build Options:**
 
-.. code-block:: bash
-
-    make clean
-
-- Optional build flags:
+Set optional flags when invoking make: `make <target> OPTION=1`
 
 .. list-table::
    :header-rows: 1
@@ -56,6 +65,38 @@ Makefile options
    * - Option
      - Description
    * - USE_INTEL=1
-     - Use Intel MPI compiler instead of PETSc default
+     - Use Intel MPI compiler (`mpiicc`) instead of PETSc default
    * - USE_EXTRAE=1
      - Enable Extrae instrumentation for performance tracing
+
+Examples
+--------
+- Build PETGEM kernels with default settings:
+
+.. code-block:: bash
+
+    make all
+
+- Build PETGEM kernels using Intel MPI:
+
+.. code-block:: bash
+
+    make all USE_INTEL=1
+
+- Build PETGEM kernels with Extrae tracing enabled:
+
+.. code-block:: bash
+
+    make all USE_EXTRAE=1
+
+- Clean the build:
+
+.. code-block:: bash
+
+    make clean
+
+- Generate documentation:
+
+.. code-block:: bash
+
+    make docs

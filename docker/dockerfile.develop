@@ -56,7 +56,7 @@ RUN mkdir -p $EXTRAE_DIR/libunwind $EXTRAE_DIR/papi $EXTRAE_DIR/libxml2 $EXTRAE_
 
 # libunwind
 WORKDIR /workspace
-RUN git clone https://github.com/libunwind/libunwind.git \
+RUN git clone -b v1.8.3 https://github.com/libunwind/libunwind.git \
     && cd libunwind \
     && autoreconf -i \
     && ./configure --prefix=$EXTRAE_DIR/libunwind \
@@ -64,7 +64,7 @@ RUN git clone https://github.com/libunwind/libunwind.git \
 
 # PAPI
 WORKDIR /workspace
-RUN git clone https://github.com/icl-utk-edu/papi \
+RUN git clone -b papi-7-2-0-t https://github.com/icl-utk-edu/papi \
     && cd papi/src \
     && ./configure --prefix=$EXTRAE_DIR/papi CC=gcc F77=gfortran \
     && make && make install
@@ -79,14 +79,14 @@ RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz \
 
 # libxml2
 WORKDIR /workspace
-RUN git clone --branch v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
+RUN git clone -b v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
     && cd libxml2 \
     && ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python \
     && make && make install
 
 # Extrae
 WORKDIR /workspace
-RUN git clone https://github.com/bsc-performance-tools/extrae.git \
+RUN git clone -b 4.3.1 https://github.com/bsc-performance-tools/extrae.git \
     && cd extrae \
     && git submodule update --init --recursive \
     && autoreconf -f -i \

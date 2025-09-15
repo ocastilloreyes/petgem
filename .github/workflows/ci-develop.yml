@@ -131,8 +131,9 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "mpirun -n 1 build/./csem_kernel -options_file ${PETGEM_TEST_DIR}/params_nord1.txt && \
-                     mpirun -n 2 build/./csem_kernel -options_file ${PETGEM_TEST_DIR}/params_nord1.txt"
+            bash -c "make USE_EXTRAE=0 && \
+                    mpirun -n 1 build/./csem_kernel -options_file ${PETGEM_TEST_DIR}/params_nord1.txt && \
+                    mpirun -n 2 build/./csem_kernel -options_file ${PETGEM_TEST_DIR}/params_nord1.txt"
 
       - name: Run PETGEM p=2 examples to verify correct installation
         run: |
@@ -140,8 +141,9 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "mpirun -n 1 build/./csem_kernel -options_file ${PETGEM_TEST_DIR}/params_nord2.txt && \
-                     mpirun -n 2 build/./csem_kernel -options_file ${PETGEM_TEST_DIR}/params_nord2.txt "
+            bash -c "make USE_EXTRAE=0 && \
+                    mpirun -n 1 build/./csem_kernel -options_file ${PETGEM_TEST_DIR}/params_nord2.txt && \
+                    mpirun -n 2 build/./csem_kernel -options_file ${PETGEM_TEST_DIR}/params_nord2.txt "
 
   # Job: publish CI report
   publish-report:
