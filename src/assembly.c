@@ -768,7 +768,7 @@ PetscErrorCode assembleCsemLHS(DM dm, Grid grid, CsemSourceSet sources, Params p
             PetscCall(PetscPrintf(comm, "%f, %f, %f\n", invJacobian[j][0], invJacobian[j][2], invJacobian[j][2]));
          }*/
          
-        PetscCall(computeElementalGradientMatrix(cellOrientation, gradientMatrix));
+        //PetscCall(computeElementalGradientMatrix(cellOrientation, gradientMatrix));
         //PetscCall(computeElementalGradientMatrix2(params.nord, cellOrientation, numGaussPoints, gaussPoints, weigths));
 
         // Check that gradientMatrix is the kernel of Ke

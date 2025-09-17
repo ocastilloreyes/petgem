@@ -3,7 +3,7 @@
    <div style="display: flex; align-items: center; margin-bottom: 20px;">
        <img src="docs/source/_static/petgem_logo.png" alt="PETGEM Logo" width="100px" style="margin-right: 20px;">
        <div>
-           <h1>PETGEM: Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling</h1>
+           <h1>Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling</h1>
        </div>
    </div>
 

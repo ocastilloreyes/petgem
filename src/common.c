@@ -50,7 +50,7 @@ PetscErrorCode printHeader(){
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "----------------------------------------------------------------------------\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                                                          -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                  PETGEM                                  -\n"));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-        Parallel Toolkit for Large-scale Electromagnetic Modeling         -\n"));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-    Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling    -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                                                          -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-          GitHub Repository: github.com/ocastilloreyes/petgem             -\n"));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-                                                                          -\n"));
@@ -157,6 +157,8 @@ PetscErrorCode createDirectory(const char *path) {
 PetscErrorCode printTimers(PetscLogDouble timers[]) {
 
     PetscLogDouble elapsed_time;
+
+    PetscFunctionBeginUser;
 
     /* Compute elapsed time */
     elapsed_time = timers[0] + timers[1] + timers[2] + timers[3];

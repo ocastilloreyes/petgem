@@ -15,7 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-distutils \
     libglu1 libxcursor1 libgl1-mesa-glx libxinerama1 tzdata \
     texinfo doxygen latexmk \
-    texlive-latex-base texlive-latex-extra texlive-fonts-recommended \
+    texlive texlive-latex-extra texlive-latex-base texlive-latex-extra texlive-fonts-recommended \
+    dvipng cm-super \
     python3-breathe python3-meshio python3-h5py python3-numpy python3-matplotlib \
     python3-sphinx python3-sphinx-rtd-theme \
     && pip3 install --no-cache-dir cython \

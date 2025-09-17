@@ -1,23 +1,29 @@
-# --------------------------------------------------------------
-# Python Script for preprocessing mesh, resistivity data, and 
-# receiver information for PETGEM simulations.
-# This script processes a Gmsh-generated mesh by associating 
-# resistivity values with each finite element cell and 
-# incorporating receiver locations. The resulting datasets 
-# are formatted and stored for use in PETGEM forward modeling 
-# and inversion workflows.
-#
-# Usage:
-#   python3 preprocessing.py -resistivity_view vtk:canonical_model.vtu
-#
-# Notes:
-#   - The option `-resistivity_view vtk:canonical_model.vtu` exports 
-#     the resistivity distribution in VTK format, allowing direct 
-#     visualization with tools such as ParaView.
-#   - Similarly, the option `-field_view vtk:wham_model.vtu` 
-#     exports the simulated field data in VTK format for 
-#     postprocessing and analysis.
-# --------------------------------------------------------------
+#!/usr/bin/env python3
+"""
+*********************************************************************
+ Script for preprocessing mesh, resistivity data, and 
+ receiver information for PETGEM simulations.
+ This script processes a Gmsh-generated mesh by associating 
+ resistivity values with each finite element cell and 
+ incorporating receiver locations. The resulting datasets 
+ are formatted and stored for use in PETGEM forward modeling 
+ and inversion workflows.
+
+ Usage:
+   python3 preprocessing.py -resistivity_view vtk:canonical_model.vtu
+
+ Notes:
+   - The option `-resistivity_view vtk:canonical_model.vtu` exports 
+     the resistivity distribution in VTK format, allowing direct 
+     visualization with tools such as ParaView.
+   - Similarly, the option `-field_view vtk:wham_model.vtu` 
+     exports the simulated field data in VTK format for 
+     postprocessing and analysis.
+
+ Author: Octavio Castillo-Reyes (UPC/BSC) (octavio.castillo@upc.edu; octavio.castillo@bsc.es)
+ Latest update: September 10th, 2025     
+*********************************************************************
+"""
 
 import sys
 import meshio
@@ -32,14 +38,15 @@ from petsc4py import PETSc
 # ------------------------------------------------------------------------------
 # USER PARAMS
 # ------------------------------------------------------------------------------
-input_mesh_filename = "tests/canonical_model/mesh.msh"
-output_mesh_filename = "tests/canonical_model/canonical_model.h5"
-input_receivers_filename = "tests/canonical_model/receivers.txt"
-output_receivers_filename = "tests/canonical_model/receivers.h5"
+nord = sys.argv[1]
+input_mesh_filename = f"tests/csem_model/mesh_p{nord}.msh"
+output_mesh_filename = f"tests/csem_model/resistivity_model_p{nord}.h5"
+input_receivers_filename = "tests/csem_model/receivers.txt"
+output_receivers_filename = "tests/csem_model/receivers.h5"
 numDimensions = 3
-sigma_x = np.array([1.e-8, 0.1, 0.2, 0.001], dtype=float)
-sigma_y = np.array([1.e-8, 0.1, 0.2, 0.001], dtype=float)
-sigma_z = np.array([1.e-8, 0.1, 0.2, 0.001], dtype=float)
+sigma_x = np.array([3.3333, 1., 0.01, 1.], dtype=float)
+sigma_y = np.array([3.3333, 1., 0.01, 1.], dtype=float)
+sigma_z = np.array([3.3333, 1., 0.01, 1.], dtype=float)
 
 # ------------------------------------------------------------------------------
 # IMPORT MESH
@@ -118,7 +125,7 @@ plex.globalVectorView(viewer, plex, v)
 # use complex scalars. Currently, the conversion from real to complex has not been 
 # implemented. Therefore, we store the data as complex, allowing PETGEM to cast it 
 # from complex to real when needed.
-receivers = np.loadtxt(input_receivers_filename)
+receivers = np.loadtxt(input_receivers_filename, comments='#')
 vector = PETSc.Vec().createWithArray(receivers, comm=PETSc.COMM_SELF)
 vector.setName("receivers")
 vector.setUp()
