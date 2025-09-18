@@ -82,7 +82,7 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "make"
+            bash -c "make clean && make && make clean"
             
   # Job: Generate project documentation
   compile-docs:

@@ -9,13 +9,15 @@ Canonical CSEM example
 These test cases validate **PETGEM** using 3D CSEM models
 with simple stratified resistivity structures. The setup reproduces the reference experiment described in:
 
-Castillo-Reyes, O., de la Puente, J. M., Cela, J. M. (2018). *PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements.* Computers & Geosciences, 119, 123–136. https://doi.org/10.1016/j.cageo.2018.07.005 <https://doi.org/10.1016/j.cageo.2018.07.005>_
+Castillo-Reyes, O., de la Puente, J. M., Cela, J. M. (2018). *PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements.* Computers & Geosciences, 119, 123–136. `doi <https://doi.org/10.1016/j.cageo.2018.07.005>`_.
 
-### Model description
+
+Model description
+#################  
 
 - Frequency: 2 Hz
 - Source position: (0.0, 0.0, -975.0) m
-- Conductivity structures:
+- Conductivity structures
    - Seawater: 3.33 S/m
    - Sediments: 1.0 S/m
    - Oil reservoir: 0.01 S/m
@@ -73,7 +75,7 @@ Run the following commands to execute the test cases for `nord=1` or `nord=2`. R
 .. figure:: /_static/images/csem_test_p2.png
    :alt: Comparison of Ex component between PETGEM* and Dipole1D for nord=2
    :align: center
-   :width: 80%
+   :width: 95%
 
    Comparison of the electric field component **Ex** between **PETGEM** and the
    semi-analytical reference code **Dipole1D** for the case `nord=2`. The resulting
