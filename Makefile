@@ -24,13 +24,16 @@ include ${PETSC_DIR}/lib/petsc/conf/rules
 # Optional Extrae instrumentation
 # ----------------------------------------------------------------------------- 
 USE_EXTRAE ?= 0
-ifeq ($(USE_EXTRAE), 1)
-    E_CFLAGS  := -I$(EXTRAE_HOME)/include -DUSE_EXTRAE
-    E_LDFLAGS := -L$(EXTRAE_HOME)/lib -lmpitrace
-else
-    E_CFLAGS  :=
-    E_LDFLAGS :=
+
+E_CFLAGS  := -DUSE_EXTRAE=$(USE_EXTRAE)
+E_LDFLAGS :=
+
+ifeq ($(USE_EXTRAE),1)
+  E_CFLAGS  += -I$(EXTRAE_HOME)/include
+  E_LDFLAGS += -L$(EXTRAE_HOME)/lib -lmpitrace
 endif
+
+
 
 # ----------------------------------------------------------------------------- 
 # Include directory for PETGEM headers

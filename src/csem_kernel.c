@@ -221,7 +221,9 @@ int main(int argc, char **argv)
     #ifdef USE_EXTRAE
     Extrae_event (1000, 10);
     #endif
+
     PetscCall(printFooter());
+    
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif

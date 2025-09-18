@@ -185,7 +185,7 @@ jobs:
                      python3 ${EXTRAE_TEST_DIR}/generate_resistivity_model.py 1 && \
                      python3 ${EXTRAE_TEST_DIR}/generate_params_file.py 1 && \
                      mpirun -n 4 build/csem_kernel -options_file ${EXTRAE_TEST_DIR}/params_nord1.txt && \
-                     $EXTRAE_HOME/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}"
+                     ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}"
 
   # Job: publish CI report
   publish-report:

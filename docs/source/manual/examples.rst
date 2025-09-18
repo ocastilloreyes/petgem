@@ -62,13 +62,22 @@ Run the following commands to execute the test cases for `nord=1` or `nord=2`. R
    `csem_kernel` runs in parallel (4 MPI tasks) to compute the CSEM responses
 
 5. **Results comparison**  
-   `compare_responses.py [nord]` validates **PETGEM** output against semi-analytical 1D reference responses (Dipole1D)
+   `compare_responses.py [nord]` validates **PETGEM** output against semi-analytical 1D reference responses (**Dipole1D**)
 
 ### Expected outcome
 
 - Forward responses computed by **PETGEM** are compared to 1D semi-analytical solutions
 - Agreement is quantified via normalized root-mean-square deviation (NRMSD)
-- Successful execution confirms that **PETGEM** produces accurate results for both the `nord=1` and `nord=2` scenarios
+- Successful execution confirms that **PETGEM** produces accurate results for both the `nord=1` and `nord=2` scenarios.
+
+.. figure:: /_static/images/csem_test_p2.png
+   :alt: Comparison of Ex component between PETGEM* and Dipole1D for nord=2
+   :align: center
+   :width: 80%
+
+   Comparison of the electric field component **Ex** between **PETGEM** and the
+   semi-analytical reference code **Dipole1D** for the case `nord=2`. The resulting
+   normalized root-mean-square deviation (NRMSD) is **0.0134**.
 
 
 Extrae profiling example
@@ -109,7 +118,7 @@ resistivity model, parameter file, execute the forward modeling, and create the 
    mpirun -n 4 build/csem_kernel -options_file ${EXTRAE_TEST_DIR}/params_nord1.txt
 
    # Merge intermediate files and create the trace
-   $EXTRAE_HOME/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}
+   ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}
 
 ### Step-by-step
 
