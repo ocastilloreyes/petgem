@@ -1,21 +1,16 @@
 Examples
 ========
+This section provides example simulations to help users get started with CSEM modeling
+using **PETGEM**. These examples are designed to be both educational and practical, allowing
+users to validate the code and learn the typical workflow for setting up and running simulations.
 
-Canonical Examples
-------------------
-- Provided in `tests/canonical_model`
-- Includes p=1 and p=2 simulations for a simple layered resistivity model
+Canonical CSEM examples
+-----------------------
+- Provided in `tests/csem_model`
+- Detailed instructions to run the tests, including `nord=1` and `nord=2` simulations for a simple layered resistivity model, are explained in :doc:`../../tests/csem_model/readme`
 
-Running Examples
-----------------
-.. code-block:: bash
 
-    # Generate mesh
-    gmsh tests/canonical_model/mesh.geo -3
-
-    # Generate resistivity model and parameters
-    python3 tests/canonical_model/generate_resistivity_model.py
-    python3 tests/canonical_model/generate_params_file.py
-
-    # Run PETGEM simulation
-    mpirun -n 1 build/csem-kernel -options_file tests/canonical_model/params_nord1.txt
+Extrae profiling example
+------------------------
+- Provided in `tests/extrae_profiling`
+- 

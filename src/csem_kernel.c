@@ -57,7 +57,7 @@ int main(int argc, char **argv)
     Params  params;  
     Grid    grid; 
     CsemSourceSet sources = {0, 0, NULL};
-    PetscLogDouble timers[4]; 
+    PetscLogDouble timers[7]; 
     PetscLogDouble start_timer, end_timer;
 
     /* PETSC initialization */
@@ -90,12 +90,15 @@ int main(int argc, char **argv)
     Extrae_event (1000, 3);
     #endif
     
-    /* Start timer for read/setup grid */
+    /* Start timer for read params */
     PetscCall(PetscTime(&start_timer));
     
-    /* Call fuction */
     PetscCall(readParams(&params, size));
     
+    /* End timer for read params */
+    PetscCall(PetscTime(&end_timer));
+    timers[0] = end_timer-start_timer;
+
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
     #endif
@@ -105,7 +108,14 @@ int main(int argc, char **argv)
     Extrae_event (1000, 4);
     #endif
 
+    /* Start timer for setup source */
+    PetscCall(PetscTime(&start_timer));
+
     PetscCall(setupCsemSource(&sources, params));
+
+    /* End timer for setup source */
+    PetscCall(PetscTime(&end_timer));
+    timers[1] = end_timer-start_timer;
 
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
@@ -116,7 +126,14 @@ int main(int argc, char **argv)
     Extrae_event (1000, 5);
     #endif    
 
+    /* Start timer for import grid */
+    PetscCall(PetscTime(&start_timer));
+
     PetscCall(importGrid(&dm, &resistivity, params));
+
+    /* End timer for import grid */
+    PetscCall(PetscTime(&end_timer));
+    timers[2] = end_timer-start_timer;
 
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
@@ -127,11 +144,14 @@ int main(int argc, char **argv)
     Extrae_event (1000, 6);
     #endif
     
+    /* Start timer for setup grid */
+    PetscCall(PetscTime(&start_timer));
+
     PetscCall(setupCsemGrid(&dm, &grid, params));
     
-    /* End timer for read/setup grid */
+    /* End timer for setup grid */
     PetscCall(PetscTime(&end_timer));
-    timers[0] = end_timer-start_timer;
+    timers[3] = end_timer-start_timer;
 
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
@@ -152,7 +172,7 @@ int main(int argc, char **argv)
     
     /* End timer for assembly */
     PetscCall(PetscTime(&end_timer));
-    timers[1] = end_timer-start_timer;
+    timers[4] = end_timer-start_timer;
 
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
@@ -170,7 +190,7 @@ int main(int argc, char **argv)
 
     /* End timer for solver */
     PetscCall(PetscTime(&end_timer));
-    timers[2] = end_timer-start_timer;
+    timers[5] = end_timer-start_timer;
 
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);
@@ -188,7 +208,7 @@ int main(int argc, char **argv)
 
     /* End timer for postprocessing */
     PetscCall(PetscTime(&end_timer));
-    timers[3] = end_timer-start_timer;
+    timers[6] = end_timer-start_timer;
     
     #ifdef USE_EXTRAE
     Extrae_event (1000, 0);

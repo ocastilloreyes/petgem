@@ -161,13 +161,19 @@ PetscErrorCode printTimers(PetscLogDouble timers[]) {
     PetscFunctionBeginUser;
 
     /* Compute elapsed time */
-    elapsed_time = timers[0] + timers[1] + timers[2] + timers[3];
-
+    elapsed_time = 0.0;
+    for (PetscInt i=0; i<7; i++){
+        elapsed_time += timers[i];        
+    }    
+    
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Timers:\n"));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Read/setup grid  = %.4g secs\n", timers[0]));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Assembly         = %.4g secs\n", timers[1]));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Solver           = %.4g secs\n", timers[2]));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Postprocessing   = %.4g secs\n", timers[3]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Read user params = %.4g secs\n", timers[0]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Setup source     = %.4g secs\n", timers[1]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Import grid      = %.4g secs\n", timers[2]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   setup grid       = %.4g secs\n", timers[3]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Assembly         = %.4g secs\n", timers[4]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Solver           = %.4g secs\n", timers[5]));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Postprocessing   = %.4g secs\n", timers[6]));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Elapsed time     = %.4g secs\n", elapsed_time));
 
     PetscFunctionReturn(PETSC_SUCCESS);

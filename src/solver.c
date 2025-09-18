@@ -41,15 +41,19 @@ PetscErrorCode solveCsemSystem(DM dm, Mat A, Mat B, Mat G, Params params, Mat *X
     
     PetscFunctionBeginUser;
     
+    /* Variables declaration */
+    KSP ksp;
+    PetscBool ismatis = PETSC_FALSE;
+    PetscInt M, N, m, n;
+    VecType vtype;
+    
     /* Create KSP object */
     MPI_Comm comm = PetscObjectComm((PetscObject)dm);
-    KSP ksp;
 
     /* Setup solver and run it */
     PetscCall(KSPCreate(comm, &ksp));
     PetscCall(KSPSetOperators(ksp, A, A));
-
-    PetscBool ismatis = PETSC_FALSE;
+    
     PetscCall(PetscObjectTypeCompare((PetscObject)A, MATIS, &ismatis));
     if (ismatis && G) {
       PC pc;
@@ -57,11 +61,10 @@ PetscErrorCode solveCsemSystem(DM dm, Mat A, Mat B, Mat G, Params params, Mat *X
       PetscCall(KSPGetPC(ksp, &pc));
       PetscCall(PCSetType(pc, PCBDDC));
       PetscCall(PCBDDCSetDiscreteGradient(pc, G, params.nord, 0, PETSC_TRUE, PETSC_TRUE));
+
     }
     PetscCall(KSPSetFromOptions(ksp));
 
-    PetscInt M, N, m, n;
-    VecType vtype;
     PetscCall(MatGetSize(B, &M, &N));
     PetscCall(MatGetLocalSize(B, &m, &n));
     PetscCall(MatGetVecType(A, &vtype));

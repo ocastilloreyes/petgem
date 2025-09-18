@@ -52,22 +52,22 @@ ENV PATH="$GMSH_DIR/bin:${PATH}"
 # ---------------------------
 # Extrae dependencies
 # ---------------------------
-ENV EXTRAE_DIR=/usr/local/extrae
-RUN mkdir -p $EXTRAE_DIR/libunwind $EXTRAE_DIR/papi $EXTRAE_DIR/libxml2 $EXTRAE_DIR/binutils
+ENV EXTRAE_HOME=/usr/local/extrae
+RUN mkdir -p $EXTRAE_HOME/libunwind $EXTRAE_HOME/papi $EXTRAE_HOME/libxml2 $EXTRAE_HOME/binutils
 
 # libunwind
 WORKDIR /workspace
 RUN git clone -b v1.8.3 https://github.com/libunwind/libunwind.git \
     && cd libunwind \
     && autoreconf -i \
-    && ./configure --prefix=$EXTRAE_DIR/libunwind \
+    && ./configure --prefix=$EXTRAE_HOME/libunwind \
     && make && make install
 
 # PAPI
 WORKDIR /workspace
 RUN git clone -b papi-7-2-0-t https://github.com/icl-utk-edu/papi \
     && cd papi/src \
-    && ./configure --prefix=$EXTRAE_DIR/papi CC=gcc F77=gfortran \
+    && ./configure --prefix=$EXTRAE_HOME/papi CC=gcc F77=gfortran \
     && make && make install
 
 # binutils
@@ -75,14 +75,14 @@ WORKDIR /workspace
 RUN wget http://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz \
     && tar -xf binutils-2.42.tar.gz \
     && cd binutils-2.42 \
-    && ./configure --prefix=$EXTRAE_DIR/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error" \
-    && make && make install && cp libiberty/pic/libiberty.a $EXTRAE_DIR/binutils/lib
+    && ./configure --prefix=$EXTRAE_HOME/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error" \
+    && make && make install && cp libiberty/pic/libiberty.a $EXTRAE_HOME/binutils/lib
 
 # libxml2
 WORKDIR /workspace
 RUN git clone -b v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
     && cd libxml2 \
-    && ./autogen.sh --prefix=$EXTRAE_DIR/libxml2 --without-python \
+    && ./autogen.sh --prefix=$EXTRAE_HOME/libxml2 --without-python \
     && make && make install
 
 # Extrae
@@ -91,13 +91,13 @@ RUN git clone -b 4.3.1 https://github.com/bsc-performance-tools/extrae.git \
     && cd extrae \
     && git submodule update --init --recursive \
     && autoreconf -f -i \
-    && ./configure --prefix=$EXTRAE_DIR \
+    && ./configure --prefix=$EXTRAE_HOME \
         --with-mpi=$PETSC_DIR/$PETSC_ARCH/ \
-        --with-papi=$EXTRAE_DIR/papi \
-        --with-xml-prefix=$EXTRAE_DIR/libxml2 \
-        --with-unwind=$EXTRAE_DIR/libunwind \
-        --with-binutils=$EXTRAE_DIR/binutils \
-        --without-dyninst --disable-openmp \
+        --with-papi=$EXTRAE_HOME/papi \
+        --with-xml-prefix=$EXTRAE_HOME/libxml2 \
+        --with-unwind=$EXTRAE_HOME/libunwind \
+        --with-binutils=$EXTRAE_HOME/binutils \
+        --without-dyninst \
     && make -j1 && make install
 
 # Cleanup unnecessary files
