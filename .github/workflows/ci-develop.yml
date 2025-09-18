@@ -175,13 +175,13 @@ jobs:
         run: |
           docker run --rm \
             -e EXTRAE_CONFIG_FILE=${EXTRAE_TEST_DIR}/extrae.xml \
-            -e LD_LIBRARY_PATH=${EXTRAE_HOME}/lib:$LD_LIBRARY_PATH \
             -e TRACE_NAME=petgem.prv \
             -e EXTRAE_LABELS=${EXTRAE_TEST_DIR}/petgem_labels.txt \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "gmsh ${EXTRAE_TEST_DIR}/mesh_p1.geo -3 && \
+            bash -c "export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH && \
+                     gmsh ${EXTRAE_TEST_DIR}/mesh_p1.geo -3 && \
                      python3 ${EXTRAE_TEST_DIR}/generate_resistivity_model.py 1 && \
                      python3 ${EXTRAE_TEST_DIR}/generate_params_file.py 1 && \
                      mpirun -n 4 build/csem_kernel -options_file ${EXTRAE_TEST_DIR}/params_nord1.txt && \
