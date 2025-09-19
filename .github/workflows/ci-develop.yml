@@ -29,6 +29,33 @@ env:
 # Jobs
 # ====
 jobs:
+   # ==================
+  # Detect changes
+  # ==================
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      src: ${{ steps.filter.outputs.src }}
+      docs: ${{ steps.filter.outputs.docs }}
+      tests: ${{ steps.filter.outputs.tests }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - 'src/**'
+              - 'include/**'
+              - 'Makefile'
+            docs:
+              - 'docs/**'
+              - 'scripts/auto_doc/**'
+              - 'Doxyfile'
+            tests:
+              - 'tests/**'
+
   # ==================
   # Build docker image
   # ==================
@@ -63,17 +90,16 @@ jobs:
   # ==============================
   compile-petgem:
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: [docker-build, changes]
+    if: needs.changes.outputs.src == 'true'
     strategy:
       matrix:
         extrae: [0, 1]
       fail-fast: true
     steps:
       - uses: actions/checkout@v4
-
       - name: Pull Docker image
         run: docker pull ${{ env.DOCKER_IMAGE }}
-
       - name: Compile PETGEM
         run: |
           docker run --rm \
@@ -81,7 +107,6 @@ jobs:
             -w /workspace \
             ${{ env.DOCKER_IMAGE }} \
             bash -c "make USE_EXTRAE=${{ matrix.extrae }}"
-
       - name: Upload compiled binaries
         uses: actions/upload-artifact@v4
         with:
@@ -93,7 +118,8 @@ jobs:
   # ============
   test-petgem:
     runs-on: ubuntu-latest
-    needs: compile-petgem
+    needs: [compile-petgem, changes]
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true'
     strategy:
       matrix:
         include:
@@ -170,14 +196,12 @@ jobs:
   # =====================
   compile-docs:
     runs-on: ubuntu-latest
-    needs: docker-build
-    if: ${{ github.event_name != 'push' || contains(github.event.commits.*.modified, 'docs/') }}
+    needs: [docker-build, changes]
+    if: needs.changes.outputs.docs == 'true'
     steps:
       - uses: actions/checkout@v4
-      
       - name: Pull Docker image
         run: docker pull ${{ env.DOCKER_IMAGE }}
-      
       - name: Generate documentation
         run: |
           docker run --rm \
