@@ -76,7 +76,7 @@ jobs:
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-      # Compile PETGEM inside Docker and capture log
+      # Compile PETGEM without Extrae
       - name: Compile PETGEM without Extrae
         run: |
           docker run --rm \
@@ -84,6 +84,13 @@ jobs:
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
             bash -c "make USE_EXTRAE=0"
+
+      # Upload compiled binaries as artifact
+      - name: Upload PETGEM binary (no Extrae)
+        uses: actions/upload-artifact@v3
+        with:
+          name: petgem-binaries-no-extrae
+          path: build/csem_kernel
 
   # Job: Compile the PETGEM code with Extrae
   compile-petgem-extrae:
@@ -96,7 +103,7 @@ jobs:
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-      # Compile PETGEM inside Docker and capture log
+      # Compile PETGEM with Extrae
       - name: Compile PETGEM with Extrae
         run: |
           docker run --rm \
@@ -104,6 +111,13 @@ jobs:
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
             bash -c "make USE_EXTRAE=1"
+
+       # Upload compiled binaries as artifact
+      - name: Upload PETGEM binary (Extrae)
+        uses: actions/upload-artifact@v3
+        with:
+          name: petgem-binaries-extrae
+          path: build/csem_kernel_extrae
 
   # Job: Generate project documentation
   compile-docs:
@@ -125,27 +139,25 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
             bash -c "make docs"
  
-  # Job: run PETGEM test preprocessing scripts inside Docker
+  # Job: run PETGEM without Extrae
   test-csem-kernel:
     runs-on: ubuntu-latest
     needs: compile-petgem
     steps:
       - uses: actions/checkout@v4
 
+      # Download compiled binary
+      - name: Download PETGEM binary
+        uses: actions/download-artifact@v3
+        with:
+          name: petgem-binaries-no-extrae
+          path: build
+
       # Pull Docker image
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-      # Compile PETGEM
-      - name: Compile PETGEM without Extrae
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "make"
-
-      # Run PETGEM test for nord=1
+      # Run PETGEM tests
       - name: Preprocess data and run PETGEM nord=1 example
         run: |
           docker run --rm \
@@ -171,27 +183,25 @@ jobs:
                      mpirun -n 4 build/csem_kernel -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord2.txt && \
                      python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py 2"
 
-  # Job: run PETGEM test with Extrae profiling
+  # Job: run PETGEM with Extrae
   test-extrae-profiling:
     runs-on: ubuntu-latest
     needs: compile-petgem-extrae
     steps:
       - uses: actions/checkout@v4
 
+      # Download compiled Extrae binary
+      - name: Download PETGEM binary with Extrae
+        uses: actions/download-artifact@v3
+        with:
+          name: petgem-binaries-extrae
+          path: build
+
       # Pull Docker image
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-      # Compile PETGEM with Extrae
-      - name: Compile PETGEM with Extrae
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "make USE_EXTRAE=1"
-
-      # Run PETGEM test with Extrae
+      # Run PETGEM with Extrae
       - name: Preprocess data and run PETGEM nord=1 with Extrae
         run: |
           docker run --rm \
