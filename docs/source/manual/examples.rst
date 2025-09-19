@@ -13,10 +13,10 @@ Castillo-Reyes, O., de la Puente, J. M., Cela, J. M. (2018). *PETGEM: A parallel
 
 
 Model description
-#################  
+#################
 
 - Frequency: 2 Hz
-- Source position: (0.0, 0.0, -975.0) m
+- Source position at xyz=[0.0, 0.0,-975.0] m
 - Conductivity structures
    - Seawater: 3.33 S/m
    - Sediments: 1.0 S/m
@@ -25,11 +25,15 @@ Model description
 
 The domain is discretized with an unstructured tetrahedral mesh generated using **Gmsh**.
 
-### Execution steps
+Execution steps
+###############
 
 Run the following commands to execute the test cases for `nord=1` or `nord=2`. Replace `[nord]` with `1` or `2` as needed:
 
 .. code-block:: bash
+
+   # Compile PETGEM 
+   make
 
    # Setup environment
    export PETGEM_CSEM_TEST_DIR=tests/csem_model
@@ -49,7 +53,8 @@ Run the following commands to execute the test cases for `nord=1` or `nord=2`. R
    # Compare results with reference
    python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py [nord]
 
-### Step-by-step
+Step-by-step
+############
 
 1. **Mesh generation**  
    `mesh_p[nord].geo` defines the geometry and meshing strategy. Gmsh outputs the tetrahedral mesh for simulation
@@ -66,7 +71,8 @@ Run the following commands to execute the test cases for `nord=1` or `nord=2`. R
 5. **Results comparison**  
    `compare_responses.py [nord]` validates **PETGEM** output against semi-analytical 1D reference responses (**Dipole1D**)
 
-### Expected outcome
+Expected outcome
+################
 
 - Forward responses computed by **PETGEM** are compared to 1D semi-analytical solutions
 - Agreement is quantified via normalized root-mean-square deviation (NRMSD)
@@ -90,7 +96,8 @@ to generate execution traces and visualize them with **Paraver**, allowing ident
 of parallel performance bottlenecks and evaluation of load balancing.
 
 
-### Execution steps
+Execution steps
+###############
 
 Run the following commands to compile **PETGEM** with Extrae support, generate the mesh,
 resistivity model, parameter file, execute the forward modeling, and create the trace:
@@ -122,7 +129,8 @@ resistivity model, parameter file, execute the forward modeling, and create the 
    # Merge intermediate files and create the trace
    ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}
 
-### Step-by-step
+Step-by-step
+############
 
 1. **Compile PETGEM with Extrae**  
    Activates instrumentation to record performance events during execution
@@ -142,7 +150,8 @@ resistivity model, parameter file, execute the forward modeling, and create the 
 6. **Trace creation**  
    Merges intermediate **Extrae** files and generates the execution trace `${EXTRAE_TEST_DIR}/petgem.prv`
 
-### Expected outcome
+Expected outcome
+################
 
 - Execution trace `petgem.prv` is created in `${EXTRAE_TEST_DIR}`
 - The trace can be opened with **Paraver** using the configuration file at `${EXTRAE_TEST_DIR}/petgem_functions.cfg`

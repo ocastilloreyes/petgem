@@ -116,6 +116,7 @@ plex.coordinatesView(viewer)
 plex.sectionView(viewer, plex)
 v.setName("resistivity")
 plex.globalVectorView(viewer, plex, v)
+print(f"Created {output_mesh_filename}")
 
 
 # ------------------------------------------------------------------------------
@@ -131,3 +132,4 @@ vector.setName("receivers")
 vector.setUp()
 viewer = PETSc.Viewer().createHDF5(output_receivers_filename, mode='w', comm=PETSc.COMM_SELF)
 vector.view(viewer)
+print(f"Created {output_receivers_filename}")
