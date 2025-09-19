@@ -124,157 +124,157 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
             bash -c "make docs"
  
-  # # Job: run PETGEM test preprocessing scripts inside Docker
-  # test-csem-kernel:
-  #   runs-on: ubuntu-latest
-  #   needs: compile-src
-  #   steps:
-  #     - uses: actions/checkout@v4
+  # Job: run PETGEM test preprocessing scripts inside Docker
+  test-csem-kernel:
+    runs-on: ubuntu-latest
+    needs: compile-petgem
+    steps:
+      - uses: actions/checkout@v4
 
-  #     # Pull Docker image
-  #     - name: Pull Docker image
-  #       run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+      # Pull Docker image
+      - name: Pull Docker image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-  #     # Compile PETGEM
-  #     - name: Compile PETGEM
-  #       run: |
-  #         docker run --rm \
-  #           -v ${{ github.workspace }}:/workspace \
-  #           -w /workspace \
-  #           ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-  #           bash -c "make clean && make"
+      # Compile PETGEM
+      - name: Compile PETGEM without Extrae
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            bash -c "make"
 
-  #     # Run PETGEM test for nord=1
-  #     - name: Preprocess data and run PETGEM p=1 example
-  #       run: |
-  #         docker run --rm \
-  #           -v ${{ github.workspace }}:/workspace \
-  #           -w /workspace \
-  #           ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-  #           bash -c "gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p1.geo -3 && \
-  #                    python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py 1 && \
-  #                    python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py 1 && \
-  #                    mpirun -n 4 build/csem_kernel -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord1.txt && \
-  #                    python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py 1"
+      # Run PETGEM test for nord=1
+      - name: Preprocess data and run PETGEM nord=1 example
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            bash -c "gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p1.geo -3 && \
+                     python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py 1 && \
+                     python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py 1 && \
+                     mpirun -n 4 build/csem_kernel -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord1.txt && \
+                     python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py 1"
 
-  #     # Run PETGEM test for nord=2
-  #     - name: Preprocess data and run PETGEM p=2 example
-  #       run: |
-  #         docker run --rm \
-  #           -v ${{ github.workspace }}:/workspace \
-  #           -w /workspace \
-  #           ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-  #           bash -c "gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p2.geo -3 && \
-  #                    python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py 2 && \
-  #                    python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py 2 && \
-  #                    mpirun -n 4 build/csem_kernel -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord2.txt && \
-  #                    python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py 2"
+      # Run PETGEM test for nord=2
+      - name: Preprocess data and run PETGEM nord=2 example
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            bash -c "gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p2.geo -3 && \
+                     python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py 2 && \
+                     python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py 2 && \
+                     mpirun -n 4 build/csem_kernel -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord2.txt && \
+                     python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py 2"
 
-  # # Job: run PETGEM test with Extrae profiling
-  # test-extrae-profiling:
-  #   runs-on: ubuntu-latest
-  #   needs: compile-src
-  #   steps:
-  #     - uses: actions/checkout@v4
+  # Job: run PETGEM test with Extrae profiling
+  test-extrae-profiling:
+    runs-on: ubuntu-latest
+    needs: compile-petgem-extrae
+    steps:
+      - uses: actions/checkout@v4
 
-  #     # Pull Docker image
-  #     - name: Pull Docker image
-  #       run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+      # Pull Docker image
+      - name: Pull Docker image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-  #     # Compile PETGEM with Extrae
-  #     - name: Compile PETGEM with Extrae
-  #       run: |
-  #         docker run --rm \
-  #           -v ${{ github.workspace }}:/workspace \
-  #           -w /workspace \
-  #           ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-  #           bash -c "make clean && make USE_EXTRAE=1"
+      # Compile PETGEM with Extrae
+      - name: Compile PETGEM with Extrae
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            bash -c "make USE_EXTRAE=1"
 
-  #     # Run PETGEM test with Extrae
-  #     - name: Preprocess data and run PETGEM p=1 with Extrae
-  #       run: |
-  #         docker run --rm \
-  #           -e EXTRAE_CONFIG_FILE=${EXTRAE_TEST_DIR}/extrae.xml \
-  #           -e TRACE_NAME=petgem.prv \
-  #           -e EXTRAE_LABELS=${EXTRAE_TEST_DIR}/petgem_labels.txt \
-  #           -v ${{ github.workspace }}:/workspace \
-  #           -w /workspace \
-  #           ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-  #           bash -c "export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH && \
-  #                    gmsh ${EXTRAE_TEST_DIR}/mesh_p1.geo -3 && \
-  #                    python3 ${EXTRAE_TEST_DIR}/generate_resistivity_model.py 1 && \
-  #                    python3 ${EXTRAE_TEST_DIR}/generate_params_file.py 1 && \
-  #                    mpirun -n 4 build/csem_kernel -options_file ${EXTRAE_TEST_DIR}/params_nord1.txt && \
-  #                    ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}"
+      # Run PETGEM test with Extrae
+      - name: Preprocess data and run PETGEM nord=1 with Extrae
+        run: |
+          docker run --rm \
+            -e EXTRAE_CONFIG_FILE=${EXTRAE_TEST_DIR}/extrae.xml \
+            -e TRACE_NAME=petgem.prv \
+            -e EXTRAE_LABELS=${EXTRAE_TEST_DIR}/petgem_labels.txt \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
+            bash -c "export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH && \
+                     gmsh ${EXTRAE_TEST_DIR}/mesh_p1.geo -3 && \
+                     python3 ${EXTRAE_TEST_DIR}/generate_resistivity_model.py 1 && \
+                     python3 ${EXTRAE_TEST_DIR}/generate_params_file.py 1 && \
+                     mpirun -n 4 build/csem_kernel_extrae -options_file ${EXTRAE_TEST_DIR}/params_nord1.txt && \
+                     ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}"
 
-  # # Job: publish CI report
-  # publish-report:
-  #   runs-on: ubuntu-latest
-  #   needs: [docker-build, compile-src, compile-docs, test-csem-kernel]
-  #   steps:
-  #     - uses: actions/checkout@v4
+  # Job: publish CI report
+  publish-report:
+    runs-on: ubuntu-latest
+    needs: [docker-build, compile-docs, compile-petgem, compile-petgem-extrae, test-csem-kernel, test_extrae-profiling]
+    steps:
+      - uses: actions/checkout@v4
 
-  #     - name: Install jq
-  #       run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
-  #     - name: Prepare report folder
-  #       run: mkdir -p ci-report
+      - name: Prepare report folder
+        run: mkdir -p ci-report
 
-  #     - name: Copy PETGEM logo to report folder
-  #       run: cp docs/source/_static/petgem_logo.png ci-report/
+      - name: Copy PETGEM logo to report folder
+        run: cp docs/source/_static/petgem_logo.png ci-report/
 
-  #     - name: Generate CI report
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       run: |
-  #         WORKFLOW_RUN_ID=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs --jq '.workflow_runs[0].id')
-  #         JOBS_JSON=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs/$WORKFLOW_RUN_ID/jobs)
+      - name: Generate CI report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          WORKFLOW_RUN_ID=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs --jq '.workflow_runs[0].id')
+          JOBS_JSON=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs/$WORKFLOW_RUN_ID/jobs)
 
-  #         BRANCH=${GITHUB_REF##*/}
-  #         DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
-  #         COMMIT_SHA=${GITHUB_SHA::7}
+          BRANCH=${GITHUB_REF##*/}
+          DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          COMMIT_SHA=${GITHUB_SHA::7}
 
-  #         echo "<html><head><title>PETGEM CI Report</title>
-  #         <style>
-  #           body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; color: #333; }
-  #           h1 { color: #004080; display: flex; align-items: center; }
-  #           h1 img { height: 50px; margin-right: 15px; }
-  #           .meta { margin-bottom: 20px; font-size: 14px; color: #555; }
-  #           table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-  #           th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-  #           th { background-color: #004080; color: white; }
-  #           tr:nth-child(even) { background-color: #f2f2f2; }
-  #           a { color: #004080; text-decoration: none; font-weight: bold; }
-  #           a:hover { text-decoration: underline; }
-  #           .success { color: green; font-weight: bold; }
-  #           .failure { color: red; font-weight: bold; }
-  #           .in_progress { color: orange; font-weight: bold; }
-  #         </style>
-  #         </head><body>" > ci-report/index.html
+          echo "<html><head><title>PETGEM CI Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; color: #333; }
+            h1 { color: #004080; display: flex; align-items: center; }
+            h1 img { height: 50px; margin-right: 15px; }
+            .meta { margin-bottom: 20px; font-size: 14px; color: #555; }
+            table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background-color: #004080; color: white; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+            a { color: #004080; text-decoration: none; font-weight: bold; }
+            a:hover { text-decoration: underline; }
+            .success { color: green; font-weight: bold; }
+            .failure { color: red; font-weight: bold; }
+            .in_progress { color: orange; font-weight: bold; }
+          </style>
+          </head><body>" > ci-report/index.html
 
-  #         echo "<h1><img src='petgem_logo.png' alt='PETGEM Logo'/> CI Report</h1>" >> ci-report/index.html
-  #         echo "<div class='meta'>Branch: <b>$BRANCH</b> | Date: <b>$DATE</b> | Commit: <code>$COMMIT_SHA</code></div>" >> ci-report/index.html
+          echo "<h1><img src='petgem_logo.png' alt='PETGEM Logo'/> CI Report</h1>" >> ci-report/index.html
+          echo "<div class='meta'>Branch: <b>$BRANCH</b> | Date: <b>$DATE</b> | Commit: <code>$COMMIT_SHA</code></div>" >> ci-report/index.html
 
-  #         echo "<table><tr><th>Job</th><th>Status</th><th>Conclusion</th></tr>" >> ci-report/index.html
-  #         echo "$JOBS_JSON" | jq -r '.jobs[] | 
-  #           "<tr><td><a href=\"" + .html_url + "\">" + .name + "</a></td>
-  #            <td>\(.status)</td>
-  #            <td><span class=\"" + (.conclusion // "in_progress") + "\">" + (.conclusion // "in_progress") + "</span></td></tr>"' \
-  #           >> ci-report/index.html
-  #         echo "</table></body></html>" >> ci-report/index.html
+          echo "<table><tr><th>Job</th><th>Status</th><th>Conclusion</th></tr>" >> ci-report/index.html
+          echo "$JOBS_JSON" | jq -r '.jobs[] | 
+            "<tr><td><a href=\"" + .html_url + "\">" + .name + "</a></td>
+             <td>\(.status)</td>
+             <td><span class=\"" + (.conclusion // "in_progress") + "\">" + (.conclusion // "in_progress") + "</span></td></tr>"' \
+            >> ci-report/index.html
+          echo "</table></body></html>" >> ci-report/index.html
 
-  #     - name: Publish report to GitHub Pages
-  #       uses: peaceiris/actions-gh-pages@v4
-  #       with:
-  #         github_token: ${{ secrets.GITHUB_TOKEN }}
-  #         publish_dir: ./ci-report
-  #         publish_branch: gh-pages
-  #         user_name: github-actions
-  #         user_email: github-actions@github.com
-  #         keep_files: false
+      - name: Publish report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./ci-report
+          publish_branch: gh-pages
+          user_name: github-actions
+          user_email: github-actions@github.com
+          keep_files: false
 
-  #     - name: Print GitHub Pages URL
-  #       run: |
-  #         REPO_NAME=$(basename $GITHUB_REPOSITORY)
-  #         echo "CI report is available at:"
-  #         echo "https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/index.html"
+      - name: Print GitHub Pages URL
+        run: |
+          REPO_NAME=$(basename $GITHUB_REPOSITORY)
+          echo "CI report is available at:"
+          echo "https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/index.html"
