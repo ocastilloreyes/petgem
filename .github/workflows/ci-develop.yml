@@ -9,43 +9,42 @@ name: PETGEM CI
 on:
   push:
     branches:
-      - develop  # Trigger CI on pushes to 'develop' branch
+      - develop
   pull_request:
     branches:
-      - develop  # Trigger CI on PRs targeting 'develop'
+      - develop
+  workflow_dispatch:
 
 # ========================
 # Global environment variables accessible by all jobs
 # ========================
 env:
-  PETSC_DIR: /usr/local/petsc             # PETSc installation directory
-  PETSC_ARCH: arch-linux-c-opt            # PETSc architecture/config
-  GMSH_DIR: /usr/local/gmsh/bin           # GMSH executable directory
-  EXTRAE_HOME: /usr/local/extrae          # Extrae installation directory
-  PETGEM_CSEM_TEST_DIR: tests/csem_model  # PETGEM-CSEM test directory
-  EXTRAE_TEST_DIR: tests/extrae_profiling # PETGEM-Extrae test directory
+  PETSC_DIR: /usr/local/petsc
+  PETSC_ARCH: arch-linux-c-opt
+  GMSH_DIR: /usr/local/gmsh/bin
+  EXTRAE_HOME: /usr/local/extrae
+  PETGEM_CSEM_TEST_DIR: tests/csem_model
+  EXTRAE_TEST_DIR: tests/extrae_profiling
 
 # ========================
-# Docker-build
+# Jobs
 # ========================
 jobs:
-  # Job: docker-build
+  # Job: Build Docker image
   docker-build:
     runs-on: ubuntu-latest
+    outputs:
+      image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
     steps:
-      # Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Setup QEMU for cross-platform Docker builds
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # Setup Docker Buildx for advanced caching and multi-platform builds
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Log in to GitHub Container Registry
       - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
@@ -53,184 +52,111 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build Docker image and push to GHCR
-      - name: Build Docker image and push
+      - name: Build and load Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/dockerfile.develop
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-          load: false
+          load: true             # Load image locally to avoid pulls
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Job: Compile the PETGEM code without Extrae
+  # Job: Compile PETGEM (matrix for USE_EXTRAE)
   compile-petgem:
     runs-on: ubuntu-latest
-    needs: docker-build  # Wait for Docker image build to complete
+    needs: docker-build
+    strategy:
+      matrix:
+        extrae: [0, 1]
     steps:
       - uses: actions/checkout@v4
 
-      # Pull the CI Docker image
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-      # Compile PETGEM without Extrae
-      - name: Compile PETGEM without Extrae
+      - name: Compile PETGEM
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "make USE_EXTRAE=0"
+            bash -c "make USE_EXTRAE=${{ matrix.extrae }}"
 
-      # Upload compiled binaries as artifact
-      - name: Upload PETGEM binary (no Extrae)
+      - name: Upload compiled binaries
         uses: actions/upload-artifact@v4
         with:
-          name: petgem-binaries-no-extrae
-          path: build/csem_kernel
+          name: petgem-binaries-${{ matrix.extrae }}
+          path: ${{ matrix.extrae == 0 && 'build/csem_kernel' || 'build/csem_kernel_extrae' }}
 
-  # Job: Compile the PETGEM code with Extrae
-  compile-petgem-extrae:
+  # Job: Run PETGEM tests (matrix for USE_EXTRAE and nord)
+  test-petgem:
     runs-on: ubuntu-latest
-    needs: docker-build  # Wait for Docker image build to complete
+    needs: compile-petgem
+    strategy:
+      matrix:
+        extrae: [0, 1]
+        nord: [1, 2]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
 
-      # Pull the CI Docker image
+      - name: Download PETGEM binary
+        uses: actions/download-artifact@v4
+        with:
+          name: petgem-binaries-${{ matrix.extrae }}
+          path: build
+
+      - name: Make PETGEM binary executable
+        run: chmod +x ${{ matrix.extrae == 0 && 'build/csem_kernel' || 'build/csem_kernel_extrae' }}
+
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-      # Compile PETGEM with Extrae
-      - name: Compile PETGEM with Extrae
+      - name: Run PETGEM example
         run: |
+          BINARY=${{ matrix.extrae == 0 && 'build/csem_kernel' || 'build/csem_kernel_extrae' }}
+          TEST_DIR=${{ matrix.extrae == 0 && env.PETGEM_CSEM_TEST_DIR || env.EXTRAE_TEST_DIR }}
+
           docker run --rm \
+            -e EXTRAE_HOME=${{ env.EXTRAE_HOME }} \
+            -e EXTRAE_CONFIG_FILE=${TEST_DIR}/extrae.xml \
+            -e TRACE_NAME=petgem.prv \
+            -e EXTRAE_LABELS=${TEST_DIR}/petgem_labels.txt \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "make USE_EXTRAE=1"
+            bash -c " \
+              gmsh ${TEST_DIR}/mesh_p${{ matrix.nord }}.geo -3 && \
+              python3 ${TEST_DIR}/generate_resistivity_model.py ${{ matrix.nord }} && \
+              python3 ${TEST_DIR}/generate_params_file.py ${{ matrix.nord }} && \
+              mpirun -n 4 $BINARY -options_file ${TEST_DIR}/params_nord${{ matrix.nord }}.txt && \
+              ${{ matrix.extrae == 1 && '${EXTRAE_HOME}/bin/mpi2prv -f ${TEST_DIR}/TRACE.mpits -o ${TEST_DIR}/${TRACE_NAME}' || 'true' }} && \
+              python3 ${TEST_DIR}/compare_responses.py ${{ matrix.nord }}"  
 
-       # Upload compiled binaries as artifact
-      - name: Upload PETGEM binary (Extrae)
-        uses: actions/upload-artifact@v4
-        with:
-          name: petgem-binaries-extrae
-          path: build/csem_kernel_extrae
-
-  # Job: Generate project documentation
+  # Job: Generate documentation
   compile-docs:
     runs-on: ubuntu-latest
     needs: docker-build
     steps:
       - uses: actions/checkout@v4
 
-      # Pull Docker image
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
-      # Generate docs
-      - name: Generate documentation and badge
+      - name: Generate documentation
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/app \
             -w /app \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
             bash -c "make docs"
- 
-  # Job: run PETGEM without Extrae
-  test-csem-kernel:
-    runs-on: ubuntu-latest
-    needs: compile-petgem
-    steps:
-      - uses: actions/checkout@v4
 
-      # Download compiled binary
-      - name: Download PETGEM binary
-        uses: actions/download-artifact@v4
-        with:
-          name: petgem-binaries-no-extrae
-          path: build
-
-      # Restore executable permission
-      - name: Make PETGEM binary executable
-        run: chmod +x build/csem_kernel
-
-      # Pull Docker image
-      - name: Pull Docker image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-
-      # Run PETGEM tests
-      - name: Preprocess data and run PETGEM nord=1 example
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p1.geo -3 && \
-                     python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py 1 && \
-                     python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py 1 && \
-                     mpirun -n 4 build/csem_kernel -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord1.txt && \
-                     python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py 1"
-
-      # Run PETGEM test for nord=2
-      - name: Preprocess data and run PETGEM nord=2 example
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p2.geo -3 && \
-                     python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py 2 && \
-                     python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py 2 && \
-                     mpirun -n 4 build/csem_kernel -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord2.txt && \
-                     python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py 2"
-
-  # Job: run PETGEM with Extrae
-  test-extrae-profiling:
-    runs-on: ubuntu-latest
-    needs: compile-petgem-extrae
-    steps:
-      - uses: actions/checkout@v4
-
-      # Download compiled Extrae binary
-      - name: Download PETGEM binary with Extrae
-        uses: actions/download-artifact@v4
-        with:
-          name: petgem-binaries-extrae
-          path: build
-
-      # Restore executable permission
-      - name: Make PETGEM-Extrae binary executable
-        run: chmod +x build/csem_kernel_extrae
-
-      # Pull Docker image
-      - name: Pull Docker image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-
-      # Run PETGEM with Extrae
-      - name: Preprocess data and run PETGEM nord=1 with Extrae
-        run: |
-          docker run --rm \
-            -e EXTRAE_HOME \
-            -e EXTRAE_CONFIG_FILE=${EXTRAE_TEST_DIR}/extrae.xml \
-            -e TRACE_NAME=petgem.prv \
-            -e EXTRAE_LABELS=${EXTRAE_TEST_DIR}/petgem_labels.txt \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
-            bash -c "export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH && \
-                     gmsh ${EXTRAE_TEST_DIR}/mesh_p1.geo -3 && \
-                     python3 ${EXTRAE_TEST_DIR}/generate_resistivity_model.py 1 && \
-                     python3 ${EXTRAE_TEST_DIR}/generate_params_file.py 1 && \
-                     mpirun -n 4 build/csem_kernel_extrae -options_file ${EXTRAE_TEST_DIR}/params_nord1.txt && \
-                     ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}"
-
-  # Job: publish CI report
+  # Job: Publish CI report
   publish-report:
     runs-on: ubuntu-latest
-    needs: [docker-build, compile-docs, compile-petgem, compile-petgem-extrae, test-csem-kernel, test-extrae-profiling]
+    needs: [docker-build, compile-docs, compile-petgem, test-petgem]
     steps:
       - uses: actions/checkout@v4
 
@@ -240,10 +166,10 @@ jobs:
       - name: Prepare report folder
         run: mkdir -p ci-report
 
-      - name: Copy PETGEM logo to report folder
+      - name: Copy PETGEM logo
         run: cp docs/source/_static/petgem_logo.png ci-report/
 
-      - name: Generate CI report
+      - name: Generate CI HTML report
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -256,16 +182,15 @@ jobs:
 
           echo "<html><head><title>PETGEM CI Report</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; color: #333; }
+            body { font-family: Arial; margin: 40px; background: #f9f9f9; color: #333; }
             h1 { color: #004080; display: flex; align-items: center; }
             h1 img { height: 50px; margin-right: 15px; }
             .meta { margin-bottom: 20px; font-size: 14px; color: #555; }
-            table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+            table { border-collapse: collapse; width: 100%; background: #fff; }
             th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
             th { background-color: #004080; color: white; }
             tr:nth-child(even) { background-color: #f2f2f2; }
             a { color: #004080; text-decoration: none; font-weight: bold; }
-            a:hover { text-decoration: underline; }
             .success { color: green; font-weight: bold; }
             .failure { color: red; font-weight: bold; }
             .in_progress { color: orange; font-weight: bold; }
