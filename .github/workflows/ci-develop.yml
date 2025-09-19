@@ -210,7 +210,7 @@ jobs:
   # Job: publish CI report
   publish-report:
     runs-on: ubuntu-latest
-    needs: [docker-build, compile-docs, compile-petgem, compile-petgem-extrae, test-csem-kernel, test_extrae-profiling]
+    needs: [docker-build, compile-docs, compile-petgem, compile-petgem-extrae, test-csem-kernel, test-extrae-profiling]
     steps:
       - uses: actions/checkout@v4
 
