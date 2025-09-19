@@ -87,7 +87,7 @@ jobs:
       - name: Upload compiled binaries
         uses: actions/upload-artifact@v4
         with:
-          name: petgem-binaries-${{ matrix.extrae }}
+          name: ${{ matrix.extrae == 0 && 'petgem-binaries-no-extrae' || 'petgem-binaries-extrae' }}
           path: ${{ matrix.extrae == 0 && 'build/csem_kernel' || 'build/csem_kernel_extrae' }}
 
   test-petgem:
