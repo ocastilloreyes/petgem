@@ -23,6 +23,7 @@ env:
   EXTRAE_HOME: /usr/local/extrae
   PETGEM_CSEM_TEST_DIR: tests/csem_model
   EXTRAE_TEST_DIR: tests/extrae_profiling
+  DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
 # ====
 # Jobs
@@ -33,8 +34,6 @@ jobs:
   # ==================
   docker-build:
     runs-on: ubuntu-latest
-    outputs:
-      image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +53,7 @@ jobs:
           context: .
           file: ./docker/dockerfile.develop
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+          tags: ${{ env.DOCKER_IMAGE }}
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -73,14 +72,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Pull Docker image
-        run: docker pull ${{ needs.docker-build.outputs.image }}
+        run: docker pull ${{ env.DOCKER_IMAGE }}
 
       - name: Compile PETGEM
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ${{ needs.docker-build.outputs.image }} \
+            ${{ env.DOCKER_IMAGE }} \
             bash -c "make USE_EXTRAE=${{ matrix.extrae }}"
 
       - name: Upload compiled binaries
@@ -98,7 +97,6 @@ jobs:
     strategy:
       matrix:
         include:
-          # PETGEM without extrae
           - type: normal
             nord: 1
             binary: petgem-binaries-no-extrae
@@ -109,13 +107,12 @@ jobs:
             binary: petgem-binaries-no-extrae
             exe: csem_kernel
             compare: true
-          # PETGEM with Extrae
           - type: extrae
             nord: 1
             binary: petgem-binaries-extrae
             exe: csem_kernel_extrae
             compare: false
-      max-parallel: 2   # Run up to 2 tests concurrently
+      max-parallel: 2
       fail-fast: true
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +127,7 @@ jobs:
         run: chmod +x build/${{ matrix.exe }}
 
       - name: Pull Docker image
-        run: docker pull ${{ needs.docker-build.outputs.image }}
+        run: docker pull ${{ env.DOCKER_IMAGE }}
 
       - name: Cache Python packages
         uses: actions/cache@v3
@@ -146,7 +143,7 @@ jobs:
             docker run --rm \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace \
-              ${{ needs.docker-build.outputs.image }} \
+              ${{ env.DOCKER_IMAGE }} \
               bash -c "gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p${{ matrix.nord }}.geo -3 && \
                        python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py ${{ matrix.nord }} && \
                        python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py ${{ matrix.nord }} && \
@@ -160,7 +157,7 @@ jobs:
               -e EXTRAE_LABELS=${EXTRAE_TEST_DIR}/petgem_labels.txt \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace \
-              ${{ needs.docker-build.outputs.image }} \
+              ${{ env.DOCKER_IMAGE }} \
               bash -c "export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH && \
                        gmsh ${EXTRAE_TEST_DIR}/mesh_p1.geo -3 && \
                        python3 ${EXTRAE_TEST_DIR}/generate_resistivity_model.py 1 && \
@@ -177,14 +174,16 @@ jobs:
     if: ${{ github.event_name != 'push' || contains(github.event.commits.*.modified, 'docs/') }}
     steps:
       - uses: actions/checkout@v4
+      
       - name: Pull Docker image
-        run: docker pull ${{ needs.docker-build.outputs.image }}
+        run: docker pull ${{ env.DOCKER_IMAGE }}
+      
       - name: Generate documentation
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/app \
             -w /app \
-            ${{ needs.docker-build.outputs.image }} \
+            ${{ env.DOCKER_IMAGE }} \
             bash -c "make docs"
 
   # ========================
