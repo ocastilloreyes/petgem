@@ -247,7 +247,7 @@ jobs:
             h1 { color: #004080; display: flex; align-items: center; }
             h1 img { height: 50px; margin-right: 15px; }
             .meta { margin-bottom: 20px; font-size: 14px; color: #555; }
-            table { border-collapse: collapse; width: 100%; background: #fff; margin-bottom: 20px; }
+            table { border-collapse: collapse; width: 100%; background: #fff; }
             th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
             th { background-color: #004080; color: white; }
             tr:nth-child(even) { background-color: #f2f2f2; }
@@ -255,8 +255,7 @@ jobs:
             .success { color: green; font-weight: bold; }
             .failure { color: red; font-weight: bold; }
             .in_progress { color: orange; font-weight: bold; }
-            .legend { font-size: 13px; color: #444; background: #eef; padding: 10px; border-radius: 8px; }
-            .legend b { color: #004080; }
+            .notes { margin-top: 20px; font-size: 13px; color: #444; }
           </style>
           </head>
           <body>
@@ -268,25 +267,26 @@ jobs:
 
           echo "$JOBS_JSON" | jq -r '.jobs[] | "<tr><td><a href=\"" + .html_url + "\">" + .name + "</a></td><td>\(.status)</td><td><span class=\"" + (.conclusion // "in_progress") + "\">" + (.conclusion // "in_progress") + "</span></td></tr>"' >> ci-report/index.html
 
-          # Add static row for publish-report
+          # Add manual row for this job
           echo "<tr><td>publish-report</td><td>completed</td><td><span class=\"success\">success</span></td></tr>" >> ci-report/index.html
 
           echo "</table>" >> ci-report/index.html
 
-          # Add notes/legend
+          # Add clarification notes
           cat <<EOF >> ci-report/index.html
-          <div class="legend">
-            <h3>Notes</h3>
+          <div class="notes">
+            <h3>Notes:</h3>
             <ul>
               <li><b>compile-petgem (0)</b> → PETGEM compiled <i>without Extrae</i></li>
               <li><b>compile-petgem (1)</b> → PETGEM compiled <i>with Extrae</i></li>
-              <li><b>normal</b> → run without Extrae</li>
-              <li><b>extrae</b> → run with Extrae</li>
-              <li><b>true</b> → test comparison executed</li>
+              <li><b>normal</b> → run <i>without Extrae</i></li>
+              <li><b>extrae</b> → run <i>with Extrae</i></li>
+              <li><b>true</b> → run test comparison enabled</li>
             </ul>
           </div>
           </body></html>
           EOF
+
 
       - name: Publish report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4

@@ -2,28 +2,20 @@
 About PETGEM
 ############
 
-Overview
---------
-PETGEM (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is an HPC-ready software suite
-designed for simulating electromagnetic wave propagation in 3D subsurface models. PETGEM supports
-MPI parallelism, unstructured tetrahedral meshes, and high-order vector finite element methods.
+PETGEM (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is an open-source software for large-scale 3D electromagnetic (EM) forward modeling. It implements a high-order edge finite element method on unstructured tetrahedral meshes, enabling accurate simulations for active-source EM problems.
+
+Originally developed in Python, **PETGEM** has been refactored in C and integrated with `PETSc <https://petsc.org/release/>_` to improve scalability on massively parallel architectures, memory efficiency, and mesh handling. These advances make **PETGEM** well suited for current and future exascale systems.
+
+**PETGEM** has been successfully applied to subsurface exploration in oil & gas, geothermal reservoir characterization, and environmental EM surveys.
 
 Key Features
 ------------
-- High-order vector finite element method for controlled-source EM problems
-- Support for unstructured tetrahedral meshes
-- Parallel computing with MPI and PETSc
+- High-order edge finite element method ($p=1$ to $6$)
+- Unstructured tetrahedral mesh support
+- Parallel computing with MPI and `PETSc <https://petsc.org/release/>_`
 - Python bindings for pre- and post-processing
 - Integration with mesh generators (`Gmsh <http://gmsh.info/>`_) and performance tools (`Extrae <https://tools.bsc.es/extrae>`_)
 
-Applications
-------------
-PETGEM is suitable for:
-
-- Geothermal reservoir exploration
-- Oil & gas subsurface imaging
-- Environmental EM surveys
-- Academic research in geophysics
 
 References
 ----------
