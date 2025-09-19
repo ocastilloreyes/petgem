@@ -153,6 +153,10 @@ jobs:
           name: petgem-binaries-no-extrae
           path: build
 
+      # Restore executable permission
+      - name: Make PETGEM binary executable
+        run: chmod +x build/csem_kernel
+
       # Pull Docker image
       - name: Pull Docker image
         run: docker pull ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
@@ -196,6 +200,10 @@ jobs:
         with:
           name: petgem-binaries-extrae
           path: build
+
+      # Restore executable permission
+      - name: Make PETGEM-Extrae binary executable
+        run: chmod +x build/csem_kernel_extrae
 
       # Pull Docker image
       - name: Pull Docker image
