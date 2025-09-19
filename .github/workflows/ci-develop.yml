@@ -128,6 +128,7 @@ jobs:
             -w /workspace \
             ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest \
             bash -c " \
+              export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH &&
               gmsh ${TEST_DIR}/mesh_p${{ matrix.nord }}.geo -3 && \
               python3 ${TEST_DIR}/generate_resistivity_model.py ${{ matrix.nord }} && \
               python3 ${TEST_DIR}/generate_params_file.py ${{ matrix.nord }} && \
