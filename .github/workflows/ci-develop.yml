@@ -21,8 +21,9 @@ env:
   PETSC_DIR: /usr/local/petsc             # PETSc installation directory
   PETSC_ARCH: arch-linux-c-opt            # PETSc architecture/config
   GMSH_DIR: /usr/local/gmsh/bin           # GMSH executable directory
-  PETGEM_CSEM_TEST_DIR: tests/csem_model  # Directory with PETGEM test models
-  EXTRAE_TEST_DIR: tests/extrae_profiling # Directory with Extrae test 
+  EXTRAE_HOME: /usr/local/extrae          # Extrae installation directory
+  PETGEM_CSEM_TEST_DIR: tests/csem_model  # PETGEM-CSEM test directory
+  EXTRAE_TEST_DIR: tests/extrae_profiling # PETGEM-Extrae test directory
 
 # ========================
 # Docker-build
@@ -194,6 +195,7 @@ jobs:
       - name: Preprocess data and run PETGEM nord=1 with Extrae
         run: |
           docker run --rm \
+            -e EXTRAE_HOME \
             -e EXTRAE_CONFIG_FILE=${EXTRAE_TEST_DIR}/extrae.xml \
             -e TRACE_NAME=petgem.prv \
             -e EXTRAE_LABELS=${EXTRAE_TEST_DIR}/petgem_labels.txt \
