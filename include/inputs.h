@@ -27,8 +27,8 @@ typedef struct {
   char sourceFilename[PETSC_MAX_PATH_LEN];
   PetscInt nord;
   PetscMPIInt numMPITasks;
-} Params;
+} csemParams;
 
-PetscErrorCode readParams(const PetscMPIInt size, Params* params);
+PetscErrorCode readCsemParams(const PetscMPIInt size, csemParams* params);
 
 #endif

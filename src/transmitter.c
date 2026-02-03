@@ -25,21 +25,52 @@
 #include "transmitter.h"
 
 /**
- * @brief Reads CSEM source parameters from a file.
+ * @brief Reads and sets up CSEM source parameters from a text file.
  *
- * Opens the file specified in @p params.sourceFilename.
- * Reads the number of sources and the source frequency.
- * Allocates memory for @p sources->sourceArray.
+ * This function opens the file specified in `params.sourceFilename`,
+ * reads the source frequency (from the first non-comment, non-empty line),
+ * counts the number of source entries, allocates memory for the source array,
+ * and parses the source positions and parameters.
  *
- * @param[out] sources Pointer to the setCsemSource struct
- * to be populated.
- * @param[in] params A CsemParams struct containing
- * simulation parameters, including source filename.
- * @return PetscErrorCode PETSC_SUCCESS on successful
- * reading and parsing. Returns error codes on file
- * open/read errors or format inconsistencies.
+ * @param[in] params A csemParams struct containing simulation parameters,
+ *                   including the source filename.
+ * @param[out] sources Pointer to a CsemSourceSet struct that will be populated
+ *                     with the frequency, number of sources, and an array of
+ *                     source structs containing position, current, length, dip,
+ *                     and azimuth information.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful reading and parsing,
+ *         or an appropriate PETSc error code if:
+ *           - The file cannot be opened.
+ *           - Frequency or source parameters cannot be read.
+ *           - Memory allocation fails.
+ *           - Source data lines are missing or malformed.
+ *
+ * @details
+ * Steps performed by the function:
+ * 1. Opens the source file for reading.
+ * 2. Skips comments (lines starting with '#') and empty lines.
+ * 3. Reads the source frequency from the first valid line.
+ * 4. Counts the number of sources in the file, ignoring comment/empty lines.
+ * 5. Allocates memory for `sources->sourceArray`.
+ * 6. Rewinds the file to read each source entry:
+ *    - Each line must contain 7 numbers: x, y, z, current, length, dip, azimuth.
+ *    - Stores the parsed values in the corresponding source struct.
+ * 7. Closes the file.
+ * 8. Prints the parsed source data to stdout for verification.
+ *
+ * @note
+ * - The function expects the source file to follow the format:
+ *     frequency
+ *     x y z current length dip azimuth
+ *     x y z current length dip azimuth
+ *     ...
+ *   with optional comments (#) or blank lines.
+ * - The caller is responsible for freeing `sources->sourceArray` after use.
+ * - The function supports multiple sources, each with full spatial and
+ *   electrical parameters.
  */
-PetscErrorCode setupCsemSource(const Params params, CsemSourceSet* sources) {
+PetscErrorCode setupCsemSource(const csemParams params, CsemSourceSet* sources) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */

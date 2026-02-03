@@ -30,34 +30,42 @@
 #include "inputs.h"
 
 /**
- * @brief Reads and validates user-provided parameters from
- * PETSc options.
- * @param[out] params Pointer to the Params struct to be
- * populated.
- * @param[in] size The total number of MPI tasks
- * (MPI_Comm_size).
- * @return PetscErrorCode PETSC_SUCCESS on successful
- * parsing and validation. Returns error codes if mandatory
- * parameters are missing or invalid.
- * @details Parses command-line options or options file
- * entries for:
- *          - `-mesh_filename`: Path to the mesh file
- * (mandatory).
- *          - `-receivers_filename`: Path to the receivers
- * file (mandatory).
- *          - `-output_dir`: Output directory path
- * (mandatory).
- *          - `-output_filename`: Base name for output files
- * (mandatory).
- *          - `-nord`: Finite element basis order (1-6,
- * mandatory).
- *          - `-source_filename`: Path to the source
- * definition file (mandatory). Stores the parsed values in
- * the `params` struct. Validates mandatory parameters and
- * the range/type of `nord` and `mode`. Stores the MPI size.
- * Creates the output directory.
+ * @brief Reads, parses, and validates user-provided CSEM simulation parameters from PETSc options.
+ *
+ * @param[in] size The total number of MPI tasks (MPI_Comm_size).
+ * @param[out] params Pointer to a `csemParams` struct to populate with validated parameters.
+ *
+ * @return PetscErrorCode
+ *   - PETSC_SUCCESS on successful parsing and validation.
+ *   - PETSC_ERR_ARG_NULL or other PETSc error codes if mandatory parameters are missing or invalid.
+ *
+ * @details
+ * This function reads required CSEM simulation parameters from the PETSc options database
+ * (command-line options or options file) and populates the `params` structure. It also
+ * performs basic validation of mandatory parameters and value ranges. The following
+ * options are read:
+ *
+ * - `-mesh_filename`        : Path to the mesh file (mandatory, HDF5 format).
+ * - `-receivers_filename`   : Path to the receivers file (mandatory, HDF5 format).
+ * - `-output_dir`           : Directory where output files will be written (mandatory).
+ * - `-output_filename`      : Base name for output files (mandatory).
+ * - `-nord`                 : Finite element basis order (integer, 1 ≤ nord ≤ 3, mandatory).
+ * - `-source_filename`      : Path to the source definition file (mandatory).
+ *
+ * The function performs the following:
+ * 1. Checks that each mandatory parameter is provided.
+ * 2. Validates that `nord` is within the allowed range (1–3).
+ * 3. Copies all string parameters into the `params` struct safely using `PetscStrncpy`.
+ * 4. Stores the number of MPI tasks in `params->numMPITasks`.
+ * 5. Creates the output directory if it does not exist by calling `createDirectory`.
+ *
+ * @note
+ * - If any mandatory parameter is missing or invalid, the function terminates with an
+ *   informative PETSc error message.
+ * - This function is intended to be called **before any simulation setup** to ensure all
+ *   required parameters are present and valid.
  */
-PetscErrorCode readParams(const PetscMPIInt size, Params* params) {
+PetscErrorCode readCsemParams(const PetscMPIInt size, csemParams* params) {
 
   PetscFunctionBeginUser;
 

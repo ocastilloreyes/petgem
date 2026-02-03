@@ -19,6 +19,6 @@
 #include <petsc.h>
 #include <petscdmplex.h>
 
-PetscErrorCode solveCsemSystem(const Params params, const DM dm, const Mat A, const Mat B, const Mat G, Mat* X);
+PetscErrorCode solveCsemSystem(const csemParams params, const DM dm, const Mat A, const Mat B, const Mat G, Mat* X);
 
 #endif

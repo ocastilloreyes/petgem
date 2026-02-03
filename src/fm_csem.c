@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
   Vec resistivity;
   Mat A, B, X;
   Mat G = NULL;
-  Params params;
+  csemParams params;
   Grid grid;
   CsemSourceSet sources = {0, 0, NULL};
   PetscLogDouble timers[7];
@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
   /* Start timer for read params */
   PetscCall(PetscTime(&start_timer));
 
-  PetscCall(readParams(size, &params));
+  PetscCall(readCsemParams(size, &params));
 
   /* End timer for read params */
   PetscCall(PetscTime(&end_timer));

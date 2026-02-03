@@ -22,8 +22,52 @@
 #include "inputs.h"
 #include "transmitter.h"
 
-
-PetscErrorCode assembleCsemRHS(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B) {
+/**
+ * @brief Assembles the right-hand side (RHS) matrix for the CSEM system.
+ *
+ * This function constructs the RHS vectors for all sources in the
+ * simulation. Each column of the output matrix `B` corresponds to a
+ * different source. The function performs finite element assembly
+ * using H(curl) Nédélec elements, taking into account the source
+ * dipole orientation, rotation, and position within the tetrahedral mesh.
+ *
+ * @param[in] params A csemParams struct containing simulation parameters,
+ *                   including the basis order (nord) and number of MPI tasks.
+ * @param[in] sources A CsemSourceSet struct containing source positions,
+ *                    currents, lengths, and dipole orientation angles.
+ * @param[in] dm The DMPlex object representing the mesh topology and H(curl)
+ *               discretization.
+ * @param[in] grid A Grid struct containing mesh statistics and DOF information.
+ * @param[out] B Pointer to a Mat object that will be created and populated
+ *               with the RHS vectors for all sources.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful assembly, or a PETSc
+ *         error code if an error occurs during vector/matrix creation,
+ *         FEM basis evaluation, or point location.
+ *
+ * @details
+ * The function performs the following steps:
+ * 1. Creates a global vector `b` to store a single source's RHS.
+ * 2. Allocates memory for Nédélec basis functions, their curls, and coefficients.
+ * 3. Iterates over all sources in `sources->sourceArray`.
+ *    - Computes the source vector based on current, length, dip, and azimuth.
+ *    - Locates the source in the mesh using `locatePoint`.
+ *    - Extracts cell coordinates, computes the Jacobian, and transforms
+ *      the source position to reference coordinates (XiEtaZeta).
+ *    - Computes Nédélec basis functions and, if applicable, their curls.
+ *    - Computes the local contributions of the source to the RHS using
+ *      `VecSetValuesLocal`.
+ *    - Assembles the local vector into the global RHS vector.
+ *    - Copies the assembled vector into the corresponding column of `B`.
+ * 4. Applies the complex scaling factor for frequency and magnetic permeability.
+ * 5. Frees all allocated memory and prints assembly progress messages.
+ *
+ * @note
+ * - Supports multiple sources, each mapped to a column of the dense matrix `B`.
+ *   is partially implemented and can be extended.
+ * - The caller is responsible for managing the lifetime of the returned matrix `B`.
+ */
+PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
@@ -217,7 +261,54 @@ PetscErrorCode assembleCsemRHS(const Params params, const CsemSourceSet sources,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode assembleCsemLHS(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, const Vec resistivity,
+/**
+ * @brief Assembles the left-hand side (LHS) matrix and discrete gradient for the CSEM system.
+ *
+ * Constructs the global system matrix `A` and the discrete gradient matrix `G`
+ * for H(curl) finite element discretization of Maxwell's equations. Each cell's
+ * elemental mass and stiffness matrices are computed and assembled into the
+ * global system. The discrete gradient matrix relates H(curl) edge DOFs to H1 nodal DOFs,
+ * required for PCBDDC preconditioning in PETSc.
+ *
+ * @param[in] params A csemParams struct containing simulation parameters,
+ *                   including basis order (nord) and number of MPI tasks.
+ * @param[in] sources A CsemSourceSet struct containing source frequency information
+ *                    (used to compute the frequency-dependent LHS factor).
+ * @param[in] dm The DMPlex object representing the mesh topology and H(curl)
+ *               discretization.
+ * @param[in] grid A Grid struct containing mesh statistics, number of DOFs per cell,
+ *                 and auxiliary H1 DM information for the discrete gradient.
+ * @param[in] resistivity A Vec containing the resistivity values at mesh locations.
+ * @param[out] A Pointer to a Mat object to be created and populated with the global LHS.
+ * @param[out] G Pointer to a Mat object to be created and populated with the discrete gradient.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful assembly, or a PETSc error code
+ *         on memory allocation, matrix insertion, or FEM evaluation errors.
+ *
+ * @details
+ * The function performs the following steps:
+ * 1. Computes the complex frequency-dependent factor `constFactor = i * omega * mu`.
+ * 2. Creates the global system matrix `A` and prepares the local-to-global mappings.
+ * 3. Creates the discrete gradient matrix `G` connecting H(curl) DOFs to H1 DOFs.
+ * 4. Computes quadrature points and weights for 1D and 3D integration.
+ * 5. Allocates memory for elemental mass (Me), stiffness (Ke), and gradient matrices.
+ * 6. Iterates over all active cells in the mesh:
+ *    - Extracts cell vertex coordinates and computes the Jacobian and orientation.
+ *    - Extracts cell resistivity.
+ *    - Computes elemental mass and stiffness matrices via numerical quadrature.
+ *    - Computes the elemental discrete gradient matrix.
+ *    - Assembles the local elemental matrices into the global LHS matrix `A`.
+ *    - Inserts the local gradient matrix into the discrete gradient matrix `G` (currently only for first-order elements).
+ * 7. Performs global assembly for `A` and `G`.
+ * 8. Optionally filters the discrete gradient matrix to include only nonzero DOFs.
+ * 9. Prints assembly progress and optionally views matrices via PETSc options.
+ * 10. Frees all allocated memory.
+ *
+ * @note
+ * - The discrete gradient matrix `G` is primarily used for PCBDDC preconditioning.
+ * - The caller is responsible for destroying matrices `A` and `G` after use.
+ */
+PetscErrorCode assembleCsemLHS(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, const Vec resistivity,
                                Mat* A, Mat* G) {
   PetscFunctionBeginUser;
 

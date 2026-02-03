@@ -22,27 +22,55 @@
 /* PETGEM functions */
 
 /**
- * @brief Solves the linear system AX=B using KSP.
+ * @brief Solves the linear system AX = B using PETSc KSP.
  *
- * If the matrix @p A is of type MATIS and @p G is provided,
- * it configures the preconditioner to PCBDDC and sets the
- * discrete gradient using PCBDDCSetDiscreteGradient.
+ * This function solves multiple linear systems (one per column of B) using
+ * PETSc's KSP solver. If the system matrix A is of type MATIS and a discrete
+ * gradient matrix G is provided, the solver configures a PCBDDC preconditioner
+ * and sets the discrete gradient to improve convergence for H(curl) problems.
  *
- * @param[in] dm The DMPlex object (used for communicator).
- * @param[in] A The system matrix (assembled by
- * assembleSystem).
- * @param[in] B The right-hand side matrix (assembled by
- * assembleSystem, one column per source).
- * @param[in] G The discrete gradient matrix (used for
- * PCBDDC setup if @p A is MATIS).
- * @param[in] params A Params struct containing simulation
- * parameters (used for PCBDDC setup).
- * @param[out] X Pointer to the solution matrix (Mat) to be
- * created and populated.
- * @return PetscErrorCode PETSC_SUCCESS on successful solve,
- * or an error code otherwise.
+ * @param[in] dm The PETSc DMPlex object representing the mesh. Its communicator
+ *               is used for parallel solver setup.
+ * @param[in] A The system matrix (Mat) assembled for the simulation. Should be
+ *              compatible with the discretization (H(curl) FEM).
+ * @param[in] B The right-hand side matrix (Mat), with one column per source.
+ * @param[in] G Optional discrete gradient matrix (Mat). Required for MATIS matrices
+ *              to set up the PCBDDC preconditioner correctly.
+ * @param[in] params A Params struct containing simulation parameters, including
+ *                   the FEM order (`nord`) used for PCBDDC discrete gradient setup.
+ * @param[out] X Pointer to the solution matrix (Mat) that will be created and
+ *               populated with the solution vectors corresponding to each column
+ *               of B.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful solve, or an appropriate
+ *         PETSc error code otherwise.
+ *
+ * @details
+ * The function performs the following steps:
+ * 1. Creates a KSP solver object and sets A as both the operator and preconditioner matrix.
+ * 2. Checks if A is of type MATIS:
+ *    - If so and G is provided, configures the KSP preconditioner as PCBDDC.
+ *    - Calls PCBDDCSetDiscreteGradient with G, FEM order, and default orientation settings.
+ * 3. Reads solver options from the command line via KSPSetFromOptions.
+ * 4. Creates a dense solution matrix X compatible with the vector type of A.
+ * 5. Solves the system(s) using KSPMatSolve for all columns of B.
+ * 6. Prints progress messages before and after solving.
+ * 7. Destroys the KSP object and returns success.
+ *
+ * @note
+ * - The function supports multiple right-hand sides (columns in B) efficiently.
+ * - For MATIS matrices, the discrete gradient G is essential to enforce the
+ *   kernel of the curl operator in H(curl) FEM.
+ * - The solution matrix X is created internally; the caller is responsible for
+ *   destroying it after use.
+ * - Solver options (KSP type, tolerances, preconditioner settings, etc.) can
+ *   be controlled via PETSc options database.
+ *
+ * @warning
+ * - Ensure B has the correct size and ordering consistent with A.
+ * - G must be compatible with the ordering of DOFs in A if MATIS/PCBDDC is used.
  */
-PetscErrorCode solveCsemSystem(const Params params, const DM dm, const Mat A, const Mat B, const Mat G, Mat* X) {
+PetscErrorCode solveCsemSystem(const csemParams params, const DM dm, const Mat A, const Mat B, const Mat G, Mat* X) {
 
   PetscFunctionBeginUser;
 

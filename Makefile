@@ -3,12 +3,12 @@
 # -----------------------------------------------------------------------------
 USE_EXTRAE ?= 0
 ifeq ($(USE_EXTRAE), 1)
-    TARGET := build/fm.csem
+    TARGET := build/fm.csem.extrae
     OBJDIR := build/extrae
     EXTRA_CFLAGS := -I$(EXTRAE_HOME)/include -DUSE_EXTRAE
     EXTRA_LDFLAGS := -L$(EXTRAE_HOME)/lib -lmpitrace
 else
-    TARGET := build/fm.csem.extrae
+    TARGET := build/fm.csem
     OBJDIR := build/noextrae
     EXTRA_CFLAGS :=
     EXTRA_LDFLAGS :=

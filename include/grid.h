@@ -59,9 +59,9 @@ typedef struct {
   PetscInt orientation[10];
 } Cell;
 
-PetscErrorCode importGrid(const Params params, DM* odm, Vec* resistivity_output);
+PetscErrorCode importGrid(const csemParams params, DM* odm, Vec* resistivity_output);
 
-PetscErrorCode setupCsemGrid(const Params params, DM* dm, Grid* grid);
+PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid);
 
 PetscErrorCode locatePoint(const DM dm, const PetscReal* position, PetscInt* pointInCell);
 

@@ -21,9 +21,9 @@
 #include "transmitter.h"
 #include <petsc.h>
 
-PetscErrorCode assembleCsemRHS(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B);
+PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B);
 
-PetscErrorCode assembleCsemLHS(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, const Vec resistivity,
+PetscErrorCode assembleCsemLHS(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, const Vec resistivity,
                                Mat* A, Mat* G);
 
 #endif

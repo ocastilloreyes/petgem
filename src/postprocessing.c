@@ -28,28 +28,54 @@
 #include "version.h"
 
 /**
- * @brief Computes electric (E) and magnetic (H) fields at
- * specified receiver locations.
+ * @brief Computes electric (E) and magnetic (H) fields at specified receiver locations.
  *
- * The computed electric (E) and magnetic (H) field
- * components for each source are saved to separate HDF5
- * files. Metadata about the simulation is also written as
- * attributes to the output files.
+ * @param[in] params A `csemParams` struct containing simulation parameters such as 
+ *                   finite element order, output filenames, and MPI task information.
+ * @param[in] sources A `CsemSourceSet` struct containing information about sources,
+ *                    including number of sources, frequency, positions, and currents.
+ * @param[in] dm The PETSc DMPlex object representing the mesh and H(curl) discretization.
+ * @param[in] grid A `Grid` struct containing mesh statistics, number of DOFs per cell,
+ *                 and other relevant discretization information.
+ * @param[in] X The solution matrix (Mat), where each column corresponds to the solution
+ *              vector for a specific source.
  *
- * @param[in] dm The DMPlex object representing the mesh
- * topology and H(curl) discretization.
- * @param[in] X The solution matrix (Mat), where each column
- * corresponds to the solution vector for a specific source.
- * @param[in] grid A Grid struct containing mesh statistics
- * and DOF information.
- * @param[in] sources A setSource struct containing source
- * parameters (frequency, positions, etc.).
- * @param[in] params A Params struct containing simulation
- * parameters (basis order, mode, output settings, etc.).
- * @return PetscErrorCode PETSC_SUCCESS on success, or an
- * error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success, or an appropriate PETSc error code.
+ *
+ * @details
+ * This function performs the following steps:
+ * 1. Loads the receiver coordinates from an HDF5 file into a PETSc Vec.
+ * 2. Locates receivers in the computational mesh using `DMLocatePoints`.
+ * 3. Allocates PETSc vectors to store the electric (Ex, Ey, Ez) and magnetic (Hx, Hy, Hz) fields.
+ * 4. Loops over each source:
+ *    - Extracts the solution vector for the source.
+ *    - Converts the global solution vector to a local representation.
+ *    - Loops over receivers:
+ *        * Determines the cell containing the receiver.
+ *        * Computes the reference coordinates (Xi, Eta, Zeta) for the receiver.
+ *        * Computes Nédélec basis functions and their curls at the receiver location.
+ *        * Interpolates the E and H fields using the DOFs in the cell.
+ *        * Applies Maxwell's equations to compute H from E (scaling by frequency and permeability).
+ *    - Performs parallel assembly of field vectors.
+ *    - Writes the computed fields to an HDF5 file, including metadata attributes such as:
+ *        + PETGEM version
+ *        + Mesh and receivers filenames
+ *        + Simulation date
+ *        + Source frequency and position
+ *        + FEM order and number of MPI tasks
+ * 5. Frees all allocated memory and PETSc objects.
+ *
+ * @note
+ * - This function assumes 3D simulations (NUM_DIMENSIONS = 3) and H(curl) elements.
+ * - Only receivers located inside the computational domain are considered; others
+ *   generate a warning and are ignored.
+ * - The magnetic field is computed via H = (1 / (i * omega * mu)) curl(E), following
+ *   standard Maxwell equations.
+ * - Output files are written in HDF5 format with one file per source, and the filename
+ *   is constructed using the output directory, base filename, and source index.
+ *
  */
-PetscErrorCode computeFields(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, const Mat X) {
+PetscErrorCode computeFields(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, const Mat X) {
   PetscFunctionBeginUser;
 
   /* Variable declarations */

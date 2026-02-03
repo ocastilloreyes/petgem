@@ -31,6 +31,25 @@
 
 #define LINE_WIDTH 74
 
+/**
+ * @brief Computes the display width of a UTF-8 string in characters.
+ *
+ * This function calculates the number of printable characters in
+ * the input null-terminated string, assuming UTF-8 encoding. It
+ * counts only the leading bytes of multi-byte UTF-8 characters,
+ * effectively providing the number of characters as they would
+ * appear on the console.
+ *
+ * This function is used by formatting helpers (e.g., printCenteredText)
+ * to correctly align text containing multi-byte characters.
+ *
+ * @param[in]  s      Null-terminated UTF-8 string.
+ * @param[out] width  Pointer to an integer where the computed display
+ *                    width (in characters) will be stored.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful computation,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode computeDisplayWidth(const char* s, PetscInt* width) {
 
   PetscFunctionBeginUser;
@@ -52,6 +71,23 @@ static PetscErrorCode computeDisplayWidth(const char* s, PetscInt* width) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints a horizontal separator line.
+ *
+ * This function prints a line of length LINE_WIDTH consisting
+ * of repeated occurrences of the specified character, followed
+ * by a newline. It is typically used to visually separate
+ * sections of formatted console output.
+ *
+ * Output is produced using PETSc parallel printing routines on
+ * PETSC_COMM_WORLD, ensuring consistent and collective display
+ * across all MPI processes.
+ *
+ * @param[in] c  Character used to fill the separator line.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful
+ *         completion, or a PETSc error code otherwise.
+ */
 static PetscErrorCode printSeparator(const char c) {
 
   PetscFunctionBeginUser;
@@ -69,6 +105,21 @@ static PetscErrorCode printSeparator(const char c) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints an empty framed line.
+ *
+ * This function prints a blank line enclosed by leading and
+ * trailing '-' characters, with a total width of LINE_WIDTH.
+ * It is intended for spacing within formatted PETGEM output
+ * blocks while preserving the visual frame.
+ *
+ * Output is produced using PETSc parallel printing routines on
+ * PETSC_COMM_WORLD, ensuring consistent and collective display
+ * across all MPI processes.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful
+ *         completion, or a PETSc error code otherwise.
+ */
 static PetscErrorCode printEmptyLine(void) {
 
   PetscFunctionBeginUser;
@@ -78,6 +129,25 @@ static PetscErrorCode printEmptyLine(void) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints a line of text centered within a fixed-width frame.
+ *
+ * This function prints the given text centered within a line of
+ * width LINE_WIDTH, enclosed by leading and trailing '-' characters.
+ * The centering is computed based on the display width of the text
+ * (as returned by computeDisplayWidth()), allowing correct alignment
+ * for multi-byte or wide characters.
+ *
+ * Output is produced using PETSc parallel printing routines on
+ * PETSC_COMM_WORLD, ensuring consistent and collective display
+ * across all MPI processes.
+ *
+ * @param[in] text  Null-terminated string to be printed centered
+ *                  within the formatted line.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful
+ *         completion, or a PETSc error code otherwise.
+ */
 static PetscErrorCode printCenteredText(const char* text) {
 
   PetscFunctionBeginUser;
@@ -98,6 +168,31 @@ static PetscErrorCode printCenteredText(const char* text) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints a formatted timer value in hh:mm:ss.sss format
+ *        along with its percentage of the total runtime.
+ *
+ * This function converts a time interval given in seconds into
+ * hours, minutes, and seconds, and prints it together with the
+ * percentage that this interval represents relative to a total
+ * execution time.
+ *
+ * The output is formatted as a single line containing a textual
+ * label, the elapsed time in hh:mm:ss.sss format, and the
+ * corresponding percentage. Printing is performed collectively
+ * using PETSc parallel printing routines on PETSC_COMM_WORLD.
+ *
+ * If the total time is zero or negative, the reported percentage
+ * is set to zero to avoid division by zero.
+ *
+ * @param[in] label  Descriptive label for the timed stage.
+ * @param[in] t      Elapsed time for the stage, in seconds.
+ * @param[in] total  Total elapsed time used to compute the
+ *                   percentage, in seconds.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful
+ *         completion, or a PETSc error code otherwise.
+ */
 static PetscErrorCode PrintTimerHMSPercent(const char* label, PetscLogDouble t, PetscLogDouble total) {
   PetscFunctionBeginUser;
 
@@ -117,21 +212,23 @@ static PetscErrorCode PrintTimerHMSPercent(const char* label, PetscLogDouble t, 
 }
 
 /**
- * @brief Prints a header with PETGEM project information
- * and the current year.
+ * @brief Prints a formatted PETGEM header banner.
  *
- * This function prints a formatted header to the console,
- * containing information about the PETGEM project,
- * including its name, purpose, GitHub repository, website,
- * and the names and affiliations of the developers. It also
- * includes the current year.
+ * This function prints a formatted header to standard output
+ * containing basic information about the PETGEM project,
+ * including:
+ *   - Project name and expanded acronym
+ *   - GitHub repository URL
+ *   - Developer name
+ *   - Institutional affiliations
  *
- * The header is printed using PETSc's parallel printing
- * functions, ensuring that the output is consistent across
- * all processes in the PETSc communicator.
+ * The header is printed using PETSc-based printing utilities
+ * and formatting helpers (separators, centered text), ensuring
+ * consistent and collective output across all MPI processes
+ * associated with PETSC_COMM_WORLD.
  *
  * @return PetscErrorCode PETSC_SUCCESS on successful
- * completion, or an error code otherwise.
+ *         completion, or a PETSc error code otherwise.
  */
 PetscErrorCode printHeader(void) {
 
@@ -177,19 +274,23 @@ PetscErrorCode printFooter(void) {
 }
 
 /**
- * @brief Creates a directory if it does not already exist.
+ * @brief Ensures that a directory exists, creating it if necessary.
  *
- * This function checks if the specified directory exists.
- * If the directory does not exist, it attempts to create it
- * with the specified permissions. The function uses PETSc
- * error handling to report any issues encountered during
- * the creation of the directory.
+ * This function checks whether the specified path exists. If the path
+ * already exists and refers to a directory, the function returns
+ * successfully. If the path exists but is not a directory, an error
+ * is raised.
  *
- * @param[in] path  A constant character pointer to the path
- * of the directory to be created.
- * @return PetscErrorCode PETSC_SUCCESS on successful
- * completion. If the directory creation fails, it returns
- * an appropriate PETSc error code.
+ * If the path does not exist, the function attempts to create the
+ * directory with POSIX permissions 0755. Any errors encountered
+ * during directory creation are reported using PETSc error handling
+ * mechanisms.
+ *
+ * @param[in] path  Path to the directory to be checked or created.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc
+ *         error code if the path exists but is not a directory,
+ *         or if directory creation fails.
  */
 PetscErrorCode createDirectory(const char* path) {
 
@@ -215,30 +316,43 @@ PetscErrorCode createDirectory(const char* path) {
 }
 
 /**
- * @brief Prints execution time statistics for different
- * computational stages.
+ * @brief Prints execution time statistics for the main
+ * computational stages of the PETGEM workflow.
  *
  * This function receives an array of timers containing the
- * elapsed execution times of different phases of the PETGEM
- * workflow. It prints to the console the time spent in:
- *   - Reading and setting up the grid
+ * elapsed execution times (in seconds) for the different
+ * phases of the PETGEM execution. It computes the total
+ * elapsed time as the sum of all stages and prints a
+ * formatted timing report to standard output, including
+ * the absolute time (hh:mm:ss.sss) and the percentage of
+ * the total runtime for each stage.
+ *
+ * The reported stages are:
+ *   - Reading user parameters
+ *   - Source setup
+ *   - Grid import
+ *   - Grid setup
  *   - Assembly
  *   - Solver
  *   - Postprocessing
  *
- * In addition, it computes and displays the total elapsed
- * time as the sum of these stages. The output is generated
- * using PETSc's parallel printing functions, ensuring
- * consistency across all processes in the PETSc
- * communicator.
+ * Output is produced using PETSc parallel printing routines,
+ * ensuring consistent and collective reporting across all
+ * MPI processes associated with PETSC_COMM_WORLD.
  *
- * @param[in] timers Array of length 4 containing execution
- * times (in seconds) for each stage of the workflow in the
- * following order: timers[0] = Read/setup grid timers[1] =
- * Assembly timers[2] = Solver timers[3] = Postprocessing
+ * @param[in] timers Array of length 7 containing execution
+ *                   times (in seconds) for each stage, in
+ *                   the following order:
+ *                   timers[0] = Read user parameters
+ *                   timers[1] = Setup source
+ *                   timers[2] = Import grid
+ *                   timers[3] = Setup grid
+ *                   timers[4] = Assembly
+ *                   timers[5] = Solver
+ *                   timers[6] = Postprocessing
  *
  * @return PetscErrorCode PETSC_SUCCESS on successful
- * completion, or an error code otherwise.
+ *         completion, or a PETSc error code otherwise.
  */
 PetscErrorCode printTimers(const PetscLogDouble timers[]) {
   PetscFunctionBeginUser;

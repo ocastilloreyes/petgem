@@ -26,25 +26,41 @@
 #include "inputs.h"
 
 /**
- * @brief Imports the mesh topology, coordinates, labels,
- * and resistivity field from an HDF5 file.
- * @param[out] odm Pointer to the DMPlex object to be
- * created and populated.
- * @param[out] resistivity_output Pointer to the Vec that
- * will store the local resistivity values.
- * @param[in] params A Params struct containing simulation
- * parameters, including the mesh filename.
- * @return PetscErrorCode PETSC_SUCCESS on success.
- * @details Reads a PETSc-formatted HDF5 file containing a
- * DMPlex mesh ("petgem_mesh") and an associated Vec
- * ("resistivity"). It handles mesh distribution for
- * parallel runs. The function clones the loaded DM for the
- * main computation (`odm`) and returns the resistivity
- * field as a local Vec. DM options like VecType and MatType
- * are processed.
+ * @brief Imports a DMPlex mesh and associated resistivity field from an HDF5 file.
+ *
+ * This function reads a PETSc-formatted HDF5 file containing a DMPlex mesh
+ * (named "petgem_mesh") and a resistivity vector (named "resistivity"). It
+ * supports distributed meshes for parallel runs and handles DM cloning
+ * so that the output DM can be used independently from the internal
+ * load DM.
+ *
+ * The function performs the following steps:
+ *   - Creates and initializes a DMPlex object.
+ *   - Loads topology, labels, and coordinates from the HDF5 file.
+ *   - Distributes the mesh across MPI ranks if necessary.
+ *   - Loads the global resistivity vector and scatters it to a local vector.
+ *   - Clones the loaded DM for main computations (`odm`) while maintaining
+ *     shared topology and coordinates.
+ *   - Processes DM options from the command line (`-dm_vec_type` and `-dm_mat_type`).
+ *
+ * @param[in]  params                Struct containing simulation parameters,
+ *                                   including the HDF5 mesh filename.
+ * @param[out] odm                   Pointer to the cloned DMPlex object
+ *                                   that will be used in computations.
+ * @param[out] resistivity_output    Pointer to a local Vec storing
+ *                                   the resistivity values for the local portion
+ *                                   of the mesh. The vector holds a unique
+ *                                   reference and can be used independently
+ *                                   of the DM used for loading.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code
+ *         on failure.
+ *
+ * @note This function uses PETSc viewers, PetscSF objects, and DM distribution
+ *       routines to handle parallel mesh loading. All output vectors and DMs
+ *       are allocated and ready for use in PETSc parallel computations.
  */
-
-PetscErrorCode importGrid(const Params params, DM* odm, Vec* resistivity_output) {
+PetscErrorCode importGrid(const csemParams params, DM* odm, Vec* resistivity_output) {
   PetscFunctionBegin;
 
   /* Variables declaration */
@@ -126,37 +142,36 @@ PetscErrorCode importGrid(const Params params, DM* odm, Vec* resistivity_output)
 }
 
 /**
- * @brief Sets up the DMPlex object with appropriate
- * sections for H(curl) and H1 finite elements for CSEM
- * modeling. *
+ * @brief Configures a DMPlex object with H(curl) and H1 sections for CSEM simulations.
  *
- * Configures the primary DM for H(curl) elements of order
- * @p params.nord. Concretely:
- * - Sets the number of fields to 1.
- * - Creates a "Boundary" label and marks boundary faces (ID
- * 100).
- * - Computes DOFs per vertex, edge, face, and volume based
- * on @p params.nord.
- * - Creates the PetscSection for H(curl) elements, applying
- * boundary conditions to the marked faces.
- * - Computes and stores local and global counts of
- * vertices, edges, faces, and cells in the @p grid struct.
- * - Stores DOF counts, element start/end indices, and
- * dimension in the @p grid struct.
- * - Prints mesh statistics.
+ * This function sets up the primary DMPlex object for CSEM modeling
+ * using high-order edge (H(curl)) elements of order `params.nord`
+ * and a corresponding H1 conforming space. The following steps are performed:
  *
- * @param[inout] dm Pointer to the DMPlex object to be
- * configured.
- * @param[out] grid Pointer to the Grid struct to be
- * populated with mesh statistics and DOF info for CSEM
- * modeling.
- * @param[in] params A Params struct containing simulation
- * parameters, especially the basis order
- * (@p params.nord).
- * @return PetscErrorCode PETSC_SUCCESS on success, or an
- * error code otherwise.
+ *   - Sets the number of fields in the DM to 1.
+ *   - Creates a "Boundary" label and marks boundary faces with ID 100.
+ *   - Computes degrees of freedom (DOFs) per vertex, edge, face, and volume
+ *     according to the PETGEM basis order (`params.nord`).
+ *   - Creates and attaches a PetscSection for H(curl) elements,
+ *     applying boundary conditions on the marked faces.
+ *   - Clones the DM to create an H1 conforming DM (stored in `grid->H1dm`).
+ *   - Computes local and global counts of vertices, edges, faces, and cells.
+ *   - Stores DOF counts, element start/end indices, and dimension in the `grid` struct.
+ *   - Prints mesh and HEFEM statistics for verification.
+ *
+ * @param[in]  params  Struct containing simulation parameters, especially the basis order `params.nord` and mesh filename.
+ * @param[inout] dm    Pointer to the DMPlex object to configure with H(curl) and H1 sections.
+ * @param[out] grid    Pointer to the Grid struct to be populated with mesh statistics, DOF counts, and the H1 DM.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ *
+ * @note The function uses PETSc parallel reductions (MPI_Allreduce) to compute global mesh statistics
+ *       and relies on PETSc DMPlex utilities to handle boundary labeling, section creation,
+ *       and point numbering. Output is printed collectively using PETSc routines.
+ * @note The H1 DM (`grid->H1dm`) is cloned from the H(curl) DM and can be used independently for
+ *       additional computations, e.g., scalar potential fields.
  */
-PetscErrorCode setupCsemGrid(const Params params, DM* dm, Grid* grid) {
+PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
 
   PetscFunctionBeginUser;
 
@@ -344,22 +359,27 @@ PetscErrorCode setupCsemGrid(const Params params, DM* dm, Grid* grid) {
 }
 
 /**
- * @brief Locates the cell containing a given point (e.g.,
- * source position or receiver position).
- * @param[in] dm The DMPlex object representing the mesh.
- * @param[in] position Array containing the [x, y, z]
- * coordinates of the point to locate.
- * @param[out] pointInCell Pointer to an integer where the
- * index of the containing cell will be stored. Set to -1 if
- * not found locally.
- * @return PetscErrorCode PETSC_SUCCESS on success.
- * @details Uses `DMLocatePoints` to find which cell owns
- * the given `position`. Performs an MPI reduction
- * (`MPI_LOR`) to check if the point was found on *any*
- * process. If the point is not found globally, it triggers
- * a `PetscCheck` error.
+ * @brief Locates the mesh cell containing a given point (e.g., source or receiver position).
+ *
+ * This function uses `DMLocatePoints` to determine which DMPlex cell owns the specified
+ * point coordinates. It performs a parallel check across all MPI ranks to ensure that
+ * the point is contained in at least one process. If the point is not found globally,
+ * the function raises a PETSc error.
+ *
+ * @param[in]  dm           DMPlex object representing the computational mesh.
+ * @param[in]  position     Array of size 3 containing the [x, y, z] coordinates of the point.
+ * @param[out] pointInCell  Pointer to an integer where the index of the containing cell
+ *                          will be stored. Set to -1 if the point is not found locally.
+ *
+ * @return PetscErrorCode   PETSC_SUCCESS on success, or a PETSc error code on failure.
+ *
+ * @note The search is performed collectively across all MPI processes using
+ *       `MPI_Allreduce` with logical OR to ensure the point exists somewhere in the domain.
+ *       Each process may return -1 if it does not own the point.
+ * @note A PETSc error is raised if the point is not located on any process.
+ * @note This function allocates a temporary Vec for point coordinates and a PetscSF
+ *       for the search, both of which are destroyed before returning.
  */
-
 PetscErrorCode locatePoint(const DM dm, const PetscReal* position, PetscInt* pointInCell) {
   PetscFunctionBeginUser;
 
@@ -410,6 +430,29 @@ PetscErrorCode locatePoint(const DM dm, const PetscReal* position, PetscInt* poi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Extracts the coordinates of the vertices of a given cell.
+ *
+ * This function retrieves the coordinates of all vertices of the specified
+ * cell from a DMPlex object and stores them in a user-provided `Cell` struct.
+ * It uses `DMPlexGetCellCoordinates` and `DMPlexRestoreCellCoordinates`
+ * to access the cell geometry safely.
+ *
+ * @param[in]  dm      DMPlex object representing the computational mesh.
+ * @param[in]  cellID  Global/local index of the cell to extract coordinates from.
+ * @param[out] cell    Pointer to a `Cell` struct where the coordinates of
+ *                     the cell's vertices will be stored. The struct is assumed
+ *                     to have sufficient space for `NUM_VERTICES_PER_CELL * NUM_DIMENSIONS`.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ *
+ * @note The function assumes that each cell has exactly `NUM_VERTICES_PER_CELL` vertices
+ *       and each vertex has `NUM_DIMENSIONS` coordinates. If this is not satisfied,
+ *       a PETSc error is raised.
+ * @note The coordinates are copied as `PetscReal` values into the `cell->coordinates` array.
+ * @note Temporary internal arrays returned by `DMPlexGetCellCoordinates` are restored
+ *       before the function returns.
+ */
 PetscErrorCode extractCellCoordinates(DM dm, PetscInt cellID, Cell* cell) {
   PetscFunctionBeginUser;
 
@@ -433,6 +476,29 @@ PetscErrorCode extractCellCoordinates(DM dm, PetscInt cellID, Cell* cell) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Extracts the resistivity components of a given cell.
+ *
+ * This function retrieves the resistivity values associated with a specific
+ * cell from a PETSc Vec defined on a DMPlex object and stores them in a
+ * user-provided `Cell` struct. It uses `DMPlexVecGetClosure` and
+ * `DMPlexVecRestoreClosure` to access the local cell data safely.
+ *
+ * @param[in]  dmResistivity  DMPlex object representing the resistivity field layout.
+ * @param[in]  resistivity    Vec containing the resistivity values defined on the mesh.
+ * @param[in]  cellID         Index of the cell to extract resistivity from.
+ * @param[out] cell           Pointer to a `Cell` struct where the resistivity
+ *                            components for the cell will be stored. Assumes
+ *                            space for `NUM_RESISTIVITY_COMPONENTS` entries.
+ *
+ * @return PetscErrorCode     PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ *
+ * @note The function assumes each cell has exactly `NUM_RESISTIVITY_COMPONENTS` (3) resistivity values.
+ *       If this is not satisfied, a PETSc error is raised.
+ * @note The resistivity values are copied as `PetscReal` into `cell->resistivity`.
+ * @note Temporary internal arrays returned by `DMPlexVecGetClosure` are restored
+ *       before the function returns.
+ */
 PetscErrorCode extractCellResistivity(DM dmResistivity, Vec resistivity, PetscInt cellID, Cell* cell) {
   PetscFunctionBeginUser;
 
@@ -454,6 +520,28 @@ PetscErrorCode extractCellResistivity(DM dmResistivity, Vec resistivity, PetscIn
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Extracts the transitive closure of a given cell.
+ *
+ * This function retrieves the transitive closure of a specified cell in a
+ * DMPlex mesh and stores it in a user-provided `Cell` struct. The closure
+ * contains all points (vertices, edges, faces, and the cell itself) that
+ * make up the cell, along with their orientation.
+ *
+ * @param[in]  dm      DMPlex object representing the computational mesh.
+ * @param[in]  cellID  Index of the cell whose transitive closure is to be extracted.
+ * @param[out] cell    Pointer to a `Cell` struct where the closure will be stored.
+ *                     Assumes space for `MAX_TRANSITIVE_CLOSURE_SIZE * 2` integers.
+ *                     The field `cell->closureSize` will store the number of points
+ *                     in the closure.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ *
+ * @note The function uses `DMPlexGetTransitiveClosure` and `DMPlexRestoreTransitiveClosure`
+ *       to access internal DMPlex data.  
+ * @note Each entry in the closure array is a pair: `(point, orientation)`.
+ * @note A PETSc error is raised if the closure size exceeds `MAX_TRANSITIVE_CLOSURE_SIZE`.
+ */
 PetscErrorCode extractCellClousure(DM dm, PetscInt cellID, Cell* cell) {
   PetscFunctionBeginUser;
 

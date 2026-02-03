@@ -23,6 +23,6 @@
 #include <petsc.h>
 #include <petscdmplex.h>
 
-PetscErrorCode computeFields(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, const Mat X);
+PetscErrorCode computeFields(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, const Mat X);
 
 #endif

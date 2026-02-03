@@ -33,6 +33,6 @@ typedef struct {
   CsemSource* sourceArray; /* Array of sources */
 } CsemSourceSet;
 
-PetscErrorCode setupCsemSource(const Params params, CsemSourceSet* sources);
+PetscErrorCode setupCsemSource(const csemParams params, CsemSourceSet* sources);
 
 #endif
