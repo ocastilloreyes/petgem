@@ -19,18 +19,19 @@ def write_params(nord, output_dir, output_filename):
         -receivers_filename {output_dir}/receivers.h5
         -source_filename {output_dir}/sources.txt
         -nord {nord}
-        -pc_type lu 
-        -pc_factor_mat_solver_type mumps
+        -dm_mat_type is
+        -ksp_type fgmres
+        -pc_type bddc
+        -pc_bddc_use_deluxe_scaling 1
+        -pc_bddc_coarse_pc_type lu
         -output_dir {output_dir}/
         -output_filename {output_filename}
-        -malloc_dump
     """)
 
     filename = f"{output_dir}/params_nord{nord}.txt"
     with open(filename, "w") as f:
         f.write(content)
     print(f"Created {filename}")
-
 
 def main():
 

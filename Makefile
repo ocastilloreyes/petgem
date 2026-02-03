@@ -14,7 +14,8 @@ else
     EXTRA_LDFLAGS :=
 endif
 
-all: $(TARGET)		# Build the PETGEM kernels
+# Build the PETGEM kernels
+all: $(TARGET)
 
 # -----------------------------------------------------------------------------
 # Include PETSc-provided makefile configuration

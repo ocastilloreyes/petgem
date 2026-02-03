@@ -248,8 +248,8 @@ PetscErrorCode printHeader(void) {
   PetscCall(printSeparator('-'));
   PetscCall(printEmptyLine());
   PetscCall(printCenteredText("Octavio Castillo-Reyes"));
-  PetscCall(printCenteredText("Universitat Politècnica de Catalunya (UPC) - 2025"));
-  PetscCall(printCenteredText("Barcelona Supercomputing Center (BSC) - 2025"));
+  PetscCall(printCenteredText("Universitat Politècnica de Catalunya (UPC) - 2026"));
+  PetscCall(printCenteredText("Barcelona Supercomputing Center (BSC) - 2026"));
   PetscCall(printEmptyLine());
   PetscCall(printSeparator('-'));
 
