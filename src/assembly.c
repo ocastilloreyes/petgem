@@ -444,8 +444,8 @@ PetscErrorCode assembleCsemLHS(const csemParams params, const CsemSourceSet sour
     /* XXX TODO higher order*/
     if (params.nord == 1) {
       PetscCall(PetscArrayzero(closureLHS, grid.numDofInCell * grid.numH1DofInCell));
-      for(PetscInt j = 0; j < grid.numDofInCell; j++){
-        for(PetscInt k = 0; k < grid.numH1DofInCell; k++){
+      for (PetscInt j = 0; j < grid.numDofInCell; j++) {
+        for (PetscInt k = 0; k < grid.numH1DofInCell; k++) {
           closureLHS[j * grid.numH1DofInCell + k] = gradientMatrix[j][k];
         }
       }

@@ -93,7 +93,7 @@ static PetscErrorCode tripleProduct(const PetscReal a[3], const PetscReal b[3], 
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  *
  * @note The transformation applied is specific to PETGEM’s triangular element
- *       conventions: 
+ *       conventions:
  *       \f$x = (1 + ξ)/2\f$, \f$y = -(ξ + η)/2\f$, weight scaled by 1/4.
  */
 static PetscErrorCode renormalization2DGaussPoints(const PetscReal (*gaussPoints)[3], Quadrature2D* quadrature) {
@@ -477,7 +477,7 @@ static PetscErrorCode PolyILegendre(const PetscReal X, const PetscReal T, const 
 /**
  * @brief Computes Jacobi polynomials \(P_j^{\alpha,0}\) for shifted and scaled coordinates.
  *
- * Evaluates Jacobi polynomials using a recurrence relation adapted for the shifted variable 
+ * Evaluates Jacobi polynomials using a recurrence relation adapted for the shifted variable
  * \(y = 2 X - T\), suitable for constructing high-order basis functions on faces and volumes.
  *
  * @param[in]  X        Coordinate, typically s1 from an oriented face projection.
@@ -492,8 +492,8 @@ static PetscErrorCode PolyILegendre(const PetscReal X, const PetscReal T, const 
  *          values (Minalpha, Minalpha+2, …), while the second dimension corresponds to
  *          the polynomial order j (0..nord). The function initializes P_0 = 1 and P_1 using
  *          the shifted coordinate, then fills higher-order polynomials using the three-term
- *          recurrence relation.  
- *          
+ *          recurrence relation.
+ *
  *          Typically used in PETGEM for constructing H(curl) and H1 face/volume basis functions.
  */
 static PetscErrorCode PolyJacobi(const PetscReal X, const PetscReal T, const PetscInt nord, PetscInt Minalpha, PetscReal** P) {
@@ -556,8 +556,8 @@ static PetscErrorCode PolyJacobi(const PetscReal X, const PetscReal T, const Pet
 /**
  * @brief Computes integrated shifted scaled Jacobi polynomials \(L_j^{\alpha,0}\) and related terms P, R.
  *
- * Evaluates integrated Jacobi polynomials for shifted coordinates \(y = 2X - T\) using a recurrence 
- * relation, along with the base Jacobi polynomials P (derivative w.r.t. X) and the T-derivative 
+ * Evaluates integrated Jacobi polynomials for shifted coordinates \(y = 2X - T\) using a recurrence
+ * relation, along with the base Jacobi polynomials P (derivative w.r.t. X) and the T-derivative
  * related term R. Typically used for high-order basis function construction on faces and volumes.
  *
  * @param[in]  X        Coordinate, typically s1 or s2 depending on context (face/volume basis).
@@ -575,7 +575,7 @@ static PetscErrorCode PolyJacobi(const PetscReal X, const PetscReal T, const Pet
  *          The first column of L corresponds to order 1, while higher orders are computed via the
  *          recurrence. R is initialized to zero and filled where necessary.
  *
- *          Used internally in PETGEM for constructing high-order face and volume basis functions 
+ *          Used internally in PETGEM for constructing high-order face and volume basis functions
  *          in H(curl) and H1 spaces.
  */
 static PetscErrorCode PolyIJacobi(const PetscReal X, const PetscReal T, const PetscInt nord, const PetscInt Minalpha, PetscReal** L,
@@ -937,7 +937,7 @@ static PetscErrorCode ProjectTetF(const PetscReal Lam[NUM_DIMENSIONS + 1], const
  *
  * @return PetscErrorCode PETSC_SUCCESS always.
  *
- * @details If Nori == 0, GS = S and GDS = DS (no change).  
+ * @details If Nori == 0, GS = S and GDS = DS (no change).
  *          If Nori == 1, GS = [s1, s0] and GDS = [Grad(s1), Grad(s0)].
  *          This is used to ensure consistent local-to-global edge orientation
  *          when assembling edge-based basis functions.
@@ -1325,7 +1325,7 @@ static PetscErrorCode AncPhiTri(const PetscReal S[NUM_DIMENSIONS], const PetscRe
 
   /* Get EE - this is never a simplified case (IdecE=0) */
   PetscCall(AncPhiE((const PetscReal*)GLampE, (const PetscReal(*)[2])GDLampE, nordFace - minJ, IdecF, PhiE, DPhiE));
-  
+
   /* Get homogenized Integrated Jacobi polynomials, homLal, and gradients */
   sL[0] = S[0] + S[1];
   sL[1] = S[2];
@@ -1374,7 +1374,7 @@ static PetscErrorCode AncPhiTri(const PetscReal S[NUM_DIMENSIONS], const PetscRe
 /**
  * @brief Computes H1 hierarchical high-order basis functions (shape functions) and their gradients for a tetrahedral element.
  *
- * This function constructs high-order H1 finite element shape functions for a tetrahedron of polynomial order `nord`. 
+ * This function constructs high-order H1 finite element shape functions for a tetrahedron of polynomial order `nord`.
  * It includes vertex, edge, face, and interior (bubble) basis functions using a hierarchical approach with
  * homogenized integrated Legendre and Jacobi polynomials. The gradients of each shape function with respect
  * to global coordinates are also computed.
@@ -1384,7 +1384,7 @@ static PetscErrorCode AncPhiTri(const PetscReal S[NUM_DIMENSIONS], const PetscRe
  * @param[in]  cellOrientation Array of 10 integers specifying local orientations for the 4 faces and 6 edges of the tetrahedron.
  *                             - cellOrientation[0..3]: face orientations
  *                             - cellOrientation[4..9]: edge orientations
- * @param[out] ShapH           Output array storing the scalar values of H1 shape functions at X. 
+ * @param[out] ShapH           Output array storing the scalar values of H1 shape functions at X.
  *                             Dimension: MAXtetraH = (nord+3)*(nord+2)*(nord+1)/6
  * @param[out] GradH           Output 2D array storing gradients of H1 shape functions with respect to global coordinates.
  *                             Dimensions: GradH[NUM_DIMENSIONS][MAXtetraH]
@@ -1399,7 +1399,7 @@ static PetscErrorCode AncPhiTri(const PetscReal S[NUM_DIMENSIONS], const PetscRe
  * 5. Compute interior (bubble) shape functions using AncPhiTri and HomIJacobi for the volume.
  * 6. Gradients are computed using the chain rule from the affine coordinates and polynomial derivatives.
  *
- * The function allocates temporary arrays for intermediate polynomial values and gradients and frees them 
+ * The function allocates temporary arrays for intermediate polynomial values and gradients and frees them
  * before returning. Orientation of edges and faces is applied according to `cellOrientation`.
  *
  * This function is suitable for use in assembling high-order H1 finite element matrices over tetrahedral meshes.
@@ -1867,8 +1867,8 @@ PetscErrorCode tetrahedronXYZToReference(const PetscReal coordinates[NUM_VERTICE
 }
 
 /**
- * @brief Computes the Jacobian matrix, its inverse, and determinant 
- *        for the affine mapping from the reference tetrahedron to 
+ * @brief Computes the Jacobian matrix, its inverse, and determinant
+ *        for the affine mapping from the reference tetrahedron to
  *        a physical tetrahedron.
  *
  * @param[in,out] cell Pointer to a `Cell` structure containing:
@@ -1885,7 +1885,7 @@ PetscErrorCode tetrahedronXYZToReference(const PetscReal coordinates[NUM_VERTICE
  *          that maps points from the reference tetrahedron
  *          (vertices at (0,0,0), (1,0,0), (0,1,0), (0,0,1))
  *          to the physical tetrahedron defined by `cell->coordinates`.
- *          
+ *
  *          Steps performed:
  *            1. Constructs the Jacobian matrix using differences of vertex coordinates.
  *            2. Computes the determinant of the Jacobian.
@@ -2441,7 +2441,7 @@ PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature) {
  * @brief Computes the coefficients and derivatives for first-order Nédélec edge basis functions.
  *
  * @param[in] nord The polynomial order (currently only supports first-order, i.e., nord = 1).
- * @param[out] coeffs Output 2D array (numDofInCell x numDofInCell) storing the 
+ * @param[out] coeffs Output 2D array (numDofInCell x numDofInCell) storing the
  *                    coefficients for the Nédélec basis functions.
  * @param[out] Dx_Ni Output 2D array (NUM_DIMENSIONS x numDofInCell) storing the
  *                   x-derivatives of the basis functions.
@@ -2455,24 +2455,24 @@ PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature) {
  * This function generates the coefficients and derivatives of first-order Nédélec
  * edge elements in 3D for a tetrahedral reference cell. Nédélec basis functions
  * are curl-conforming and used in electromagnetics (H(curl) spaces).
- * 
+ *
  * The algorithm proceeds as follows:
  * 1. Computes the number of degrees of freedom per tetrahedral cell:
  *      numDofInCell = nord * (nord + 2) * (nord + 3) / 2
  *    For first-order elements, this corresponds to the 6 edges of the tetrahedron.
- * 
+ *
  * 2. Constructs a small 6x6 matrix representing the mapping from reference edge
  *    functions to the global basis functions and an identity matrix for the RHS.
- * 
+ *
  * 3. Solves the linear system (matrix * coef = identity) using PETSc LU factorization
  *    to obtain the coefficients of the basis functions in the standard edge basis.
  *    Values below a threshold (EPS = 1e-14) are set to zero for numerical stability.
- * 
+ *
  * 4. Computes the derivatives of the Nédélec basis functions:
  *    - Dx_Ni, Dy_Ni, Dz_Ni store the partial derivatives with respect to x, y, z.
  *    - The derivatives are filled according to the curl-conforming definition
  *      for first-order edge functions.
- * 
+ *
  * 5. Frees all temporary PETSc objects (matrices and index sets) used for the solve.
  *
  */
@@ -2571,7 +2571,7 @@ PetscErrorCode computeNedelecOrder1Coefficients(const PetscInt nord, PetscReal**
  *                   to global Nédélec basis functions.
  * @param[out] Ni Output 2D array (NUM_DIMENSIONS x numDofInCell) storing the evaluated
  *                Nédélec basis functions at the point in physical coordinates.
- * 
+ *
  * @return PetscErrorCode PETSC_SUCCESS on success.
  *
  * @details
@@ -2823,9 +2823,9 @@ PetscErrorCode computeNedelecOrder1BasisFunctionCurls(const PetscInt nord, const
  * @param[in] quadrature Pointer to the Quadrature3D structure containing:
  *                       - Gauss points
  *                       - Weights for tetrahedral integration
- * @param[out] Me Elemental mass matrix (numDofInCell x numDofInCell), 
+ * @param[out] Me Elemental mass matrix (numDofInCell x numDofInCell),
  *                representing \int_T (ε_r * N_i) · N_j dV.
- * @param[out] Ke Elemental stiffness matrix (numDofInCell x numDofInCell), 
+ * @param[out] Ke Elemental stiffness matrix (numDofInCell x numDofInCell),
  *                representing \int_T (μ_r^{-1} * curl(N_i)) · curl(N_j) dV.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success.
@@ -2839,7 +2839,7 @@ PetscErrorCode computeNedelecOrder1BasisFunctionCurls(const PetscInt nord, const
  *    - Define the magnetic permeability tensor `mu_r` (currently identity).
  *
  * 2. **Memory Allocation**
- *    - Allocate arrays for basis functions (Ni), their curls (NiCurl), 
+ *    - Allocate arrays for basis functions (Ni), their curls (NiCurl),
  *      derivatives (Dx_Ni, Dy_Ni, Dz_Ni), and Nédélec coefficients.
  *
  * 3. **Reset Elemental Matrices**
@@ -2986,7 +2986,8 @@ PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numD
       }
 
       /* Compute curl basis functions */
-      PetscCall(computeNedelecOrder1BasisFunctionCurls(nord, Dx_Ni_const, Dy_Ni_const, Dz_Ni_const, cell->jacobian, cell->detJacobian, NiCurl));
+      PetscCall(
+          computeNedelecOrder1BasisFunctionCurls(nord, Dx_Ni_const, Dy_Ni_const, Dz_Ni_const, cell->jacobian, cell->detJacobian, NiCurl));
 
       /* Perform stiffness matrix integral */
       for (PetscInt j = 0; j < numDofInCell; j++) {
@@ -3085,7 +3086,7 @@ PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numD
  * - The matrix represents a mapping from scalar H1 basis gradients to vector H(curl)
  *   edge functions, used in mixed FEM formulations (e.g., for curl-conforming discretizations).
  * - Orientation signs from `cell->orientation` are applied to ensure global assembly consistency.
-*/
+ */
 PetscErrorCode computeElementalGradientMatrix(const PetscInt nord, const PetscInt numDofInCell, const PetscInt numH1DofInCell,
                                               const Cell* cell, const Quadrature1D* quadrature, PetscReal** gradientMatrix) {
   PetscFunctionBeginUser;
@@ -3245,7 +3246,7 @@ PetscErrorCode computeElementalGradientMatrix(const PetscInt nord, const PetscIn
  *     - `DMPlexGetTransitiveClosure` for retrieving connected points
  *     - `DMPlexGetCone` for face-to-edge and edge-to-vertex connectivity
  *     - `DMPlexGetCellCoordinates` for vertex coordinates
-*/
+ */
 PetscErrorCode printCellEntities(const DM dm, const PetscInt cell) {
   PetscFunctionBeginUser;
 
@@ -3389,7 +3390,7 @@ PetscErrorCode printCellEntities(const DM dm, const PetscInt cell) {
  *
  * @details
  * This function checks the property:
- * 
+ *
  *     M * G == 0
  *
  * where:
@@ -3406,10 +3407,11 @@ PetscErrorCode printCellEntities(const DM dm, const PetscInt cell) {
  *
  * @note
  * - M is assumed to be square (m x m) and stored in **row-major** order.
- * - G is assumed to be stored in **row-major** order (m x n).  
+ * - G is assumed to be stored in **row-major** order (m x n).
  * - The check is mainly intended for debugging or verification during development.
  */
-PetscErrorCode checkDiscreteGradientKernel(const PetscReal* M, const PetscReal* G, const PetscInt m, const PetscInt n, const PetscInt cell) {
+PetscErrorCode checkDiscreteGradientKernel(const PetscReal* M, const PetscReal* G, const PetscInt m, const PetscInt n,
+                                           const PetscInt cell) {
   PetscFunctionBeginUser;
 
   /* Activate/deactive printing */
@@ -3425,23 +3427,19 @@ PetscErrorCode checkDiscreteGradientKernel(const PetscReal* M, const PetscReal* 
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n"));
 #endif
 
-  /* Compute discrete gradient */  
+  /* Compute discrete gradient */
   for (PetscInt i = 0; i < m; i++) {
     for (PetscInt j = 0; j < n; j++) {
       PetscReal v = 0;
       for (PetscInt k = 0; k < m; k++) {
-        /* M is m x m, G is m x n */ 
+        /* M is m x m, G is m x n */
         v += M[i * m + k] * G[k * n + j];
       }
       if (!PetscIsCloseAtTol(v, 0, 0, PETSC_SMALL)) {
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Error: discrete gradient is not in the kernel of the mass matrix for cell %d (%d, %d) \n", cell, i, j));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Error: discrete gradient is not in the kernel of the mass matrix for cell %d (%d, %d) \n",
+                              cell, i, j));
       }
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-
-
-
-
-

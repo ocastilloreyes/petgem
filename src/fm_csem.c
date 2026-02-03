@@ -1,6 +1,6 @@
 static char help[] = "PETGEM kernel for 3D CSEM modeling using high-order vector finite elements.\n\
   Command line usage:\n\
-    mpirun -n <np> ./kernel -options_file <file.txt>\n";
+    mpirun -n <np> ./fm.csem -options_file <file.txt>\n";
 
 /* C libraries */
 #include <stdio.h>

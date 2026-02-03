@@ -25,7 +25,6 @@ tests/extrae_profiling/set-0
 
 
 # Local management
-.clang-format
 
 
 # Object files, executables, libraries

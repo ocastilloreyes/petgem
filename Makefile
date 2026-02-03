@@ -1,20 +1,30 @@
 # -----------------------------------------------------------------------------
-# Select binary name, flags, and object directory based on USE_EXTRAE
+# Select binary names, flags, and object directory based on USE_EXTRAE
 # -----------------------------------------------------------------------------
 USE_EXTRAE ?= 0
 ifeq ($(USE_EXTRAE), 1)
-    TARGET := build/fm.csem.extrae
-    OBJDIR := build/extrae
     EXTRA_CFLAGS := -I$(EXTRAE_HOME)/include -DUSE_EXTRAE
     EXTRA_LDFLAGS := -L$(EXTRAE_HOME)/lib -lmpitrace
+    OBJDIR := build/extrae
 else
-    TARGET := build/fm.csem
-    OBJDIR := build/noextrae
     EXTRA_CFLAGS :=
     EXTRA_LDFLAGS :=
+    OBJDIR := build/noextrae
 endif
 
-# Build the PETGEM kernels
+# Target names
+FM_TARGET := build/fm.csem
+IM_TARGET := build/im.csem
+ifeq ($(USE_EXTRAE),1)
+    FM_TARGET := build/fm.csem.extrae
+    IM_TARGET := build/im.csem.extrae
+endif
+
+TARGET := $(FM_TARGET) $(IM_TARGET)
+
+# -----------------------------------------------------------------------------
+# Build all targets by default
+# -----------------------------------------------------------------------------
 all: $(TARGET)
 
 # -----------------------------------------------------------------------------
@@ -47,38 +57,44 @@ WARN_CFLAGS := -Wall -Wextra -Wpedantic \
 # Final CFLAGS: base flags + optional Extrae
 CFLAGS := $(BASE_CFLAGS) $(WARN_CFLAGS) $(EXTRA_CFLAGS)
 
-
 # Include directory for PETGEM headers
 I_CFLAGS := -Iinclude
 
 # -----------------------------------------------------------------------------
-# Source files for the PETGEM kernel
+# Source files
 # -----------------------------------------------------------------------------
-SRCS := src/fm_csem.c \
-        src/common.c \
-        src/inputs.c \
-        src/transmitter.c \
-        src/grid.c \
-        src/assembly.c \
-        src/constants.c \
-        src/hvfem.c \
-        src/solver.c \
-        src/postprocessing.c
+SHARED_SRCS := src/common.c \
+               src/inputs.c \
+               src/transmitter.c \
+               src/grid.c \
+               src/assembly.c \
+               src/constants.c \
+               src/hvfem.c \
+               src/solver.c \
+               src/postprocessing.c
 
-OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(SRCS))
+# Kernel-specific sources
+FM_SRCS := src/fm_csem.c $(SHARED_SRCS)
+IM_SRCS := src/im_csem.c $(SHARED_SRCS)
+
+# Object files
+FM_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(FM_SRCS))
+IM_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(IM_SRCS))
 
 # -----------------------------------------------------------------------------
-# Build and cleaning rules
+# Build rules for each kernel
 # -----------------------------------------------------------------------------
+$(FM_TARGET): $(FM_OBJS) | build
+	@echo "[LD] $@"
+	@$(CLINKER) $^ -o $@ $(EXTRA_LDFLAGS) $(PETSC_LIB)
+
+$(IM_TARGET): $(IM_OBJS) | build
+	@echo "[LD] $@"
+	@$(CLINKER) $^ -o $@ $(EXTRA_LDFLAGS) $(PETSC_LIB)
 
 # Ensure object directory exists before compiling
 $(OBJDIR):
 	@mkdir -p $(OBJDIR)
-
-# Link all object files into the final executable
-$(TARGET): $(OBJS) | build
-	@echo "[LD] $@"
-	@$(CLINKER) $^ -o $@ $(EXTRA_LDFLAGS) $(PETSC_LIB)
 
 # Compilation rule for each source file
 $(OBJDIR)/%.o: src/%.c | $(OBJDIR)
@@ -89,7 +105,9 @@ $(OBJDIR)/%.o: src/%.c | $(OBJDIR)
 build:
 	@mkdir -p build
 
+# -----------------------------------------------------------------------------
 # Cleaning
+# -----------------------------------------------------------------------------
 clean::         ## Remove object files and executables
 	@echo "[CLEAN]"
 	@rm -rf build $(OBJDIR)
@@ -130,8 +148,8 @@ clean_doc:                                              ## Clean documentation
 help:              ## Show this help message
 	@echo "Available make targets:"
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[1;36m%-20s\033[0m %s\n", $$1, $$2}'
+        	| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[1;36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Optional build options (set with 'make <target> OPTION=1'):"
 	@echo "  USE_INTEL=1     Use Intel MPI compiler (mpiicc) instead of PETSc default"
-	@echo "  USE_EXTRAE=1    Build binary with Extrae support
+	@echo "  USE_EXTRAE=1    Build binary with Extrae support"

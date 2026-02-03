@@ -538,7 +538,7 @@ PetscErrorCode extractCellResistivity(DM dmResistivity, Vec resistivity, PetscIn
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  *
  * @note The function uses `DMPlexGetTransitiveClosure` and `DMPlexRestoreTransitiveClosure`
- *       to access internal DMPlex data.  
+ *       to access internal DMPlex data.
  * @note Each entry in the closure array is a pair: `(point, orientation)`.
  * @note A PETSc error is raised if the closure size exceeds `MAX_TRANSITIVE_CLOSURE_SIZE`.
  */

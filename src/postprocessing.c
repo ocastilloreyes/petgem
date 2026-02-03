@@ -30,7 +30,7 @@
 /**
  * @brief Computes electric (E) and magnetic (H) fields at specified receiver locations.
  *
- * @param[in] params A `csemParams` struct containing simulation parameters such as 
+ * @param[in] params A `csemParams` struct containing simulation parameters such as
  *                   finite element order, output filenames, and MPI task information.
  * @param[in] sources A `CsemSourceSet` struct containing information about sources,
  *                    including number of sources, frequency, positions, and currents.
