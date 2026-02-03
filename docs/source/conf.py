@@ -7,8 +7,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'PETGEM'
-copyright = '2025, Castillo Reyes, Octavio'
-author = 'Castillo Reyes, Octavio'
+copyright = '2025, Castillo-Reyes, Octavio'
+author = 'Castillo-Reyes, Octavio'
 release = '2.0.0'
 
 # -- General configuration ---------------------------------------------------
@@ -28,6 +28,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
+html_logo = "_static/petgem_logo.png"
 
 # Breathe configuration
 breathe_projects = {

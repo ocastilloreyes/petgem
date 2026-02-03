@@ -2,26 +2,27 @@
   Filename: postprocessing.h
   Author: Octavio Castillo Reyes (UPC/BSC)
   Date: 2025-09-05
- 
+
   Description:
-  This file contains a collection of definitions for postprocessing functions that are used
-  throughout the PETGEM project.
+  This file contains a collection of definitions for
+  postprocessing functions that are used throughout the
+  PETGEM project.
 
   Usage:
-  Include this file in your source code to utilize the postprocessing functions. 
-  For example:
-  #include "postprocessing.h" 
+  Include this file in your source code to utilize the
+  postprocessing functions. For example: #include
+  "postprocessing.h"
 */
 
 #ifndef POSTPROCESSING_H
 #define POSTPROCESSING_H
 
+#include "grid.h"
+#include "inputs.h"
+#include "transmitter.h"
 #include <petsc.h>
 #include <petscdmplex.h>
-#include "inputs.h"
-#include "grid.h"
-#include "transmitter.h"
 
-PetscErrorCode computeFields(DM dm, Mat X, Grid grid, CsemSourceSet source, Params params);
+PetscErrorCode computeFields(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, const Mat X);
 
 #endif

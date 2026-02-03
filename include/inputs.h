@@ -2,31 +2,33 @@
   Filename: inputs.h
   Author: Octavio Castillo Reyes (UPC/BSC)
   Date: 2025-09-05
- 
+
   Description:
-  This file contains a collection of definitions for user input functions that are used
-  throughout the PETGEM project. These functions include operations for printing and timers.
+  This file contains a collection of definitions for user
+  input functions that are used throughout the PETGEM
+  project. These functions include operations for printing
+  and timers.
 
   Usage:
-  Include this file in your source code to utilize the input functions. 
-  For example:
-  #include "inputs.h" 
+  Include this file in your source code to utilize the input
+  functions. For example: #include "inputs.h"
 */
 
 #ifndef INPUTS_H
 #define INPUTS_H
 
+#include <petsc.h>
+
 typedef struct {
-    char meshFile[PETSC_MAX_PATH_LEN];
-    char receiversFile[PETSC_MAX_PATH_LEN];
-    char outputDirectory[PETSC_MAX_PATH_LEN];
-    char outputFilename[PETSC_MAX_PATH_LEN];
-    char sourceFilename[PETSC_MAX_PATH_LEN];
-    PetscInt nord;
-    PetscMPIInt numMPITasks;
+  char meshFile[PETSC_MAX_PATH_LEN];
+  char receiversFile[PETSC_MAX_PATH_LEN];
+  char outputDirectory[PETSC_MAX_PATH_LEN];
+  char outputFilename[PETSC_MAX_PATH_LEN];
+  char sourceFilename[PETSC_MAX_PATH_LEN];
+  PetscInt nord;
+  PetscMPIInt numMPITasks;
 } Params;
 
-PetscErrorCode readParams(Params *params, PetscMPIInt size);
+PetscErrorCode readParams(const PetscMPIInt size, Params* params);
 
 #endif
-

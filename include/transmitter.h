@@ -2,15 +2,16 @@
   Filename: transmitter.h
   Author: Octavio Castillo Reyes (UPC/BSC)
   Date: 2025-09-05
- 
+
   Description:
-  This file contains a collection of definitions for transmitter functions that are used
-  throughout the PETGEM project.
+  This file contains a collection of definitions for
+  transmitter functions that are used throughout the PETGEM
+  project.
 
   Usage:
-  Include this file in your source code to utilize the transmitter functions. 
-  For example:
-  #include "transmitter.h" 
+  Include this file in your source code to utilize the
+  transmitter functions. For example: #include
+  "transmitter.h"
 */
 
 #ifndef TRANSMITTER_H
@@ -19,25 +20,19 @@
 #include "inputs.h"
 
 typedef struct {
-   PetscReal position[3];  /* Transmitter position (x, y, z) */    
-   PetscReal current;      /* Electric current          */
-   PetscReal length;       /* Dipole length             */
-   PetscReal dipAngle;     /* Dip angle                 */
-   PetscReal azimuthAngle; /* Azimuth angle             */
+  PetscReal position[3];  /* Transmitter position (x, y, z) */
+  PetscReal current;      /* Electric current          */
+  PetscReal length;       /* Dipole length             */
+  PetscReal dipAngle;     /* Dip angle                 */
+  PetscReal azimuthAngle; /* Azimuth angle             */
 } CsemSource;
 
 typedef struct {
-   PetscReal freq;        /* Frequency                 */
-   PetscInt numSources;   /* Total number of transmitters */
-   CsemSource*  sourceArray;  /* Array of sources */
+  PetscReal freq;          /* Frequency                 */
+  PetscInt numSources;     /* Total number of transmitters */
+  CsemSource* sourceArray; /* Array of sources */
 } CsemSourceSet;
 
+PetscErrorCode setupCsemSource(const Params params, CsemSourceSet* sources);
 
-PetscErrorCode setupCsemSource(CsemSourceSet* sources, Params params);
-
-#endif 
-
-
-
-
-
+#endif

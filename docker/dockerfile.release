@@ -9,7 +9,6 @@ WORKDIR /workspace
 # ---------------------------
 # Copy PETGEM runtime binaries from develop build stage
 # ---------------------------
-# These paths correspond to the runtime stage of your original Dockerfile
 COPY --from=builder /usr/local/petsc /usr/local/petsc
 COPY --from=builder /usr/local/gmsh /usr/local/gmsh
 COPY --from=builder /usr/local/extrae /usr/local/extrae

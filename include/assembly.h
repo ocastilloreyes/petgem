@@ -2,30 +2,28 @@
   Filename: assembly.h
   Author: Octavio Castillo Reyes (UPC/BSC)
   Date: 2024-10-02
- 
+
   Description:
-  This file contains a collection of definitions for assembly functions that are used
-  throughout the PETGEM project.
- 
+  This file contains a collection of definitions for
+  assembly functions that are used throughout the PETGEM
+  project.
+
   Usage:
-  Include this file in your source code to utilize the assembly functions. 
-  For example:
-  #include "assembly.h" 
+  Include this file in your source code to utilize the
+  assembly functions. For example: #include "assembly.h"
 */
 
 #ifndef ASSEMBLY_H
 #define ASSEMBLY_H
 
-#include <petsc.h>
-#include "inputs.h"
 #include "grid.h"
+#include "inputs.h"
 #include "transmitter.h"
+#include <petsc.h>
 
-PetscErrorCode assembleSystem(DM dm, Vec resistivity, Grid grid, CsemSourceSet sources, Params params, Mat *A, Mat *B, Mat *G);
+PetscErrorCode assembleCsemRHS(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B);
 
-PetscErrorCode assembleCsemRHS(DM dm, Grid grid, CsemSourceSet sources, Params params, Mat *B);
-
-PetscErrorCode assembleCsemLHS(DM dm, Grid grid, CsemSourceSet sources, Params params, Vec resistivity,   Mat *A, Mat *G);
+PetscErrorCode assembleCsemLHS(const Params params, const CsemSourceSet sources, const DM dm, const Grid grid, const Vec resistivity,
+                               Mat* A, Mat* G);
 
 #endif
-

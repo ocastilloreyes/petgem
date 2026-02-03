@@ -2,45 +2,84 @@
   Filename: hvfem.h
   Author: Octavio Castillo Reyes (UPC/BSC)
   Date: 2025-09-05
- 
+
   Description:
-  This file contains a collection of definitions for high-order vector finite element functions that 
-  are used throughout the PETGEM project.
- 
+  This file contains a collection of definitions for
+  high-order vector finite element functions that are used
+  throughout the PETGEM project.
+
   Usage:
-  Include this file in your source code to utilize the hvfem functions. 
-  For example:
-  #include "hvfem.h" 
+  Include this file in your source code to utilize the hvfem
+  functions. For example: #include "hvfem.h"
 */
 
 #ifndef HVFEM_H
 #define HVFEM_H
 
+#include "constants.h"
+#include "grid.h"
 #include <petsc.h>
 #include <petscdmplex.h>
-#include "constants.h"
 
+typedef struct {
+  PetscInt numPoints;
+  PetscReal* points;
+  PetscReal* weights;
+} Quadrature1D;
 
-PetscErrorCode computeJacobian(PetscScalar *cellCoords, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS]);
+typedef struct {
+  PetscInt numPoints;
+  PetscReal** points;
+  PetscReal* weights;
+} Quadrature2D;
 
-PetscErrorCode computeNumGaussPoints3D(PetscInt nord, PetscInt *numGaussPoints);
+typedef struct {
+  PetscInt numPoints;
+  PetscReal** points;
+  PetscReal* weights;
+} Quadrature3D;
 
-PetscErrorCode computeGaussPoints3D(PetscInt numPoints, PetscReal **points, PetscReal *weights);
+PetscErrorCode printCellEntities(DM dm, PetscInt cell);
 
-PetscErrorCode vectorRotation(PetscReal azimuth, PetscReal dip, PetscReal rotationVector[NUM_DIMENSIONS]);
+PetscErrorCode computeCellJacobian(Cell* cell);
 
-PetscErrorCode tetrahedronXYZToXiEtaZeta(PetscScalar *cellCoords, PetscReal point[NUM_DIMENSIONS], PetscReal XiEtaZeta[NUM_DIMENSIONS]);
+PetscErrorCode computeCellOrientation(Cell* cell);
 
-PetscErrorCode computeElementalMatrix(PetscInt nord, PetscInt cellOrientation[10], PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscInt numGaussPoints, PetscReal **gaussPoints, PetscReal *weigths, PetscReal *cellResistivity, PetscReal **Me, PetscReal **Ke);
+PetscErrorCode computeNum1DQuadraturePoints(const PetscInt nord, Quadrature1D* quadrature);
 
-PetscErrorCode computeBasisFunctions(PetscInt nord, PetscInt cellOrientation[10], PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal *point, PetscReal **basisFunctions, PetscReal **curlBasisFunctions);
+PetscErrorCode computeNum2DQuadraturePoints(const PetscInt nord, Quadrature2D* quadrature);
 
-PetscErrorCode computeCellOrientation(DM dm, PetscInt cell, PetscInt cellOrientation[10]);
+PetscErrorCode computeNum3DQuadraturePoints(const PetscInt nord, Quadrature3D* quadrature);
 
-PetscErrorCode computeCellOrientation(DM dm, PetscInt cell, PetscInt cellOrientation[10]);
+PetscErrorCode compute1DQuadraturePoints(Quadrature1D* quadrature);
 
-PetscErrorCode computeElementalGradientMatrix(PetscInt cellOrientation[10], PetscReal **gradientMatrix);
+PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature);
 
-PetscErrorCode computeElementalGradientMatrix2(PetscInt nord, PetscInt cellOrientation[10], PetscInt numGaussPoints, PetscReal **gaussPoints, PetscReal *weigths);
+PetscErrorCode tetrahedronXYZToReference(const PetscReal coordinates[NUM_VERTICES_PER_CELL * NUM_DIMENSIONS],
+                                         const PetscReal point[NUM_DIMENSIONS], PetscReal XiEtaZeta[NUM_DIMENSIONS]);
+
+PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal dip, PetscReal rotationVector[NUM_DIMENSIONS]);
+
+PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numDofInCell, const Cell* cell, const Quadrature3D* quadrature,
+                                        PetscReal** Me, PetscReal** Ke);
+
+PetscErrorCode computeNedelecOrder1BasisFunctions(const PetscInt nord, const PetscReal point[NUM_DIMENSIONS],
+                                                  const PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscReal* const* coeffs,
+                                                  PetscReal** Ni);
+
+PetscErrorCode computeNedelecOrder1BasisFunctionCurls(const PetscInt nord, const PetscReal* const* Dx_Ni, const PetscReal* const* Dy_Ni,
+                                                      const PetscReal* const* Dz_Ni,
+                                                      const PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscReal detJacobian,
+                                                      PetscReal** NiCurl);
+
+PetscErrorCode computeNedelecOrder1Coefficients(const PetscInt nord, PetscReal** coeffs, PetscReal** Dx_Ni, PetscReal** Dy_Ni,
+                                                PetscReal** Dz_Ni);
+
+PetscErrorCode computeElementalGradientMatrix(const PetscInt nord, const PetscInt numDofInCell, const PetscInt numH1DofInCell,
+                                              const Cell* cell, const Quadrature1D* quadrature, PetscReal** gradientMatrix);
+
+PetscErrorCode printCellEntities(const DM dm, const PetscInt cell);
+
+PetscErrorCode checkDiscreteGradientKernel(const PetscReal* M, const PetscReal* G, const PetscInt m, const PetscInt n, const PetscInt cell);
 
 #endif

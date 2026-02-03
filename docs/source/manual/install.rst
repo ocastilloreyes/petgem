@@ -1,43 +1,56 @@
+============
 Installation
 ============
+This section guides you through installing **PETGEM**. You will find instructions for setting up the environment, building the code, running tests, and generating documentation. **PETGEM** supports Linux-based systems and can be run natively or via Docker for a ready-to-use environment.
 
 Requirements
 ------------
-- Ubuntu 22.04 (tested)
-- PETSc with MPI, HDF5, MUMPS, petsc4py 
-- GMSH
-- Python 3.10+ with numpy, h5py, meshio, matplotlib, sphinx
-- Optional: Extrae for performance tracing
+Before installing **PETGEM**, ensure the following dependencies are available:
+
+- `PETSc <https://petsc.org/release/>`_ compiled with MPI and support for complex numbers. A recommended configuration is:
+
+  .. code-block:: bash
+
+     ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran \
+                 --download-mpich --download-fblaslapack \
+                 --with-scalar-type=complex --download-mumps --download-scalapack \
+                 --download-ptscotch --download-cmake --with-debugging=1 \
+                 --download-hdf5 --download-triangle
+- `Gmsh <http://gmsh.info/>`_
+- Python 3.10+ with packages: `numpy`, `h5py`, `meshio`, `matplotlib`, `sphinx`
+- `Extrae <https://tools.bsc.es/extrae>`_ for performance tracing (optional)
 
 Docker installation
 -------------------
-PETGEM provides a ready-to-use Docker environment:
+**PETGEM** provides a ready-to-use Docker environment for easy setup:
 
 .. code-block:: bash
 
-   # Clone repository
+   # Clone the repository
    git clone https://github.com/ocastilloreyes/petgem.git
    cd petgem
 
    # Build Docker image
    docker build -t petgem-env -f docker/dockerfile.release .
 
-   # Run PETGEM inside container
-   docker run --rm -it -v $(pwd):/workspace -w /workspace petgem-env bash
+   # Run Docker
+   docker run --rm -it -v $(pwd):/workspace -w /workspace petgem-env
 
-   # Compile code
+   # Compile PETGEM (inside container)
    make USE_EXTRAE=0
 
    # Run a test model
-   gmsh tests/canonical_model/mesh.geo -3
-   python3 tests/canonical_model/generate_resistivity_model.py
-   python3 tests/canonical_model/generate_params_file.py
+   gmsh tests/csem_model/mesh_p1.geo -3
+   python3 tests/csem_model/generate_resistivity_model.py 1
+   python3 tests/csem_model/generate_params_file.py 1 
+   mpirun -n 4 build/fm.csem -options_file tests/csem_model/params_nord1.txt
+   python3 tests/csem_model/compare_responses.py 1 
 
 Makefile usage
 --------------
-PETGEM provides a Makefile to simplify building and generating documentation.
+**PETGEM** provides a Makefile to simplify building the code and generating documentation.
 
-**Common Makefile Targets:**
+**Common makefile targets:**
 
 .. list-table::
    :header-rows: 1
@@ -55,9 +68,9 @@ PETGEM provides a Makefile to simplify building and generating documentation.
    * - help
      - Show Makefile help message
 
-**Optional Build Options:**
+**Optional build options:**
 
-Set optional flags when invoking make: `make <target> OPTION=1`
+You can set optional flags when invoking `make`: `make <target> OPTION=1`
 
 .. list-table::
    :header-rows: 1
@@ -68,35 +81,3 @@ Set optional flags when invoking make: `make <target> OPTION=1`
      - Use Intel MPI compiler (`mpiicc`) instead of PETSc default
    * - USE_EXTRAE=1
      - Enable Extrae instrumentation for performance tracing
-
-Examples
---------
-- Build PETGEM kernels with default settings:
-
-.. code-block:: bash
-
-    make all
-
-- Build PETGEM kernels using Intel MPI:
-
-.. code-block:: bash
-
-    make all USE_INTEL=1
-
-- Build PETGEM kernels with Extrae tracing enabled:
-
-.. code-block:: bash
-
-    make all USE_EXTRAE=1
-
-- Clean the build:
-
-.. code-block:: bash
-
-    make clean
-
-- Generate documentation:
-
-.. code-block:: bash
-
-    make docs

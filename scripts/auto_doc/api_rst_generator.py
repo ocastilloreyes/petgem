@@ -25,7 +25,7 @@ def create_api_rst_files():
         rst_filepath = os.path.join(API_RST_DIR, rst_filename)
 
         ref_label = f".. _api-{base_name}:\n\n"
-        title_text = f"{base_name.capitalize()} Module ({c_filename})"
+        title_text = f"{base_name.capitalize()} module ({c_filename})"
         title_underline = "=" * len(title_text) + "\n\n"
         title = f"{title_text}\n{title_underline}"
 

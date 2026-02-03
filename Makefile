@@ -1,30 +1,20 @@
 # -----------------------------------------------------------------------------
-# PETGEM Makefile (dual-compiler, dual-binary support)
-# -----------------------------------------------------------------------------
-# This Makefile compiles and links the PETGEM kernel application with PETSc. 
-# It supports optional integration with Extrae for tracing and ensures that 
-# build artifacts are stored inside the "build" directory. 
-# Supports PETSc default compiler and Intel MPI compiler (mpiicc). 
-# Builds two binaries:
-#   - build/csem_kernel          (default, without Extrae)
-#   - build/csem_kernel_extrae   (with Extrae, if USE_EXTRAE=1)
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
-# Select binary name based on USE_EXTRAE
+# Select binary name, flags, and object directory based on USE_EXTRAE
 # -----------------------------------------------------------------------------
 USE_EXTRAE ?= 0
 ifeq ($(USE_EXTRAE), 1)
-    TARGET := build/csem_kernel_extrae
-    E_CFLAGS  := -I$(EXTRAE_HOME)/include -DUSE_EXTRAE
-    E_LDFLAGS := -L$(EXTRAE_HOME)/lib -lmpitrace
+    TARGET := build/fm.csem
+    OBJDIR := build/extrae
+    EXTRA_CFLAGS := -I$(EXTRAE_HOME)/include -DUSE_EXTRAE
+    EXTRA_LDFLAGS := -L$(EXTRAE_HOME)/lib -lmpitrace
 else
-    TARGET := build/csem_kernel
-    E_CFLAGS  :=
-    E_LDFLAGS :=
+    TARGET := build/fm.csem.extrae
+    OBJDIR := build/noextrae
+    EXTRA_CFLAGS :=
+    EXTRA_LDFLAGS :=
 endif
 
-all: $(TARGET)		## Build the PETGEM kernels
+all: $(TARGET)		# Build the PETGEM kernels
 
 # -----------------------------------------------------------------------------
 # Include PETSc-provided makefile configuration
@@ -33,61 +23,75 @@ include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
 
 # -----------------------------------------------------------------------------
-# Include directory for PETGEM headers
-# -----------------------------------------------------------------------------
-I_CFLAGS := -Iinclude
-
-# -----------------------------------------------------------------------------
-# Choose compiler
+# Choose compiler and compilation flags
 # -----------------------------------------------------------------------------
 USE_INTEL ?= 0
 ifeq ($(USE_INTEL), 1)
     CC := mpiicc
-    CFLAGS := -Iinclude ${PETSC_CC_INCLUDES} -O3 -g
+    BASE_CFLAGS := ${PETSC_CC_INCLUDES} -O3 -g
 else
     CC := ${PETSC_CC}
-    CFLAGS := ${PETSC_CC_INCLUDES} -O3 -g
+    BASE_CFLAGS := ${PETSC_CC_INCLUDES} -O3 -g
 endif
+
+# -----------------------------------------------------------------------------
+# Warning flags (unused code detection)
+# -----------------------------------------------------------------------------
+WARN_CFLAGS := -Wall -Wextra -Wpedantic \
+               -Wunused-variable \
+               -Wunused-function \
+               -Wunused-parameter \
+               -Wunused-but-set-variable
+
+# Final CFLAGS: base flags + optional Extrae
+CFLAGS := $(BASE_CFLAGS) $(WARN_CFLAGS) $(EXTRA_CFLAGS)
+
+
+# Include directory for PETGEM headers
+I_CFLAGS := -Iinclude
 
 # -----------------------------------------------------------------------------
 # Source files for the PETGEM kernel
 # -----------------------------------------------------------------------------
-SRCS := src/csem_kernel.c \
+SRCS := src/fm_csem.c \
         src/common.c \
         src/inputs.c \
         src/transmitter.c \
         src/grid.c \
         src/assembly.c \
+        src/constants.c \
         src/hvfem.c \
         src/solver.c \
         src/postprocessing.c
-OBJS := $(SRCS:.c=.o)
+
+OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(SRCS))
 
 # -----------------------------------------------------------------------------
 # Build and cleaning rules
 # -----------------------------------------------------------------------------
 
-# Ensure build directory exists before linking
-$(TARGET): | build
+# Ensure object directory exists before compiling
+$(OBJDIR):
+	@mkdir -p $(OBJDIR)
 
 # Link all object files into the final executable
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) | build
 	@echo "[LD] $@"
-	@$(CLINKER) $^ -o $@ $(CFLAGS) $(E_LDFLAGS) $(PETSC_LIB)
+	@$(CLINKER) $^ -o $@ $(EXTRA_LDFLAGS) $(PETSC_LIB)
 
 # Compilation rule for each source file
-%.o: %.c
+$(OBJDIR)/%.o: src/%.c | $(OBJDIR)
 	@echo "[CC] $<"
-	@${PETSC_COMPILE_SINGLE} $(CFLAGS) $(I_CFLAGS) $(E_CFLAGS) $< -o $@
+	@${PETSC_COMPILE_SINGLE} $(CFLAGS) $(I_CFLAGS) -c $< -o $@
 
-# Create build directory
+# Ensure build directory exists for binaries
 build:
 	@mkdir -p build
 
 # Cleaning
 clean::         ## Remove object files and executables
 	@echo "[CLEAN]"
-	@rm -rf build
+	@rm -rf build $(OBJDIR)
 
 # -----------------------------------------------------------------------------
 # Documentation
@@ -129,4 +133,4 @@ help:              ## Show this help message
 	@echo ""
 	@echo "Optional build options (set with 'make <target> OPTION=1'):"
 	@echo "  USE_INTEL=1     Use Intel MPI compiler (mpiicc) instead of PETSc default"
-	@echo "  USE_EXTRAE=1    Build binary with Extrae support (csem_kernel_extrae)"
+	@echo "  USE_EXTRAE=1    Build binary with Extrae support

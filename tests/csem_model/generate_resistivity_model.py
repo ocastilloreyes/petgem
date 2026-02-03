@@ -21,7 +21,7 @@
      postprocessing and analysis.
 
  Author: Octavio Castillo-Reyes (UPC/BSC) (octavio.castillo@upc.edu; octavio.castillo@bsc.es)
- Latest update: September 10th, 2025     
+ Latest update: February 10th, 2026     
 *********************************************************************
 """
 

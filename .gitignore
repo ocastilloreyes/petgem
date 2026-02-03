@@ -6,7 +6,19 @@ docs/build/
 docs/doxygen/
 docs/source/api
 docs/source/readme
-data/wham
+
+# Test data
+tests/csem_model/*.png
+tests/csem_model/*.msh
+tests/csem_model/params_nord*
+tests/csem_model/receivers.h5
+tests/csem_model/resistivity_model_p1.h5
+tests/csem_model/responses_p1*
+tests/unit_cube
+
+# Local management
+.clang-format
+
 
 # Object files, executables, libraries
 *.o
@@ -14,3 +26,4 @@ data/wham
 *.a
 *.dll
 *.exe
+

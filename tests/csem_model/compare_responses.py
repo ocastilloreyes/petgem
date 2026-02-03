@@ -94,7 +94,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------------
     plt.figure(figsize=(8, 4))
     plt.semilogy(x_coordinates,np.abs(reference),label=r'\texttt{Reference}',c=colors_fields[0],markersize=size_marker,markeredgecolor='k',linewidth=line_width)
-    plt.semilogy(x_coordinates,np.abs(Ex),label=r'\texttt{PETGEM}',c=colors_fields[1],markersize=size_marker,markeredgecolor='k',linewidth=line_width)
+    plt.semilogy(x_coordinates,np.abs(Ex),label=r'\texttt{PETGEM}',c=colors_fields[1],markersize=size_marker,markeredgecolor='k',linewidth=line_width, marker='o', linestyle='')
     plt.title('Ex')
     plt.ylabel(r'Amplitude (V/m)')
     plt.xlabel(r'Offset (m)')
