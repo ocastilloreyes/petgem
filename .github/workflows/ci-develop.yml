@@ -21,7 +21,7 @@ env:
   PETSC_ARCH: arch-linux-c-opt
   GMSH_DIR: /usr/local/gmsh/bin
   EXTRAE_HOME: /usr/local/extrae
-  PETGEM_CSEM_TEST_DIR: tests/csem_model
+  CSEM_TEST_DIR: tests/csem_model
   EXTRAE_TEST_DIR: tests/extrae_profiling
   DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
 
@@ -167,27 +167,47 @@ jobs:
                 -v ${{ github.workspace }}:/workspace \
                 -w /workspace \
                 ${{ env.DOCKER_IMAGE }} \
-                bash -c "gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p${{ matrix.nord }}.geo -3 && \
-                         python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py ${{ matrix.nord }} && \
-                         python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py ${{ matrix.nord }} && \
-                         mpirun -n 4 build/${{ matrix.exe }} -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord${{ matrix.nord }}.txt && \
-                         python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py ${{ matrix.nord }}"
+                bash -c "
+                  export CSEM_TEST_DIR=tests/csem_model && \
+                  export NORD=${{ matrix.nord }} && \
+                  gmsh \${CSEM_TEST_DIR}/mesh_p\${NORD}.geo -3 && \
+                  python3 \${CSEM_TEST_DIR}/generate_input.py \
+                    -nord \${NORD} \
+                    -case_dir \${CSEM_TEST_DIR} \
+                    -mesh_filename mesh_p\${NORD}.msh \
+                    -source_filename sources.txt \
+                    -receiver_filename receivers.txt && \
+                  mpirun -n 4 build/${{ matrix.exe }} \
+                    -options_file \${CSEM_TEST_DIR}/params_nord\${NORD}.txt && \
+                  python3 \${CSEM_TEST_DIR}/compare_responses.py \${NORD}
+                "
               ;;
             extrae)
               docker run --rm \
                 -e EXTRAE_HOME \
-                -e EXTRAE_CONFIG_FILE=${EXTRAE_TEST_DIR}/extrae.xml \
-                -e TRACE_NAME=petgem.prv \
-                -e EXTRAE_LABELS=${EXTRAE_TEST_DIR}/petgem_labels.txt \
                 -v ${{ github.workspace }}:/workspace \
                 -w /workspace \
                 ${{ env.DOCKER_IMAGE }} \
-                bash -c "export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH && \
-                         gmsh ${EXTRAE_TEST_DIR}/mesh_p1.geo -3 && \
-                         python3 ${EXTRAE_TEST_DIR}/generate_resistivity_model.py 1 && \
-                         python3 ${EXTRAE_TEST_DIR}/generate_params_file.py 1 && \
-                         mpirun -n 4 build/${{ matrix.exe }} -options_file ${EXTRAE_TEST_DIR}/params_nord1.txt && \
-                         ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}"
+                bash -c "
+                  export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH && \
+                  export EXTRAE_TEST_DIR=tests/extrae_profiling && \
+                  export EXTRAE_CONFIG_FILE=\${EXTRAE_TEST_DIR}/extrae.xml && \
+                  export TRACE_NAME=petgem.prv && \
+                  export EXTRAE_LABELS=\${EXTRAE_TEST_DIR}/petgem_labels.txt && \
+                  export NORD=${{ matrix.nord }} && \
+                  gmsh \${EXTRAE_TEST_DIR}/mesh_p\${NORD}.geo -3 && \
+                  python3 \${EXTRAE_TEST_DIR}/generate_input.py \
+                    -nord \${NORD} \
+                    -case_dir \${EXTRAE_TEST_DIR} \
+                    -mesh_filename mesh_p\${NORD}.msh \
+                    -source_filename sources.txt \
+                    -receiver_filename receivers.txt && \
+                  mpirun -n 4 build/${{ matrix.exe }} \
+                    -options_file \${EXTRAE_TEST_DIR}/params_nord\${NORD}.txt && \
+                  \${EXTRAE_HOME}/bin/mpi2prv \
+                    -f \${EXTRAE_TEST_DIR}/TRACE.mpits \
+                    -o \${EXTRAE_TEST_DIR}/\${TRACE_NAME}
+                "
               ;;
           esac
 

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "petgem"
+dynamic = ["version"]
+description = "Internal Python layer for PETGEM testing and prototyping"
+dependencies = ["numpy", "meshio", "petsc4py"]
+
+[tool.setuptools]
+packages = ["petgem"]
+package-dir = { "petgem" = "utils" }
+
+[tool.setuptools.dynamic]
+version = {attr = "petgem._version.__version__"}

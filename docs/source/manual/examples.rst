@@ -30,43 +30,70 @@ The domain is discretized with an unstructured tetrahedral mesh generated using 
 Execution steps
 ***************
 
-Run the following commands to execute the test cases for ``nord=1`` or ``nord=2``. Replace ``nord`` with ``1`` or ``2`` as needed:
+Run the following commands to execute the test cases for ``nord=1`` or ``nord=2``.
+Set the desired polynomial order by modifying the ``NORD`` variable:
 
 .. code-block:: bash
 
-   # Compile PETGEM 
+   # Compile PETGEM
    make
 
    # Setup environment
-   export PETGEM_CSEM_TEST_DIR=tests/csem_model
+   export CSEM_TEST_DIR=tests/csem_model
+   export NORD=1        # Change to 2 if needed
 
-   # Mesh generation (specific to nord)
-   gmsh ${PETGEM_CSEM_TEST_DIR}/mesh_p[nord].geo -3
+   # Mesh generation
+   gmsh ${CSEM_TEST_DIR}/mesh_p${NORD}.geo -3
 
-   # Generate resistivity model
-   python3 ${PETGEM_CSEM_TEST_DIR}/generate_resistivity_model.py [nord]
+   # Generate input data
+   python3 ${CSEM_TEST_DIR}/generate_input.py \
+       -nord ${NORD} \
+       -case_dir ${CSEM_TEST_DIR} \
+       -mesh_filename mesh_p${NORD}.msh \
+       -source_filename sources.txt \
+       -receiver_filename receivers.txt
 
-   # Generate parameter file
-   python3 ${PETGEM_CSEM_TEST_DIR}/generate_params_file.py [nord]
-
-   # Forward modeling (parallel)
-   mpirun -n 4 build/fm.csem -options_file ${PETGEM_CSEM_TEST_DIR}/params_nord[nord].txt
+   # Forward modeling (parallel example)
+   mpirun -n 4 build/fm.csem \
+       -options_file ${CSEM_TEST_DIR}/params_nord${NORD}.txt
 
    # Compare results with reference
-   python3 ${PETGEM_CSEM_TEST_DIR}/compare_responses.py [nord]
+   python3 ${CSEM_TEST_DIR}/compare_responses.py ${NORD}
 
 Step-by-step
 ************
 
-1. Mesh generation: ``mesh_p[nord].geo`` defines the geometry and meshing strategy. Gmsh outputs the tetrahedral mesh for simulation
+1. **Compilation**
 
-2. Resistivity model generation: ``generate_resistivity_model.py [nord]`` builds the layered conductivity distribution for ``nord=1`` or ``nord=2``
+   ``make`` builds the PETGEM executable (``build/fm.csem``).
 
-3. Parameter file generation: ``generate_params_file.py [nord]`` creates ``params_nord[nord].txt`` containing **PETGEM** runtime options
+2. **Environment setup**
 
-4. Forward modeling: ``fm.csem`` runs in parallel (4 MPI tasks in this test case) to compute the CSEM responses
+   The environment variables ``CSEM_TEST_DIR`` and ``NORD`` define
+   the test case directory and the polynomial order (``nord=1`` or ``nord=2``).
 
-5. Results comparison: ``compare_responses.py [nord]`` validates **PETGEM** output against semi-analytical 1D reference responses (**Dipole1D**)
+3. **Mesh generation**
+
+   ``mesh_p${NORD}.geo`` defines the geometry and meshing strategy.
+   ``gmsh`` generates the 3D unstructured tetrahedral mesh
+   (``mesh_p${NORD}.msh``).
+
+4. **Input data generation**
+
+   ``generate_input.py`` creates the required simulation inputs,
+   including the resistivity model and parameter file
+   (``params_nord${NORD}.txt``), based on the selected polynomial order.
+
+5. **Forward modeling**
+
+   ``fm.csem`` runs in parallel (4 MPI tasks in this test case)
+   using the generated parameter file to compute the CSEM responses.
+
+6. **Results comparison**
+
+   ``compare_responses.py ${NORD}`` validates PETGEM results
+   against the semi-analytical 1D reference responses
+   from Dipole1D.
 
 Expected outcome
 ****************
@@ -104,39 +131,74 @@ resistivity model, parameter file, execute the forward modeling, and generate th
    export EXTRAE_CONFIG_FILE=${EXTRAE_TEST_DIR}/extrae.xml
    export TRACE_NAME=petgem.prv
    export EXTRAE_LABELS=${EXTRAE_TEST_DIR}/petgem_labels.txt
-   
+   export NORD=1  
+
    # Compile PETGEM with Extrae instrumentation
    make USE_EXTRAE=1
 
    # Mesh generation
-   gmsh ${EXTRAE_TEST_DIR}/mesh_p1.geo -3
+   gmsh ${EXTRAE_TEST_DIR}/mesh_p${NORD}.geo -3
 
-   # Generate resistivity model
-   python3 ${EXTRAE_TEST_DIR}/generate_resistivity_model.py 1
+   # Generate input data
+   python3 ${EXTRAE_TEST_DIR}/generate_input.py \
+       -nord ${NORD} \
+       -case_dir ${EXTRAE_TEST_DIR} \
+       -mesh_filename mesh_p${NORD}.msh \
+       -source_filename sources.txt \
+       -receiver_filename receivers.txt
 
-   # Generate parameter file
-   python3 ${EXTRAE_TEST_DIR}/generate_params_file.py 1
-
-   # Forward modeling (parallel)
-   mpirun -n 4 build/fm.csem.extrae -options_file ${EXTRAE_TEST_DIR}/params_nord1.txt
+   # Forward modeling (parallel example)
+   mpirun -n 4 build/fm.csem.extrae \
+       -options_file ${EXTRAE_TEST_DIR}/params_nord${NORD}.txt
 
    # Merge intermediate files and create the trace
-   ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}
+   ${EXTRAE_HOME}/bin/mpi2prv -f ${EXTRAE_TEST_DIR}/TRACE.mpits -o ${EXTRAE_TEST_DIR}/${TRACE_NAME}   
+
 
 Step-by-step
 ************
 
-1. Compile **PETGEM** with `Extrae <https://tools.bsc.es/extrae>`_ support: Activates instrumentation to record performance events during execution
+1. **Environment setup**
 
-2. Mesh generation: ``mesh_p1.geo`` defines the geometry and meshing strategy. Gmsh outputs the tetrahedral mesh for simulation
+   Set environment variables to enable `Extrae <https://tools.bsc.es/extrae>`_ support, define the test directory,
+   trace name, labels file, and the polynomial order (``NORD=1``):
 
-3. Resistivity model generation: ``generate_resistivity_model.py 1`` builds the layered conductivity distribution for ``nord=1``
+   - ``LD_LIBRARY_PATH`` to include Extrae libraries
+   - ``EXTRAE_TEST_DIR`` for test case files
+   - ``EXTRAE_CONFIG_FILE`` for Extrae configuration
+   - ``TRACE_NAME`` for the output trace
+   - ``EXTRAE_LABELS`` for the labels used in instrumentation
+   - ``NORD`` for the finite element basis functions
 
-4. Parameter file generation: ``generate_params_file.py 1`` creates ``params_nord1.txt`` containing **PETGEM** runtime options
+2. **Compilation**
 
-5. Forward modeling: ``fm.csem.extrae`` runs in parallel (4 MPI tasks in this test case) to compute the CSEM responses
+   ``make USE_EXTRAE=1`` builds PETGEM with Extrae instrumentation enabled
+   (``build/fm.csem.extrae``).
 
-6. Trace creation: ``${EXTRAE_HOME}/bin/mpi2prv`` merges intermediate `Extrae <https://tools.bsc.es/extrae>`_ files and generates the execution trace ``${EXTRAE_TEST_DIR}/petgem.prv``
+3. **Mesh generation**
+
+   ``mesh_p${NORD}.geo`` defines the geometry and meshing strategy.
+   ``gmsh`` generates the 3D unstructured tetrahedral mesh
+   (``mesh_p${NORD}.msh``).
+
+4. **Input data generation**
+
+   ``generate_input.py`` creates the required simulation inputs,
+   including the resistivity model and parameter file
+   (``params_nord${NORD}.txt``), based on the selected polynomial order.
+
+5. **Forward modeling**
+
+   ``fm.csem.extrae`` runs in parallel (4 MPI tasks in this test case)
+   using the generated parameter file to compute the CSEM responses
+   while recording performance events.
+
+6. **Trace generation**
+
+   ``${EXTRAE_HOME}/bin/mpi2prv`` merges intermediate Extrae files
+   and generates the execution trace
+   (``${EXTRAE_TEST_DIR}/${TRACE_NAME}``) for performance analysis.
+
 
 Expected outcome
 ****************

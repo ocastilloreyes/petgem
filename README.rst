@@ -52,6 +52,9 @@ PETGEM requires the following main dependencies:
    - matplotlib
    - h5py
    - meshio
+   - cython 
+   - setuptools 
+   - wheel
    - sphinx (for documentation)
 
 For a fully reproducible environment, a Docker image is provided (see below).
@@ -73,14 +76,26 @@ You can build and run PETGEM inside Docker for a consistent development and test
    # Run PETGEM inside container
    docker run --rm -it -v $(pwd):/workspace -w /workspace petgem-env bash
 
-   # Compile code
-   make USE_EXTRAE=0
+   # Compile PETGEM
+   make
 
-   # Run a test model
-   gmsh tests/canonical_model/mesh.geo -3
-   python3 tests/canonical_model/generate_resistivity_model.py
-   python3 tests/canonical_model/generate_params_file.py
+   # Setup environment
+   export CSEM_TEST_DIR=tests/csem_model
 
+   # Mesh generation (specific to nord=1)
+   gmsh ${CSEM_TEST_DIR}/mesh_p1.geo -3
+
+   # Generate input data (mesh, params file. Specific to nord=1)
+   python3 ${CSEM_TEST_DIR}/generate_input.py \
+      -nord 1 \
+      -case_dir ${CSEM_TEST_DIR} \
+      -mesh_filename mesh_p1.msh \
+      -source_filename sources.txt \
+      -receiver_filename receivers.txt
+
+   # Forward modeling (Parallel and specific to nord=1)
+   mpirun -n 4 build/fm.csem -options_file ${CSEM_TEST_DIR}/params_nord1.txt
+   
 Documentation
 -------------
 
