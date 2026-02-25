@@ -46,19 +46,23 @@ Set the desired polynomial order by modifying the ``NORD`` variable:
    gmsh ${CSEM_TEST_DIR}/mesh_p${NORD}.geo -3
 
    # Generate input data
-   python3 ${CSEM_TEST_DIR}/generate_input.py \
-       -nord ${NORD} \
-       -case_dir ${CSEM_TEST_DIR} \
-       -mesh_filename mesh_p${NORD}.msh \
-       -source_filename sources.txt \
-       -receiver_filename receivers.txt
+   python3 ${CSEM_TEST_DIR}/preprocess.py \
+      -nord ${NORD} \
+      -case_dir ${CSEM_TEST_DIR} \
+      -mesh_filename mesh_p${NORD}.msh \
+      -source_filename sources.txt \
+      -receiver_filename receivers.txt
 
    # Forward modeling (parallel example)
    mpirun -n 4 build/fm.csem \
-       -options_file ${CSEM_TEST_DIR}/params_nord${NORD}.txt
+      -options_file ${CSEM_TEST_DIR}/params_nord${NORD}.txt
 
    # Compare results with reference
-   python3 ${CSEM_TEST_DIR}/compare_responses.py ${NORD}
+   python3 ${CSEM_TEST_DIR}/postprocess.py \
+      -nord ${NORD} \
+      -case_dir $CSEM_TEST_DIR \
+      -receiver_filename receivers.h5 \
+      -responses_filename responses_p${NORD}_src1.h5
 
 Step-by-step
 ************
@@ -80,7 +84,7 @@ Step-by-step
 
 4. **Input data generation**
 
-   ``generate_input.py`` creates the required simulation inputs,
+   ``preprocess.py`` creates the required simulation inputs,
    including the resistivity model and parameter file
    (``params_nord${NORD}.txt``), based on the selected polynomial order.
 
@@ -140,7 +144,7 @@ resistivity model, parameter file, execute the forward modeling, and generate th
    gmsh ${EXTRAE_TEST_DIR}/mesh_p${NORD}.geo -3
 
    # Generate input data
-   python3 ${EXTRAE_TEST_DIR}/generate_input.py \
+   python3 ${EXTRAE_TEST_DIR}/preprocess.py \
        -nord ${NORD} \
        -case_dir ${EXTRAE_TEST_DIR} \
        -mesh_filename mesh_p${NORD}.msh \
@@ -183,7 +187,7 @@ Step-by-step
 
 4. **Input data generation**
 
-   ``generate_input.py`` creates the required simulation inputs,
+   ``preprocess.py`` creates the required simulation inputs,
    including the resistivity model and parameter file
    (``params_nord${NORD}.txt``), based on the selected polynomial order.
 

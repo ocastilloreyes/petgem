@@ -12,20 +12,21 @@ tests/csem_model/*.png
 tests/csem_model/*.msh
 tests/csem_model/params_nord*
 tests/csem_model/receivers.h5
-tests/csem_model/resistivity_model_p1.h5
+tests/csem_model/model_p1.h5
 tests/csem_model/responses_p1*
 tests/unit_cube
 tests/extrae_profiling/mesh_p1.msh
 tests/extrae_profiling/params_nord1.txt
 tests/extrae_profiling/receivers.h5
-tests/extrae_profiling/resistivity_model_p1.h5
+tests/extrae_profiling/model_p1.h5
 tests/extrae_profiling/TRACE.*
 tests/extrae_profiling/responses_p1*
 tests/extrae_profiling/set-0
 
+# Python module (preprocessing and postprocessing)
+utils/__pycache__
 
 # Local management
-
 
 # Object files, executables, libraries
 *.o

@@ -16,7 +16,7 @@ simulations.
 -------------------------------------------------------------------------------
 USAGE
 -------------------------------------------------------------------------------
-python3 generate_input.py \
+python3 preprocess.py \
     -nord <order> \
     -case_dir <directory> \
     -mesh_filename <mesh_file> \
@@ -54,8 +54,8 @@ OPTIONAL ARGUMENTS
 -------------------------------------------------------------------------------
 OUTPUT FILES
 -------------------------------------------------------------------------------
-- resistivity_model_p<nord>.h5
-- responses_p<nord>.params
+- model_p<nord>.h5
+- params_nord<nord>.txt
 - receivers.h5
 
 -------------------------------------------------------------------------------
@@ -65,7 +65,7 @@ Author:
     octavio.castillo@bsc.es
 
 Latest update:
-    February 24th, 2026
+    February 25th, 2026
 ===============================================================================
 """
 
@@ -95,7 +95,7 @@ def main():
     # -------------------------------------------------------------------------
     print("\nParsing input arguments")
 
-    args = petgem.parseArgs()
+    args = petgem.parsePreprocessingArgs()
 
     input_mesh_filename = os.path.join(args.case_dir, args.mesh_filename)
     input_sources_filename = os.path.join(args.case_dir, args.source_filename)

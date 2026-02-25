@@ -7,7 +7,7 @@ import sys
 import textwrap
 from petsc4py import PETSc
 
-def parseArgs():
+def parsePreprocessingArgs():
     parser = argparse.ArgumentParser(description="Preprocess mesh, resistivity, and receiver data for PETGEM simulations")
 
     # Required positional argument
@@ -15,13 +15,26 @@ def parseArgs():
     parser.add_argument("-case_dir",      type=str, required=True, help="Directory containing case data")
     parser.add_argument("-mesh_filename", type=str, required=True, help="Mesh filename")
     parser.add_argument("-receiver_filename", type=str, required=True, help="Receivers filename")
-    parser.add_argument("-source_filename", type=str, required=True, help="Receivers filename")
+    parser.add_argument("-source_filename",   type=str, required=True, help="Receivers filename")
 
     # Optional arguments
     parser.add_argument("-resistivity_view", type=str, default=None, help="Export resistivity distribution (e.g., vtk:filename.vtu)")
-    parser.add_argument("-sigma_file", type=str, default=None, help="CSV file with sigma_x, sigma_y, sigma_z for each material")
+    parser.add_argument("-sigma_file",       type=str, default=None, help="CSV file with sigma_x, sigma_y, sigma_z for each material")
 
     return parser.parse_args()
+
+
+def parsePostprocessingArgs():
+    parser = argparse.ArgumentParser(description="Postprocess electromagnetic responses from PETGEM simulations")
+
+    # Required positional argument
+    parser.add_argument("-nord",          type=int, required=True, help="Polynomial order used to select the mesh (e.g., 1, 2, 3)")
+    parser.add_argument("-case_dir",      type=str, required=True, help="Directory containing case data")
+    parser.add_argument("-receiver_filename", type=str, required=True, help="Receivers filename")
+    parser.add_argument("-responses_filename", type=str, required=True, help="Receivers filename")
+    
+    return parser.parse_args()
+
 
 def createDM(numDimensions, cells, coords):
 
@@ -91,3 +104,13 @@ def writeParamsFile(nord, output_dir, output_filename):
     filename = f"{output_dir}/params_nord{nord}.txt"
     with open(filename, "w") as f:
         f.write(content)
+
+def readVectorH5(filename, dataset_name):
+    """Read a PETSc Vec from an HDF5 file."""
+    tmp = PETSc.Vec().create(comm=PETSc.COMM_SELF)
+    tmp.setName(dataset_name)
+    viewer = PETSc.Viewer().createHDF5(str(filename), mode='r', comm=PETSc.COMM_SELF)
+    tmp.load(viewer)
+    viewer.destroy()
+    vector = tmp.getArray()
+    return vector
