@@ -10,6 +10,7 @@ docs/source/readme
 # Test data
 tests/csem_model/*.png
 tests/csem_model/*.msh
+tests/csem_model/*.vtk
 tests/csem_model/params_nord*
 tests/csem_model/receivers.h5
 tests/csem_model/model_p1.h5
@@ -22,6 +23,9 @@ tests/extrae_profiling/model_p1.h5
 tests/extrae_profiling/TRACE.*
 tests/extrae_profiling/responses_p1*
 tests/extrae_profiling/set-0
+tests/extrae_profiling/*.pcf
+tests/extrae_profiling/*.prv
+tests/extrae_profiling/*.row
 
 # Python module (preprocessing and postprocessing)
 utils/__pycache__

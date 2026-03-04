@@ -26,9 +26,6 @@ More information
 
 - See our publication list at :ref:`publications`
 
-Manual Documentation
---------------------
-
 .. toctree::
    :maxdepth: 2
    :caption: Manual:
@@ -38,10 +35,6 @@ Manual Documentation
    manual/examples
    manual/publications
    manual/contact
-
-
-API Reference
--------------
 
 .. toctree::
    :maxdepth: 1

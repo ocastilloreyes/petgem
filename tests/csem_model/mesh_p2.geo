@@ -230,3 +230,4 @@ Point {129:135} In Volume {1};
 
 // Mesh file format supported by PETGEM
 Mesh.MshFileVersion = 2.2;
+Mesh.MeshSizeExtendFromBoundary = 2;

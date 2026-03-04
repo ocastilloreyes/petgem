@@ -57,14 +57,9 @@ ENV PATH="$PETSC_DIR/${PETSC_ARCH}/bin:${PATH}"
 ENV GMSH_DIR=/usr/local/gmsh
 RUN mkdir -p $GMSH_DIR
 WORKDIR /workspace
-#RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz \
-#    && tar -xf gmsh-stable-Linux64.tgz -C $GMSH_DIR --strip-components=1
-#ENV PATH="$GMSH_DIR/bin:${PATH}"
-
-RUN wget http://gmsh.info/bin/Linux/gmsh-4.15.0-Linux64.tgz \
-    && tar -xf gmsh-4.15.0-Linux64.tgz -C $GMSH_DIR --strip-components=1
+RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz \
+    && tar -xf gmsh-stable-Linux64.tgz -C $GMSH_DIR --strip-components=1
 ENV PATH="$GMSH_DIR/bin:${PATH}"
-
 
 # ---------------------------
 # Extrae
@@ -125,12 +120,10 @@ RUN rm -rf /workspace/*
 # ---------------------------
 WORKDIR /workspace
 COPY . /workspace
-RUN apt-get update && \
-    apt-get install -y tree
 
 # Upgrade pip and install package in editable mode
 RUN pip3 install --upgrade pip setuptools wheel \
-    && pip3 install -e . \
-    && pip3 install numpy meshio petsc4py
+    && pip3 install -e . 
+# && pip3 install numpy meshio petsc4py
 
 CMD ["bash"]

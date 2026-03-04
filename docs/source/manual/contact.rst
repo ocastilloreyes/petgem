@@ -10,8 +10,8 @@ Repository
 ----------
 - `PETGEM GitHub repository <https://github.com/ocastilloreyes/petgem/>`_
 
-Contact & support
------------------
+Support
+-------
 If you have questions, bug reports, or feature requests, please use one of the following channels:
 
 - Issues: Use GitHub Issues in the above repository to report bugs, request features, or submit feedback.

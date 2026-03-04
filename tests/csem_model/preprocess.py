@@ -65,7 +65,7 @@ Author:
     octavio.castillo@bsc.es
 
 Latest update:
-    February 25th, 2026
+    March 04th, 2026
 ===============================================================================
 """
 
@@ -115,9 +115,9 @@ def main():
     # -------------------------------------------------------------------------
     print("\nDefining resistivity model")
 
-    sigma_x = np.array([3.3333, 1.0, 0.01, 1.0], dtype=float)
-    sigma_y = np.array([3.3333, 1.0, 0.01, 1.0], dtype=float)
-    sigma_z = np.array([3.3333, 1.0, 0.01, 1.0], dtype=float)
+    sigma_x = np.array([0.1, 1.0], dtype=float)
+    sigma_y = np.array([0.1, 1.0], dtype=float)
+    sigma_z = np.array([0.1, 1.0], dtype=float)
 
     print(f"  Number of materials     : {len(sigma_x)}")
 
@@ -185,8 +185,6 @@ def main():
     print("\nGenerating PETGEM parameter file")
 
     petgem.writeParamsFile(args.nord, args.case_dir, output_petgem_filename)
-
-    print(f"  Parameter file prefix: {output_petgem_filename}")
 
     # -------------------------------------------------------------------------
     # 8. Store receivers
