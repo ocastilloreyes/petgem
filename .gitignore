@@ -15,6 +15,7 @@ tests/csem_model/params_nord*
 tests/csem_model/receivers.h5
 tests/csem_model/model_p1.h5
 tests/csem_model/responses_p1*
+tests/csem_model/model.vtu
 tests/unit_cube
 tests/extrae_profiling/mesh_p1.msh
 tests/extrae_profiling/params_nord1.txt
@@ -26,6 +27,7 @@ tests/extrae_profiling/set-0
 tests/extrae_profiling/*.pcf
 tests/extrae_profiling/*.prv
 tests/extrae_profiling/*.row
+tests/model1/
 
 # Python module (preprocessing and postprocessing)
 utils/__pycache__

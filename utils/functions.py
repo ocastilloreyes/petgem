@@ -19,6 +19,7 @@ def parsePreprocessingArgs():
 
     # Optional arguments
     parser.add_argument("-resistivity_view", type=str, default=None, help="Export resistivity distribution (e.g., vtk:filename.vtu)")
+    parser.add_argument("-dm_view",          type=str, default=None, help="Print dm data")
     parser.add_argument("-sigma_file",       type=str, default=None, help="CSV file with sigma_x, sigma_y, sigma_z for each material")
 
     return parser.parse_args()
@@ -36,12 +37,16 @@ def parsePostprocessingArgs():
     return parser.parse_args()
 
 
-def createDM(numDimensions, cells, coords):
+def createDM(numDimensions, cells, coords, dm_view=False):
 
     plex = PETSc.DMPlex().create()
     plex.setFromOptions()
     plex.createFromCellList(numDimensions, cells, coords)
-    plex.viewFromOptions("-dm_view")
+    
+    if dm_view:
+        PETSc.Options()["dm_view"] = ""
+        plex.viewFromOptions("-dm_view")
+
     dim = plex.getDimension()
 
     # Create manually a section with 1 field, dim components on cells
@@ -56,9 +61,12 @@ def createDM(numDimensions, cells, coords):
 
     return plex
 
-def writeDM(plex, resistivity, output_mesh_filename):
+def writeDM(plex, resistivity, output_mesh_filename, resistivity_view=None):
     v = plex.createGlobalVec()
     v.getArray()[:] = resistivity.reshape(-1)[:]
+
+    if resistivity_view is not None:
+        PETSc.Options()["resistivity_view"] = f"vtk:{resistivity_view}"
     v.viewFromOptions("-resistivity_view")
 
     viewer = PETSc.ViewerHDF5().create(output_mesh_filename, "w")

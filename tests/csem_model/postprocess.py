@@ -88,13 +88,6 @@ def main():
     print(f"  PETGEM responses file  : {args.responses_filename}")
     print(f"  Receivers file         : {args.receiver_filename}")
 
-    #receivers_filename = os.path.join(args.case_dir, args.receiver_filename)
-
-#     petgem_filename = f"tests/csem_model/responses_p{nord}_src1.h5"
-#     receivers_filename = f"tests/csem_model/receivers.h5"
-#     figure_out_filename = f"tests/csem_model/figure_p{nord}.png"
-
-
     # -------------------------------------------------------------------------
     # 2. Load reference data
     # -------------------------------------------------------------------------

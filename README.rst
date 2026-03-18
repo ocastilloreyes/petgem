@@ -91,7 +91,8 @@ You can build and run PETGEM inside Docker for a consistent development and test
       -case_dir ${CSEM_TEST_DIR} \
       -mesh_filename mesh_p1.msh \
       -source_filename sources.txt \
-      -receiver_filename receivers.txt
+      -receiver_filename receivers.txt \
+      -resistivity_view model.vtu
 
    # Forward modeling (Parallel and specific to nord=1)
    mpirun -n 4 build/fm.csem -options_file ${CSEM_TEST_DIR}/params_nord1.txt

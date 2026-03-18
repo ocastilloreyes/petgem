@@ -46,7 +46,7 @@ REQUIRED ARGUMENTS
 OPTIONAL ARGUMENTS
 -------------------------------------------------------------------------------
 -resistivity_view <vtkfile>
-    Export resistivity distribution (e.g., vtk:model.vtu)
+    Export resistivity distribution (e.g., model_p<nord>.vtu)
 
 -sigma_file <csvfile>
     CSV file containing sigma_x, sigma_y, sigma_z per material
@@ -105,6 +105,17 @@ def main():
     output_receivers_filename = os.path.join(args.case_dir, "receivers.h5")
     output_petgem_filename = f"responses_p{args.nord}"
 
+    # Optional parameters
+    if args.resistivity_view is not None:
+        output_vtk_filename = os.path.join(args.case_dir, args.resistivity_view)
+    else:
+        output_vtk_filename = None
+
+    if args.dm_view is not None:
+        dm_view = True
+    else:
+        dm_view = False  
+
     print(f"  Polynomial order (nord): {args.nord}")
     print(f"  Case directory         : {args.case_dir}")
     print(f"  Mesh file              : {input_mesh_filename}")
@@ -149,7 +160,7 @@ def main():
     # -------------------------------------------------------------------------
     print("\n Creating PETSc DM (DMPlex) object")
 
-    plex = petgem.createDM(NUM_DIMENSIONS, cells, coords)
+    plex = petgem.createDM(NUM_DIMENSIONS, cells, coords, dm_view=dm_view)
 
     print("  DM object successfully created")
 
@@ -175,7 +186,7 @@ def main():
     # -------------------------------------------------------------------------
     print("\nWriting PETGEM model to HDF5")
 
-    petgem.writeDM(plex, resistivity, output_mesh_filename)
+    petgem.writeDM(plex, resistivity, output_mesh_filename, resistivity_view=output_vtk_filename)
 
     print(f"  Output mesh file: {output_mesh_filename}")
 

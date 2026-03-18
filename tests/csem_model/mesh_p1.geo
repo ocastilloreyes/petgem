@@ -22,10 +22,6 @@
 *    March 04th, 2026
 *********************************************************************/
 
-// ---------------------------------------------------------
-// ---------------- GEOMETRY -------------------------------
-// ---------------------------------------------------------
-
 // ============ Characteristic mesh size ===================
 lc_max = 250.;
 lc_min = 5.;
@@ -73,7 +69,6 @@ Physical Volume("Resistive_block", 1) = {1};
 
 
 // ================= Half-space domain =====================
-// Extended domain to ~6 skin depths
 Point (9)  = {-2000.,  2000.,  2000., lc_max};
 Point (10) = { 2000.,  2000.,  2000., lc_max};
 Point (11) = {-2000., -2000.,  2000., lc_max};
@@ -183,4 +178,3 @@ Mesh.MeshSizeExtendFromBoundary = 2;
 Mesh.MeshSizeFromCurvature = 1;
 Mesh.MeshSizeFromPoints = 1;
 Mesh.MshFileVersion = 2.2;
-
