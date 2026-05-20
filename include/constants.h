@@ -1,16 +1,11 @@
 /*
-  Filename: constants.h
-  Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2024-10-02
-
-  Description:
-  This file contains a collection of constants that are used
-  throughout the PETGEM project.
-
-  Usage:
-  Include this file in your source code to utilize the
-  constant parameters. For example: #include "constants.h"
-*/
+ * Filename: constants.h
+ * Author: Octavio Castillo Reyes (UPC/BSC)
+ * Date: 2026-03-04
+ *
+ * Description:
+ * Constants used throughout the PETGEM project.
+ */
 
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
@@ -28,9 +23,19 @@
 #define NUM_VERTICES_PER_EDGE 2
 #define NUM_VERTICES_PER_FACE 3
 #define NUM_DIMENSIONS 3
+#define NUM_H1_DOF_PER_CELL 4
 #define NUM_EM_FIELD_COMPONENTS 6
-#define NUM_RESISTIVITY_COMPONENTS 3
+#define NUM_CONDUCTIVITY_COMPONENTS 3
+#define NUM_MATERIALS_ID_COMPONENTS 1
 #define MAX_TRANSITIVE_CLOSURE_SIZE 90
+
+/* Inversion-kernel array caps — sized at struct-definition time so they
+ * must be compile-time constants. Bump and recompile if a use case
+ * exceeds these. setupInversionSources errors when exceeded; the
+ * fixed-materials option array is sized to the cap on read. */
+#define INV_MAX_FIXED_MATERIALS  8
+#define INV_MAX_FREQUENCIES      64
+#define INV_MAX_FD_CHECK_CELLS   64
 extern const PetscInt EDGE_VERTICES[NUM_EDGES_PER_CELL][NUM_VERTICES_PER_EDGE];
 extern const PetscInt FACE_VERTICES[NUM_FACES_PER_CELL][NUM_VERTICES_PER_FACE];
 extern const PetscInt REFERENCE_CELL[NUM_DIMENSIONS][NUM_VERTICES_PER_CELL];
@@ -66,6 +71,25 @@ extern const PetscReal NORD16_2DGAUSSPOINTS[52][3];
 extern const PetscReal NORD17_2DGAUSSPOINTS[61][3];
 extern const PetscReal NORD18_2DGAUSSPOINTS[70][3];
 extern const PetscReal NORD19_2DGAUSSPOINTS[73][3];
+
+/* Second-order Nédélec element static data (used by hvfem.c) */
+extern const PetscReal EDGE_ROWS[12][20];
+extern const PetscReal FACE_NORMALS_REF[4][3];
+extern const PetscReal FACE0_AUX_X[20];
+extern const PetscReal FACE0_AUX_Y[20];
+extern const PetscReal FACE0_AUX_Z[20];
+extern const PetscReal FACE1_AUX_X[20];
+extern const PetscReal FACE1_AUX_Y[20];
+extern const PetscReal FACE1_AUX_Z[20];
+extern const PetscReal FACE2_AUX_X[20];
+extern const PetscReal FACE2_AUX_Y[20];
+extern const PetscReal FACE2_AUX_Z[20];
+extern const PetscReal FACE3_AUX_X[20];
+extern const PetscReal FACE3_AUX_Y[20];
+extern const PetscReal FACE3_AUX_Z[20];
+extern const PetscReal *const FACE_AUX_X[4];
+extern const PetscReal *const FACE_AUX_Y[4];
+extern const PetscReal *const FACE_AUX_Z[4];
 
 /* 3D quadrature gauss points */
 extern const PetscReal NORD1_3DGAUSSPOINTS[1][4];

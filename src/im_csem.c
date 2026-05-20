@@ -1,6 +1,18 @@
-static char help[] = "PETGEM kernel for 3D CSEM imaging using high-order vector finite elements.\n\
-  Command line usage:\n\
-    mpirun -n <np> ./im.csem -options_file <file.txt>\n";
+/*
+ * Filename: im_csem.c
+ * Author: Octavio Castillo Reyes (UPC/BSC)
+ * Date: 2026-02-03
+ *
+ * Description:
+ * Inverse CSEM kernel (runInverse). Linked into both the legacy
+ * im.csem binary and the unified petgem dispatcher.
+ */
+
+static char imHelp[] = "PETGEM inverse CSEM kernel (runInverse / im.csem).\n\
+  Standalone usage:\n\
+    mpirun -n <np> ./im.csem -options_file <file.txt>\n\
+  Unified-binary usage:\n\
+    mpirun -n <np> ./petgem inverse -options_file <file.txt>\n";
 
 /* C libraries */
 #include <stdio.h>
@@ -12,14 +24,13 @@ static char help[] = "PETGEM kernel for 3D CSEM imaging using high-order vector 
 #include <petscsys.h>
 
 /* PETGEM functions */
-#include "assembly.h"
 #include "common.h"
 #include "constants.h"
 #include "grid.h"
 #include "inputs.h"
-#include "postprocessing.h"
-#include "solver.h"
-#include "transmitter.h"
+#include "inversion.h"
+#include "io.h"
+#include "kernels.h"
 #include "version.h"
 
 /* Extrae library for performance analysis */
@@ -27,33 +38,37 @@ static char help[] = "PETGEM kernel for 3D CSEM imaging using high-order vector 
 #include "extrae_user_events.h"
 #endif
 
-int main(int argc, char** argv) {
-
-  /* Check if the --version option is provided */
+int runInverse(int argc, char **argv)
+{
+  /* ---------------------------------------------------------------- */
+  /* Check if the --version option is provided                        */
+  /* ---------------------------------------------------------------- */
   if (argc > 1 && strcmp(argv[1], "--version") == 0) {
     printf("PETGEM version %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
     return 0;
   }
 
-  //   /* Variables declaration */
-  PetscMPIInt rank, size;
-  //   DM dm;
-  //   Vec resistivity;
-  //   Mat A, B, X;
-  //   Mat G = NULL;
-  //   csemParams params;
-  //   Grid grid;
-  //   CsemSourceSet sources = {0, 0, NULL};
-  //   PetscLogDouble timers[7];
-  //   PetscLogDouble start_timer, end_timer;
+  /* ---------------------------------------------------------------- */
+  /* Variables declaration                                            */
+  /* ---------------------------------------------------------------- */
+  PetscMPIInt     rank, size;
+  DM              dm;
+  Vec             resistivity, materials_id, receivers;
+  csemParams      params;
+  invParams       iparams;
+  Grid            grid;
+  PetscLogDouble  timers[7];
+  PetscLogDouble  start_timer, end_timer;
 
-  /* PETSC initialization */
+  /* ---------------------------------------------------------------- */
+  /* PETSC initialization                                             */
+  /* ---------------------------------------------------------------- */
   PetscFunctionBeginUser;
 #ifdef USE_EXTRAE
   Extrae_event(1000, 1);
 #endif
 
-  PetscCall(PetscInitialize(&argc, &argv, (char*)0, help));
+  PetscCall(PetscInitialize(&argc, &argv, (char *)0, imHelp));
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
 
@@ -61,7 +76,9 @@ int main(int argc, char** argv) {
   Extrae_event(1000, 0);
 #endif
 
-/* Print PETGEM header */
+  /* ---------------------------------------------------------------- */
+  /* Print PETGEM header                                              */
+  /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 2);
 #endif
@@ -72,159 +89,125 @@ int main(int argc, char** argv) {
   Extrae_event(1000, 0);
 #endif
 
-  // /* Parse user parameters */
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 3);
-  // #endif
+  /* ---------------------------------------------------------------- */
+  /* Parse user parameters                                            */
+  /* ---------------------------------------------------------------- */
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 3);
+#endif
 
-  //   /* Start timer for read params */
-  //   PetscCall(PetscTime(&start_timer));
+  PetscCall(PetscTime(&start_timer));
+  PetscCall(readCsemParams(size, &params));
+  PetscCall(PetscTime(&end_timer));
+  timers[0] = end_timer - start_timer;
 
-  //   PetscCall(readCsemParams(size, &params));
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 0);
+#endif
 
-  //   /* End timer for read params */
-  //   PetscCall(PetscTime(&end_timer));
-  //   timers[0] = end_timer - start_timer;
+  /* ---------------------------------------------------------------- */
+  /* Parse inversion parameters                                        */
+  /* ---------------------------------------------------------------- */
+  PetscCall(readInversionParams(&iparams));
 
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 0);
-  // #endif
+  /* ---------------------------------------------------------------- */
+  /* Parse inversion sources (8-field format: freq x y z I L dip az)   */
+  /* ---------------------------------------------------------------- */
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 4);
+#endif
 
-  // /* Create and setup source */
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 4);
-  // #endif
+  PetscCall(PetscTime(&start_timer));
+  PetscCall(setupInversionSources(params.sourceFilename, &iparams));
+  PetscCall(PetscTime(&end_timer));
+  timers[1] = end_timer - start_timer;
 
-  //   /* Start timer for setup source */
-  //   PetscCall(PetscTime(&start_timer));
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 0);
+#endif
 
-  //   PetscCall(setupCsemSource(params, &sources));
+  /* ---------------------------------------------------------------- */
+  /* Load unified PETGEM input: mesh + sigma + materials_id +          */
+  /* receivers. Multi-frequency sources come from setupInversionSources */
+  /* above (different file format), so we pass NULL for the sources    */
+  /* output.                                                            */
+  /* ---------------------------------------------------------------- */
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 5);
+#endif
 
-  //   /* End timer for setup source */
-  //   PetscCall(PetscTime(&end_timer));
-  //   timers[1] = end_timer - start_timer;
+  PetscCall(PetscTime(&start_timer));
+  PetscCall(loadCsemInputs(&params, &dm, &resistivity, &materials_id,
+                           NULL,           /* sources: im uses its own multi-freq reader */
+                           &receivers));
+  /* Sync the basis order into invParams: the bundle's /nord (read by
+   * loadCsemInputs into params.nord) is the source of truth, unless the
+   * user supplied -nord on the command line (handled in readInversionParams). */
+  if (iparams.nord == 0) iparams.nord = params.nord;
+  PetscCall(PetscTime(&end_timer));
+  timers[2] = end_timer - start_timer;
 
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 0);
-  // #endif
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 0);
+#endif
 
-  // /* Import mesh and resistivity model */
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 5);
-  // #endif
+  /* ---------------------------------------------------------------- */
+  /* Setup grid for FE computations                                    */
+  /* ---------------------------------------------------------------- */
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 6);
+#endif
 
-  //   /* Start timer for import grid */
-  //   PetscCall(PetscTime(&start_timer));
+  PetscCall(PetscTime(&start_timer));
+  PetscCall(setupCsemGrid(params, &dm, &grid));
+  PetscCall(PetscTime(&end_timer));
+  timers[3] = end_timer - start_timer;
 
-  //   PetscCall(importGrid(params, &dm, &resistivity));
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 0);
+#endif
 
-  //   /* End timer for import grid */
-  //   PetscCall(PetscTime(&end_timer));
-  //   timers[2] = end_timer - start_timer;
+  /* ---------------------------------------------------------------- */
+  /* Run inversion                                                     */
+  /* ---------------------------------------------------------------- */
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 7);
+#endif
 
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 0);
-  // #endif
+  PetscCall(PetscTime(&start_timer));
+  PetscCall(runCsemInversion(&iparams,
+                              dm, &grid, resistivity, materials_id,
+                              receivers));
+  PetscCall(PetscTime(&end_timer));
+  timers[4] = end_timer - start_timer;
 
-  // /* Setup grid for FE computations */
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 6);
-  // #endif
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 0);
+#endif
 
-  //   /* Start timer for setup grid */
-  //   PetscCall(PetscTime(&start_timer));
+  /* Unused timer slots */
+  timers[5] = 0.0;
+  timers[6] = 0.0;
 
-  //   PetscCall(setupCsemGrid(params, &dm, &grid));
+  /* ---------------------------------------------------------------- */
+  /* Print timers and footer                                           */
+  /* ---------------------------------------------------------------- */
+  PetscCall(printTimers(timers));
+  PetscCall(printFooter());
 
-  //   /* End timer for setup grid */
-  //   PetscCall(PetscTime(&end_timer));
-  //   timers[3] = end_timer - start_timer;
+  /* ---------------------------------------------------------------- */
+  /* Free memory                                                       */
+  /* ---------------------------------------------------------------- */
+  PetscCall(DMDestroy(&grid.H1dm));
+  PetscCall(DMDestroy(&grid.H1dm_Pnord));
+  PetscCall(DMDestroy(&dm));
+  PetscCall(VecDestroy(&resistivity));
+  PetscCall(VecDestroy(&materials_id));
+  PetscCall(VecDestroy(&receivers));
 
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 0);
-  // #endif
-
-  // /* Setup linear system */
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 7);
-  // #endif
-
-  //   /* Start timer for assembly grid */
-  //   PetscCall(PetscTime(&start_timer));
-
-  //   /* Assemble linear system */
-  //   PetscCall(assembleCsemRHS(params, sources, dm, grid, &B));
-  //   PetscCall(assembleCsemLHS(params, sources, dm, grid, resistivity, &A, &G));
-
-  //   /* End timer for assembly */
-  //   PetscCall(PetscTime(&end_timer));
-  //   timers[4] = end_timer - start_timer;
-
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 0);
-  // #endif
-
-  // /* Solve linear system */
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 8);
-  // #endif
-
-  //   /* Start timer for solver */
-  //   PetscCall(PetscTime(&start_timer));
-
-  //   PetscCall(solveCsemSystem(params, dm, A, B, G, &X));
-
-  //   /* End timer for solver */
-  //   PetscCall(PetscTime(&end_timer));
-  //   timers[5] = end_timer - start_timer;
-
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 0);
-  // #endif
-
-  // /* Postprocessing solution */
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 9);
-  // #endif
-
-  //   /* Start timer for postprocessing */
-  //   PetscCall(PetscTime(&start_timer));
-
-  //   PetscCall(computeFields(params, sources, dm, grid, X));
-
-  //   /* End timer for postprocessing */
-  //   PetscCall(PetscTime(&end_timer));
-  //   timers[6] = end_timer - start_timer;
-
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 0);
-  // #endif
-
-  //   /* Print timers */
-  //   PetscCall(printTimers(timers));
-
-  // /* Print PETGEM footer */
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 10);
-  // #endif
-
-  //   PetscCall(printFooter());
-
-  // #ifdef USE_EXTRAE
-  //   Extrae_event(1000, 0);
-  // #endif
-
-  //   /* Free memory */
-  //   PetscCall(DMDestroy(&grid.H1dm));
-  //   PetscCall(DMDestroy(&dm));
-  //   PetscCall(VecDestroy(&resistivity));
-  //   PetscCall(MatDestroy(&G));
-  //   PetscCall(MatDestroy(&A));
-  //   PetscCall(MatDestroy(&B));
-  //   PetscCall(MatDestroy(&X));
-  //   PetscCall(PetscFree(sources.sourceArray));
-
-  /* PETSc finalize*/
+  /* ---------------------------------------------------------------- */
+  /* PETSc finalize                                                   */
+  /* ---------------------------------------------------------------- */
   PetscCall(PetscFinalize());
   return 0;
 }

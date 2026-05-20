@@ -1,14 +1,10 @@
 /*
  * Filename: solver.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2025-08-05
+ * Date: 2026-02-03
  *
  * Description:
- * This file contains functions solving phase.
- *
- * Usage:
- * Include this file in your source code to utilize the
- * solver functions. For example: #include "solver.h"
+ * Linear-system solver routines for the PETGEM kernels.
  */
 
 /* C libraries */
@@ -36,8 +32,6 @@
  * @param[in] B The right-hand side matrix (Mat), with one column per source.
  * @param[in] G Optional discrete gradient matrix (Mat). Required for MATIS matrices
  *              to set up the PCBDDC preconditioner correctly.
- * @param[in] params A Params struct containing simulation parameters, including
- *                   the FEM order (`nord`) used for PCBDDC discrete gradient setup.
  * @param[out] X Pointer to the solution matrix (Mat) that will be created and
  *               populated with the solution vectors corresponding to each column
  *               of B.
@@ -70,7 +64,7 @@
  * - Ensure B has the correct size and ordering consistent with A.
  * - G must be compatible with the ordering of DOFs in A if MATIS/PCBDDC is used.
  */
-PetscErrorCode solveCsemSystem(const csemParams params, const DM dm, const Mat A, const Mat B, const Mat G, Mat* X) {
+PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat G, Mat* X) {
 
   PetscFunctionBeginUser;
 
@@ -88,12 +82,31 @@ PetscErrorCode solveCsemSystem(const csemParams params, const DM dm, const Mat A
   PetscCall(KSPSetOperators(ksp, A, A));
 
   PetscCall(PetscObjectTypeCompare((PetscObject)A, MATIS, &ismatis));
+
+  /* PCBDDC + Nédélec discrete-gradient operator at every supported order.
+   *
+   * G here is the TOPOLOGICAL gradient G_BDDC : Nédélec_k → P_nord H1
+   * from assembleCsemKandM (lowest-Whitney vertex incidence per mesh
+   * edge, higher-order edge / face / volume rows zero, K·G_BDDC ≠ 0
+   * by design). PCBDDCSetDiscreteGradient is called with order = 1:
+   * BDDC uses G as a structural hint to identify the curl-kernel
+   * coarse space (∇P_1 ⊂ Nédélec_1 ⊂ Nédélec_k), and higher-order
+   * H(curl) DOFs are static-condensed internally.
+   *
+   * The mathematically exact, cross-cell-consistent canonical Π^Ned
+   * gradient against P_nord H1 is also produced by assembleCsemKandM
+   * (the separate `G` matrix output) but is NOT passed to PCBDDC
+   * because its denser face/volume couplings violate the edge-cluster
+   * nnz budget BDDC checks during PCBDDCNedelecSupport ("SIZE OF EDGE
+   * > EXTCOL SECOND PASS" at nord ≥ 3). The canonical G is used for
+   * K·G analysis and any consumer that needs the actual algebraic
+   * gradient. */
   if (ismatis && G) {
     PC pc;
-
     PetscCall(KSPGetPC(ksp, &pc));
     PetscCall(PCSetType(pc, PCBDDC));
-    PetscCall(PCBDDCSetDiscreteGradient(pc, G, params.nord, 0, PETSC_TRUE, PETSC_TRUE));
+    PetscCall(PCBDDCSetDiscreteGradient(pc, G, 1, 0,
+                                        PETSC_TRUE, PETSC_TRUE));
   }
   PetscCall(KSPSetFromOptions(ksp));
 
@@ -103,7 +116,9 @@ PetscErrorCode solveCsemSystem(const csemParams params, const DM dm, const Mat A
   PetscCall(MatCreateDenseFromVecType(comm, vtype, m, n, M, N, m, NULL, X));
   PetscCall(PetscPrintf(comm, "\n Solution of %" PetscInt_FMT " linear systems:\n", N));
   PetscCall(PetscPrintf(comm, "   Solver process    = Initiated\n"));
+
   PetscCall(KSPMatSolve(ksp, B, *X));
+
   PetscCall(PetscPrintf(comm, "   Solver process    = Finished\n"));
   PetscCall(KSPDestroy(&ksp));
 

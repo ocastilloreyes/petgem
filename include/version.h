@@ -1,11 +1,11 @@
 /*
-  Filename: version.h
-  Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2024-10-02
-
-  Description:
-  This file contains details about PETGEM version
-*/
+ * Filename: version.h
+ * Author: Octavio Castillo Reyes (UPC/BSC)
+ * Date: 2026-02-03
+ *
+ * Description:
+ * PETGEM version macros (VERSION_MAJOR / VERSION_MINOR / VERSION_PATCH).
+ */
 
 #ifndef VERSION_H
 #define VERSION_H

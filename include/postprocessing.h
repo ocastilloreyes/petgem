@@ -1,18 +1,11 @@
 /*
-  Filename: postprocessing.h
-  Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2025-09-05
-
-  Description:
-  This file contains a collection of definitions for
-  postprocessing functions that are used throughout the
-  PETGEM project.
-
-  Usage:
-  Include this file in your source code to utilize the
-  postprocessing functions. For example: #include
-  "postprocessing.h"
-*/
+ * Filename: postprocessing.h
+ * Author: Octavio Castillo Reyes (UPC/BSC)
+ * Date: 2026-02-03
+ *
+ * Description:
+ * Prototypes for the postprocessing functions used throughout PETGEM.
+ */
 
 #ifndef POSTPROCESSING_H
 #define POSTPROCESSING_H
@@ -23,6 +16,12 @@
 #include <petsc.h>
 #include <petscdmplex.h>
 
-PetscErrorCode computeFields(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, const Mat X);
+/* Compute electric and magnetic fields at receivers for the forward kernel.
+ * `receivers` is the serial Vec (PETSC_COMM_SELF, length 3·N_recv) returned
+ * by loadCsemInputs — passed through so postprocessing does not re-open
+ * the input HDF5. */
+PetscErrorCode computeFields(const csemParams params, const CsemSourceSet sources,
+                             const DM dm, const Grid grid,
+                             Vec receivers, const Mat X);
 
 #endif

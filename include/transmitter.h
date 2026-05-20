@@ -1,18 +1,12 @@
 /*
-  Filename: transmitter.h
-  Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2025-09-05
-
-  Description:
-  This file contains a collection of definitions for
-  transmitter functions that are used throughout the PETGEM
-  project.
-
-  Usage:
-  Include this file in your source code to utilize the
-  transmitter functions. For example: #include
-  "transmitter.h"
-*/
+ * Filename: transmitter.h
+ * Author: Octavio Castillo Reyes (UPC/BSC)
+ * Date: 2026-02-03
+ *
+ * Description:
+ * Type definitions for the CSEM transmitter (source) records used
+ * throughout PETGEM.
+ */
 
 #ifndef TRANSMITTER_H
 #define TRANSMITTER_H
@@ -32,7 +26,5 @@ typedef struct {
   PetscInt numSources;     /* Total number of transmitters */
   CsemSource* sourceArray; /* Array of sources */
 } CsemSourceSet;
-
-PetscErrorCode setupCsemSource(const csemParams params, CsemSourceSet* sources);
 
 #endif

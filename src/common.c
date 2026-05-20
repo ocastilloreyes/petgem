@@ -1,18 +1,11 @@
 /*
  * Filename: common.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2025-05-28
+ * Date: 2026-02-03
  *
  * Description:
- * This file contains a collection of functions for common
- * utility functions that are used throughout the PETGEM
- * toolkit. These functions include operations for printing
- * and timers.
- *
- * Usage:
- * Include this file in your source code to utilize the
- * common functions. For example: #include "common.h"
- *
+ * Common utility functions used throughout the PETGEM toolkit,
+ * including printing helpers and timers.
  */
 
 /* C libraries */
@@ -153,13 +146,16 @@ static PetscErrorCode printCenteredText(const char* text) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
-  PetscInt text_len, total_space, left_pad, right_pad;
+  PetscInt text_len;
+  /* `*` width specifier requires `int` per C standard; PetscInt would
+   * be int64_t on 64-bit indices builds and trip strict format checks. */
+  int total_space, left_pad, right_pad;
 
   /* Compute display width */
   PetscCall(computeDisplayWidth(text, &text_len));
 
   /* Compute paddings */
-  total_space = LINE_WIDTH - 2 - text_len;
+  total_space = LINE_WIDTH - 2 - (int)text_len;
   left_pad = total_space / 2;
   right_pad = total_space - left_pad;
 
@@ -197,11 +193,13 @@ static PetscErrorCode PrintTimerHMSPercent(const char* label, PetscLogDouble t, 
   PetscFunctionBeginUser;
 
   /* Variables declaration */
-  PetscInt hours, minutes;
+  /* `%02d` requires `int`; hours/minutes are bounded small (≤ runtime in
+   * hours), so plain int is the natural type. */
+  int hours, minutes;
   PetscLogDouble seconds, percent;
 
-  hours = (PetscInt)(t / 3600.0);
-  minutes = (PetscInt)((t - hours * 3600.0) / 60.0);
+  hours = (int)(t / 3600.0);
+  minutes = (int)((t - hours * 3600.0) / 60.0);
   seconds = t - hours * 3600.0 - minutes * 60.0;
 
   percent = (total > 0.0) ? (100.0 * t / total) : 0.0;
@@ -374,6 +372,43 @@ PetscErrorCode printTimers(const PetscLogDouble timers[]) {
   PetscCall(PrintTimerHMSPercent("Solver", timers[5], elapsed_time));
   PetscCall(PrintTimerHMSPercent("Postprocessing", timers[6], elapsed_time));
   PetscCall(PrintTimerHMSPercent("Elapsed time", elapsed_time, elapsed_time));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+
+PetscErrorCode printUsage(const char *progname) {
+  PetscFunctionBeginUser;
+
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,
+    "Usage:\n"
+    "  %s modeling [petsc options...]      # run forward kernel (fm.csem)\n"
+    "  %s inverse  [petsc options...]      # run inverse kernel (im.csem)\n"
+    "  %s -mode modeling [petsc options]   # equivalent (PETSc-option form)\n"
+    "  %s -mode inverse  [petsc options]\n"
+    "  %s --version\n"
+    "\n"
+    "Pass -options_file <file.txt> for the usual params input.\n",
+    progname, progname, progname, progname, progname));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode parseModeArg(const char *s, PetscInt *mode)
+{
+  PetscFunctionBeginUser;
+
+  PetscCheck(s, PETSC_COMM_SELF, PETSC_ERR_ARG_NULL,
+             "Mode string cannot be NULL");
+
+  if (strcmp(s, "modeling") == 0 || strcmp(s, "forward") == 0 || strcmp(s, "fm") == 0) { 
+    *mode = 0;  /* Forward modeling */
+  } else if (strcmp(s, "inverse") == 0 || strcmp(s, "im") == 0) { 
+    *mode = 1;  /* Inverse modeling */
+  } else {
+    *mode = -1; /* Unknown */
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

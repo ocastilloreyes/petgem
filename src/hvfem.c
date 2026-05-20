@@ -1,16 +1,11 @@
 /*
  * Filename: hvfem.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2025-06-12
+ * Date: 2026-02-03
  *
  * Description:
- * This file contains functions for high-order vector finite
- * element method (HVFEM) computations.
- *
- * Usage:
- * Include this file in your source code to utilize the grid
- * functions. For example: #include "grid.h"
- *
+ * Functions for high-order vector finite element method (HVFEM)
+ * computations.
  */
 
 /* C libraries */
@@ -24,6 +19,51 @@
 /* PETGEM functions */
 #include "constants.h"
 #include "hvfem.h"
+#include "hvfem_internal.h"
+
+/* ============================================================================
+ * Forward declarations of file-local (static) helpers.
+ *
+ * Helpers shared with the hierarchical Nédélec TU — dotProduct, crossProduct,
+ * vectorNorm, invertMatrix, cartesianToVolumetricCoordinates,
+ * solve3x3MatrixSystem3x6RHS, shape3DHTet — are declared in hvfem_internal.h
+ * and have external linkage.
+ *
+ * The remaining helpers stay file-local; their definitions follow below in
+ * the same logical groupings.
+ * ========================================================================= */
+
+/* Vector algebra (file-local only) */
+static PetscErrorCode tripleProduct(const PetscReal a[NUM_DIMENSIONS], const PetscReal b[NUM_DIMENSIONS], const PetscReal c[NUM_DIMENSIONS], PetscReal* result);
+
+/* Quadrature renormalization */
+static PetscErrorCode renormalization2DGaussPoints(const PetscReal (*gaussPoints)[3], Quadrature2D* quadrature);
+static PetscErrorCode renormalization3DGaussPoints(const PetscReal (*gaussPoints)[4], Quadrature3D* quadrature);
+
+/* Reference-cell coordinates.
+ * AffineTetrahedron / ProjectTetE / ProjectTetF and the orientation helpers
+ * OrientE / OrientTri are also consumed by the hierarchical Nédélec basis
+ * (src/hvfem_hierarchical.c); their declarations live in hvfem_internal.h
+ * and they are no longer file-static. BlendTetV stays file-local. */
+static PetscErrorCode BlendTetV(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscReal DLam[NUM_DIMENSIONS][NUM_DIMENSIONS + 1],
+                                PetscReal LambV[NUM_VERTICES_PER_CELL], PetscReal DLambV[NUM_VERTICES_PER_CELL][NUM_DIMENSIONS]);
+
+/* Polynomial bases. PolyLegendre is also reused by HomLegendre in the
+ * hierarchical basis TU; its declaration lives in hvfem_internal.h.
+ * HomIJacobi (declared in hvfem_internal.h) is consumed by AncETri there. */
+static PetscErrorCode PolyILegendre(const PetscReal X, const PetscReal T, const PetscInt nord, const PetscBool Idec, PetscReal homL[],
+                                    PetscReal homP[], PetscReal homR[]);
+static PetscErrorCode PolyJacobi(const PetscReal X, const PetscReal T, const PetscInt nord, PetscInt Minalpha, PetscReal** P);
+static PetscErrorCode PolyIJacobi(const PetscReal X, const PetscReal T, const PetscInt nord, const PetscInt Minalpha, PetscReal** L,
+                                  PetscReal** P, PetscReal** R);
+
+/* Edge/face ancillary polynomials */
+static PetscErrorCode HomILegendre(const PetscReal S[2], const PetscReal DS[NUM_DIMENSIONS][2], const PetscInt nord, PetscBool const Idec,
+                                   PetscReal* PhiE, PetscReal** DPhiE);
+static PetscErrorCode AncPhiE(const PetscReal S[2], const PetscReal DS[NUM_DIMENSIONS][2], const PetscInt nord, const PetscBool Idec,
+                              PetscReal* PhiE, PetscReal** DPhiE);
+static PetscErrorCode AncPhiTri(const PetscReal S[NUM_DIMENSIONS], const PetscReal DS[NUM_DIMENSIONS][NUM_DIMENSIONS],
+                                const PetscInt nordFace, const PetscBool IdecF, PetscReal** PhiTri, PetscReal*** DPhiTri);
 
 /**
  * @brief Computes the dot product of two vectors in `NUM_DIMENSIONS`-dimensional space.
@@ -40,7 +80,7 @@
  *
  * @note The function assumes both input vectors have exactly `NUM_DIMENSIONS` entries.
  */
-static PetscErrorCode dotProduct(const PetscReal vector1[NUM_DIMENSIONS], const PetscReal vector2[NUM_DIMENSIONS], PetscReal* result) {
+PetscErrorCode dotProduct(const PetscReal vector1[NUM_DIMENSIONS], const PetscReal vector2[NUM_DIMENSIONS], PetscReal* result) {
   PetscFunctionBeginUser;
 
   *result = 0.0;
@@ -68,10 +108,21 @@ static PetscErrorCode dotProduct(const PetscReal vector1[NUM_DIMENSIONS], const 
  *
  * @note The function assumes that all input vectors are 3-dimensional.
  */
-static PetscErrorCode tripleProduct(const PetscReal a[3], const PetscReal b[3], const PetscReal c[3], PetscReal* result) {
+static PetscErrorCode tripleProduct(const PetscReal a[NUM_DIMENSIONS], const PetscReal b[NUM_DIMENSIONS], const PetscReal c[NUM_DIMENSIONS], PetscReal* result) {
   PetscFunctionBeginUser;
 
   *result = a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode crossProduct(const PetscReal a[NUM_DIMENSIONS], const PetscReal b[NUM_DIMENSIONS], PetscReal result[NUM_DIMENSIONS]) {
+
+  PetscFunctionBeginUser;
+
+  result[0] = a[1] * b[2] - a[2] * b[1];
+  result[1] = a[2] * b[0] - a[0] * b[2];
+  result[2] = a[0] * b[1] - a[1] * b[0];
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -164,7 +215,7 @@ static PetscErrorCode renormalization3DGaussPoints(const PetscReal (*gaussPoints
  * @note Intended for small matrices due to the fixed-size augmented array `aug[6][12]`.
  * @note Uses PETSc macros for error handling (`SETERRQ`) and absolute values (`PetscAbsReal`).
  */
-static PetscErrorCode invertMatrix(const PetscInt N, const PetscReal A[], PetscReal invA[]) {
+PetscErrorCode invertMatrix(const PetscInt N, const PetscReal A[], PetscReal invA[]) {
   PetscFunctionBeginUser;
 
   PetscReal aug[6][12]; // max N=6
@@ -247,7 +298,7 @@ static PetscErrorCode invertMatrix(const PetscInt N, const PetscReal A[], PetscR
  * @note The input point `r` is assumed to lie inside or near the reference tetrahedron.
  * @note The reference tetrahedron vertices are taken from the `REFERENCE_CELL` global array.
  */
-static PetscErrorCode cartesianToVolumetricCoordinates(const PetscReal r[NUM_DIMENSIONS], PetscReal L[4]) {
+PetscErrorCode cartesianToVolumetricCoordinates(const PetscReal r[NUM_DIMENSIONS], PetscReal L[4]) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
@@ -296,7 +347,7 @@ static PetscErrorCode cartesianToVolumetricCoordinates(const PetscReal r[NUM_DIM
  * @note Intended for small matrices (3×3 system with 3×6 RHS). For larger systems,
  *       other PETSc solvers should be used.
  */
-static PetscErrorCode solve3x3MatrixSystem3x6RHS(const PetscReal matrix1[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal** matrix2,
+PetscErrorCode solve3x3MatrixSystem3x6RHS(const PetscReal matrix1[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal** matrix2,
                                                  PetscReal** matrix3) {
   PetscFunctionBeginUser;
 
@@ -381,7 +432,7 @@ static PetscErrorCode solve3x3MatrixSystem3x6RHS(const PetscReal matrix1[NUM_DIM
  *       \f]
  *       where \f$y = 2 X - T\f$.
  */
-static PetscErrorCode PolyLegendre(const PetscReal X, const PetscReal T, const PetscInt nord, PetscReal P[]) {
+PetscErrorCode PolyLegendre(const PetscReal X, const PetscReal T, const PetscInt nord, PetscReal P[]) {
 
   PetscFunctionBeginUser;
 
@@ -680,7 +731,7 @@ static PetscErrorCode PolyIJacobi(const PetscReal X, const PetscReal T, const Pe
  *
  * @return PetscErrorCode PETSC_SUCCESS always.
  */
-static PetscErrorCode AffineTetrahedron(const PetscReal X[NUM_DIMENSIONS], PetscReal Lam[NUM_DIMENSIONS + 1],
+PetscErrorCode AffineTetrahedron(const PetscReal X[NUM_DIMENSIONS], PetscReal Lam[NUM_DIMENSIONS + 1],
                                         PetscReal DLam[NUM_DIMENSIONS][NUM_DIMENSIONS + 1]) {
 
   PetscFunctionBeginUser;
@@ -776,66 +827,41 @@ static PetscErrorCode BlendTetV(const PetscReal Lam[NUM_DIMENSIONS + 1], const P
  * @note The local orientation of each edge is fixed as in PETGEM convention:
  *       e0: v1->v0, e1: v0->v2, e2: v2->v1, e3: v1->v3, e4: v3->v0, e5: v2->v3.
  */
-static PetscErrorCode ProjectTetE(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscReal DLam[NUM_DIMENSIONS][NUM_DIMENSIONS + 1],
+PetscErrorCode ProjectTetE(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscReal DLam[NUM_DIMENSIONS][NUM_DIMENSIONS + 1],
                                   PetscReal LampE[NUM_EDGES_PER_CELL][2], PetscReal DLampE[NUM_EDGES_PER_CELL][NUM_DIMENSIONS][2],
                                   PetscBool* IdecE) {
 
   PetscFunctionBeginUser;
 
-  /* Compute projection */
-
-  /* e=0 --> edge10 with local orientation v1->v0 */
-  PetscInt e = 0;
-  LampE[e][0] = Lam[1];
-  LampE[e][1] = Lam[0];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampE[e][i][0] = DLam[i][1];
-    DLampE[e][i][1] = DLam[i][0];
-  }
-
-  /* e=1 --> edge02 with local orientation v0->v2 */
-  e = 1;
-  LampE[e][0] = Lam[0];
-  LampE[e][1] = Lam[2];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampE[e][i][0] = DLam[i][0];
-    DLampE[e][i][1] = DLam[i][2];
-  }
-
-  /* e=2 --> edge21 with local orientation v2->v1 */
-  e = 2;
-  LampE[e][0] = Lam[2];
-  LampE[e][1] = Lam[1];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampE[e][i][0] = DLam[i][2];
-    DLampE[e][i][1] = DLam[i][1];
-  }
-
-  /* e=3 --> edge13 with local orientation v1->v3 */
-  e = 3;
-  LampE[e][0] = Lam[1];
-  LampE[e][1] = Lam[3];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampE[e][i][0] = DLam[i][1];
-    DLampE[e][i][1] = DLam[i][3];
-  }
-
-  /* e=4 --> edge30 with local orientation v3->v0 */
-  e = 4;
-  LampE[e][0] = Lam[3];
-  LampE[e][1] = Lam[0];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampE[e][i][0] = DLam[i][3];
-    DLampE[e][i][1] = DLam[i][0];
-  }
-
-  /* e=5 --> edge23 with local orientation v2->v3 */
-  e = 5;
-  LampE[e][0] = Lam[2];
-  LampE[e][1] = Lam[3];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampE[e][i][0] = DLam[i][2];
-    DLampE[e][i][1] = DLam[i][3];
+  /* Edge slot ↔ vertex pair must match the PETGEM canonical labeling in
+   * EDGE_VERTICES (constants.c) — that is the convention used by the cell
+   * closure traversal, the global DOF assignment, and the Block-A debug
+   * dump. Any mismatch here produces Whitney functions for the wrong
+   * physical edge at each slot.
+   *
+   * Slot layout (EDGE_VERTICES):
+   *   E0: v0->v1   E1: v1->v2   E2: v2->v0
+   *   E3: v0->v3   E4: v3->v1   E5: v2->v3
+   *
+   * For each slot e the i-th component is Lam[v_i] and DLam[*][v_i] for
+   * v_i = EDGE_VERTICES[e][i]. AncEE then forms the Whitney
+   *   w = Lam[v_0] · ∇Lam[v_1] − Lam[v_1] · ∇Lam[v_0]
+   * which is the standard tangentially-oriented edge basis aligned with
+   * the v_0 → v_1 direction.
+   *
+   * Historical note: an earlier convention (v1->v0, v0->v2, v2->v1, ...)
+   * silently mismatched EDGE_VERTICES in 5 of 6 slots. It was invisible
+   * for shape3DHTet because the CSEM solve uses H1=P1 only (no edge
+   * bubbles); the hierarchical H(curl) basis exposes it on every cell. */
+  for (PetscInt e = 0; e < NUM_EDGES_PER_CELL; e++) {
+    const PetscInt va = EDGE_VERTICES[e][0];
+    const PetscInt vb = EDGE_VERTICES[e][1];
+    LampE[e][0] = Lam[va];
+    LampE[e][1] = Lam[vb];
+    for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+      DLampE[e][i][0] = DLam[i][va];
+      DLampE[e][i][1] = DLam[i][vb];
+    }
   }
 
   /* Projected coordinates are Lam, so IdecE=false for all edges */
@@ -865,56 +891,43 @@ static PetscErrorCode ProjectTetE(const PetscReal Lam[NUM_DIMENSIONS + 1], const
  *       f0: v1->v0->v2, f1: v1->v3->v0, f2: v1->v2->v3, f3: v2->v0->v3.
  *       This ensures consistent face-based basis construction.
  */
-static PetscErrorCode ProjectTetF(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscReal DLam[NUM_DIMENSIONS][NUM_DIMENSIONS + 1],
+PetscErrorCode ProjectTetF(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscReal DLam[NUM_DIMENSIONS][NUM_DIMENSIONS + 1],
                                   PetscReal LampF[NUM_FACES_PER_CELL][NUM_DIMENSIONS],
                                   PetscReal DLampF[NUM_FACES_PER_CELL][NUM_DIMENSIONS][NUM_DIMENSIONS], PetscBool* IdecF) {
 
   PetscFunctionBeginUser;
 
-  /* Compute projection */
-
-  /* f=0 --> face102 with local orientation v1->v0->v2 */
-  PetscInt f = 0;
-  LampF[f][0] = Lam[1];
-  LampF[f][1] = Lam[0];
-  LampF[f][2] = Lam[2];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampF[f][i][0] = DLam[i][1];
-    DLampF[f][i][1] = DLam[i][0];
-    DLampF[f][i][2] = DLam[i][2];
-  }
-
-  /* f=1 --> face130 with local orientation v1->v3->v0 */
-  f = 1;
-  LampF[f][0] = Lam[1];
-  LampF[f][1] = Lam[3];
-  LampF[f][2] = Lam[0];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampF[f][i][0] = DLam[i][1];
-    DLampF[f][i][1] = DLam[i][3];
-    DLampF[f][i][2] = DLam[i][0];
-  }
-
-  /* f=2 --> face123 with local orientation v1->v2->v3 */
-  f = 2;
-  LampF[f][0] = Lam[1];
-  LampF[f][1] = Lam[2];
-  LampF[f][2] = Lam[3];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampF[f][i][0] = DLam[i][1];
-    DLampF[f][i][1] = DLam[i][2];
-    DLampF[f][i][2] = DLam[i][3];
-  }
-
-  /* f=3 --> face203 with local orientation v2->v0->v3 */
-  f = 3;
-  LampF[f][0] = Lam[2];
-  LampF[f][1] = Lam[0];
-  LampF[f][2] = Lam[3];
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    DLampF[f][i][0] = DLam[i][2];
-    DLampF[f][i][1] = DLam[i][0];
-    DLampF[f][i][2] = DLam[i][3];
+  /* Face slot ↔ vertex triple must match the PETGEM canonical labeling in
+   * FACE_VERTICES (constants.c) — same convention used by the cell closure
+   * traversal, the global face-DOF assignment, and the OrientTri permutation
+   * codes 0..5 produced by computeCellOrientation.
+   *
+   * Slot layout (FACE_VERTICES):
+   *   F0: {v0, v1, v2}    F1: {v0, v1, v3}
+   *   F2: {v0, v2, v3}    F3: {v1, v2, v3}
+   *
+   * For each slot f the i-th component is Lam[v_i] for v_i = FACE_VERTICES[f][i].
+   * The hierarchical face-bubble construction (AncETri / OrientTri) treats
+   * NoriF=0 as "vertices in canonical order" — so canonical here MUST be
+   * FACE_VERTICES, otherwise NoriF=0 silently means "some other permutation"
+   * and adjacent cells disagree on face-DOF orientation.
+   *
+   * Historical note: an earlier convention (v1->v0->v2, v1->v3->v0,
+   * v1->v2->v3, v2->v0->v3) silently mismatched FACE_VERTICES — slots 2 and
+   * 3 referenced different physical faces, slots 0 and 1 used permuted
+   * vertices. Invisible at nord=1 (no face DOFs); breaks nord >= 2. */
+  for (PetscInt f = 0; f < NUM_FACES_PER_CELL; f++) {
+    const PetscInt v0 = FACE_VERTICES[f][0];
+    const PetscInt v1 = FACE_VERTICES[f][1];
+    const PetscInt v2 = FACE_VERTICES[f][2];
+    LampF[f][0] = Lam[v0];
+    LampF[f][1] = Lam[v1];
+    LampF[f][2] = Lam[v2];
+    for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+      DLampF[f][i][0] = DLam[i][v0];
+      DLampF[f][i][1] = DLam[i][v1];
+      DLampF[f][i][2] = DLam[i][v2];
+    }
   }
 
   *IdecF = PETSC_FALSE;
@@ -942,7 +955,7 @@ static PetscErrorCode ProjectTetF(const PetscReal Lam[NUM_DIMENSIONS + 1], const
  *          This is used to ensure consistent local-to-global edge orientation
  *          when assembling edge-based basis functions.
  */
-static PetscErrorCode OrientE(const PetscReal S[2], const PetscReal DS[NUM_DIMENSIONS][2], const PetscInt Nori, PetscReal GS[2],
+PetscErrorCode OrientE(const PetscReal S[2], const PetscReal DS[NUM_DIMENSIONS][2], const PetscInt Nori, PetscReal GS[2],
                               PetscReal GDS[NUM_DIMENSIONS][2]) {
 
   PetscFunctionBeginUser;
@@ -995,7 +1008,7 @@ static PetscErrorCode OrientE(const PetscReal S[2], const PetscReal DS[NUM_DIMEN
  *          This ensures that face-based basis functions are consistently oriented
  *          across tetrahedral elements when assembling global matrices.
  */
-static PetscErrorCode OrientTri(const PetscReal S[NUM_DIMENSIONS], const PetscReal DS[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscInt Nori,
+PetscErrorCode OrientTri(const PetscReal S[NUM_DIMENSIONS], const PetscReal DS[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscInt Nori,
                                 PetscReal GS[NUM_DIMENSIONS], PetscReal GDS[NUM_DIMENSIONS][NUM_DIMENSIONS]) {
 
   PetscFunctionBeginUser;
@@ -1147,7 +1160,7 @@ static PetscErrorCode HomILegendre(const PetscReal S[2], const PetscReal DS[NUM_
  *          The arrays HomL and DHomL are ready for direct use in finite element assembly
  *          for face- or volume-based high-order basis functions.
  */
-static PetscErrorCode HomIJacobi(const PetscReal S[2], const PetscReal DS[NUM_DIMENSIONS][2], const PetscInt nord, const PetscInt Minalpha,
+PetscErrorCode HomIJacobi(const PetscReal S[2], const PetscReal DS[NUM_DIMENSIONS][2], const PetscInt nord, const PetscInt Minalpha,
                                  const PetscBool Idec, PetscReal** HomL, PetscReal*** DHomL) {
 
   PetscFunctionBeginUser;
@@ -1404,7 +1417,7 @@ static PetscErrorCode AncPhiTri(const PetscReal S[NUM_DIMENSIONS], const PetscRe
  *
  * This function is suitable for use in assembling high-order H1 finite element matrices over tetrahedral meshes.
  */
-static PetscErrorCode shape3DHTet(const PetscReal X[NUM_DIMENSIONS], const PetscInt nord, const PetscInt cellOrientation[10],
+PetscErrorCode shape3DHTet(const PetscReal X[NUM_DIMENSIONS], const PetscInt nord, const CellOrientation *cellOrientation,
                                   PetscReal* ShapH, PetscReal** GradH) {
   PetscFunctionBeginUser;
 
@@ -1462,12 +1475,14 @@ static PetscErrorCode shape3DHTet(const PetscReal X[NUM_DIMENSIONS], const Petsc
 
   /* Extract orientation for faces */
   for (PetscInt i = 0; i < NUM_FACES_PER_CELL; ++i) {
-    NoriF[i] = cellOrientation[i];
+    NoriF[i] = cellOrientation->faces[i];
   }
 
-  /* Extract orientation for edges */
+  /* Extract orientation for edges.
+   * computeCellOrientation stores edges as sign ±1; OrientE expects
+   * a {0,1} index (0 = aligned, 1 = reversed). */
   for (PetscInt i = 0; i < NUM_EDGES_PER_CELL; ++i) {
-    NoriE[i] = cellOrientation[i + NUM_FACES_PER_CELL];
+    NoriE[i] = (cellOrientation->edgeSigns[i] < 0) ? 1 : 0;
   }
 
   /* Compute shape functions for edges */
@@ -1694,6 +1709,58 @@ static PetscErrorCode shape3DHTet(const PetscReal X[NUM_DIMENSIONS], const Petsc
     PetscCall(PetscFree(DPhiTri[i]));
   }
   PetscCall(PetscFree(DPhiTri));
+
+  /* ---- shape3DHTet basis-natural → PETSc DMPlex closure reorder -----
+   *
+   * The body above fills ShapH and GradH in BASIS-NATURAL order
+   *     [vertex 0..3, edge 0..6(nord-1)-1,
+   *      face 0..4·(nord-1)(nord-2)/2-1,
+   *      volume 0..(nord-1)(nord-2)(nord-3)/6-1].
+   *
+   * PETSc DMPlex closure traversal at a cell yields DOFs in the
+   * REVERSE depth order
+   *     [volume, face, edge, vertex]
+   * — see the symmetric perm table in shape3DETet (hierarchical
+   * H(curl) basis) for the same idea on the H(curl) side. Without
+   * this fixup the column indices passed to MatSetValuesLocal (which
+   * come from DMPlexGetClosureIndices, i.e. PETSc closure order)
+   * would address natural-order positions; at nord = 1 the two
+   * coincide (only vertex DOFs) and the bug is invisible, but for
+   * nord ≥ 2 every G coefficient lands in the wrong column.
+   *
+   * The permutation is computed inline from the structural counts
+   * (no static table); at most one branch per output position. */
+  {
+    const PetscInt e        = nord - 1;
+    const PetscInt f        = (nord - 1) * (nord - 2) / 2;
+    const PetscInt v        = (nord - 1) * (nord - 2) * (nord - 3) / 6;
+    const PetscInt num_edge = 6 * e;
+    const PetscInt num_face = 4 * f;
+    const PetscInt num_vol  = v;
+    const PetscInt total    = (nord + 1) * (nord + 2) * (nord + 3) / 6;
+
+    /* Copy natural-order values into a stack scratch. */
+    PetscReal tmpShapH[210];   /* >= max total (nord=6 → 84) */
+    PetscReal tmpGradH[NUM_DIMENSIONS][210];
+    for (PetscInt k = 0; k < total; k++) {
+      tmpShapH[k] = ShapH[k];
+      for (PetscInt d = 0; d < NUM_DIMENSIONS; d++)
+        tmpGradH[d][k] = GradH[d][k];
+    }
+
+    /* Reorder into closure order. */
+    for (PetscInt p = 0; p < total; p++) {
+      PetscInt q = p;
+      PetscInt nat;
+      if (q < num_vol)                       nat = 4 + num_edge + num_face + q;
+      else if ((q -= num_vol)      < num_face)  nat = 4 + num_edge + q;
+      else if ((q -= num_face)     < num_edge)  nat = 4 + q;
+      else                                   nat = q - num_edge;
+      ShapH[p] = tmpShapH[nat];
+      for (PetscInt d = 0; d < NUM_DIMENSIONS; d++)
+        GradH[d][p] = tmpGradH[d][nat];
+    }
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -2002,48 +2069,77 @@ PetscErrorCode computeCellOrientation(Cell* cell) {
      E0, E1, E2, E3, E4, E5
   */
 
-  /* Get orientation for faces */
-  currentPoint = 2;
+  /* Face orientation for OrientTri (PETGEM 0..5).
+   *
+   * IMPORTANT: we do NOT derive this from PETSc's orientation flag in the
+   * cell closure. PETSc's triangle-polytope orientation convention has
+   * shifted across versions and an earlier cast (raw -3..2 -> {4,3,5,0,1,2})
+   * was never validated end-to-end — the legacy nord=2 path bypassed
+   * OrientTri entirely (canonical face tangents from sorted vertices), and
+   * shape3DHTet at H1 nord >= 2 was never exercised in production. The
+   * hierarchical H(curl) basis is the first to actually consume faces[f],
+   * and a wrong cast silently breaks tangential continuity on every face
+   * with non-zero PETSc orientation.
+   *
+   * Instead, we mirror the legacy canonical-face-tangent strategy: lex-sort
+   * the three face vertices by their physical coordinates. That ordering
+   * is cell-invariant — both K+ and K- sharing F see the same three
+   * physical points and sort them identically. The permutation that takes
+   * (FACE_VERTICES[f][0], FACE_VERTICES[f][1], FACE_VERTICES[f][2]) into
+   * the sorted order, expressed as one of OrientTri's 6 permutation codes
+   * (0..5 — see comments around OrientTri), is what we store as faces[f].
+   *
+   * After this, OrientTri produces the SAME canonical (GS[0],GS[1],GS[2])
+   * triple from both cells on the shared face, so AncETri / HomIJacobi
+   * yield matching face-bubble basis values from each side. */
   for (PetscInt i = 0; i < NUM_FACES_PER_CELL; i++) {
-    cell->orientation[i] = cell->closure[currentPoint + 1];
+    const PetscInt v0 = FACE_VERTICES[i][0];
+    const PetscInt v1 = FACE_VERTICES[i][1];
+    const PetscInt v2 = FACE_VERTICES[i][2];
+    const PetscReal *p[3] = {
+        &cell->coordinates[v0 * NUM_DIMENSIONS],
+        &cell->coordinates[v1 * NUM_DIMENSIONS],
+        &cell->coordinates[v2 * NUM_DIMENSIONS]};
 
-    /* Cast to PETGEM basis functions orientation */
-    switch (cell->orientation[i]) {
-    case -3:
-      cell->orientation[i] = 4;
-      break;
-    case -2:
-      cell->orientation[i] = 3;
-      break;
-    case -1:
-      cell->orientation[i] = 5;
-      break;
-    case 0:
-      cell->orientation[i] = 0;
-      break;
-    case 1:
-      cell->orientation[i] = 1;
-      break;
-    case 2:
-      cell->orientation[i] = 2;
-      break;
-    default:
-      break;
+    /* Insertion-sort indices [0,1,2] by physical coord (x, then y, then z). */
+    PetscInt ord[3] = {0, 1, 2};
+    for (PetscInt a = 1; a < 3; a++) {
+      for (PetscInt b = a; b > 0; b--) {
+        const PetscReal *pa = p[ord[b - 1]];
+        const PetscReal *pb = p[ord[b]];
+        PetscBool swap = PETSC_FALSE;
+        if      (pa[0] >  pb[0]) swap = PETSC_TRUE;
+        else if (pa[0] == pb[0]) {
+          if      (pa[1] >  pb[1]) swap = PETSC_TRUE;
+          else if (pa[1] == pb[1] && pa[2] > pb[2]) swap = PETSC_TRUE;
+        }
+        if (swap) { PetscInt t = ord[b - 1]; ord[b - 1] = ord[b]; ord[b] = t; }
+        else break;
+      }
     }
-    currentPoint += 2;
+
+    /* Map permutation tuple (ord[0],ord[1],ord[2]) to an OrientTri code.
+     *   0: (0,1,2)   1: (1,2,0)   2: (2,0,1)
+     *   3: (0,2,1)   4: (1,0,2)   5: (2,1,0)
+     */
+    PetscInt nori = -1;
+    if      (ord[0] == 0 && ord[1] == 1 && ord[2] == 2) nori = 0;
+    else if (ord[0] == 1 && ord[1] == 2 && ord[2] == 0) nori = 1;
+    else if (ord[0] == 2 && ord[1] == 0 && ord[2] == 1) nori = 2;
+    else if (ord[0] == 0 && ord[1] == 2 && ord[2] == 1) nori = 3;
+    else if (ord[0] == 1 && ord[1] == 0 && ord[2] == 2) nori = 4;
+    else if (ord[0] == 2 && ord[1] == 1 && ord[2] == 0) nori = 5;
+    PetscCheck(nori >= 0, PETSC_COMM_SELF, PETSC_ERR_PLIB,
+               "computeCellOrientation: unable to map face %" PetscInt_FMT
+               " sort permutation (%" PetscInt_FMT ",%" PetscInt_FMT ",%" PetscInt_FMT
+               ") to an OrientTri code", i, ord[0], ord[1], ord[2]);
+    cell->orientation.faces[i] = nori;
   }
 
-  /* Get orientation for edges */
+  /* Get orientation for edges (stored as ±1 signs) */
   currentPoint = 2 + NUM_FACES_PER_CELL * 2;
   for (PetscInt i = 0; i < NUM_EDGES_PER_CELL; i++) {
-    cell->orientation[i + NUM_FACES_PER_CELL] = cell->closure[currentPoint + 1];
-
-    /* Cast to PETGEM basis functions orientation */
-    if (cell->orientation[i + NUM_FACES_PER_CELL] < 0) {
-      cell->orientation[i + NUM_FACES_PER_CELL] = -1;
-    } else {
-      cell->orientation[i + NUM_FACES_PER_CELL] = 1;
-    }
+    cell->orientation.edgeSigns[i] = (cell->closure[currentPoint + 1] < 0) ? -1 : 1;
     currentPoint += 2;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -2082,15 +2178,15 @@ PetscErrorCode computeNum1DQuadraturePoints(const PetscInt nord, Quadrature1D* q
 
   /* Basic verification */
   PetscCheck(gaussOrder >= 0, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE, "Error: Negative polynomial orders are not supported");
-  PetscCheck(gaussOrder <= 11, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE, "Error: 1D polynomial orders higher than 11 are not supported");
+  PetscCheck(gaussOrder <= 12, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE, "Error: 1D polynomial orders higher than 11 are not supported");
 
   /* Gauss-Legendre rule:
      exact for polynomials of degree (2*numPoints - 1)
      Saturated to 11 points for high orders */
   numPoints = gaussOrder / 2 + 1;
 
-  if (numPoints > 11) {
-    numPoints = 11;
+  if (numPoints > 12) {
+    numPoints = 12;
   }
 
   quadrature->numPoints = numPoints;
@@ -2438,379 +2534,6 @@ PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature) {
 }
 
 /**
- * @brief Computes the coefficients and derivatives for first-order Nédélec edge basis functions.
- *
- * @param[in] nord The polynomial order (currently only supports first-order, i.e., nord = 1).
- * @param[out] coeffs Output 2D array (numDofInCell x numDofInCell) storing the
- *                    coefficients for the Nédélec basis functions.
- * @param[out] Dx_Ni Output 2D array (NUM_DIMENSIONS x numDofInCell) storing the
- *                   x-derivatives of the basis functions.
- * @param[out] Dy_Ni Output 2D array (NUM_DIMENSIONS x numDofInCell) storing the
- *                   y-derivatives of the basis functions.
- * @param[out] Dz_Ni Output 2D array (NUM_DIMENSIONS x numDofInCell) storing the
- *                   z-derivatives of the basis functions.
- * @return PetscErrorCode PETSC_SUCCESS on success.
- *
- * @details
- * This function generates the coefficients and derivatives of first-order Nédélec
- * edge elements in 3D for a tetrahedral reference cell. Nédélec basis functions
- * are curl-conforming and used in electromagnetics (H(curl) spaces).
- *
- * The algorithm proceeds as follows:
- * 1. Computes the number of degrees of freedom per tetrahedral cell:
- *      numDofInCell = nord * (nord + 2) * (nord + 3) / 2
- *    For first-order elements, this corresponds to the 6 edges of the tetrahedron.
- *
- * 2. Constructs a small 6x6 matrix representing the mapping from reference edge
- *    functions to the global basis functions and an identity matrix for the RHS.
- *
- * 3. Solves the linear system (matrix * coef = identity) using PETSc LU factorization
- *    to obtain the coefficients of the basis functions in the standard edge basis.
- *    Values below a threshold (EPS = 1e-14) are set to zero for numerical stability.
- *
- * 4. Computes the derivatives of the Nédélec basis functions:
- *    - Dx_Ni, Dy_Ni, Dz_Ni store the partial derivatives with respect to x, y, z.
- *    - The derivatives are filled according to the curl-conforming definition
- *      for first-order edge functions.
- *
- * 5. Frees all temporary PETSc objects (matrices and index sets) used for the solve.
- *
- */
-PetscErrorCode computeNedelecOrder1Coefficients(const PetscInt nord, PetscReal** coeffs, PetscReal** Dx_Ni, PetscReal** Dy_Ni,
-                                                PetscReal** Dz_Ni) {
-  PetscFunctionBeginUser;
-
-  /* Variables declaration */
-  Mat matrix, secm, coef;
-  IS row, col;
-  PetscReal EPS = 1e-14;
-  PetscScalar* coef_array;
-  PetscReal val;
-  PetscInt numDofInCell;
-
-  /* Compute number of dofs per cell */
-  numDofInCell = nord * (nord + 2) * (nord + 3) / 2;
-
-  /* Define data for matrix */
-  PetscScalar matriz_data[36] = {1.0,  0.0,  0.0,  0.0,  0.0, 0.0,   /* Row 0 */
-                                 -1.0, 1.0,  0.0,  -1.0, 0.0, 0.0,   /* Row 1 */
-                                 0.0,  -1.0, 0.0,  0.0,  0.0, 0.0,   /* Row 2 */
-                                 0.0,  0.0,  1.0,  0.0,  0.0, 0.0,   /* Row 3 */
-                                 1.0,  0.0,  -1.0, 0.0,  1.0, 0.0,   /* Row 4 */
-                                 0.0,  -1.0, 1.0,  0.0,  0.0, -1.0}; /* Row 5 */
-
-  /* Identity matrix */
-  PetscScalar secm_data[36] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                               0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0};
-
-  /* Create matrices from arrays */
-  PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, numDofInCell, numDofInCell, matriz_data, &matrix));
-  PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, numDofInCell, numDofInCell, secm_data, &secm));
-  PetscCall(MatDuplicate(secm, MAT_DO_NOT_COPY_VALUES, &coef));
-
-  /* Compute index sets */
-  PetscCall(ISCreateStride(PETSC_COMM_SELF, numDofInCell, 0, 1, &row));
-  PetscCall(ISCreateStride(PETSC_COMM_SELF, numDofInCell, 0, 1, &col));
-
-  /* Factor LU */
-  PetscCall(MatLUFactor(matrix, row, col, NULL));
-
-  /* Solve matrix * coef = secm (coef = matriz \ secm) */
-  PetscCall(MatMatSolve(matrix, secm, coef));
-
-  /* Get pointer array for coef */
-  PetscCall(MatDenseGetArray(coef, &coef_array));
-
-  /* Apply threshold and fill output matrix */
-  for (PetscInt i = 0; i < numDofInCell; i++) {
-    for (PetscInt j = 0; j < numDofInCell; j++) {
-      val = PetscRealPart(coef_array[i * numDofInCell + j]);
-      if (PetscAbsReal(val) < EPS)
-        val = 0.0;
-      coeffs[i][j] = val;
-    }
-  }
-
-  /* Restore array */
-  PetscCall(MatDenseRestoreArray(coef, &coef_array));
-
-  /* Compute derivatives */
-  for (PetscInt i = 0; i < numDofInCell; i++) {
-    Dx_Ni[0][i] = 0.0;          // DxNix
-    Dx_Ni[1][i] = coeffs[3][i]; // DxNiy
-    Dx_Ni[2][i] = coeffs[4][i]; // DxNiz
-
-    Dy_Ni[0][i] = -coeffs[3][i]; // DyNix
-    Dy_Ni[1][i] = 0.0;           // DyNiy
-    Dy_Ni[2][i] = coeffs[5][i];  // DyNiz
-
-    Dz_Ni[0][i] = -coeffs[4][i]; // DzNix
-    Dz_Ni[1][i] = -coeffs[5][i]; // DzNiy
-    Dz_Ni[2][i] = 0.0;           // DzNiz
-  }
-
-  /* Free memory */
-  PetscCall(MatDestroy(&matrix));
-  PetscCall(MatDestroy(&secm));
-  PetscCall(MatDestroy(&coef));
-  PetscCall(ISDestroy(&col));
-  PetscCall(ISDestroy(&row));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Evaluates first-order Nédélec edge basis functions at a given point in a tetrahedral cell.
- *
- * @param[in] nord Polynomial order of the basis functions (currently only first-order, nord = 1).
- * @param[in] point The global [x, y, z] coordinates of the evaluation point.
- * @param[in] jacobian The 3x3 Jacobian matrix of the affine mapping from the reference tetrahedron
- *                     to the physical tetrahedron.
- * @param[in] coeffs Coefficient matrix (numDofInCell x numDofInCell) computed by
- *                   computeNedelecOrder1Coefficients(), mapping reference basis functions
- *                   to global Nédélec basis functions.
- * @param[out] Ni Output 2D array (NUM_DIMENSIONS x numDofInCell) storing the evaluated
- *                Nédélec basis functions at the point in physical coordinates.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success.
- *
- * @details
- * This function evaluates the curl-conforming Nédélec edge basis functions of first order
- * (H(curl) space) for a tetrahedral element at a given physical point. The procedure is as follows:
- *
- * 1. Compute the number of degrees of freedom per cell:
- *      numDofInCell = nord * (nord + 2) * (nord + 3) / 2
- *    For first-order elements, this corresponds to the six edges of the tetrahedron.
- *
- * 2. Map the physical point to the reference tetrahedron:
- *      - Convert Cartesian coordinates to volumetric (barycentric) coordinates L[4].
- *      - Compute the reference coordinates rref in the reference cell using the
- *        predefined REFERENCE_CELL vertices.
- *
- * 3. Evaluate the reference Nédélec basis functions Ni_Reference at rref:
- *      - The auxiliary arrays aux_x, aux_y, aux_z store the linear combinations of
- *        reference basis vectors along x, y, z.
- *      - Multiply these auxiliary arrays by the coefficient matrix `coeffs` to obtain
- *        Ni_Reference.
- *
- * 4. Transform Ni_Reference to physical space:
- *      - Build the Jacobian of the reference tetrahedron in column-major order.
- *      - Invert the reference Jacobian to map derivatives from the reference to the
- *        physical cell.
- *      - Compute Ni_ReferenceTmp = inv(J_ref) * Ni_Reference.
- *      - Apply the physical cell Jacobian to transform Ni_ReferenceTmp into the
- *        physical basis functions Ni using solve3x3MatrixSystem3x6RHS().
- *
- * 5. Free all temporary arrays used for reference computations.
- *
- */
-PetscErrorCode computeNedelecOrder1BasisFunctions(const PetscInt nord, const PetscReal point[NUM_DIMENSIONS],
-                                                  const PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscReal* const* coeffs,
-                                                  PetscReal** Ni) {
-  PetscFunctionBeginUser;
-
-  /* Variables declaration */
-  PetscInt numDofInCell;
-  PetscReal L[4];
-  PetscReal rref[NUM_DIMENSIONS];
-  PetscReal jacobianReferenceCell[NUM_DIMENSIONS * NUM_DIMENSIONS], invJacobianReferenceCell[NUM_DIMENSIONS * NUM_DIMENSIONS];
-  PetscReal **Ni_Reference, **Ni_ReferenceTmp;
-  PetscReal dotResult;
-
-  /* Compute number of dofs per cell */
-  numDofInCell = nord * (nord + 2) * (nord + 3) / 2;
-
-  /* Variables that depends on nord */
-  PetscReal aux_x[numDofInCell], aux_y[numDofInCell], aux_z[numDofInCell];
-
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Ni_Reference));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Ni_ReferenceTmp));
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    PetscCall(PetscCalloc1(numDofInCell, &Ni_Reference[i]));
-    PetscCall(PetscCalloc1(numDofInCell, &Ni_ReferenceTmp[i]));
-  }
-
-  /* Compute r in reference cell */
-  PetscCall(cartesianToVolumetricCoordinates(point, L));
-
-  /* Perform dot product */
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    dotResult = 0.0;
-    for (PetscInt j = 0; j < 4; j++) {
-      dotResult += L[j] * REFERENCE_CELL[i][j];
-    }
-    rref[i] = dotResult;
-  }
-
-  /* Evaluation of NiRef(rref) */
-  aux_x[0] = 1.0;
-  aux_x[1] = 0.0;
-  aux_x[2] = 0.0;
-  aux_x[3] = rref[1];
-  aux_x[4] = rref[2];
-  aux_x[5] = 0.0;
-
-  aux_y[0] = 0.0;
-  aux_y[1] = 1.0;
-  aux_y[2] = 0.0;
-  aux_y[3] = -rref[0];
-  aux_y[4] = 0.0;
-  aux_y[5] = rref[2];
-
-  aux_z[0] = 0.0;
-  aux_z[1] = 0.0;
-  aux_z[2] = 1.0;
-  aux_z[3] = 0.0;
-  aux_z[4] = -rref[0];
-  aux_z[5] = -rref[1];
-
-  /* Row vector * matrix multiplication */
-  for (PetscInt i = 0; i < numDofInCell; i++) {
-    Ni_Reference[0][i] = 0.0;
-    Ni_Reference[1][i] = 0.0;
-    Ni_Reference[2][i] = 0.0;
-
-    for (PetscInt j = 0; j < numDofInCell; j++) {
-      Ni_Reference[0][i] += aux_x[j] * coeffs[j][i];
-      Ni_Reference[1][i] += aux_y[j] * coeffs[j][i];
-      Ni_Reference[2][i] += aux_z[j] * coeffs[j][i];
-    }
-  }
-
-  /* Build Jacobian in column-major order */
-  jacobianReferenceCell[0 + 0 * NUM_DIMENSIONS] = REFERENCE_CELL[0][1] - REFERENCE_CELL[0][0];
-  jacobianReferenceCell[1 + 0 * NUM_DIMENSIONS] = REFERENCE_CELL[1][1] - REFERENCE_CELL[1][0];
-  jacobianReferenceCell[2 + 0 * NUM_DIMENSIONS] = REFERENCE_CELL[2][1] - REFERENCE_CELL[2][0];
-
-  jacobianReferenceCell[0 + 1 * NUM_DIMENSIONS] = REFERENCE_CELL[0][2] - REFERENCE_CELL[0][0];
-  jacobianReferenceCell[1 + 1 * NUM_DIMENSIONS] = REFERENCE_CELL[1][2] - REFERENCE_CELL[1][0];
-  jacobianReferenceCell[2 + 1 * NUM_DIMENSIONS] = REFERENCE_CELL[2][2] - REFERENCE_CELL[2][0];
-
-  jacobianReferenceCell[0 + 2 * NUM_DIMENSIONS] = REFERENCE_CELL[0][3] - REFERENCE_CELL[0][0];
-  jacobianReferenceCell[1 + 2 * NUM_DIMENSIONS] = REFERENCE_CELL[1][3] - REFERENCE_CELL[1][0];
-  jacobianReferenceCell[2 + 2 * NUM_DIMENSIONS] = REFERENCE_CELL[2][3] - REFERENCE_CELL[2][0];
-
-  /* Invert Jacobian */
-  PetscCall(invertMatrix(NUM_DIMENSIONS, jacobianReferenceCell, invJacobianReferenceCell));
-
-  /* Transform Ni_Reference -> Ni */
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    for (PetscInt j = 0; j < numDofInCell; j++) {
-      Ni_ReferenceTmp[i][j] = 0.0;
-      for (PetscInt k = 0; k < NUM_DIMENSIONS; k++) {
-        Ni_ReferenceTmp[i][j] += invJacobianReferenceCell[i * NUM_DIMENSIONS + k] * Ni_Reference[k][j];
-      }
-    }
-  }
-
-  /* Transform basis from reference cell to real cell */
-  PetscCall(solve3x3MatrixSystem3x6RHS(jacobian, Ni_ReferenceTmp, Ni));
-
-  /* Free memory */
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    PetscCall(PetscFree(Ni_Reference[i]));
-    PetscCall(PetscFree(Ni_ReferenceTmp[i]));
-  }
-  PetscCall(PetscFree(Ni_Reference));
-  PetscCall(PetscFree(Ni_ReferenceTmp));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Computes the curls of first-order Nédélec edge basis functions in a physical tetrahedral cell.
- *
- * @param[in] nord Polynomial order of the basis functions (currently only first-order, nord = 1).
- * @param[in] Dx_Ni 2D array (NUM_DIMENSIONS x numDofInCell) of derivatives of the Nédélec basis
- *                   functions with respect to x in the reference cell.
- * @param[in] Dy_Ni 2D array (NUM_DIMENSIONS x numDofInCell) of derivatives with respect to y.
- * @param[in] Dz_Ni 2D array (NUM_DIMENSIONS x numDofInCell) of derivatives with respect to z.
- * @param[in] jacobian 3x3 Jacobian matrix of the affine mapping from the reference tetrahedron
- *                     to the physical tetrahedron.
- * @param[in] detJacobian Determinant of the Jacobian matrix.
- * @param[out] NiCurl 2D array (NUM_DIMENSIONS x numDofInCell) to store the curl of each
- *                    Nédélec basis function in physical coordinates.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success.
- *
- * @details
- * This function evaluates the curl of first-order Nédélec edge basis functions
- * (H(curl) conforming) at all edges of a tetrahedral element. The procedure is:
- *
- * 1. Compute the number of degrees of freedom per cell:
- *      numDofInCell = nord * (nord + 2) * (nord + 3) / 2
- *    For first-order Nédélec elements, this corresponds to six edges.
- *
- * 2. Compute the curl in the reference tetrahedron:
- *      - Predefined matrices A, B, C encode the symbolic curl relationships for
- *        the first-order Nédélec edge functions.
- *      - Each component of the curl (x, y, z) is computed for all basis functions
- *        using the derivatives Dx_Ni, Dy_Ni, Dz_Ni and these symbolic matrices.
- *
- * 3. Transform the curl from the reference tetrahedron to the physical tetrahedron:
- *      - Apply the physical Jacobian transformation: curl_real = (J * curl_ref) / det(J)
- *      - This ensures the curl is correctly represented in the physical coordinates
- *        and preserves H(curl) conformity.
- *
- * 4. The resulting NiCurl array contains the x, y, z components of the curl for each
- *    Nédélec basis function in the physical cell.
- *
- * @note Currently, this function supports only first-order Nédélec edge basis functions.
- *       For higher-order extensions, the symbolic matrices and derivative handling
- *       would need to be generalized.
- */
-PetscErrorCode computeNedelecOrder1BasisFunctionCurls(const PetscInt nord, const PetscReal* const* Dx_Ni, const PetscReal* const* Dy_Ni,
-                                                      const PetscReal* const* Dz_Ni,
-                                                      const PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscReal detJacobian,
-                                                      PetscReal** NiCurl) {
-  PetscFunctionBeginUser;
-
-  /* Variables declaration */
-  PetscInt numDofInCell;
-  PetscReal A[NUM_DIMENSIONS][NUM_DIMENSIONS] = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, {0.0, -1.0, 0.0}};
-
-  PetscReal B[NUM_DIMENSIONS][NUM_DIMENSIONS] = {{0.0, 0.0, -1.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
-
-  PetscReal C[NUM_DIMENSIONS][NUM_DIMENSIONS] = {{0.0, 1.0, 0.0}, {-1.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
-
-  /* Compute number of dofs per cell */
-  numDofInCell = nord * (nord + 2) * (nord + 3) / 2;
-
-  /* Variables that depends on nord */
-  PetscReal curlReferenceCell[NUM_DIMENSIONS][numDofInCell];
-
-  /* Initialize array */
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    for (PetscInt j = 0; j < numDofInCell; j++) {
-      curlReferenceCell[i][j] = 0.0;
-    }
-  }
-
-  /* Compute curl in reference cell */
-  for (PetscInt i = 0; i < numDofInCell; i++) {
-    curlReferenceCell[0][i] += A[0][1] * Dx_Ni[1][i] + A[0][2] * Dx_Ni[2][i] - A[0][1] * Dy_Ni[0][i] + A[1][2] * Dy_Ni[2][i] -
-                               A[0][2] * Dz_Ni[0][i] - A[1][2] * Dz_Ni[1][i];
-    curlReferenceCell[1][i] += B[0][1] * Dx_Ni[1][i] + B[0][2] * Dx_Ni[2][i] - B[0][1] * Dy_Ni[0][i] + B[1][2] * Dy_Ni[2][i] -
-                               B[0][2] * Dz_Ni[0][i] - B[1][2] * Dz_Ni[1][i];
-    curlReferenceCell[2][i] += C[0][1] * Dx_Ni[1][i] + C[0][2] * Dx_Ni[2][i] - C[0][1] * Dy_Ni[0][i] + C[1][2] * Dy_Ni[2][i] -
-                               C[0][2] * Dz_Ni[0][i] - C[1][2] * Dz_Ni[1][i];
-  }
-
-  /* Transform to real cell directly */
-  for (PetscInt j = 0; j < NUM_DIMENSIONS; j++) {
-    for (PetscInt i = 0; i < numDofInCell; i++) {
-      NiCurl[j][i] = 0.0;
-      for (PetscInt k = 0; k < NUM_DIMENSIONS; k++) {
-        NiCurl[j][i] += jacobian[k][j] * curlReferenceCell[k][i];
-      }
-      NiCurl[j][i] /= detJacobian;
-    }
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
  * @brief Computes the elemental mass and stiffness matrices for a tetrahedral cell
  *        using first-order Nédélec edge basis functions (H(curl)-conforming).
  *
@@ -2819,7 +2542,7 @@ PetscErrorCode computeNedelecOrder1BasisFunctionCurls(const PetscInt nord, const
  * @param[in] cell Pointer to the Cell structure containing:
  *                 - Jacobian matrix and determinant
  *                 - Orientation of edges
- *                 - Resistivity tensor for material properties
+ *                 - Conductivity tensor for material properties
  * @param[in] quadrature Pointer to the Quadrature3D structure containing:
  *                       - Gauss points
  *                       - Weights for tetrahedral integration
@@ -2835,7 +2558,7 @@ PetscErrorCode computeNedelecOrder1BasisFunctionCurls(const PetscInt nord, const
  * elemental matrices for a tetrahedral element in 3D:
  *
  * 1. **Tensor Setup**
- *    - Define the permittivity tensor `e_r` from the cell resistivity.
+ *    - Define the permittivity tensor `e_r` from the cell conductivity.
  *    - Define the magnetic permeability tensor `mu_r` (currently identity).
  *
  * 2. **Memory Allocation**
@@ -2870,22 +2593,23 @@ PetscErrorCode computeNedelecOrder1BasisFunctionCurls(const PetscInt nord, const
  * - The stiffness matrix assumes isotropic magnetic permeability (μ_r = 1.0).
  */
 
-PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numDofInCell, const Cell* cell, const Quadrature3D* quadrature,
+PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, const Quadrature3D* quadrature,
                                         PetscReal** Me, PetscReal** Ke) {
   PetscFunctionBeginUser;
 
-  /* Variable declarations */
+  const PetscInt numDofInCell = fem->numDofInCell;
+  const NedelecOps *ops       = fem->ops;
+
+  /* Constitutive tensors */
   PetscReal e_r[NUM_DIMENSIONS][NUM_DIMENSIONS] = {{0.0}};
   PetscReal mu_r[NUM_DIMENSIONS][NUM_DIMENSIONS] = {{0.0}};
   PetscReal iPoint[NUM_DIMENSIONS] = {0.0};
   PetscReal **Ni, **NiCurl, **coeffs, **Dx_Ni, **Dy_Ni, **Dz_Ni;
 
-  /* Tensor for integration (Vertical transverse electric permitivity) */
-  e_r[0][0] = cell->resistivity[0];
-  e_r[1][1] = cell->resistivity[1];
-  e_r[2][2] = cell->resistivity[2];
+  e_r[0][0] = cell->conductivity[0];
+  e_r[1][1] = cell->conductivity[1];
+  e_r[2][2] = cell->conductivity[2];
 
-  /* Tensor for integration (Constant magnetic permittivity) */
   mu_r[0][0] = 1.0;
   mu_r[1][1] = 1.0;
   mu_r[2][2] = 1.0;
@@ -2909,13 +2633,11 @@ PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numD
     PetscCall(PetscCalloc1(numDofInCell, &coeffs[i]));
   }
 
-  /* Create the const views for arrays */
   const PetscReal** coeffs_const = (const PetscReal**)coeffs;
   const PetscReal** Dx_Ni_const = (const PetscReal**)Dx_Ni;
   const PetscReal** Dy_Ni_const = (const PetscReal**)Dy_Ni;
   const PetscReal** Dz_Ni_const = (const PetscReal**)Dz_Ni;
 
-  /* Reset elemental matrices */
   for (PetscInt i = 0; i < numDofInCell; ++i) {
     for (PetscInt j = 0; j < numDofInCell; ++j) {
       Me[i][j] = 0.0;
@@ -2923,27 +2645,19 @@ PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numD
     }
   }
 
-  /* Compute elemental matrices (mass and stifness matrix) */
-  switch (nord) {
-  case 1: {
-    /* Local variables */
-    PetscInt signs[NUM_EDGES_PER_CELL];
+  if (ops) {
+    PetscInt signs[numDofInCell];
     PetscReal Ni_i[NUM_DIMENSIONS], Ni_j[NUM_DIMENSIONS], tmp[NUM_DIMENSIONS], value;
 
-    /* Extract edges signs from cellOrientation */
-    for (PetscInt i = 4; i < NUM_EDGES_PER_CELL + 4; i++) {
-      signs[i - 4] = cell->orientation[i];
-    }
+    PetscCall(buildDofSigns(cell, fem, signs));
 
-    /* Compute nedelec coefficients and its derivatives */
-    PetscCall(computeNedelecOrder1Coefficients(nord, coeffs, Dx_Ni, Dy_Ni, Dz_Ni));
+    /* Cell-local coefficients (and nord=1 monomial derivatives). */
+    PetscCall(ops->computeCoefficients(cell, coeffs, Dx_Ni, Dy_Ni, Dz_Ni));
 
-    /* Compute basis functions for all gauss points */
-    for (PetscInt i = 0; i < quadrature->numPoints; ++i) {
-      /* Get gauss for i point */
-      iPoint[0] = quadrature->points[i][0];
-      iPoint[1] = quadrature->points[i][1];
-      iPoint[2] = quadrature->points[i][2];
+    for (PetscInt q = 0; q < quadrature->numPoints; ++q) {
+      iPoint[0] = quadrature->points[q][0];
+      iPoint[1] = quadrature->points[q][1];
+      iPoint[2] = quadrature->points[q][2];
 
       for (PetscInt j = 0; j < NUM_DIMENSIONS; j++) {
         for (PetscInt k = 0; k < numDofInCell; k++) {
@@ -2952,65 +2666,45 @@ PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numD
         }
       }
 
-      /* Compute basis functions for point i (this function
-       * returns the basis function in the real cell) */
-      PetscCall(computeNedelecOrder1BasisFunctions(nord, iPoint, cell->jacobian, coeffs_const, Ni));
+      PetscCall(ops->computeBasis(cell, iPoint, coeffs_const, Ni));
 
-      /* Perform mass matrix integral */
+      /* Mass matrix: Me_jk += w_q * (N_j · e_r · N_k) * sign_j * sign_k * detJ */
       for (PetscInt j = 0; j < numDofInCell; j++) {
         for (PetscInt k = 0; k < numDofInCell; k++) {
-
-          /* Extract column j and k from Ni */
           for (PetscInt l = 0; l < NUM_DIMENSIONS; l++) {
             Ni_i[l] = Ni[l][j];
             Ni_j[l] = Ni[l][k];
           }
-
-          /* Compute tmp = e_r * Ni_j   (3x3 * 3x1) */
           for (PetscInt l = 0; l < NUM_DIMENSIONS; l++) {
             tmp[l] = 0.0;
             for (PetscInt m = 0; m < NUM_DIMENSIONS; m++) {
               tmp[l] += e_r[l][m] * Ni_j[m];
             }
           }
-
-          /* Compute scalar product Ni_i' * tmp */
           value = 0.0;
           for (PetscInt l = 0; l < NUM_DIMENSIONS; l++) {
             value += Ni_i[l] * tmp[l];
           }
-
-          /* Apply the remaining scalar multipliers */
-          Me[j][k] += (quadrature->weights[i] * value * signs[j] * signs[k] * cell->detJacobian);
+          Me[j][k] += (quadrature->weights[q] * value * signs[j] * signs[k] * cell->detJacobian);
         }
       }
 
-      /* Compute curl basis functions */
-      PetscCall(
-          computeNedelecOrder1BasisFunctionCurls(nord, Dx_Ni_const, Dy_Ni_const, Dz_Ni_const, cell->jacobian, cell->detJacobian, NiCurl));
+      PetscCall(ops->computeCurls(cell, iPoint, coeffs_const,
+                                  Dx_Ni_const, Dy_Ni_const, Dz_Ni_const, NiCurl));
 
-      /* Perform stiffness matrix integral */
+      /* Stiffness matrix: Ke_jk += w_q * (curl N_j · mu_r · curl N_k) * sign_j * sign_k * detJ */
       for (PetscInt j = 0; j < numDofInCell; j++) {
         for (PetscInt k = 0; k < numDofInCell; k++) {
           value = mu_r[0][0] * NiCurl[0][j] * NiCurl[0][k] + mu_r[0][1] * (NiCurl[0][j] * NiCurl[1][k] + NiCurl[1][j] * NiCurl[0][k]) +
                   mu_r[1][1] * NiCurl[1][j] * NiCurl[1][k] + mu_r[0][2] * (NiCurl[0][j] * NiCurl[2][k] + NiCurl[2][j] * NiCurl[0][k]) +
                   mu_r[1][2] * (NiCurl[1][j] * NiCurl[2][k] + NiCurl[2][j] * NiCurl[1][k]) + mu_r[2][2] * NiCurl[2][j] * NiCurl[2][k];
 
-          Ke[j][k] += (quadrature->weights[i] * value * signs[j] * signs[k] * cell->detJacobian);
+          Ke[j][k] += (quadrature->weights[q] * value * signs[j] * signs[k] * cell->detJacobian);
         }
       }
     }
-    break;
-  }
-  case 2: {
-    break;
-  }
-  default: {
-    break;
-  }
   }
 
-  /* Free memory */
   for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
     PetscCall(PetscFree(Ni[i]));
     PetscCall(PetscFree(NiCurl[i]));
@@ -3031,6 +2725,16 @@ PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numD
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+PetscReal vectorNorm(const PetscReal v[NUM_DIMENSIONS]) {
+  return PetscSqrtReal(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+
+
+
+
+/* Nédélec nord=2 static data (EDGE_ROWS, FACE_NORMALS_REF, FACE*_AUX_*,
+ * FACE_AUX_X/Y/Z) lives in constants.c and is declared in constants.h. */
 
 /**
  * @brief Computes the elemental gradient matrix mapping H1 scalar basis functions
@@ -3087,359 +2791,94 @@ PetscErrorCode computeElementalMatrices(const PetscInt nord, const PetscInt numD
  *   edge functions, used in mixed FEM formulations (e.g., for curl-conforming discretizations).
  * - Orientation signs from `cell->orientation` are applied to ensure global assembly consistency.
  */
-PetscErrorCode computeElementalGradientMatrix(const PetscInt nord, const PetscInt numDofInCell, const PetscInt numH1DofInCell,
-                                              const Cell* cell, const Quadrature1D* quadrature, PetscReal** gradientMatrix) {
+PetscErrorCode computeElementalGradientMatrix(const FEMSpace* fem, const Cell* cell, const Quadrature1D* quadrature1d,
+                                              PetscReal** gradientMatrix) {
   PetscFunctionBeginUser;
 
-  /* Variables declaration */
-  PetscInt edgeVerticesLocal[NUM_VERTICES_PER_EDGE];
-  PetscReal edgeJacobian[NUM_DIMENSIONS], edgeJacobianUnitVector[NUM_DIMENSIONS], originCoordinates[NUM_DIMENSIONS];
-  PetscReal point3D[NUM_DIMENSIONS];
-  PetscReal normJacobian, tmp, tmp_v1[NUM_DIMENSIONS];
-  PetscInt MAXtetraH;
-  PetscReal *ShapH, **GradH;
-  PetscReal qEvaluated;
-  PetscInt m;
+  const PetscInt numDofInCell    = fem->numDofInCell;
+  const PetscInt numH1DofInCell  = fem->numH1DofInCell;
 
-  /* Allocate matrices for shape functions */
-  MAXtetraH = ((nord + 3) * (nord + 2) * (nord + 1)) / 6;
-
-  PetscCall(PetscCalloc1(MAXtetraH, &ShapH));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &GradH));
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    PetscCall(PetscCalloc1(MAXtetraH, &GradH[i]));
-  }
-
-  /* Reset gradient matrix */
   for (PetscInt i = 0; i < numDofInCell; ++i) {
     for (PetscInt j = 0; j < numH1DofInCell; ++j) {
       gradientMatrix[i][j] = 0.;
     }
   }
 
-  /* Loop over H1 dofs */
-  for (PetscInt i = 0; i < numH1DofInCell; i++) {
-
-    m = 0;
-
-    /* Loop over edges */
-    for (PetscInt j = 0; j < NUM_EDGES_PER_CELL; j++) {
-
-      /* Setup node indexes for edge j */
-      for (PetscInt k = 0; k < NUM_VERTICES_PER_EDGE; k++) {
-        edgeVerticesLocal[k] = EDGE_VERTICES[j][k];
-      }
-
-      /* Compute edge jacobian */
-      for (PetscInt k = 0; k < NUM_DIMENSIONS; k++) {
-        edgeJacobian[k] = REFERENCE_CELL[k][edgeVerticesLocal[1]] - REFERENCE_CELL[k][edgeVerticesLocal[0]];
-      }
-
-      /* Compute edge jacobian unit vector */
-      tmp = 0.0;
-      for (PetscInt k = 0; k < NUM_DIMENSIONS; k++) {
-        tmp += edgeJacobian[k] * edgeJacobian[k];
-      }
-
-      normJacobian = PetscSqrtReal(tmp);
-
-      for (PetscInt k = 0; k < NUM_DIMENSIONS; k++) {
-        edgeJacobianUnitVector[k] = edgeJacobian[k] / normJacobian;
-      }
-
-      /* Setup origin coordinates (first edge vertice) */
-      for (PetscInt k = 0; k < NUM_DIMENSIONS; k++) {
-        originCoordinates[k] = REFERENCE_CELL[k][edgeVerticesLocal[0]];
-      }
-
-      /* Compute gradient matrix (loop over quadrature points) */
-      for (PetscInt k = 0; k < quadrature->numPoints; k++) {
-
-        /* Translate 1d quadrature point to 3d space */
-        for (PetscInt l = 0; l < NUM_DIMENSIONS; l++) {
-          point3D[l] = edgeJacobian[l] * quadrature->points[l] + originCoordinates[l];
-        }
-
-        /* Compute H1 gradient */
-        PetscCall(shape3DHTet(point3D, nord, cell->orientation, ShapH, GradH));
-
-        switch (nord) {
-        case 1: {
-          qEvaluated = 1.0;
-
-          /* Init array and compute dot product */
-          for (PetscInt l = 0; l < NUM_DIMENSIONS; l++) {
-            tmp_v1[l] = GradH[l][i];
-          }
-          PetscCall(dotProduct(tmp_v1, edgeJacobianUnitVector, &tmp));
-
-          /* Perform integral */
-          gradientMatrix[m][i] += quadrature->weights[k] * tmp * cell->orientation[4 + j] * qEvaluated * normJacobian;
-          break;
-        }
-        default: {
-          break;
-        }
-        }
-      }
-
-      switch (nord) {
-      case 1: {
-        m += 1;
-      }
-      }
-    }
+  if (fem->ops && fem->ops->buildGradientMatrix) {
+    PetscCall(fem->ops->buildGradientMatrix(fem, cell, quadrature1d, gradientMatrix));
   }
-
-  /* Free memory */
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    PetscCall(PetscFree(GradH[i]));
-  }
-  PetscCall(PetscFree(GradH));
-  PetscCall(PetscFree(ShapH));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/**
- * @brief Prints detailed connectivity and geometric information of a given tetrahedral cell
- *        in a DMPlex mesh.
- *
- * @param[in] dm The DMPlex object representing the unstructured mesh.
- * @param[in] cell The index of the cell whose entities are to be printed.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success.
- *
- * @details
- * This function retrieves and prints the following information for a given cell:
- *
- * 1. **Transitive closure of the cell**:
- *    - Includes all points (vertices, edges, faces) connected to the cell.
- *    - Prints the point index and its orientation.
- *
- * 2. **Face connectivity**:
- *    - Indices of faces associated with the cell.
- *    - For each face:
- *      - Indices of edges forming the face.
- *      - Indices of vertices forming the face.
- *
- * 3. **Edge connectivity**:
- *    - Indices of edges associated with the cell.
- *    - For each edge:
- *      - Indices of the two vertices defining the edge.
- *
- * 4. **Vertex coordinates**:
- *    - Coordinates of each vertex in the cell in 3D space.
- *
- * 5. **Edge midpoints**:
- *    - Computed as the average of the coordinates of the two vertices of the edge.
- *
- * @note
- * - Assumes tetrahedral cells with:
- *     - `NUM_FACES_PER_CELL` = 4
- *     - `NUM_EDGES_PER_CELL` = 6
- *     - `NUM_VERTICES_PER_CELL` = 4
- *     - `NUM_VERTICES_PER_EDGE` = 2
- *     - `NUM_EDGES_PER_FACE` = 3
- *     - `NUM_VERTICES_PER_FACE` = 3
- * - Relies on DMPlex functions:
- *     - `DMPlexGetTransitiveClosure` for retrieving connected points
- *     - `DMPlexGetCone` for face-to-edge and edge-to-vertex connectivity
- *     - `DMPlexGetCellCoordinates` for vertex coordinates
- */
-PetscErrorCode printCellEntities(const DM dm, const PetscInt cell) {
+
+
+
+
+PetscErrorCode buildDofSigns(const Cell* cell, const FEMSpace* fem, PetscInt signs[]) {
   PetscFunctionBeginUser;
+  (void)cell;
 
-  /* Variable declarations */
-  PetscInt cellFaces[NUM_FACES_PER_CELL];
-  PetscInt cellEdges[NUM_EDGES_PER_CELL];
-  PetscInt faceEdges[NUM_FACES_PER_CELL][NUM_EDGES_PER_FACE];
-  PetscInt faceVertices[NUM_FACES_PER_CELL][NUM_VERTICES_PER_FACE];
-  PetscInt edgeVertices[NUM_EDGES_PER_CELL][NUM_VERTICES_PER_EDGE];
-
-  PetscInt transitiveClosureCellSize;
-  PetscInt* transitiveClosureCellPoints = NULL;
-  PetscInt transitiveClosureFaceSize;
-  PetscInt* transitiveClosureFacePoints = NULL;
-  const PetscInt* conePoints;
-  PetscInt currentPoint;
-  PetscInt currentFace;
-  PetscBool isDG;
-  PetscInt numCoords;
-  const PetscScalar* arrayCoords;
-  PetscScalar* cellCoords = NULL;
-
-  PetscCall(DMPlexGetTransitiveClosure(dm, cell, PETSC_TRUE, &transitiveClosureCellSize, &transitiveClosureCellPoints));
-
-  /* Get faces indices for cell, edges for each face, and vertices for each face */
-  currentPoint = 2;
-  for (PetscInt i = 0; i < NUM_FACES_PER_CELL; i++) {
-    /* Face indexes */
-    cellFaces[i] = transitiveClosureCellPoints[currentPoint + i * 2];
-    PetscCall(DMPlexGetCone(dm, cellFaces[i], &conePoints));
-
-    /* Edges for each face*/
-    for (PetscInt j = 0; j < NUM_EDGES_PER_FACE; j++) {
-      faceEdges[i][j] = conePoints[j];
-    }
-
-    /* Vertices for each face */
-    /* Orden convention:
-    - Edges indices start on position 2
-    - Vertices indices start on position 2 + NUM_EDGES_PER_FACE * 2
-    */
-    PetscCall(DMPlexGetTransitiveClosure(dm, cellFaces[i], PETSC_TRUE, &transitiveClosureFaceSize, &transitiveClosureFacePoints));
-    currentFace = 8;
-    for (PetscInt k = 0; k < NUM_VERTICES_PER_FACE; k++) {
-      faceVertices[i][k] = transitiveClosureFacePoints[currentFace + k * 2];
-    }
-    PetscCall(DMPlexRestoreTransitiveClosure(dm, cellFaces[i], PETSC_TRUE, &transitiveClosureFaceSize, &transitiveClosureFacePoints));
-  }
-
-  /* Get edges indices for cell */
-  currentPoint = 2 + NUM_FACES_PER_CELL * 2;
-  for (PetscInt i = 0; i < NUM_EDGES_PER_CELL; i++) {
-    cellEdges[i] = transitiveClosureCellPoints[currentPoint + i * 2];
-    PetscCall(DMPlexGetCone(dm, cellEdges[i], &conePoints));
-    for (PetscInt j = 0; j < NUM_VERTICES_PER_EDGE; j++) {
-      edgeVertices[i][j] = conePoints[j];
-    }
-  }
-
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\nData for cell %d:\n", cell));
-
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "[Cell % d] transitive closure size = % d\n ", cell, transitiveClosureCellSize));
-
-  for (PetscInt i = 0; i < transitiveClosureCellSize; i++) {
-    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, " [Cell % d] closure entry %d = point % d(orientation % d)\n ", cell, i,
-                                      transitiveClosureCellPoints[2 * i], transitiveClosureCellPoints[2 * i + 1]));
-  }
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
-
-  /* Face --> vertices connectivity */
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Face vertices:\n"));
-  for (PetscInt i = 0; i < NUM_FACES_PER_CELL; i++) {
-    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "  [Face %d] vertices = (%d, %d, %d)\n", cellFaces[i], faceVertices[i][0],
-                                      faceVertices[i][1], faceVertices[i][2]));
-  }
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
-
-  /* Edge --> vertices connectivity */
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Edge vertices:\n"));
-  for (PetscInt i = 0; i < NUM_EDGES_PER_CELL; i++) {
-    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "[Edge % d] vertices = (% d, % d)\n ", cellEdges[i], edgeVertices[i][0],
-                                      edgeVertices[i][1]));
-  }
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
-
-  /* Face --> edges connectivity */
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Face edges:\n"));
-  for (PetscInt i = 0; i < NUM_FACES_PER_CELL; i++) {
-    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "[Face % d] edges = (% d, % d, % d)\n ", cellFaces[i], faceEdges[i][0],
-                                      faceEdges[i][1], faceEdges[i][2]));
-  }
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
-
-  /* Get/print cell coordinates */
-  PetscCall(DMPlexGetCellCoordinates(dm, cell, &isDG, &numCoords, &arrayCoords, &cellCoords));
-
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Vertex coordinates:\n"));
-  currentPoint = 2 + NUM_FACES_PER_CELL * 2 + NUM_EDGES_PER_CELL * 2;
-  for (PetscInt i = 0; i < NUM_VERTICES_PER_CELL; i++) {
-    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "[Vertex %d] coordinates = (%g, %g, %g)\n",
-                                      transitiveClosureCellPoints[currentPoint], PetscRealPart(cellCoords[3 * i + 0]),
-                                      PetscRealPart(cellCoords[3 * i + 1]), PetscRealPart(cellCoords[3 * i + 2])));
-    currentPoint += 2;
-  }
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
-
-  /* Print edge midpoints */
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Edge midpoints:\n"));
-  currentPoint = 2 + NUM_FACES_PER_CELL * 2;
-  for (PetscInt i = 0; i < NUM_EDGES_PER_CELL; i++) {
-    PetscInt v0 = EDGE_VERTICES[i][0];
-    PetscInt v1 = EDGE_VERTICES[i][1];
-
-    PetscReal xm = 0.5 * (PetscRealPart(cellCoords[3 * v0 + 0]) + PetscRealPart(cellCoords[3 * v1 + 0]));
-    PetscReal ym = 0.5 * (PetscRealPart(cellCoords[3 * v0 + 1]) + PetscRealPart(cellCoords[3 * v1 + 1]));
-    PetscReal zm = 0.5 * (PetscRealPart(cellCoords[3 * v0 + 2]) + PetscRealPart(cellCoords[3 * v1 + 2]));
-
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "[Edge %d] midpoint coordinates = (%g, %g, %g)\n", transitiveClosureCellPoints[currentPoint],
-                          xm, ym, zm));
-    currentPoint += 2;
-  }
-  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
-
-  /* Restore transitive clousure and cell coordinates */
-  PetscCall(DMPlexRestoreTransitiveClosure(dm, cell, PETSC_TRUE, &transitiveClosureCellSize, &transitiveClosureCellPoints));
-  PetscCall(DMPlexRestoreCellCoordinates(dm, cell, &isDG, &numCoords, &arrayCoords, &cellCoords));
+  /* Unified hierarchical Nédélec basis: orientation is encoded inside the
+   * reference shape functions via OrientE / OrientTri inside shape3DETet,
+   * so per-DOF sign multipliers must be +1 at every order. Multiplying by
+   * cell->orientation.edgeSigns here would double-apply orientation and
+   * break tangential continuity across cell boundaries. */
+  const PetscInt numDofInCell = fem->numDofInCell;
+  for (PetscInt j = 0; j < numDofInCell; j++) signs[j] = 1;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/**
- * @brief Verifies if the discrete gradient lies in the kernel of the mass matrix.
+/* Evaluate Nédélec basis (and optionally curls) at a point inside `cell`.
+ * Dispatches on fem->nord to the order-specific coeff/basis/curl helpers.
+ * Pass NiCurl = NULL to skip curl evaluation (e.g. RHS source integrals).
  *
- * @param[in] M Pointer to the mass matrix data (stored in row-major order, size m x m).
- * @param[in] G Pointer to the discrete gradient matrix data (stored in row-major order, size m x n).
- * @param[in] m Number of rows in M and G (dimension of the Nédélec space).
- * @param[in] n Number of columns in G (dimension of the H1 space).
- * @param[in] cell Element/cell identifier, used for error reporting.
- *
- * @return PetscErrorCode PETSC_SUCCESS on successful execution.
- *
- * @details
- * This function checks the property:
- *
- *     M * G == 0
- *
- * where:
- *   - M is the element mass matrix for a cell,
- *   - G is the discrete gradient operator mapping H1 shape functions to Nédélec space.
- *
- * The check ensures that the discrete gradient of H1 shape functions lies in the nullspace
- * of the mass matrix (a fundamental property for mixed finite element formulations).
- *
- * If the computed product is not sufficiently close to zero (within PETSC_SMALL tolerance),
- * an error message is printed specifying the cell and matrix indices where the violation occurs.
- *
- * The optional debug printing of the discrete gradient matrix is currently disabled using the `#if 0` block.
- *
- * @note
- * - M is assumed to be square (m x m) and stored in **row-major** order.
- * - G is assumed to be stored in **row-major** order (m x n).
- * - The check is mainly intended for debugging or verification during development.
- */
-PetscErrorCode checkDiscreteGradientKernel(const PetscReal* M, const PetscReal* G, const PetscInt m, const PetscInt n,
-                                           const PetscInt cell) {
+ * The caller owns all buffers: coeffs[numDofInCell][numDofInCell], and for
+ * each of Ni, NiCurl, Dx_Ni, Dy_Ni, Dz_Ni a NUM_DIMENSIONS x numDofInCell
+ * row-of-pointers layout. Dx_Ni/Dy_Ni/Dz_Ni are used only for nord=1. */
+PetscErrorCode evaluateNedelecBasis(const FEMSpace* fem, const Cell* cell,
+                                    const PetscReal point[NUM_DIMENSIONS],
+                                    PetscReal** coeffs,
+                                    PetscReal** Dx_Ni, PetscReal** Dy_Ni, PetscReal** Dz_Ni,
+                                    PetscReal** Ni, PetscReal** NiCurl) {
   PetscFunctionBeginUser;
 
-  /* Activate/deactive printing */
-#if 0
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Discrete gradient for cell %d:\n", cell));
-  
-  for (PetscInt i = 0; i < m; i++) {
-    for (PetscInt j = 0; j < n; j++) {
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "%g:\n", G[i*n + j]));
-    }
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n"));
-  }
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n"));
-#endif
+  const NedelecOps *ops = fem->ops;
+  if (!ops) PetscFunctionReturn(PETSC_SUCCESS);
 
-  /* Compute discrete gradient */
-  for (PetscInt i = 0; i < m; i++) {
-    for (PetscInt j = 0; j < n; j++) {
-      PetscReal v = 0;
-      for (PetscInt k = 0; k < m; k++) {
-        /* M is m x m, G is m x n */
-        v += M[i * m + k] * G[k * n + j];
-      }
-      if (!PetscIsCloseAtTol(v, 0, 0, PETSC_SMALL)) {
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Error: discrete gradient is not in the kernel of the mass matrix for cell %d (%d, %d) \n",
-                              cell, i, j));
-      }
-    }
+  const PetscReal* const* coeffs_const = (const PetscReal* const*)coeffs;
+
+  PetscCall(ops->computeCoefficients(cell, coeffs, Dx_Ni, Dy_Ni, Dz_Ni));
+  PetscCall(ops->computeBasis(cell, point, coeffs_const, Ni));
+
+  if (NiCurl) {
+    const PetscReal* const* Dx_const = (const PetscReal* const*)Dx_Ni;
+    const PetscReal* const* Dy_const = (const PetscReal* const*)Dy_Ni;
+    const PetscReal* const* Dz_const = (const PetscReal* const*)Dz_Ni;
+    PetscCall(ops->computeCurls(cell, point, coeffs_const,
+                                Dx_const, Dy_const, Dz_const, NiCurl));
   }
+
   PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+
+/* ===========================================================================
+ * Per-order Nédélec dispatch selector. All nedelecOps_orderN tables are
+ * defined in src/hvfem_hierarchical.c (single hierarchical implementation
+ * covering nord = 1..6); their extern declarations live in
+ * hvfem_internal.h.
+ * =========================================================================== */
+const NedelecOps *nedelecOpsForOrder(PetscInt nord) {
+  switch (nord) {
+  case 1:  return &nedelecOps_order1;
+  case 2:  return &nedelecOps_order2;
+  case 3:  return &nedelecOps_order3;
+  case 4:  return &nedelecOps_order4;
+  case 5:  return &nedelecOps_order5;
+  case 6:  return &nedelecOps_order6;
+  default: return NULL;
+  }
 }

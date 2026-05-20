@@ -1,17 +1,11 @@
 /*
  * Filename: grid.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
- * Date: 2025-06-04
+ * Date: 2026-02-03
  *
  * Description:
- * This file contains a collection of functions for grid
- * functions that are used throughout the PETGEM. These
- * functions are based on DMPlex provided by PETSc.
- *
- * Usage:
- * Include this file in your source code to utilize the grid
- * functions. For example: #include "grid.h"
- *
+ * Grid-handling functions used throughout PETGEM, built on
+ * PETSc's DMPlex.
  */
 
 /* C libraries */
@@ -23,123 +17,8 @@
 /* PETGEM funcions*/
 #include "constants.h"
 #include "grid.h"
+#include "hvfem.h"
 #include "inputs.h"
-
-/**
- * @brief Imports a DMPlex mesh and associated resistivity field from an HDF5 file.
- *
- * This function reads a PETSc-formatted HDF5 file containing a DMPlex mesh
- * (named "petgem_mesh") and a resistivity vector (named "resistivity"). It
- * supports distributed meshes for parallel runs and handles DM cloning
- * so that the output DM can be used independently from the internal
- * load DM.
- *
- * The function performs the following steps:
- *   - Creates and initializes a DMPlex object.
- *   - Loads topology, labels, and coordinates from the HDF5 file.
- *   - Distributes the mesh across MPI ranks if necessary.
- *   - Loads the global resistivity vector and scatters it to a local vector.
- *   - Clones the loaded DM for main computations (`odm`) while maintaining
- *     shared topology and coordinates.
- *   - Processes DM options from the command line (`-dm_vec_type` and `-dm_mat_type`).
- *
- * @param[in]  params                Struct containing simulation parameters,
- *                                   including the HDF5 mesh filename.
- * @param[out] odm                   Pointer to the cloned DMPlex object
- *                                   that will be used in computations.
- * @param[out] resistivity_output    Pointer to a local Vec storing
- *                                   the resistivity values for the local portion
- *                                   of the mesh. The vector holds a unique
- *                                   reference and can be used independently
- *                                   of the DM used for loading.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code
- *         on failure.
- *
- * @note This function uses PETSc viewers, PetscSF objects, and DM distribution
- *       routines to handle parallel mesh loading. All output vectors and DMs
- *       are allocated and ready for use in PETSc parallel computations.
- */
-PetscErrorCode importGrid(const csemParams params, DM* odm, Vec* resistivity_output) {
-  PetscFunctionBegin;
-
-  /* Variables declaration */
-  PetscViewer viewer;
-  DM dm, dmDist;
-  PetscSF sfLoad, sfDist, sfG;
-  PetscSF sfXC = NULL;
-  Vec resistivity, globalResistivity;
-  char typeName[PETSC_MAX_PATH_LEN];
-  PetscBool flg;
-  size_t load;
-
-  /* Create and setup DM object */
-  PetscCall(DMCreate(PETSC_COMM_WORLD, &dm));
-  PetscCall(DMSetType(dm, DMPLEX));
-  PetscCall(PetscStrlen(params.meshFile, &load));
-  if (!load) {
-    PetscCall(DMSetFromOptions(dm));
-    *odm = dm;
-    *resistivity_output = NULL;
-    PetscFunctionReturn(PETSC_SUCCESS);
-  }
-  /* Must use the same name of mesh used to dump the HDF5
-   * file */
-  PetscCall(PetscObjectSetName((PetscObject)dm, "petgem_mesh"));
-  PetscCall(PetscViewerHDF5Open(PETSC_COMM_WORLD, params.meshFile, FILE_MODE_READ, &viewer));
-  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_PETSC));
-  PetscCall(DMPlexTopologyLoad(dm, viewer, &sfLoad));
-  PetscCall(DMPlexLabelsLoad(dm, viewer, sfLoad));
-  PetscCall(DMPlexCoordinatesLoad(dm, viewer, sfLoad));
-  PetscCall(DMPlexDistribute(dm, 0, &sfDist, &dmDist));
-  if (dmDist) {
-    PetscCall(PetscSFCompose(sfLoad, sfDist, &sfXC));
-    PetscCall(DMDestroy(&dm));
-    dm = dmDist;
-    PetscCall(PetscObjectSetName((PetscObject)dm, "petgem_mesh"));
-  } else {
-    PetscCall(PetscObjectReference((PetscObject)sfLoad));
-    sfXC = sfLoad;
-  }
-  PetscCall(DMViewFromOptions(dm, NULL, "-load_dm_view"));
-
-  PetscCall(DMPlexSectionLoad(dm, viewer, NULL, sfXC, &sfG, NULL));
-  PetscCall(DMCreateGlobalVector(dm, &globalResistivity));
-  PetscCall(PetscObjectSetName((PetscObject)globalResistivity, "resistivity"));
-  PetscCall(DMPlexGlobalVectorLoad(dm, viewer, NULL, sfG, globalResistivity));
-  PetscCall(VecViewFromOptions(globalResistivity, NULL, "-load_resistivity_view"));
-  PetscCall(DMCreateLocalVector(dm, &resistivity));
-  PetscCall(DMGlobalToLocal(dm, globalResistivity, INSERT_VALUES, resistivity));
-  PetscCall(VecDestroy(&globalResistivity));
-
-  PetscCall(PetscViewerDestroy(&viewer));
-  PetscCall(PetscSFDestroy(&sfLoad));
-  PetscCall(PetscSFDestroy(&sfDist));
-  PetscCall(PetscSFDestroy(&sfXC));
-  PetscCall(PetscSFDestroy(&sfG));
-
-  /* When cloning, you get a new DM that can have its own
-     section and labels The actual mesh (topology,
-     coordinates) is shared between the two DMs */
-  PetscCall(DMClone(dm, odm));
-
-  /* We can destroy here, because the resistivity vector
-   * will hold a unique reference to it */
-  PetscCall(DMDestroy(&dm));
-
-  /* Setup output vector */
-  *resistivity_output = resistivity;
-
-  /* Process some DM options */
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-dm_vec_type", typeName, 256, &flg));
-  if (flg)
-    PetscCall(DMSetVecType(*odm, typeName));
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-dm_mat_type", typeName, 256, &flg));
-  if (flg)
-    PetscCall(DMSetMatType(*odm, typeName));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 /**
  * @brief Configures a DMPlex object with H(curl) and H1 sections for CSEM simulations.
@@ -182,8 +61,18 @@ PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
   PetscInt numBC = 1;
   PetscInt bcField[1] = {0};
   PetscInt numDofInVertex, numDofInEdge, numDofInFace, numDofInVolume, numDofInCell;
-  PetscInt numH1DofInCell = 4;
-  PetscInt numH1Dof[4] = {1, 0, 0, 0};
+  /* Per-depth H1 DOF counts (vertex, edge, face, cell). The H1 space
+   * order tracks params.nord so the Nédélec discrete gradient
+   *     ∇(P_nord H1)  ⊂  Nédélec_nord
+   * is exactly representable, which is the property PCBDDCSetDiscreteGradient
+   * relies on at any order. P_nord nodal layout:
+   *     vertex:  1
+   *     edge  :  nord - 1
+   *     face  :  (nord-1)(nord-2)/2
+   *     cell  :  (nord-1)(nord-2)(nord-3)/6
+   * Total per cell = (nord+1)(nord+2)(nord+3)/6. For nord=1 this collapses
+   * to {1,0,0,0} (4 vertex DOFs), reproducing the previous P1 layout. */
+  PetscInt numH1Dof[NUM_H1_DOF_PER_CELL];
   PetscInt numCellsLocal = 0, numCellsGlobal = 0, numFacesLocal = 0, numFacesGlobal = 0;
   PetscInt numEdgesLocal = 0, numEdgesGlobal = 0, numVerticesLocal = 0, numVerticesGlobal = 0;
   PetscInt dim, pStart, cellStart, cellEnd, faceStart, faceEnd, edgeStart, edgeEnd, vertexStart, vertexEnd;
@@ -229,12 +118,43 @@ PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
   PetscCall(DMSetLocalSection(*dm, section));
   PetscCall(PetscSectionDestroy(&section));
 
-  /* DM for H1 conforming space TODO XXX make it depend on
-   * params.nord */
+  /* DM for the P1 H1 space used by the inverse kernel's discrete
+   * gradient (assembleCsemKandM). The forward kernel uses H1dm_Pnord
+   * (below) so PCBDDC receives the order-k discrete gradient with
+   * K·G = 0. */
+  numH1Dof[0] = 1;
+  numH1Dof[1] = 0;
+  numH1Dof[2] = 0;
+  numH1Dof[3] = 0;
+  const PetscInt numH1DofInCell = NUM_H1_DOF_PER_CELL;
+
   PetscCall(DMClone(*dm, &H1dm));
   PetscCall(DMSetNumFields(H1dm, 1));
-  PetscCall(DMPlexCreateSection(H1dm, NULL, numComp, numH1Dof, 0, NULL, NULL, NULL, NULL, &section));
+  PetscCall(DMPlexCreateSection(H1dm, NULL, numComp, numH1Dof, 0, NULL,
+                                NULL, NULL, NULL, &section));
   PetscCall(DMSetLocalSection(H1dm, section));
+  PetscCall(PetscSectionDestroy(&section));
+
+  /* DM for the order-k S_h^k space — P_nord nodal + edge/face/volume
+   * bubbles, sized so ∇P_nord = curl-kernel of Nédélec_nord (the De Rham
+   * complex). The forward-kernel discrete gradient G : S_h^k → V_h^k
+   * built against this basis satisfies K·G = 0 element-wise. For
+   * nord = 1 the counts collapse to {1,0,0,0} and this DM is
+   * structurally identical to H1dm; for nord >= 2 it adds bubble DOFs. */
+  PetscInt numH1Dof_Pnord[NUM_H1_DOF_PER_CELL];
+  numH1Dof_Pnord[0] = 1;
+  numH1Dof_Pnord[1] = params.nord - 1;
+  numH1Dof_Pnord[2] = (params.nord - 1) * (params.nord - 2) / 2;
+  numH1Dof_Pnord[3] = (params.nord - 1) * (params.nord - 2) * (params.nord - 3) / 6;
+  const PetscInt numH1DofInCell_Pnord =
+      (params.nord + 1) * (params.nord + 2) * (params.nord + 3) / 6;
+
+  DM H1dm_Pnord = NULL;
+  PetscCall(DMClone(*dm, &H1dm_Pnord));
+  PetscCall(DMSetNumFields(H1dm_Pnord, 1));
+  PetscCall(DMPlexCreateSection(H1dm_Pnord, NULL, numComp, numH1Dof_Pnord, 0, NULL,
+                                NULL, NULL, NULL, &section));
+  PetscCall(DMSetLocalSection(H1dm_Pnord, section));
   PetscCall(PetscSectionDestroy(&section));
 
   /* Create point numbering */
@@ -258,11 +178,11 @@ PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
   PetscCall(DMPlexGetDepthStratum(*dm, 2, &faceStart, &faceEnd));
 
   /* Compute local number of faces */
-  for (PetscInt f = faceStart; f < faceEnd; f++) {
-    /* This is the global index of face f, using the
+  for (PetscInt i = faceStart; i < faceEnd; i++) {
+    /* This is the global index of face i, using the
        convention that if it is negative it is not owned in
        parallel */
-    if (gidxs[f - pStart] >= 0) {
+    if (gidxs[i - pStart] >= 0) {
       numFacesLocal += 1;
     }
   }
@@ -274,11 +194,11 @@ PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
   PetscCall(DMPlexGetDepthStratum(*dm, 1, &edgeStart, &edgeEnd));
 
   /* Compute local number of edges */
-  for (PetscInt e = edgeStart; e < edgeEnd; e++) {
-    /* This is the global index of edge e, using the
+  for (PetscInt i = edgeStart; i < edgeEnd; i++) {
+    /* This is the global index of edge i, using the
        convention that if it is negative it is not owned in
        parallel */
-    if (gidxs[e - pStart] >= 0) {
+    if (gidxs[i - pStart] >= 0) {
       numEdgesLocal += 1;
     }
   }
@@ -290,11 +210,11 @@ PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
   PetscCall(DMPlexGetDepthStratum(*dm, 0, &vertexStart, &vertexEnd));
 
   /* Compute local number of vertices */
-  for (PetscInt v = vertexStart; v < vertexEnd; v++) {
-    /* This is the global index of vertex v, using the
+  for (PetscInt i = vertexStart; i < vertexEnd; i++) {
+    /* This is the global index of vertex i, using the
        convention that if it is negative it is not owned in
        parallel */
-    if (gidxs[v - pStart] >= 0) {
+    if (gidxs[i - pStart] >= 0) {
       numVerticesLocal += 1;
     }
   }
@@ -328,14 +248,74 @@ PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
   grid->vertexStart = vertexStart;
   grid->vertexEnd = vertexEnd;
   grid->dim = dim;
+  grid->numH1DofInCell       = numH1DofInCell;
+  grid->numH1DofInCell_Pnord = numH1DofInCell_Pnord;
+  grid->H1dm                 = H1dm;
+  grid->H1dm_Pnord           = H1dm_Pnord;
 
-  grid->numH1DofInCell = numH1DofInCell;
-  grid->H1dm = H1dm;
+  /* Mirror the FEM space descriptor used by hvfem/assembly/postprocessing.
+   *
+   * Layout in the per-cell H(curl) vector matches PETSc DMPlex's
+   * closure-traversal order (cell -> faces -> edges -> vertices) so that
+   * cell-local slot k aligns with dofIndices[k] from DMPlexGetClosureIndices.
+   * The per-order shape3DETet permutation table in src/hvfem_hierarchical.c
+   * is constructed against this same order.
+   *
+   *   nord=1: edges only            (edgeDofOffset = 0, rest empty).
+   *   nord=2: faces, then edges     (faces 0..7, edges 8..19).
+   *   nord>=3: volume, then faces, then edges (volume 0..nVol-1,
+   *           faces nVol..nVol+nFace-1, edges nVol+nFace..end).
+   *
+   * The offset for an empty class is set to numDofInCell so loops can
+   * iterate `[offset, offset+count)` and become no-ops when count=0,
+   * without needing a per-order switch in the consumer. */
+  {
+    const PetscInt nEdge = NUM_EDGES_PER_CELL * numDofInEdge;
+    const PetscInt nFace = NUM_FACES_PER_CELL * numDofInFace;
+    const PetscInt nVol  = numDofInVolume;
+
+    grid->fem.nord            = params.nord;
+    grid->fem.numDofInCell    = numDofInCell;
+    grid->fem.numH1DofInCell        = numH1DofInCell;
+    grid->fem.numH1DofInCell_Pnord  = numH1DofInCell_Pnord;
+
+    grid->fem.numDofPerEdge   = numDofInEdge;
+    grid->fem.numDofPerFace   = numDofInFace;
+    grid->fem.numDofPerVolume = numDofInVolume;
+
+    grid->fem.numEdgeDof      = nEdge;
+    grid->fem.numFaceDof      = nFace;
+    grid->fem.numVolumeDof    = nVol;
+
+    if (params.nord == 1) {
+      /* edges only */
+      grid->fem.edgeDofOffset   = 0;
+      grid->fem.faceDofOffset   = numDofInCell;
+      grid->fem.volumeDofOffset = numDofInCell;
+    } else if (nVol == 0) {
+      /* nord=2: faces, then edges (no volume DOFs) */
+      grid->fem.faceDofOffset   = 0;
+      grid->fem.edgeDofOffset   = nFace;
+      grid->fem.volumeDofOffset = numDofInCell;
+    } else {
+      /* nord >= 3: volume, then faces, then edges. Matches PETSc
+       * DMPlexGetClosureIndices order: cell-DOFs first, then face-DOFs,
+       * then edge-DOFs. */
+      grid->fem.volumeDofOffset = 0;
+      grid->fem.faceDofOffset   = nVol;
+      grid->fem.edgeDofOffset   = nVol + nFace;
+    }
+
+    /* Per-order Nédélec dispatch table. Hot paths (computeElementalMatrices,
+     * evaluateNedelecBasis, computeElementalGradientMatrix) call through this
+     * pointer instead of switching on nord. */
+    grid->fem.ops = nedelecOpsForOrder(params.nord);
+  }
 
   /* Print grid data */
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Mesh data:\n"));
 
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Filename         = %s\n", params.meshFile));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Input file       = %s\n", params.inputFile));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of vertices  = %" PetscInt_FMT "\n", grid->numVerticesGlobal));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of edges     = %" PetscInt_FMT "\n", grid->numEdgesGlobal));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Num of faces     = %" PetscInt_FMT "\n", grid->numFacesGlobal));
@@ -453,7 +433,7 @@ PetscErrorCode locatePoint(const DM dm, const PetscReal* position, PetscInt* poi
  * @note Temporary internal arrays returned by `DMPlexGetCellCoordinates` are restored
  *       before the function returns.
  */
-PetscErrorCode extractCellCoordinates(DM dm, PetscInt cellID, Cell* cell) {
+PetscErrorCode extractCellCoordinates(const DM dm, const  PetscInt cellID, Cell* cell) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
@@ -477,45 +457,94 @@ PetscErrorCode extractCellCoordinates(DM dm, PetscInt cellID, Cell* cell) {
 }
 
 /**
- * @brief Extracts the resistivity components of a given cell.
+ * @brief Extracts the conductivity components of a given cell.
  *
- * This function retrieves the resistivity values associated with a specific
+ * This function retrieves the conductivity values associated with a specific
  * cell from a PETSc Vec defined on a DMPlex object and stores them in a
  * user-provided `Cell` struct. It uses `DMPlexVecGetClosure` and
  * `DMPlexVecRestoreClosure` to access the local cell data safely.
  *
- * @param[in]  dmResistivity  DMPlex object representing the resistivity field layout.
- * @param[in]  resistivity    Vec containing the resistivity values defined on the mesh.
- * @param[in]  cellID         Index of the cell to extract resistivity from.
- * @param[out] cell           Pointer to a `Cell` struct where the resistivity
+ * @param[in]  dmConductivity DMPlex object representing the conductivity field layout.
+ * @param[in]  conductivity    Vec containing the conductivity values defined on the mesh.
+ * @param[in]  cellID         Index of the cell to extract conductivity from.
+ * @param[out] cell           Pointer to a `Cell` struct where the conductivity
  *                            components for the cell will be stored. Assumes
- *                            space for `NUM_RESISTIVITY_COMPONENTS` entries.
+ *                            space for `NUM_CONDUCTIVITY_COMPONENTS` entries.
  *
  * @return PetscErrorCode     PETSC_SUCCESS on success, or a PETSc error code otherwise.
  *
- * @note The function assumes each cell has exactly `NUM_RESISTIVITY_COMPONENTS` (3) resistivity values.
+ * @note The function assumes each cell has exactly `NUM_CONDUCTIVITY_COMPONENTS` (3) conductivity values.
  *       If this is not satisfied, a PETSc error is raised.
- * @note The resistivity values are copied as `PetscReal` into `cell->resistivity`.
+ * @note The conductivity values are copied as `PetscReal` into `cell->conductivity`.
  * @note Temporary internal arrays returned by `DMPlexVecGetClosure` are restored
  *       before the function returns.
  */
-PetscErrorCode extractCellResistivity(DM dmResistivity, Vec resistivity, PetscInt cellID, Cell* cell) {
+PetscErrorCode extractCellConductivity(DM dmConductivity, Vec conductivity, PetscInt cellID, Cell* cell) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
-  PetscInt numResistivityComponents;
-  PetscScalar* resistivityValues = NULL;
+  PetscInt numConductivityComponents;
+  PetscScalar* conductivityValues = NULL;
 
-  PetscCall(DMPlexVecGetClosure(dmResistivity, NULL, resistivity, cellID, &numResistivityComponents, &resistivityValues));
+  PetscCall(DMPlexVecGetClosure(dmConductivity, NULL, conductivity, cellID, &numConductivityComponents, &conductivityValues));
 
-  PetscCheck(numResistivityComponents == NUM_RESISTIVITY_COMPONENTS, PETSC_COMM_SELF, PETSC_ERR_SUP,
-             "Exiting: found resistivity components != 3.\n");
+  PetscCheck(numConductivityComponents == NUM_CONDUCTIVITY_COMPONENTS, PETSC_COMM_SELF, PETSC_ERR_SUP,
+             "Exiting: found conductivity components != 3.\n");
 
-  for (PetscInt i = 0; i < NUM_RESISTIVITY_COMPONENTS; i++) {
-    cell->resistivity[i] = PetscRealPart(resistivityValues[i]);
+  for (PetscInt i = 0; i < NUM_CONDUCTIVITY_COMPONENTS; i++) {
+    cell->conductivity[i] = PetscRealPart(conductivityValues[i]);
   }
 
-  PetscCall(DMPlexVecRestoreClosure(dmResistivity, NULL, resistivity, cellID, &numResistivityComponents, &resistivityValues));
+  PetscCall(DMPlexVecRestoreClosure(dmConductivity, NULL, conductivity, cellID, &numConductivityComponents, &conductivityValues));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Extracts the material ID of a given cell.
+ *
+ * This function retrieves the material identifier associated with a specific
+ * cell from a PETSc Vec defined on a DMPlex sub-DM (field 1 of the model
+ * section, 1 dof per cell) and stores it in a user-provided `Cell` struct.
+ * It uses `DMPlexVecGetClosure` and `DMPlexVecRestoreClosure` to access the
+ * local cell data safely.
+ *
+ * The function works in parallel: each MPI rank operates on its local portion
+ * of the distributed mesh, and the materials_id Vec is the local vector
+ * obtained from the global-to-local scatter performed in loadCsemInputs.
+ *
+ * @param[in]  dmMaterialsID  DMPlex sub-DM representing the materials_id
+ *                            field layout (1 dof per cell).
+ * @param[in]  materialsID    Local Vec containing the material IDs defined
+ *                            on the local mesh partition.
+ * @param[in]  cellID         Index of the cell to extract the material ID from.
+ * @param[out] cell           Pointer to a `Cell` struct where the material ID
+ *                            will be stored in `cell->material_id`.
+ *
+ * @return PetscErrorCode     PETSC_SUCCESS on success, or a PETSc error code
+ *         otherwise.
+ *
+ * @note The function assumes each cell has exactly NUM_MATERIALS_ID_COMPONENTS
+ *       (1) material ID value. A PETSc error is raised if this is not satisfied.
+ * @note The material ID is stored as a floating-point value in the PETSc Vec
+ *       (since PETSc scalars are complex); PetscRealPart is used to extract
+ *       the real part before casting to PetscInt.
+ */
+PetscErrorCode extractCellMaterialID(DM dmMaterialsID, Vec materialsID, PetscInt cellID, Cell* cell) {
+  PetscFunctionBeginUser;
+
+  /* Variables declaration */
+  PetscInt     numMaterialIDComponents;
+  PetscScalar* materialIDValues = NULL;
+
+  PetscCall(DMPlexVecGetClosure(dmMaterialsID, NULL, materialsID, cellID, &numMaterialIDComponents, &materialIDValues));
+
+  PetscCheck(numMaterialIDComponents == NUM_MATERIALS_ID_COMPONENTS, PETSC_COMM_SELF, PETSC_ERR_SUP,
+             "Exiting: found materials_id components != 1.\n");
+
+  cell->material_id = (PetscInt)PetscRealPart(materialIDValues[0]);
+
+  PetscCall(DMPlexVecRestoreClosure(dmMaterialsID, NULL, materialsID, cellID, &numMaterialIDComponents, &materialIDValues));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -542,7 +571,7 @@ PetscErrorCode extractCellResistivity(DM dmResistivity, Vec resistivity, PetscIn
  * @note Each entry in the closure array is a pair: `(point, orientation)`.
  * @note A PETSc error is raised if the closure size exceeds `MAX_TRANSITIVE_CLOSURE_SIZE`.
  */
-PetscErrorCode extractCellClousure(DM dm, PetscInt cellID, Cell* cell) {
+PetscErrorCode extractCellClousure(const DM dm, const PetscInt cellID, Cell* cell) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
@@ -566,3 +595,208 @@ PetscErrorCode extractCellClousure(DM dm, PetscInt cellID, Cell* cell) {
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/**
+ * @brief Prints detailed connectivity and geometric information of a given tetrahedral cell
+ *        in a DMPlex mesh.
+ *
+ * @param[in] dm The DMPlex object representing the unstructured mesh.
+ * @param[in] cell The index of the cell whose entities are to be printed.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success.
+ *
+ * @details
+ * This function retrieves and prints the following information for a given cell:
+ *
+ * 1. **Transitive closure of the cell**:
+ *    - Includes all points (vertices, edges, faces) connected to the cell.
+ *    - Prints the point index and its orientation.
+ *
+ * 2. **Face connectivity**:
+ *    - Indices of faces associated with the cell.
+ *    - For each face:
+ *      - Indices of edges forming the face.
+ *      - Indices of vertices forming the face.
+ *
+ * 3. **Edge connectivity**:
+ *    - Indices of edges associated with the cell.
+ *    - For each edge:
+ *      - Indices of the two vertices defining the edge.
+ *
+ * 4. **Vertex coordinates**:
+ *    - Coordinates of each vertex in the cell in 3D space.
+ *
+ * 5. **Edge midpoints**:
+ *    - Computed as the average of the coordinates of the two vertices of the edge.
+ *
+ * @note
+ * - Assumes tetrahedral cells with:
+ *     - `NUM_FACES_PER_CELL` = 4
+ *     - `NUM_EDGES_PER_CELL` = 6
+ *     - `NUM_VERTICES_PER_CELL` = 4
+ *     - `NUM_VERTICES_PER_EDGE` = 2
+ *     - `NUM_EDGES_PER_FACE` = 3
+ *     - `NUM_VERTICES_PER_FACE` = 3
+ * - Relies on DMPlex functions:
+ *     - `DMPlexGetTransitiveClosure` for retrieving connected points
+ *     - `DMPlexGetCone` for face-to-edge and edge-to-vertex connectivity
+ *     - `DMPlexGetCellCoordinates` for vertex coordinates
+ */
+PetscErrorCode printCellEntities(const DM dm, const PetscInt cell) {
+  PetscFunctionBeginUser;
+
+  /* Variable declarations */
+  PetscInt cellFaces[NUM_FACES_PER_CELL];
+  PetscInt cellEdges[NUM_EDGES_PER_CELL];
+  PetscInt faceEdges[NUM_FACES_PER_CELL][NUM_EDGES_PER_FACE];
+  PetscInt faceVertices[NUM_FACES_PER_CELL][NUM_VERTICES_PER_FACE];
+  PetscInt edgeVertices[NUM_EDGES_PER_CELL][NUM_VERTICES_PER_EDGE];
+
+  PetscInt transitiveClosureCellSize;
+  PetscInt* transitiveClosureCellPoints = NULL;
+  PetscInt transitiveClosureFaceSize;
+  PetscInt* transitiveClosureFacePoints = NULL;
+  const PetscInt* conePoints;
+  PetscInt currentPoint;
+  PetscInt currentFace;
+  PetscBool isDG;
+  PetscInt numCoords;
+  const PetscScalar* arrayCoords;
+  PetscScalar* cellCoords = NULL;
+
+  PetscCall(DMPlexGetTransitiveClosure(dm, cell, PETSC_TRUE, &transitiveClosureCellSize, &transitiveClosureCellPoints));
+
+  /* Get faces indices for cell, edges for each face, and vertices for each face */
+  currentPoint = 2;
+  for (PetscInt i = 0; i < NUM_FACES_PER_CELL; i++) {
+    /* Face indexes */
+    cellFaces[i] = transitiveClosureCellPoints[currentPoint + i * 2];
+    PetscCall(DMPlexGetCone(dm, cellFaces[i], &conePoints));
+
+    /* Edges for each face*/
+    for (PetscInt j = 0; j < NUM_EDGES_PER_FACE; j++) {
+      faceEdges[i][j] = conePoints[j];
+    }
+
+    /* Vertices for each face */
+    /* Orden convention:
+    - Edges indices start on position 2
+    - Vertices indices start on position 2 + NUM_EDGES_PER_FACE * 2
+    */
+    PetscCall(DMPlexGetTransitiveClosure(dm, cellFaces[i], PETSC_TRUE, &transitiveClosureFaceSize, &transitiveClosureFacePoints));
+    currentFace = 8;
+    for (PetscInt k = 0; k < NUM_VERTICES_PER_FACE; k++) {
+      faceVertices[i][k] = transitiveClosureFacePoints[currentFace + k * 2];
+    }
+    PetscCall(DMPlexRestoreTransitiveClosure(dm, cellFaces[i], PETSC_TRUE, &transitiveClosureFaceSize, &transitiveClosureFacePoints));
+  }
+
+  /* Get edges indices for cell */
+  currentPoint = 2 + NUM_FACES_PER_CELL * 2;
+  for (PetscInt i = 0; i < NUM_EDGES_PER_CELL; i++) {
+    cellEdges[i] = transitiveClosureCellPoints[currentPoint + i * 2];
+    PetscCall(DMPlexGetCone(dm, cellEdges[i], &conePoints));
+    for (PetscInt j = 0; j < NUM_VERTICES_PER_EDGE; j++) {
+      edgeVertices[i][j] = conePoints[j];
+    }
+  }
+
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\nData for cell %" PetscInt_FMT ":\n", cell));
+
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "[Cell %" PetscInt_FMT "] transitive closure size = %" PetscInt_FMT "\n ", cell, transitiveClosureCellSize));
+
+  for (PetscInt i = 0; i < transitiveClosureCellSize; i++) {
+    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, " [Cell %" PetscInt_FMT "] closure entry %" PetscInt_FMT " = point %" PetscInt_FMT "(orientation %" PetscInt_FMT ")\n ", cell, i,
+                                      transitiveClosureCellPoints[2 * i], transitiveClosureCellPoints[2 * i + 1]));
+  }
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
+
+  /* Face --> vertices connectivity */
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Face vertices:\n"));
+  for (PetscInt i = 0; i < NUM_FACES_PER_CELL; i++) {
+    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "  [Face %" PetscInt_FMT "] vertices = (%" PetscInt_FMT ", %" PetscInt_FMT ", %" PetscInt_FMT ")\n", cellFaces[i], faceVertices[i][0],
+                                      faceVertices[i][1], faceVertices[i][2]));
+  }
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
+
+  /* Edge --> vertices connectivity */
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Edge vertices:\n"));
+  for (PetscInt i = 0; i < NUM_EDGES_PER_CELL; i++) {
+    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "[Edge %" PetscInt_FMT "] vertices = (%" PetscInt_FMT ", %" PetscInt_FMT ")\n ", cellEdges[i], edgeVertices[i][0],
+                                      edgeVertices[i][1]));
+  }
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
+
+  /* Face --> edges connectivity */
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Face edges:\n"));
+  for (PetscInt i = 0; i < NUM_FACES_PER_CELL; i++) {
+    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "[Face %" PetscInt_FMT "] edges = (%" PetscInt_FMT ", %" PetscInt_FMT ", %" PetscInt_FMT ")\n ", cellFaces[i], faceEdges[i][0],
+                                      faceEdges[i][1], faceEdges[i][2]));
+  }
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
+
+  /* Get/print cell coordinates */
+  PetscCall(DMPlexGetCellCoordinates(dm, cell, &isDG, &numCoords, &arrayCoords, &cellCoords));
+
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Vertex coordinates:\n"));
+  currentPoint = 2 + NUM_FACES_PER_CELL * 2 + NUM_EDGES_PER_CELL * 2;
+  for (PetscInt i = 0; i < NUM_VERTICES_PER_CELL; i++) {
+    PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "[Vertex %" PetscInt_FMT "] coordinates = (%g, %g, %g)\n",
+                                      transitiveClosureCellPoints[currentPoint], PetscRealPart(cellCoords[3 * i + 0]),
+                                      PetscRealPart(cellCoords[3 * i + 1]), PetscRealPart(cellCoords[3 * i + 2])));
+    currentPoint += 2;
+  }
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
+
+  /* Print edge midpoints */
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Edge midpoints:\n"));
+  currentPoint = 2 + NUM_FACES_PER_CELL * 2;
+  for (PetscInt i = 0; i < NUM_EDGES_PER_CELL; i++) {
+    PetscInt v0 = EDGE_VERTICES[i][0];
+    PetscInt v1 = EDGE_VERTICES[i][1];
+
+    PetscReal xm = 0.5 * (PetscRealPart(cellCoords[3 * v0 + 0]) + PetscRealPart(cellCoords[3 * v1 + 0]));
+    PetscReal ym = 0.5 * (PetscRealPart(cellCoords[3 * v0 + 1]) + PetscRealPart(cellCoords[3 * v1 + 1]));
+    PetscReal zm = 0.5 * (PetscRealPart(cellCoords[3 * v0 + 2]) + PetscRealPart(cellCoords[3 * v1 + 2]));
+
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "[Edge %" PetscInt_FMT "] midpoint coordinates = (%g, %g, %g)\n", transitiveClosureCellPoints[currentPoint],
+                          xm, ym, zm));
+    currentPoint += 2;
+  }
+  PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "\n"));
+
+  /* Restore transitive clousure and cell coordinates */
+  PetscCall(DMPlexRestoreTransitiveClosure(dm, cell, PETSC_TRUE, &transitiveClosureCellSize, &transitiveClosureCellPoints));
+  PetscCall(DMPlexRestoreCellCoordinates(dm, cell, &isDG, &numCoords, &arrayCoords, &cellCoords));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+
+PetscErrorCode computeCellCentroid(Cell* cell) {
+  PetscFunctionBeginUser;
+
+  /* Initialize centroid */
+  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+        cell->centroid[i] = 0.0; 
+  }
+
+  /* Compute centroid */ 
+  for (PetscInt i = 0; i < NUM_VERTICES_PER_CELL; i++) {
+    for (PetscInt j = 0; j < NUM_DIMENSIONS; j++) {
+            cell->centroid[j] += cell->coordinates[i * NUM_DIMENSIONS + j];
+        }
+    }
+
+  /* Average */
+  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+        cell->centroid[i] /= NUM_VERTICES_PER_CELL; 
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+
+

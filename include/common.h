@@ -1,19 +1,12 @@
 /*
-  Filename: common.h
-  Author: Octavio Castillo Reyes (UPC/BSC)
-  Date: 2025-09-05
-
-  Description:
-  This file contains a collection of definitions for common
-  utility functions that are used throughout the PETGEM
-  project. These functions include operations for printing
-  and timers.
-
-  Usage:
-  Include this file in your source code to utilize the
-  common functions. For example: #include "common.h"
-
-*/
+ * Filename: common.h
+ * Author: Octavio Castillo Reyes (UPC/BSC)
+ * Date: 2026-02-03
+ *
+ * Description:
+ * Prototypes for the common utility functions (printing helpers,
+ * timers, …) used throughout PETGEM.
+ */
 
 #ifndef COMMON_H
 #define COMMON_H
@@ -25,5 +18,9 @@ PetscErrorCode printFooter();
 PetscErrorCode createDirectory(const char* path);
 
 PetscErrorCode printTimers(const PetscLogDouble timers[]);
+
+PetscErrorCode parseModeArg(const char *s, PetscInt *mode);
+
+PetscErrorCode printUsage(const char *progname);
 
 #endif
