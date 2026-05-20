@@ -229,6 +229,8 @@ jobs:
             bash -c "
               export CASE_DIR=${{ env.CSEM_CASE_DIR }} && \
               export NORD=${{ matrix.nord }} && \
+              gmsh \${CASE_DIR}/mesh_p\${NORD}.geo -3 \
+                   -o \${CASE_DIR}/mesh_p\${NORD}.msh && \
               python3 utils/preprocess.py \
                 -mode forward \
                 -nord \${NORD} \
@@ -263,6 +265,8 @@ jobs:
               export TRACE_NAME=petgem.prv && \
               export EXTRAE_LABELS=\${EXTRAE_DIR}/petgem_labels.txt && \
               export NORD=${{ matrix.nord }} && \
+              gmsh \${CASE_DIR}/mesh_p\${NORD}.geo -3 \
+                   -o \${CASE_DIR}/mesh_p\${NORD}.msh && \
               python3 utils/preprocess.py \
                 -mode forward \
                 -nord \${NORD} \
