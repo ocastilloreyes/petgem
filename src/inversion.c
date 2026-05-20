@@ -44,6 +44,11 @@
 /*   idKdm = -2 * constFactor * Me_e                                  */
 /*   iG    = idKdm * x_e                                              */
 /*   DfDm[ie] += real( iG . nx_e )   (plain transpose, MATLAB iG.'*inx) */
+/*                                                                     */
+/* The 3D quadrature and Me/Ke buffers are provided by the caller     */
+/* (allocated once on the InversionContext, see setupInversionWorkspace).*/
+/* That hoist is purely a lifetime change — the values produced by    */
+/* each cell evaluation are byte-identical to the previous version.   */
 /* ================================================================== */
 PetscErrorCode computeGradientContribution(const invParams *iparams,
                                            const DM          dm,
@@ -53,40 +58,13 @@ PetscErrorCode computeGradientContribution(const invParams *iparams,
                                            const Vec         nxLocal,
                                            PetscScalar       constFactor,
                                            DM                dmInversion,
-                                           Vec               DfDm)
+                                           Vec               DfDm,
+                                           const Quadrature3D *quadrature_3d,
+                                           PetscReal       **Me,
+                                           PetscReal       **Ke)
 {
   PetscFunctionBeginUser;
-
-  /* Quadrature for elemental mass matrix */
-  Quadrature3D quadrature_3d;
-  Quadrature1D quadrature_1d;
-
-  PetscCall(computeNum3DQuadraturePoints(iparams->nord, &quadrature_3d));
-  PetscCall(computeNum1DQuadraturePoints(iparams->nord, &quadrature_1d));
-
-  PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.points));
-  PetscCall(PetscCalloc1(quadrature_1d.numPoints, &quadrature_1d.points));
-  for (PetscInt i = 0; i < quadrature_3d.numPoints; i++)
-    PetscCall(PetscCalloc1(NUM_DIMENSIONS, &quadrature_3d.points[i]));
-  PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.weights));
-  PetscCall(PetscCalloc1(quadrature_1d.numPoints, &quadrature_1d.weights));
-  PetscCall(compute3DQuadraturePoints(&quadrature_3d));
-  PetscCall(compute1DQuadraturePoints(&quadrature_1d));
-
-  /* Allocate elemental matrices */
-  PetscReal **Me, **Ke, **gradientMatrix;
-  PetscCall(PetscCalloc1(grid->numDofInCell, &Me));
-  PetscCall(PetscCalloc1(grid->numDofInCell, &Ke));
-  PetscCall(PetscCalloc1(grid->numDofInCell, &gradientMatrix));
-  PetscCall(PetscCalloc1(grid->numDofInCell * grid->numDofInCell, &Me[0]));
-  PetscCall(PetscCalloc1(grid->numDofInCell * grid->numDofInCell, &Ke[0]));
-  PetscCall(PetscCalloc1(grid->numDofInCell * grid->numH1DofInCell,
-                         &gradientMatrix[0]));
-  for (PetscInt i = 1; i < grid->numDofInCell; i++) {
-    Me[i]            = Me[i - 1]            + grid->numDofInCell;
-    Ke[i]            = Ke[i - 1]            + grid->numDofInCell;
-    gradientMatrix[i] = gradientMatrix[i - 1] + grid->numH1DofInCell;
-  }
+  (void)iparams; /* nord lives in grid->fem.ops via the quadrature */
 
   /* Get local section and conductivity DM */
   PetscSection section;
@@ -116,7 +94,7 @@ PetscErrorCode computeGradientContribution(const invParams *iparams,
     cell.conductivity[0] = 1.0;
     cell.conductivity[1] = 1.0;
     cell.conductivity[2] = 1.0;
-    PetscCall(computeElementalMatrices(&grid->fem, &cell, &quadrature_3d, Me, Ke));
+    PetscCall(computeElementalMatrices(&grid->fem, &cell, quadrature_3d, Me, Ke));
 
     /* Get DOF closure indices */
     PetscInt  numDofIdx, *dofIdx;
@@ -162,20 +140,179 @@ PetscErrorCode computeGradientContribution(const invParams *iparams,
   PetscCall(VecAssemblyBegin(DfDm));
   PetscCall(VecAssemblyEnd(DfDm));
 
-  /* Free quadrature memory */
-  PetscCall(PetscFree(quadrature_3d.weights));
-  PetscCall(PetscFree(quadrature_1d.weights));
-  for (PetscInt i = 0; i < quadrature_3d.numPoints; i++)
-    PetscCall(PetscFree(quadrature_3d.points[i]));
-  PetscCall(PetscFree(quadrature_3d.points));
-  PetscCall(PetscFree(quadrature_1d.points));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  PetscCall(PetscFree(Me[0]));
-  PetscCall(PetscFree(Ke[0]));
-  PetscCall(PetscFree(gradientMatrix[0]));
-  PetscCall(PetscFree(Me));
-  PetscCall(PetscFree(Ke));
-  PetscCall(PetscFree(gradientMatrix));
+/* ================================================================== */
+/* setupInversionWorkspace / destroyInversionWorkspace                 */
+/*                                                                     */
+/* Lifetime hoist of every workspace that does not depend on the       */
+/* L-BFGS iterate X.  Called once before the optimization loop and     */
+/* freed once after, replacing the per-callback allocate/free dance.   */
+/*                                                                     */
+/* What gets precomputed:                                              */
+/*   • 3D quadrature points + weights (depend only on iparams->nord)   */
+/*   • Per-cell Me / Ke elemental-matrix buffers (numDof² each)        */
+/*   • Reusable global Vecs b, x, nB, nx and parallel Ex_recv          */
+/*   • Per-frequency RHS Vec  Bvec_per_freq[ifre]                      */
+/*     (assembleCsemRHS depends only on source + freq, NOT σ)          */
+/*   • Per-frequency observed-Ex row Vec  dObsRow_per_freq[ifre]       */
+/*   • Per-frequency data weights Vec  Wf_per_freq[ifre]               */
+/*                                                                     */
+/* All produced values are byte-identical to what the previous per-    */
+/* iteration code computed; only the allocation lifetime changes.      */
+/* ================================================================== */
+static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
+{
+  PetscFunctionBeginUser;
+
+  MPI_Comm  comm = PetscObjectComm((PetscObject)ctx->dm);
+  PetscInt  numFreqs    = ctx->iparams->numFreqs;
+  PetscInt  numDof      = ctx->grid.numDofInCell;
+  PetscInt  numReceivers = ctx->Q->numReceivers;
+  PetscReal errorLevel  = ctx->iparams->errorLevel;
+
+  /* ---- 3D quadrature (depends only on nord) ---- */
+  PetscCall(computeNum3DQuadraturePoints(ctx->iparams->nord, &ctx->quad3d));
+  PetscCall(PetscCalloc1(ctx->quad3d.numPoints, &ctx->quad3d.points));
+  for (PetscInt i = 0; i < ctx->quad3d.numPoints; i++)
+    PetscCall(PetscCalloc1(NUM_DIMENSIONS, &ctx->quad3d.points[i]));
+  PetscCall(PetscCalloc1(ctx->quad3d.numPoints, &ctx->quad3d.weights));
+  PetscCall(compute3DQuadraturePoints(&ctx->quad3d));
+  ctx->quad3dInited = PETSC_TRUE;
+
+  /* ---- Me / Ke row-of-pointers buffers (zeroed per cell in the loop) ---- */
+  PetscCall(PetscCalloc1(numDof * numDof, &ctx->MeBuf));
+  PetscCall(PetscCalloc1(numDof * numDof, &ctx->KeBuf));
+  PetscCall(PetscCalloc1(numDof,          &ctx->MeRows));
+  PetscCall(PetscCalloc1(numDof,          &ctx->KeRows));
+  for (PetscInt i = 0; i < numDof; i++) {
+    ctx->MeRows[i] = ctx->MeBuf + i * numDof;
+    ctx->KeRows[i] = ctx->KeBuf + i * numDof;
+  }
+
+  /* ---- Per-iter reusable Vecs ---- */
+  PetscCall(DMCreateGlobalVector(ctx->dm, &ctx->bVec));
+  PetscCall(DMCreateGlobalVector(ctx->dm, &ctx->xVec));
+  PetscCall(DMCreateGlobalVector(ctx->dm, &ctx->nBvec));
+  PetscCall(DMCreateGlobalVector(ctx->dm, &ctx->nxVec));
+  PetscCall(VecCreateMPI(comm, PETSC_DECIDE, numReceivers, &ctx->ExRecvVec));
+  /* wcdtDvec mirrors the parallel layout of ExRecvVec so the local-receiver
+   * loop and MatMultTranspose use consistent row ownership. */
+  PetscCall(VecDuplicate(ctx->ExRecvVec, &ctx->wcdtDvec));
+
+  /* ---- Per-frequency RHS / observed-row / weights ---- */
+  ctx->numFreqsAlloc = numFreqs;
+  PetscCall(PetscCalloc1(numFreqs, &ctx->Bvec_per_freq));
+  PetscCall(PetscCalloc1(numFreqs, &ctx->Wf_per_freq));
+  PetscCall(PetscCalloc1(numFreqs, &ctx->dObsRow_per_freq));
+
+  /* Build a quiet csemParams stub for assembleCsemRHS (it only reads
+   * nord, numMPITasks and quiet — same fields the iter loop used to fill). */
+  csemParams stub;
+  PetscCall(PetscMemzero(&stub, sizeof(stub)));
+  stub.nord = ctx->iparams->nord;
+  PetscCallMPI(MPI_Comm_size(comm, &stub.numMPITasks));
+  stub.quiet = PETSC_TRUE;
+
+  for (PetscInt ifre = 0; ifre < numFreqs; ifre++) {
+    const InvCsemSource *isrc = &ctx->iparams->invSources[ifre];
+
+    /* Build a single-source CsemSourceSet so assembleCsemRHS can do its
+     * usual work.  Lives on the stack — assembleCsemRHS copies what it
+     * needs into the returned Mat. */
+    CsemSource one;
+    one.position[0]  = isrc->position[0];
+    one.position[1]  = isrc->position[1];
+    one.position[2]  = isrc->position[2];
+    one.current      = isrc->current;
+    one.length       = isrc->length;
+    one.dipAngle     = isrc->dipAngle;
+    one.azimuthAngle = isrc->azimuthAngle;
+
+    CsemSourceSet setOne;
+    setOne.freq        = isrc->freq;
+    setOne.numSources  = 1;
+    setOne.sourceArray = &one;
+
+    Mat Bmat;
+    PetscCall(assembleCsemRHS(stub, setOne, ctx->dm, ctx->grid, &Bmat));
+
+    PetscCall(DMCreateGlobalVector(ctx->dm, &ctx->Bvec_per_freq[ifre]));
+    {
+      Vec bcol;
+      PetscCall(MatDenseGetColumnVecRead(Bmat, 0, &bcol));
+      PetscCall(VecCopy(bcol, ctx->Bvec_per_freq[ifre]));
+      PetscCall(MatDenseRestoreColumnVecRead(Bmat, 0, &bcol));
+    }
+    PetscCall(MatDestroy(&Bmat));
+
+    /* Observed-Ex row: extract column ifre from the [numFreqs × numRec]
+     * dense Mat dObs (row-major in the underlying storage).  This was
+     * being repeated every callback for no reason. */
+    PetscCall(VecCreateSeq(PETSC_COMM_SELF, numReceivers, &ctx->dObsRow_per_freq[ifre]));
+    {
+      const PetscScalar *arr;
+      PetscCall(MatDenseGetArrayRead(ctx->dObs, &arr));
+      PetscScalar *rArr;
+      PetscCall(VecGetArray(ctx->dObsRow_per_freq[ifre], &rArr));
+      for (PetscInt r = 0; r < numReceivers; r++)
+        rArr[r] = arr[ifre + numFreqs * r];
+      PetscCall(VecRestoreArray(ctx->dObsRow_per_freq[ifre], &rArr));
+      PetscCall(MatDenseRestoreArrayRead(ctx->dObs, &arr));
+    }
+
+    /* Per-frequency weights Wf[r] = 1 / (|dObs[r]| * errorLevel). */
+    PetscCall(VecDuplicate(ctx->dObsRow_per_freq[ifre], &ctx->Wf_per_freq[ifre]));
+    {
+      const PetscScalar *dArr;
+      PetscScalar       *wArr;
+      PetscCall(VecGetArrayRead(ctx->dObsRow_per_freq[ifre], &dArr));
+      PetscCall(VecGetArray(ctx->Wf_per_freq[ifre], &wArr));
+      for (PetscInt r = 0; r < numReceivers; r++) {
+        PetscReal absVal = PetscAbsScalar(dArr[r]);
+        wArr[r] = (absVal > 0.0) ? 1.0 / (absVal * errorLevel) : 0.0;
+      }
+      PetscCall(VecRestoreArray(ctx->Wf_per_freq[ifre], &wArr));
+      PetscCall(VecRestoreArrayRead(ctx->dObsRow_per_freq[ifre], &dArr));
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx)
+{
+  PetscFunctionBeginUser;
+
+  if (ctx->quad3dInited) {
+    PetscCall(PetscFree(ctx->quad3d.weights));
+    for (PetscInt i = 0; i < ctx->quad3d.numPoints; i++)
+      PetscCall(PetscFree(ctx->quad3d.points[i]));
+    PetscCall(PetscFree(ctx->quad3d.points));
+    ctx->quad3dInited = PETSC_FALSE;
+  }
+  PetscCall(PetscFree(ctx->MeBuf));
+  PetscCall(PetscFree(ctx->KeBuf));
+  PetscCall(PetscFree(ctx->MeRows));
+  PetscCall(PetscFree(ctx->KeRows));
+
+  PetscCall(VecDestroy(&ctx->bVec));
+  PetscCall(VecDestroy(&ctx->xVec));
+  PetscCall(VecDestroy(&ctx->nBvec));
+  PetscCall(VecDestroy(&ctx->nxVec));
+  PetscCall(VecDestroy(&ctx->ExRecvVec));
+  PetscCall(VecDestroy(&ctx->wcdtDvec));
+
+  for (PetscInt ifre = 0; ifre < ctx->numFreqsAlloc; ifre++) {
+    PetscCall(VecDestroy(&ctx->Bvec_per_freq[ifre]));
+    PetscCall(VecDestroy(&ctx->Wf_per_freq[ifre]));
+    PetscCall(VecDestroy(&ctx->dObsRow_per_freq[ifre]));
+  }
+  PetscCall(PetscFree(ctx->Bvec_per_freq));
+  PetscCall(PetscFree(ctx->Wf_per_freq));
+  PetscCall(PetscFree(ctx->dObsRow_per_freq));
+  ctx->numFreqsAlloc = 0;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -290,7 +427,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   PetscInt          numFreqs    = c->iparams->numFreqs;
   PetscInt          numReceivers = c->Q->numReceivers;
   PetscReal         lambda       = c->iparams->lambda;
-  PetscReal         errorLevel   = c->iparams->errorLevel;
 
   PetscFunctionBeginUser;
 
@@ -338,22 +474,27 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   /* ---- 3. Zero gradient accumulator ---- */
   PetscCall(VecZeroEntries(c->DfDm));
 
-  /* ---- 4. Pre-allocate reusable Vecs (avoid create/destroy per freq) ---- */
+  /* ---- 4. Misfit accumulators ---- */
   PetscReal reduil_fi  = 0.0;
   PetscInt  numData    = numReceivers * numFreqs * 2; /* real+imag */
 
-  Vec b, x, nB, nx;
-  PetscCall(DMCreateGlobalVector(c->dm, &b));
-  PetscCall(DMCreateGlobalVector(c->dm, &x));
-  PetscCall(DMCreateGlobalVector(c->dm, &nB));
-  PetscCall(DMCreateGlobalVector(c->dm, &nx));
+  /* Pre-allocated workspace (lives on InversionContext, set up once
+   * before the L-BFGS loop). The five Vecs and the per-freq RHS / Wf /
+   * dObsRow arrays are all reused across iterations — identical numerical
+   * values to recomputing them each call, just without the allocations. */
+  Vec b       = c->bVec;
+  Vec x       = c->xVec;
+  Vec nB      = c->nBvec;
+  Vec nx      = c->nxVec;
+  Vec Ex_recv = c->ExRecvVec;
+  Vec wcdtD_mpi = c->wcdtDvec;
 
-  Vec Ex_recv;
-  PetscCall(VecCreateMPI(comm, PETSC_DECIDE, numReceivers, &Ex_recv));
-  Vec dObs_row;
-  PetscCall(VecCreateSeq(PETSC_COMM_SELF, numReceivers, &dObs_row));
-  Vec Wf;
-  PetscCall(VecDuplicate(dObs_row, &Wf));
+  /* One A matrix for the whole iteration (numFreqs systems share its
+   * sparsity pattern). Allocate with DO_NOT_COPY_VALUES; each freq does
+   * MatCopy(K → A) + MatAXPY(-Const · Ms). Replaces numFreqs× MatDuplicate
+   * (COPY_VALUES) with one allocation + numFreqs× value copy. */
+  Mat A;
+  PetscCall(MatDuplicate(Kmat, MAT_DO_NOT_COPY_VALUES, &A));
 
   /* ---- 5. Frequency loop ---- */
   for (PetscInt ifre = 0; ifre < numFreqs; ifre++) {
@@ -362,38 +503,16 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscReal   omega = isrc->freq * 2.0 * PETSC_PI;
     PetscScalar Const = PETSC_i * omega * MU;
 
-    /* Form A_f = K - iωμ·Ms via MatDuplicate + MatAXPY.
-     * SAME_NONZERO_PATTERN lets PETSc skip symbolic analysis. */
-    Mat A;
-    PetscCall(MatDuplicate(Kmat, MAT_COPY_VALUES, &A));
+    /* A_f = K - iωμ·Ms.  SAME_NONZERO_PATTERN lets PETSc skip symbolic. */
+    PetscCall(MatCopy(Kmat, A, SAME_NONZERO_PATTERN));
     PetscCall(MatAXPY(A, -Const, Msmat, SAME_NONZERO_PATTERN));
 
-    /* Assemble RHS (source vector b) — still needs per-freq source info */
-    CsemSource tmpSource;
-    tmpSource.position[0]  = isrc->position[0];
-    tmpSource.position[1]  = isrc->position[1];
-    tmpSource.position[2]  = isrc->position[2];
-    tmpSource.current      = isrc->current;
-    tmpSource.length       = isrc->length;
-    tmpSource.dipAngle     = isrc->dipAngle;
-    tmpSource.azimuthAngle = isrc->azimuthAngle;
-
-    CsemSourceSet tmpSrc;
-    tmpSrc.freq        = isrc->freq;
-    tmpSrc.numSources  = 1;
-    tmpSrc.sourceArray = &tmpSource;
-
-    Mat Bmat = NULL;
-    PetscCall(assembleCsemRHS(fwdParams, tmpSrc,
-                               c->dm, c->grid, &Bmat));
-
-    /* Extract single source column from Bmat into Vec b */
-    {
-      Vec bcol;
-      PetscCall(MatDenseGetColumnVecRead(Bmat, 0, &bcol));
-      PetscCall(VecCopy(bcol, b));
-      PetscCall(MatDenseRestoreColumnVecRead(Bmat, 0, &bcol));
-    }
+    /* RHS, observed-Ex row, and per-freq weights are all precomputed
+     * in setupInversionWorkspace — they only depend on source + dObs +
+     * errorLevel, none of which change during L-BFGS. */
+    PetscCall(VecCopy(c->Bvec_per_freq[ifre], b));
+    Vec dObs_row = c->dObsRow_per_freq[ifre];
+    Vec Wf       = c->Wf_per_freq[ifre];
 
     /* Factorize and solve forward system: A_f * x = b */
     KSP ksp;
@@ -408,32 +527,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     /* Compute Ex at receivers: Ex_recv = QEx * x */
     PetscCall(MatMult(c->Q->QEx, x, Ex_recv));
 
-    /* Get observed Ex for this frequency */
-    {
-      const PetscScalar *arr;
-      PetscCall(MatDenseGetArrayRead(c->dObs, &arr));
-      PetscScalar *rArr;
-      PetscCall(VecGetArray(dObs_row, &rArr));
-      for (PetscInt r = 0; r < numReceivers; r++)
-        rArr[r] = arr[ifre + numFreqs * r];
-      PetscCall(VecRestoreArray(dObs_row, &rArr));
-      PetscCall(MatDenseRestoreArrayRead(c->dObs, &arr));
-    }
-
-    /* Data weights: W_f = 1 / (|dObs_f| * errorLevel) */
-    {
-      const PetscScalar *dArr;
-      PetscScalar       *wArr;
-      PetscCall(VecGetArrayRead(dObs_row, &dArr));
-      PetscCall(VecGetArray(Wf, &wArr));
-      for (PetscInt r = 0; r < numReceivers; r++) {
-        PetscReal absVal = PetscAbsScalar(dArr[r]);
-        wArr[r] = (absVal > 0.0) ? 1.0 / (absVal * errorLevel) : 0.0;
-      }
-      PetscCall(VecRestoreArray(Wf, &wArr));
-      PetscCall(VecRestoreArrayRead(dObs_row, &dArr));
-    }
-
     /* Compute misfit and adjoint RHS */
     PetscInt exStart, exEnd;
     PetscCall(VecGetOwnershipRange(Ex_recv, &exStart, &exEnd));
@@ -444,8 +537,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscCall(VecGetArrayRead(dObs_row, &dArr));
     PetscCall(VecGetArrayRead(Wf, &wArr));
 
-    Vec wcdtD_mpi;
-    PetscCall(VecCreateMPI(comm, locNRec, numReceivers, &wcdtD_mpi));
     PetscScalar *wcArr;
     PetscCall(VecGetArray(wcdtD_mpi, &wcArr));
 
@@ -470,7 +561,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
 
     /* Adjoint RHS: nB = QEx^T * wcdtD_mpi */
     PetscCall(MatMultTranspose(c->Q->QEx, wcdtD_mpi, nB));
-    PetscCall(VecDestroy(&wcdtD_mpi));
 
     /* Adjoint solve: A_f * nx = nB  (reuse factorization from forward) */
     PetscCall(solveInvSystem(ksp, nB, nx));
@@ -484,27 +574,21 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscCall(computeGradientContribution(c->iparams, c->dm, &c->grid,
                                           c->conductivity,
                                           xLocal, nxLocal, Const,
-                                          c->dmInversion, c->DfDm));
+                                          c->dmInversion, c->DfDm,
+                                          &c->quad3d, c->MeRows, c->KeRows));
 
-    /* Cleanup frequency-level objects (keep reusable Vecs alive) */
+    /* Cleanup frequency-level objects (workspace stays alive on ctx). */
     PetscCall(DMRestoreLocalVector(c->dm, &xLocal));
     PetscCall(DMRestoreLocalVector(c->dm, &nxLocal));
     PetscCall(KSPDestroy(&ksp));
-    PetscCall(MatDestroy(&A));
-    PetscCall(MatDestroy(&Bmat));
   } /* end frequency loop */
 
-  /* Destroy iteration-level matrices and reusable Vecs */
+  /* Destroy iteration-level matrices (A is per-iter; K/Ms/G are rebuilt
+   * every callback because they depend on σ). */
+  PetscCall(MatDestroy(&A));
   PetscCall(MatDestroy(&Kmat));
   PetscCall(MatDestroy(&Msmat));
   PetscCall(MatDestroy(&Gmat));
-  PetscCall(VecDestroy(&b));
-  PetscCall(VecDestroy(&x));
-  PetscCall(VecDestroy(&nB));
-  PetscCall(VecDestroy(&nx));
-  PetscCall(VecDestroy(&Ex_recv));
-  PetscCall(VecDestroy(&dObs_row));
-  PetscCall(VecDestroy(&Wf));
 
   /* ---- 5. RMS ---- */
   /* RMS = sqrt( sum_freq sum_rec |W*(d_obs - E_x)|^2 / Ndata )
@@ -930,7 +1014,7 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
     .X0                 = X0,
     .DfDm               = DfDm,
     .dObs               = dObs,
-    .Wweights           = NULL,   /* weights computed per-frequency in callback */
+    .Wweights           = NULL,   /* superseded by per-freq Wf_per_freq[] */
     .Q                  = &Q,
     .graph              = &graph,
     .notFixedMaskGlobal = notFixedMaskGlobal,
@@ -946,7 +1030,13 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
     .iterCount          = 0,
     .acceptedIter       = 0,
     .bypassSmoother     = PETSC_FALSE,
+    /* Workspace fields (quad3d, MeRows, KeRows, b/x/nB/nx/Ex_recv,
+     * Bvec_per_freq, Wf_per_freq, dObsRow_per_freq) are zero-initialized
+     * by C designated-init and populated by setupInversionWorkspace next. */
   };
+
+  /* Precompute everything that doesn't depend on the L-BFGS iterate X. */
+  PetscCall(setupInversionWorkspace(&ctx));
 
   /* ---- Optional: FD gradient check at iter 0, then exit ---- */
   if (iparams->fdCheckCells > 0) {
@@ -991,6 +1081,7 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
 
 fd_cleanup:
   /* ---- Cleanup ---- */
+  PetscCall(destroyInversionWorkspace(&ctx));
   PetscCall(VecDestroy(&X0));
   PetscCall(VecDestroy(&X));
   PetscCall(VecDestroy(&DfDm));

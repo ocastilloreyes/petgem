@@ -15,6 +15,7 @@
 
 #include "constants.h"
 #include "grid.h"
+#include "hvfem.h"        /* Quadrature3D used by InversionContext workspace */
 #include "receiver_interp.h"
 #include "transmitter.h"
 #include <petsc.h>
@@ -146,6 +147,43 @@ typedef struct {
    * smoother. Used by runFdGradientCheck so the FD test evaluates a
    * self-consistent objective F(sigma(X,X0)) vs its true adjoint gradient. */
   PetscBool                       bypassSmoother;
+
+  /* ---- Pre-allocated workspace ----
+   * Owned by setupInversionWorkspace; freed by destroyInversionWorkspace.
+   * All fields below are populated once before the L-BFGS loop and reused
+   * across every objgrad evaluation. Their contents do not depend on the
+   * iterate X, so precomputing yields byte-identical numerical results to
+   * recomputing on every callback. */
+
+  /* Per-cell elemental-matrix work buffers used by computeGradientContribution
+   * (numDofInCell × numDofInCell each, zeroed per cell inside the loop). */
+  PetscReal                      *MeBuf;        /* contiguous backing (numDof²) */
+  PetscReal                      *KeBuf;        /* contiguous backing (numDof²) */
+  PetscReal                     **MeRows;       /* row-of-pointers view of MeBuf */
+  PetscReal                     **KeRows;       /* row-of-pointers view of KeBuf */
+  /* 3D quadrature for elemental mass-matrix integration. Depends only on
+   * iparams->nord (constant across the run). */
+  Quadrature3D                    quad3d;
+  PetscBool                       quad3dInited; /* PETSC_TRUE once quad3d is filled */
+
+  /* Per-iteration reusable Vecs (global, sized on dm). DMCreateGlobalVector
+   * caches storage on the DM, but moving them out of the callback still
+   * saves the 4× DMCreateGlobalVector + 2× VecCreate calls per iter and
+   * keeps the same buffers warm across iterations. */
+  Vec                             bVec;        /* RHS workspace (forward solve)         */
+  Vec                             xVec;        /* forward solution                      */
+  Vec                             nBvec;       /* adjoint RHS                           */
+  Vec                             nxVec;       /* adjoint solution                      */
+  Vec                             ExRecvVec;   /* Ex at receivers, parallel             */
+  Vec                             wcdtDvec;    /* weighted residual workspace, parallel */
+
+  /* Per-frequency precomputed inputs. The RHS Vec, weights Vec, and
+   * observed-Ex row depend only on the source, the observed data, and
+   * iparams->errorLevel — all constant across L-BFGS iterations. */
+  Vec                            *Bvec_per_freq;     /* numFreqs, sized on dm   */
+  Vec                            *Wf_per_freq;       /* numFreqs, sized seq Nrec */
+  Vec                            *dObsRow_per_freq;  /* numFreqs, sized seq Nrec */
+  PetscInt                        numFreqsAlloc;     /* size of the arrays above */
 } InversionContext;
 
 /* ------------------------------------------------------------------ */
@@ -190,7 +228,9 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM dm,
 
 /* Accumulate per-element adjoint gradient into DfDm (1 DOF/cell).
  * DfDm[ie] += real( (-2*constFactor*Me_e*x_e)^T · nx_e )
- * Plain transpose (no conjugate), matching MATLAB iG.'*inx. */
+ * Plain transpose (no conjugate), matching MATLAB iG.'*inx.
+ * `quadrature_3d`, `Me`, `Ke` are workspace buffers owned by the caller
+ * (set up once on InversionContext via setupInversionWorkspace). */
 PetscErrorCode computeGradientContribution(const invParams *iparams,
                                            const DM dm,
                                            const Grid *grid,
@@ -199,7 +239,10 @@ PetscErrorCode computeGradientContribution(const invParams *iparams,
                                            const Vec nxLocal,
                                            PetscScalar constFactor,
                                            DM dmInversion,
-                                           Vec DfDm);
+                                           Vec DfDm,
+                                           const Quadrature3D *quadrature_3d,
+                                           PetscReal **Me,
+                                           PetscReal **Ke);
 
 /* Apply forward + reverse Gauss-Seidel smoothing to vector v.
  * Gathers to rank 0, sweeps, scatters back. */
