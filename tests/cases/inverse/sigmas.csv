@@ -1,0 +1,9 @@
+# Starting conductivity for the inversion test case (4 materials).
+# Row index = 0-based material id (gmsh:physical - 1).
+# Columns: sigma_x, sigma_y, sigma_z
+# NOTE: this is a HALF-SPACE GUESS used to seed the inversion, not the
+# truth model that synthesised observed_data.h5.
+1.e-8, 1.e-8, 1.e-8
+0.01,  0.01,  0.01
+0.01,  0.01,  0.01
+0.01,  0.01,  0.01
