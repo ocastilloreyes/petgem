@@ -39,14 +39,14 @@ def copy_case_workspace(tmp_path_factory, cases_dir, case_name,
     """Copy a case directory into a fresh tmp_path so preprocess can write
     artifacts without polluting the checked-in case.  `require_files` lets
     a caller refuse to start when a needed input (e.g. reference.h5) is
-    missing — the test is skipped in that case rather than failing.
+    missing - the test is skipped in that case rather than failing.
     """
     src = cases_dir / case_name
     if not src.exists():
         pytest.skip(f"{case_name} case directory not present at {src}")
     for f in require_files:
         if not (src / f).exists():
-            pytest.skip(f"{f} missing from {src} — cannot run this test")
+            pytest.skip(f"{f} missing from {src} - cannot run this test")
     dst = tmp_path_factory.mktemp(f"{case_name}_workspace")
     print(f"\n[fixture] copying {case_name} → {dst}", flush=True)
     for entry in os.listdir(src):

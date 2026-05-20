@@ -21,7 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 try:
-    import petgem  # noqa: F401 — works when the package is installed
+    import petgem  # noqa: F401 - works when the package is installed
 except ImportError:
     import utils as _petgem_pkg
     sys.modules["petgem"] = _petgem_pkg
@@ -47,7 +47,7 @@ def fm_csem_binary(repo_root) -> Path:
       1. $PETGEM_FM_CSEM environment variable.
       2. <repo_root>/fm.csem
       3. <repo_root>/build/fm.csem
-      4. shutil.which("fm.csem") — PATH lookup.
+      4. shutil.which("fm.csem") - PATH lookup.
 
     Returns the first hit. Tests that need this fixture should `pytest.skip`
     when the file does not exist (so the suite passes on CI machines that

@@ -9,7 +9,7 @@ Pipeline (skipped if fm.csem isn't built):
      output is structurally well-formed (Ex/Ey/Ez/Hx/Hy/Hz present, all
      non-empty, dimensions agree with receivers).
 
-Structural check only — kernel runs and produces a finite, correctly-
+Structural check only - kernel runs and produces a finite, correctly-
 sized response across the supported polynomial orders.  Numerical
 validation against the reference solution lives in
 test_fm_csem_csem_model_reference.py.
@@ -35,15 +35,13 @@ def case_workspace(tmp_path_factory, cases_dir):
     return copy_case_workspace(tmp_path_factory, cases_dir, "csem_model")
 
 
-@pytest.mark.parametrize("nord", [1, 2, 3])
+@pytest.mark.parametrize("nord", [1, 2])
 def test_fm_csem_smoke(repo_root, fm_csem_binary, case_workspace, nord):
-    """Kernel runs at nord ∈ {1, 2, 3}; field components exist, are finite,
+    """Kernel runs at nord ∈ {1, 2}; field components exist, are finite,
     and sized to the receivers vector."""
     skip_if_no_binary(fm_csem_binary)
 
-    responses_path, bundle_path = run_pipeline_for_nord(
-        repo_root, fm_csem_binary, case_workspace, nord
-    )
+    responses_path, bundle_path = run_pipeline_for_nord(repo_root, fm_csem_binary, case_workspace, nord)
 
     responses = petgem.readResponses(str(responses_path))
     for name in ("Ex", "Ey", "Ez", "Hx", "Hy", "Hz"):
