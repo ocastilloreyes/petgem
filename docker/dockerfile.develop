@@ -1,7 +1,10 @@
 # =============================================================================== #
 # Docker image builder                                                            #
 # =============================================================================== #
-FROM ubuntu:22.04 
+# Tagged `AS builder` so docker/dockerfile.release (and any downstream
+# multi-stage build) can `COPY --from=builder ...` when the develop image
+# is referenced by tag.
+FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /workspace
@@ -32,7 +35,7 @@ RUN apt-get update && \
 # --------------------------------
 # Install Python packages via pip
 # --------------------------------
-RUN pip3 install --no-cache-dir cython
+RUN pip3 install --no-cache-dir cython pytest
 
 # ---------------------------
 # PETSc

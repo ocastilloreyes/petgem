@@ -18,12 +18,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract version from VERSION.h
+      - name: Extract version from version.h
         id: get_version
         run: |
-          MAJOR=$(grep "#define VERSION_MAJOR" include/VERSION.h | awk '{print $3}')
-          MINOR=$(grep "#define VERSION_MINOR" include/VERSION.h | awk '{print $3}')
-          PATCH=$(grep "#define VERSION_PATCH" include/VERSION.h | awk '{print $3}')
+          MAJOR=$(grep "#define VERSION_MAJOR" include/version.h | awk '{print $3}')
+          MINOR=$(grep "#define VERSION_MINOR" include/version.h | awk '{print $3}')
+          PATCH=$(grep "#define VERSION_PATCH" include/version.h | awk '{print $3}')
           VERSION_TAG="v${MAJOR}.${MINOR}.${PATCH}"
           echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_OUTPUT
 
@@ -44,6 +44,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build release Docker image
         uses: docker/build-push-action@v5
         with:
@@ -51,3 +58,5 @@ jobs:
           file: ./docker/dockerfile.release
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:${{ steps.get_version.outputs.VERSION_TAG }}
+          build-args: |
+            BUILDER_IMAGE=ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest

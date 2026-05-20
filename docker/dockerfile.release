@@ -1,6 +1,13 @@
 # =============================================================================== #
 # RELEASE DOCKERFILE FOR PETGEM (runtime only)                                     #
 # =============================================================================== #
+# Sources prebuilt PETSc / Gmsh / Extrae / python layers from the develop
+# image published by ci-develop.yml.  BUILDER_IMAGE is overridden at build
+# time by ci-release.yml (`--build-arg BUILDER_IMAGE=...`) so the release
+# pins itself to a specific develop digest.
+ARG BUILDER_IMAGE=ghcr.io/ocastilloreyes/petgem-ci-env:latest
+FROM ${BUILDER_IMAGE} AS builder
+
 FROM ubuntu:22.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
