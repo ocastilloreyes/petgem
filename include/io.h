@@ -42,8 +42,9 @@
  * `params` is in/out: inputFile is read, nord is written (from the bundle's
  * /nord dataset).  `sources` and `receivers` are optional: pass NULL for
  * either when the caller does not need it (e.g. im.csem passes NULL for
- * `sources` because it pulls multi-frequency sources from
- * params->sourceFilename via setupInversionSources). */
+ * `sources` because it pulls multi-frequency sources via
+ * setupInversionSources, which now reads from the same bundle's
+ * /inv_sources group). */
 PetscErrorCode loadCsemInputs(csemParams     *params,
                               DM             *dm,
                               Vec            *conductivity,

@@ -14,8 +14,8 @@
  *
  *   Inverse kernel (im.csem):
  *     readInversionParams        parser for -inv_* options
- *     setupInversionSources      text-format sources file reader (rank-0 + Bcast)
- *     loadObservedData           HDF5 /Ex compound complex128 reader
+ *     setupInversionSources      bundle reader for /inv_sources group (multi-freq sources)
+ *     loadObservedData           bundle reader for /observed/Ex (HDF5 compound complex128)
  *     writeInversionResults      final HDF5 dump (conductivity, X, RMS history)
  *     writeInversionSnapshotVTU  per-accepted-iter ParaView VTU snapshot
  *
@@ -61,11 +61,6 @@
  *   -output_filename  : base name for output artifacts (responses_*, etc.).
  *   -nord             : finite-element basis order, integer in 1..6.
  *
- * Optional options:
- *   -source_filename  : multi-frequency sources text file consumed by the
- *                       inverse kernel (im.csem). Not read by fm.csem — the
- *                       forward kernel pulls its single-frequency sources
- *                       from /sources inside inputFile.
  */
 PetscErrorCode readCsemParams(const PetscMPIInt size, csemParams* params) {
 
@@ -74,9 +69,8 @@ PetscErrorCode readCsemParams(const PetscMPIInt size, csemParams* params) {
   char      inputFilename[PETSC_MAX_PATH_LEN];
   char      outputDir[PETSC_MAX_PATH_LEN];
   char      outputFilename[PETSC_MAX_PATH_LEN];
-  char      sourceFilename[PETSC_MAX_PATH_LEN];
   PetscBool inputIsPresent, outputDirIsPresent, outputFilenameIsPresent;
-  PetscBool nordIsPresent, sourceFilenameIsPresent;
+  PetscBool nordIsPresent;
   PetscInt  nord;
 
   /* Unified input bundle (mesh + sigma + materials_id + receivers + forward sources) */
@@ -115,17 +109,6 @@ PetscErrorCode readCsemParams(const PetscMPIInt size, csemParams* params) {
     params->nord = nord;
   } else {
     params->nord = 0;  /* sentinel: loadCsemInputs will fill from /nord */
-  }
-
-  /* Optional multi-frequency sources file (im.csem only — the forward kernel
-   * reads its single-frequency sources from /sources inside inputFile). */
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-source_filename",
-                                  sourceFilename, sizeof(sourceFilename),
-                                  &sourceFilenameIsPresent));
-  if (sourceFilenameIsPresent) {
-    PetscCall(PetscStrncpy(params->sourceFilename, sourceFilename, sizeof(params->sourceFilename)));
-  } else {
-    params->sourceFilename[0] = '\0';
   }
 
   params->numMPITasks = size;
@@ -433,13 +416,6 @@ PetscErrorCode readInversionParams(invParams *iparams)
                PetscInt_FMT ")", iparams->nord);
   }
 
-  /* Observed data file */
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-observed_data_file",
-                                  iparams->observedDataFile,
-                                  sizeof(iparams->observedDataFile), &flg));
-  PetscCheck(flg, PETSC_COMM_WORLD, PETSC_ERR_USER,
-             "Option -observed_data_file is required");
-
   /* Inversion control */
   iparams->maxIter            = 80;
   iparams->lbfgsMemory        = 5;
@@ -456,7 +432,8 @@ PetscErrorCode readInversionParams(invParams *iparams)
   PetscCall(PetscOptionsGetReal(NULL, NULL, "-inv_lambda",
                                 &iparams->lambda, NULL));
   PetscCall(PetscOptionsGetReal(NULL, NULL, "-inv_error_level",
-                                &iparams->errorLevel, NULL));
+                                &iparams->errorLevel,
+                                &iparams->errorLevelFromCLI));
   PetscCall(PetscOptionsGetReal(NULL, NULL, "-inv_gtol",
                                 &iparams->gtol, NULL));
   PetscCall(PetscOptionsGetReal(NULL, NULL, "-inv_rms_tol",
@@ -464,12 +441,16 @@ PetscErrorCode readInversionParams(invParams *iparams)
   PetscCall(PetscOptionsGetReal(NULL, NULL, "-inv_diag_weight",
                                 &iparams->diagGradientWeight, NULL));
 
-  /* Fixed material IDs excluded from gradient smoothing */
-  iparams->numFixedMaterials = INV_MAX_FIXED_MATERIALS;
+  /* Fixed material IDs excluded from gradient smoothing.  Default 0
+   * means "use whatever the bundle says (or empty if bundle has no
+   * /inv_meta/fixed_materials)". */
+  iparams->numFixedMaterials       = INV_MAX_FIXED_MATERIALS;
+  iparams->fixedMaterialsFromCLI   = PETSC_FALSE;
   PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-inv_fixed_materials",
                                     iparams->fixedMaterials,
-                                    &iparams->numFixedMaterials, &flg));
-  if (!flg) iparams->numFixedMaterials = 0;
+                                    &iparams->numFixedMaterials,
+                                    &iparams->fixedMaterialsFromCLI));
+  if (!iparams->fixedMaterialsFromCLI) iparams->numFixedMaterials = 0;
 
   /* VTU snapshot interval: write model every N accepted L-BFGS steps */
   iparams->snapshotInterval = 0;
@@ -487,34 +468,28 @@ PetscErrorCode readInversionParams(invParams *iparams)
                                &iparams->fdCheckCells, NULL));
 
   /* numFreqs/allFreqs/invSources are populated later by
-   * setupInversionSources (from the sources file). */
+   * setupInversionSources (from the unified bundle's /inv_sources group). */
   iparams->numFreqs = 0;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
   PetscCall(PetscPrintf(comm, "\n Inversion parameters:\n"));
   PetscCall(PetscPrintf(comm, "   Basis order (nord)  = %" PetscInt_FMT "\n",
                         iparams->nord));
-  PetscCall(PetscPrintf(comm, "   Observed data file  = %s\n",
-                        iparams->observedDataFile));
   PetscCall(PetscPrintf(comm, "   Max iterations      = %" PetscInt_FMT "\n",
                         iparams->maxIter));
   PetscCall(PetscPrintf(comm, "   L-BFGS memory (M)   = %" PetscInt_FMT "\n",
                         iparams->lbfgsMemory));
   PetscCall(PetscPrintf(comm, "   Lambda (Tikhonov)   = %g\n",
                         (double)iparams->lambda));
-  PetscCall(PetscPrintf(comm, "   Error level         = %g\n",
-                        (double)iparams->errorLevel));
+  /* error_level and fixed_materials are printed by
+   * loadInversionMetaFromBundle after bundle resolution (so the line
+   * reflects the final value used by the kernel, including bundle
+   * overrides). */
   if (iparams->rmsTol > 0.0)
     PetscCall(PetscPrintf(comm, "   RMS early-stop      = %g\n",
                           (double)iparams->rmsTol));
   else
     PetscCall(PetscPrintf(comm, "   RMS early-stop      = disabled\n"));
-  PetscCall(PetscPrintf(comm, "   Fixed materials     = %" PetscInt_FMT
-                        " IDs:", iparams->numFixedMaterials));
-  for (PetscInt k = 0; k < iparams->numFixedMaterials; k++)
-    PetscCall(PetscPrintf(comm, " %" PetscInt_FMT,
-                          iparams->fixedMaterials[k]));
-  PetscCall(PetscPrintf(comm, "\n"));
   if (iparams->snapshotInterval > 0)
     PetscCall(PetscPrintf(comm, "   VTU snapshot        = every %" PetscInt_FMT
                           " accepted L-BFGS step(s)\n",
@@ -534,69 +509,106 @@ PetscErrorCode readInversionParams(invParams *iparams)
 /* ================================================================== */
 /* setupInversionSources                                               */
 /*                                                                     */
-/* Parses the inversion sources file (8-field format):                 */
-/*   freq  x  y  z  current  length  dip  azimuth                    */
-/* Each line is one source-frequency pair.  Comment (#) and blank      */
-/* lines are skipped.                                                  */
+/* Reads multi-frequency inversion sources from the unified bundle's   */
+/* /inv_sources group. Each row in /inv_sources/freq is one (freq,     */
+/* dipole) record; /inv_sources/{position,current,length,dipAngle,    */
+/* azimuthAngle} hold the corresponding dipole parameters.            */
+/*                                                                     */
+/* Uses raw HDF5 reads (not PetscViewerHDF5+VecLoad) because the       */
+/* datasets are written by h5py without the "complex" attribute PETSc  */
+/* expects on a complex-scalar build.                                  */
+/*                                                                     */
 /* Populates iparams->numFreqs, allFreqs[], invSources[].             */
 /* ================================================================== */
-PetscErrorCode setupInversionSources(const char *filename,
+static PetscErrorCode readF64Dataset1D(hid_t file, const char *path,
+                                       PetscInt expected_len,
+                                       double *out)
+{
+  PetscFunctionBeginUser;
+  hid_t   dset = H5Dopen2(file, path, H5P_DEFAULT);
+  PetscCheck(dset >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
+             "Cannot find dataset %s in bundle", path);
+  hid_t   sp   = H5Dget_space(dset);
+  hsize_t dims[1] = {0};
+  int     nd   = H5Sget_simple_extent_ndims(sp);
+  PetscCheck(nd == 1, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
+             "%s must be 1D, got %d", path, nd);
+  H5Sget_simple_extent_dims(sp, dims, NULL);
+  PetscCheck((PetscInt)dims[0] == expected_len, PETSC_COMM_SELF,
+             PETSC_ERR_FILE_READ,
+             "%s length %llu != expected %" PetscInt_FMT,
+             path, (unsigned long long)dims[0], expected_len);
+  H5Sclose(sp);
+  H5Dread(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, out);
+  H5Dclose(dset);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode setupInversionSources(const char *bundleFile,
                                      invParams  *iparams)
 {
   PetscFunctionBeginUser;
 
-  PetscMPIInt rank;
-  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
+  PetscCheck(bundleFile && bundleFile[0] != '\0', PETSC_COMM_WORLD,
+             PETSC_ERR_ARG_NULL,
+             "setupInversionSources: bundleFile is empty.");
 
-  /* Rank 0 reads the file; other ranks skip I/O */
-  PetscInt count = 0;
-  if (rank == 0) {
-    FILE *fp = fopen(filename, "r");
-    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN,
-               "Cannot open inversion sources file: %s", filename);
+  hid_t file = H5Fopen(bundleFile, H5F_ACC_RDONLY, H5P_DEFAULT);
+  PetscCheck(file >= 0, PETSC_COMM_WORLD, PETSC_ERR_FILE_OPEN,
+             "Cannot open bundle HDF5 file: %s", bundleFile);
 
-    char line[PETSC_MAX_PATH_LEN];
+  /* Probe /inv_sources/freq to get N_freq, then read each dataset. */
+  hid_t freqDset = H5Dopen2(file, "/inv_sources/freq", H5P_DEFAULT);
+  PetscCheck(freqDset >= 0, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ,
+             "Cannot find /inv_sources/freq in %s", bundleFile);
+  hid_t   freqSpace = H5Dget_space(freqDset);
+  hsize_t freqDims[1] = {0};
+  H5Sget_simple_extent_dims(freqSpace, freqDims, NULL);
+  PetscInt count = (PetscInt)freqDims[0];
+  H5Sclose(freqSpace);
+  H5Dclose(freqDset);
 
-    while (fgets(line, sizeof(line), fp)) {
-      if (line[0] == '#' || line[0] == '\n' || line[0] == ' ')
-        continue;
+  PetscCheck(count > 0, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ,
+             "/inv_sources/freq is empty in %s", bundleFile);
+  PetscCheck(count <= INV_MAX_FREQUENCIES, PETSC_COMM_WORLD, PETSC_ERR_SUP,
+             "Too many inversion sources (%" PetscInt_FMT " > max %d); "
+             "bump INV_MAX_FREQUENCIES in include/constants.h to raise the cap",
+             count, INV_MAX_FREQUENCIES);
 
-      PetscCheck(count < INV_MAX_FREQUENCIES, PETSC_COMM_SELF, PETSC_ERR_SUP,
-                 "Too many sources (max %d; bump INV_MAX_FREQUENCIES in "
-                 "include/constants.h to raise the cap)",
-                 INV_MAX_FREQUENCIES);
+  double *freqArr, *posArr, *curArr, *lenArr, *dipArr, *azArr;
+  PetscCall(PetscMalloc6(count, &freqArr, 3 * count, &posArr, count, &curArr,
+                         count, &lenArr, count, &dipArr, count, &azArr));
 
-      InvCsemSource *s = &iparams->invSources[count];
-      int ret = sscanf(line, "%lf %lf %lf %lf %lf %lf %lf %lf",
-                       &s->freq,
-                       &s->position[0], &s->position[1], &s->position[2],
-                       &s->current, &s->length,
-                       &s->dipAngle, &s->azimuthAngle);
-      PetscCheck(ret == 8, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-                 "Expected 8 fields (freq x y z current length dip azimuth) "
-                 "at line %" PetscInt_FMT " of %s", count + 1, filename);
+  PetscCall(readF64Dataset1D(file, "/inv_sources/freq",         count,     freqArr));
+  PetscCall(readF64Dataset1D(file, "/inv_sources/position",     3 * count, posArr));
+  PetscCall(readF64Dataset1D(file, "/inv_sources/current",      count,     curArr));
+  PetscCall(readF64Dataset1D(file, "/inv_sources/length",       count,     lenArr));
+  PetscCall(readF64Dataset1D(file, "/inv_sources/dipAngle",     count,     dipArr));
+  PetscCall(readF64Dataset1D(file, "/inv_sources/azimuthAngle", count,     azArr));
 
-      iparams->allFreqs[count] = s->freq;
-      count++;
-    }
-    fclose(fp);
+  H5Fclose(file);
 
-    PetscCheck(count > 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-               "No source entries found in %s", filename);
+  for (PetscInt i = 0; i < count; i++) {
+    InvCsemSource *s = &iparams->invSources[i];
+    s->freq              = freqArr[i];
+    s->position[0]       = posArr[i * 3 + 0];
+    s->position[1]       = posArr[i * 3 + 1];
+    s->position[2]       = posArr[i * 3 + 2];
+    s->current           = curArr[i];
+    s->length            = lenArr[i];
+    s->dipAngle          = dipArr[i];
+    s->azimuthAngle      = azArr[i];
+    iparams->allFreqs[i] = s->freq;
   }
 
-  /* Broadcast parsed data from rank 0 to all ranks */
-  PetscCallMPI(MPI_Bcast(&count, 1, MPIU_INT, 0, PETSC_COMM_WORLD));
-  PetscCallMPI(MPI_Bcast(iparams->invSources, (int)(count * sizeof(InvCsemSource)),
-                          MPI_BYTE, 0, PETSC_COMM_WORLD));
-  PetscCallMPI(MPI_Bcast(iparams->allFreqs, (int)count, MPIU_REAL, 0,
-                          PETSC_COMM_WORLD));
+  PetscCall(PetscFree6(freqArr, posArr, curArr, lenArr, dipArr, azArr));
+
   iparams->numFreqs = count;
 
   /* Print parsed source data */
   MPI_Comm comm = PETSC_COMM_WORLD;
-  PetscCall(PetscPrintf(comm, "\n Inversion sources:\n"));
-  PetscCall(PetscPrintf(comm, "   Source file         = %s\n", filename));
+  PetscCall(PetscPrintf(comm, "\n Inversion sources (from bundle /inv_sources):\n"));
+  PetscCall(PetscPrintf(comm, "   Bundle file         = %s\n", bundleFile));
   PetscCall(PetscPrintf(comm, "   Num entries         = %" PetscInt_FMT "\n",
                         iparams->numFreqs));
   for (PetscInt i = 0; i < iparams->numFreqs; i++) {
@@ -613,31 +625,123 @@ PetscErrorCode setupInversionSources(const char *filename,
 }
 
 /* ================================================================== */
-/* loadObservedData                                                    */
+/* loadInversionMetaFromBundle                                         */
 /*                                                                     */
-/* Reads observed data from HDF5 file.                                */
-/* Expected datasets:                                                  */
-/*   /Ex             [numFreqs x numReceivers] complex128              */
-/*                   (HDF5 compound type {r: float64, i: float64})    */
-/*   /frequencies    [numFreqs] float64            (optional, info)   */
-/* Stores as dense Mat dObs[numFreqs][numReceivers] (PETSC_COMM_SELF) */
+/* Pulls case-property defaults from the bundle:                       */
+/*   /observed @error_level         → iparams->errorLevel              */
+/*   /inv_meta/fixed_materials      → iparams->{fixedMaterials,        */
+/*                                              numFixedMaterials}     */
 /*                                                                     */
-/* Generate the HDF5 file with:                                        */
-/*   python tests/inverse/convert_invex_to_hdf5.py                     */
-/*   python tests/inverse/generate_observed_data.py                    */
+/* Honours CLI precedence: if iparams->errorLevelFromCLI is true,      */
+/* the CLI value wins and the bundle attribute is ignored (same for    */
+/* fixedMaterialsFromCLI).  Bundle entries that are absent leave the   */
+/* defaults from readInversionParams alone.                            */
 /* ================================================================== */
-PetscErrorCode loadObservedData(const invParams *iparams,
-                                PetscInt         numReceivers,
-                                Mat             *dObs)
+PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
+                                            invParams  *iparams)
 {
   PetscFunctionBeginUser;
 
-  /* Variables declaration */
-  PetscInt     numFreqs = iparams->numFreqs;
-  MPI_Comm     comm     = PETSC_COMM_WORLD;
+  PetscCheck(bundleFile && bundleFile[0] != '\0', PETSC_COMM_WORLD,
+             PETSC_ERR_ARG_NULL,
+             "loadInversionMetaFromBundle: bundleFile is empty.");
+
+  MPI_Comm comm = PETSC_COMM_WORLD;
+  const char *errLevelOrigin = iparams->errorLevelFromCLI ? "CLI" : "default";
+  const char *fixedMatsOrigin = iparams->fixedMaterialsFromCLI ? "CLI" : "default";
+
+  /* Suppress noisy H5 error stack when probing optional entries. */
+  H5E_auto2_t old_handler;
+  void       *old_client_data;
+  H5Eget_auto2(H5E_DEFAULT, &old_handler, &old_client_data);
+  H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
+
+  hid_t file = H5Fopen(bundleFile, H5F_ACC_RDONLY, H5P_DEFAULT);
+  PetscCheck(file >= 0, comm, PETSC_ERR_FILE_OPEN,
+             "Cannot open bundle HDF5 file: %s", bundleFile);
+
+  /* /observed @error_level (optional) */
+  if (!iparams->errorLevelFromCLI && H5Lexists(file, "/observed", H5P_DEFAULT) > 0) {
+    hid_t grp = H5Gopen2(file, "/observed", H5P_DEFAULT);
+    if (grp >= 0 && H5Aexists(grp, "error_level") > 0) {
+      hid_t  attr = H5Aopen(grp, "error_level", H5P_DEFAULT);
+      double v;
+      H5Aread(attr, H5T_NATIVE_DOUBLE, &v);
+      H5Aclose(attr);
+      iparams->errorLevel = v;
+      errLevelOrigin = "bundle";
+    }
+    if (grp >= 0) H5Gclose(grp);
+  }
+
+  /* /inv_meta/fixed_materials (optional) */
+  if (!iparams->fixedMaterialsFromCLI &&
+      H5Lexists(file, "/inv_meta/fixed_materials", H5P_DEFAULT) > 0) {
+    hid_t dset = H5Dopen2(file, "/inv_meta/fixed_materials", H5P_DEFAULT);
+    if (dset >= 0) {
+      hid_t   sp  = H5Dget_space(dset);
+      hsize_t dims[1] = {0};
+      H5Sget_simple_extent_dims(sp, dims, NULL);
+      PetscInt n = (PetscInt)dims[0];
+      PetscCheck(n <= INV_MAX_FIXED_MATERIALS, comm, PETSC_ERR_SUP,
+                 "/inv_meta/fixed_materials has %" PetscInt_FMT " entries; "
+                 "INV_MAX_FIXED_MATERIALS=%d. Bump the cap in include/constants.h.",
+                 n, INV_MAX_FIXED_MATERIALS);
+      int *buf;
+      PetscCall(PetscMalloc1(n, &buf));
+      H5Dread(dset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
+      for (PetscInt k = 0; k < n; k++) iparams->fixedMaterials[k] = (PetscInt)buf[k];
+      iparams->numFixedMaterials = n;
+      PetscCall(PetscFree(buf));
+      H5Sclose(sp);
+      H5Dclose(dset);
+      fixedMatsOrigin = "bundle";
+    }
+  }
+
+  H5Fclose(file);
+  H5Eset_auto2(H5E_DEFAULT, old_handler, old_client_data);
+
+  /* Final-value banner (matches the style of readInversionParams) */
+  PetscCall(PetscPrintf(comm, "   Error level         = %g  (%s)\n",
+                        (double)iparams->errorLevel, errLevelOrigin));
+  PetscCall(PetscPrintf(comm, "   Fixed materials     = %" PetscInt_FMT
+                        " IDs (%s):", iparams->numFixedMaterials, fixedMatsOrigin));
+  for (PetscInt k = 0; k < iparams->numFixedMaterials; k++)
+    PetscCall(PetscPrintf(comm, " %" PetscInt_FMT,
+                          iparams->fixedMaterials[k]));
+  PetscCall(PetscPrintf(comm, "\n"));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* ================================================================== */
+/* loadObservedData                                                    */
+/*                                                                     */
+/* Reads observed data from the unified bundle's /observed/Ex dataset, */
+/* which is a 2-D HDF5 compound complex128 dataset (type {r,i} float64)*/
+/* of shape [numFreqs, numReceivers].  Stores as dense Mat dObs        */
+/* (PETSC_COMM_SELF) and broadcasts to all ranks.                      */
+/*                                                                     */
+/* Generated by utils/preprocess.py -mode inverse, which embeds the    */
+/* observed-data HDF5 produced by tests/cases/inverse/                  */
+/* generate_observed_data.py into the same bundle file consumed by     */
+/* loadCsemInputs.                                                     */
+/* ================================================================== */
+PetscErrorCode loadObservedData(const char *bundleFile,
+                                PetscInt    numFreqs,
+                                PetscInt    numReceivers,
+                                Mat        *dObs)
+{
+  PetscFunctionBeginUser;
+
+  MPI_Comm     comm = PETSC_COMM_WORLD;
   PetscMPIInt  rank;
 
   PetscCallMPI(MPI_Comm_rank(comm, &rank));
+
+  PetscCheck(bundleFile && bundleFile[0] != '\0', comm, PETSC_ERR_ARG_NULL,
+             "loadObservedData: bundleFile is empty.");
 
   /* Create sequential dense matrix (all ranks) */
   PetscCall(MatCreateDense(PETSC_COMM_SELF, numFreqs, numReceivers,
@@ -646,29 +750,26 @@ PetscErrorCode loadObservedData(const invParams *iparams,
 
   /* Only rank 0 reads the HDF5 file, then broadcasts */
   if (rank == 0) {
-    hid_t file_id = H5Fopen(iparams->observedDataFile, H5F_ACC_RDONLY,
-                             H5P_DEFAULT);
+    hid_t file_id = H5Fopen(bundleFile, H5F_ACC_RDONLY, H5P_DEFAULT);
     PetscCheck(file_id >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN,
-               "Cannot open observed data HDF5 file: %s",
-               iparams->observedDataFile);
+               "Cannot open bundle HDF5 file: %s", bundleFile);
 
-    /* Open /Ex dataset (complex128 compound type {r, i}) */
-    hid_t dset = H5Dopen2(file_id, "Ex", H5P_DEFAULT);
+    /* Open /observed/Ex dataset (complex128 compound type {r, i}) */
+    hid_t dset = H5Dopen2(file_id, "/observed/Ex", H5P_DEFAULT);
     PetscCheck(dset >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-               "Cannot find /Ex dataset in %s",
-               iparams->observedDataFile);
+               "Cannot find /observed/Ex dataset in %s", bundleFile);
 
     /* Verify dimensions [numFreqs x numReceivers] */
     hid_t   space = H5Dget_space(dset);
     int     ndims = H5Sget_simple_extent_ndims(space);
     hsize_t dims[2];
     PetscCheck(ndims == 2, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-               "/Ex must be 2D, got %d dimensions", ndims);
+               "/observed/Ex must be 2D, got %d dimensions", ndims);
     H5Sget_simple_extent_dims(space, dims, NULL);
     PetscCheck((PetscInt)dims[0] == numFreqs &&
                (PetscInt)dims[1] == numReceivers,
                PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-               "/Ex shape [%llu x %llu] != expected [%" PetscInt_FMT
+               "/observed/Ex shape [%llu x %llu] != expected [%" PetscInt_FMT
                " x %" PetscInt_FMT "]",
                (unsigned long long)dims[0], (unsigned long long)dims[1],
                numFreqs, numReceivers);
@@ -728,9 +829,8 @@ PetscErrorCode loadObservedData(const invParams *iparams,
   }
   PetscCall(PetscFree(bcast));
 
-  PetscCall(PetscPrintf(comm, "\n Observed data (HDF5):\n"));
-  PetscCall(PetscPrintf(comm, "   File                = %s\n",
-                        iparams->observedDataFile));
+  PetscCall(PetscPrintf(comm, "\n Observed data (from bundle /observed/Ex):\n"));
+  PetscCall(PetscPrintf(comm, "   Bundle file         = %s\n", bundleFile));
   PetscCall(PetscPrintf(comm, "   Frequencies         = %" PetscInt_FMT "\n",
                         numFreqs));
   PetscCall(PetscPrintf(comm, "   Receivers           = %" PetscInt_FMT "\n",

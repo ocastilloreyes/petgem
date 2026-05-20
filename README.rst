@@ -56,6 +56,7 @@ PETGEM requires the following main dependencies:
    - setuptools 
    - wheel
    - sphinx (for documentation)
+   - pytest 
 
 For a fully reproducible environment, a Docker image is provided (see below).
 
@@ -80,23 +81,27 @@ You can build and run PETGEM inside Docker for a consistent development and test
    make
 
    # Setup environment
-   export CSEM_TEST_DIR=tests/csem_model
+   export CSEM_TEST_DIR=tests/cases/csem_model
 
    # Mesh generation (specific to nord=1)
    gmsh ${CSEM_TEST_DIR}/mesh_p1.geo -3
 
    # Generate input data (mesh, params file. Specific to nord=1)
-   python3 ${CSEM_TEST_DIR}/preprocess.py \
-      -nord 1 \
-      -case_dir ${CSEM_TEST_DIR} \
-      -mesh_filename mesh_p1.msh \
-      -source_filename sources.txt \
-      -receiver_filename receivers.txt \
-      -resistivity_view model.vtu
+   python3 utils/preprocess.py \
+        -mode forward \
+        -nord 1 \
+        -case_dir  ${CSEM_TEST_DIR} \
+        -mesh_filename mesh_p1.msh \
+        -source_filename sources.txt \
+        -receiver_filename receivers.txt \
+        -sigma_file sigmas.csv \
+        -input_filename input.h5 \
+        -params_filename params.txt \
+        -output_vtk model.vtu
 
    # Forward modeling (Parallel and specific to nord=1)
-   mpirun -n 4 build/fm.csem -options_file ${CSEM_TEST_DIR}/params_nord1.txt
-   
+   mpirun -n 4 build/fm.csem -options_file ${CSEM_TEST_DIR}/params.txt
+
 Documentation
 -------------
 

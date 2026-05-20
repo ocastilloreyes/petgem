@@ -879,12 +879,12 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
   ReceiverInterpolationMatrices Q;
   PetscCall(buildReceiverInterpolationMatrices(iparams->nord,
                                                 receivers,
-                                                dm, grid,
-                                                iparams->verbose, &Q));
+                                                dm, grid, &Q));
 
-  /* ---- Load observed data ---- */
+  /* ---- Load observed data from the unified bundle (/observed/Ex) ---- */
   Mat dObs;
-  PetscCall(loadObservedData(iparams, Q.numReceivers, &dObs));
+  PetscCall(loadObservedData(iparams->bundleFile, iparams->numFreqs,
+                              Q.numReceivers, &dObs));
 
   /* ---- Get conductivity DM (3 DOF/cell) for scatter operations ---- */
   DM dmConductivity;

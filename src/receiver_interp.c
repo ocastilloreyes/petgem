@@ -34,7 +34,6 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                                   Vec         receivers,
                                                   const DM    dm,
                                                   const Grid *grid,
-                                                  PetscBool   verbose,
                                                   ReceiverInterpolationMatrices *Q)
 {
   PetscFunctionBeginUser;
@@ -73,42 +72,6 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                            &receiverSF));
   PetscCall(PetscSFGetGraph(receiverSF, NULL, &numFound,
                             &recvFound, &recvInCell));
-
-  /* Diagnostic: total leaves reported by DMLocatePoints across all ranks.
-   * Expected = numGlobalReceivers (one leaf per receiver).  Any excess is
-   * a receiver found in >1 cell (shared face / edge / vertex) and will
-   * double-accumulate Q rows via ADD_VALUES below. */
-  {
-    PetscInt localLeaves = numFound, globalLeaves = 0;
-    PetscInt dupOnThisRank = 0;
-    if (numFound > 0 && recvFound) {
-      PetscInt *seen;
-      PetscCall(PetscCalloc1(numGlobalReceivers, &seen));
-      for (PetscInt j = 0; j < numFound; j++) {
-        PetscInt ridx = recvFound[j];
-        if (ridx >= 0 && ridx < numGlobalReceivers) {
-          seen[ridx]++;
-          if (seen[ridx] > 1) dupOnThisRank++;
-        }
-      }
-      PetscCall(PetscFree(seen));
-    }
-    PetscInt globalDup = 0;
-    PetscCallMPI(MPI_Allreduce(&localLeaves, &globalLeaves, 1, MPIU_INT,
-                                MPI_SUM, comm));
-    PetscCallMPI(MPI_Allreduce(&dupOnThisRank, &globalDup, 1, MPIU_INT,
-                                MPI_SUM, comm));
-    if (verbose) {
-      PetscCall(PetscPrintf(comm,
-        "\n DMLocatePoints diagnostic:\n"
-        "   Global receivers     = %" PetscInt_FMT "\n"
-        "   Total leaves found   = %" PetscInt_FMT
-        " (excess = %" PetscInt_FMT ")\n"
-        "   Intra-rank duplicates= %" PetscInt_FMT "\n",
-        numGlobalReceivers, globalLeaves,
-        globalLeaves - numGlobalReceivers, globalDup));
-    }
-  }
 
   /* Global DOF count for matrix column size */
   Vec  tmpVec;
@@ -343,31 +306,6 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   PetscCall(PetscFree(dofSigns));
   PetscCall(PetscSFDestroy(&receiverSF));
   /* Note: `receivers` Vec is owned by the caller and not destroyed here. */
-
-  PetscCall(PetscPrintf(comm,
-    "\n Receiver interpolation matrices:\n"
-    "   Receivers           = %" PetscInt_FMT "\n"
-    "   DOFs                = %" PetscInt_FMT "\n",
-    numGlobalReceivers, M));
-
-  /* Diagnostic: Q-matrix norms + nnz.  These are global reductions — if
-   * the Q entries and sparsity are correct, they must be MPI-invariant.
-   * Any drift across rank counts pinpoints the Q assembly bug (cell
-   * vertex ordering, dofSigns, Jacobian, basis evaluation). */
-  if (verbose) {
-    PetscReal qExNorm, qEyNorm, qEzNorm, qHxNorm;
-    MatInfo   info;
-    PetscCall(MatNorm(Q->QEx, NORM_FROBENIUS, &qExNorm));
-    PetscCall(MatNorm(Q->QEy, NORM_FROBENIUS, &qEyNorm));
-    PetscCall(MatNorm(Q->QEz, NORM_FROBENIUS, &qEzNorm));
-    PetscCall(MatNorm(Q->QHx, NORM_FROBENIUS, &qHxNorm));
-    PetscCall(MatGetInfo(Q->QEx, MAT_GLOBAL_SUM, &info));
-    PetscCall(PetscPrintf(comm,
-      "   ||QEx||_F = %.8e  nnz(QEx) = %.0f\n"
-      "   ||QEy||_F = %.8e  ||QEz||_F = %.8e  ||QHx||_F = %.8e\n",
-      (double)qExNorm, (double)info.nz_used,
-      (double)qEyNorm, (double)qEzNorm, (double)qHxNorm));
-  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

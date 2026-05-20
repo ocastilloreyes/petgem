@@ -37,10 +37,13 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 typedef struct {
   /* FEM parameters (shared with forward kernel) */
-  PetscInt  nord;                                  /* basis order (1,2,3)    */
+  PetscInt  nord;                                  /* basis order (1..6)     */
 
   /* Inversion-specific parameters */
-  char      observedDataFile[PETSC_MAX_PATH_LEN];  /* observed data HDF5     */
+  /* Path to the unified bundle (mirror of csemParams.inputFile, stashed
+   * here so runCsemInversion can read /observed/Ex from the bundle
+   * without taking csemParams as an arg). Set by im.csem at startup. */
+  char      bundleFile[PETSC_MAX_PATH_LEN];
   PetscInt  maxIter;                               /* max L-BFGS iterations  */
   PetscInt  lbfgsMemory;                           /* L-BFGS M parameter     */
   PetscReal lambda;                                /* Tikhonov factor        */
@@ -51,9 +54,16 @@ typedef struct {
 
   /* Fixed material IDs: cells whose material_id matches one of these values
    * are excluded from gradient smoothing (treated as self-referencing).
-   * Read from -inv_fixed_materials as a comma-separated list (0-based).   */
+   * Defaults come from the bundle's /inv_meta/fixed_materials dataset
+   * (written by the preprocess from sigmas.csv's `fixed` column);
+   * -inv_fixed_materials on the CLI is an override.                       */
   PetscInt  numFixedMaterials;                     /* number of fixed IDs    */
   PetscInt  fixedMaterials[INV_MAX_FIXED_MATERIALS]; /* fixed material ID list */
+
+  /* Provenance flags: PETSC_TRUE iff the corresponding field was set on the
+   * CLI (and so should NOT be overridden by the bundle reader).            */
+  PetscBool errorLevelFromCLI;
+  PetscBool fixedMaterialsFromCLI;
 
   /* Source-frequency pairs (parsed from sources.txt, 8-field format:
    * freq  x  y  z  current  length  dip  azimuth)                    */
@@ -153,17 +163,29 @@ typedef struct {
 /* Read inversion parameters from PETSc options database */
 PetscErrorCode readInversionParams(invParams *iparams);
 
-/* Parse inversion sources file (8-field format:
- * freq x y z current length dip azimuth).
+/* Load case-property defaults from the bundle (error_level attribute on
+ * /observed, fixed_materials array under /inv_meta) and apply to iparams
+ * UNLESS the corresponding CLI override was present (see the
+ * *FromCLI provenance flags above).  Safe to call even when the bundle
+ * has no such entries — iparams just keeps the readInversionParams
+ * defaults. */
+PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
+                                            invParams  *iparams);
+
+/* Load multi-frequency inversion sources from the unified bundle's
+ * /inv_sources group (replaces the legacy text-file format).
+ * `bundleFile` is the same HDF5 path consumed by loadCsemInputs.
  * Populates iparams->numFreqs, allFreqs[], invSources[]. */
-PetscErrorCode setupInversionSources(const char *filename,
+PetscErrorCode setupInversionSources(const char *bundleFile,
                                      invParams  *iparams);
 
-/* Load observed data from HDF5 (/Ex complex128 dataset)
- * Returns dense Mat of size numFreqs x numReceivers on PETSC_COMM_SELF */
-PetscErrorCode loadObservedData(const invParams *iparams,
-                                PetscInt numReceivers,
-                                Mat *dObs);
+/* Load observed data from the unified bundle's /observed/Ex dataset
+ * (HDF5 compound complex128, shape [numFreqs, numReceivers]).
+ * Returns dense Mat of size numFreqs x numReceivers on PETSC_COMM_SELF. */
+PetscErrorCode loadObservedData(const char *bundleFile,
+                                PetscInt    numFreqs,
+                                PetscInt    numReceivers,
+                                Mat        *dObs);
 
 /* Build CSR neighbor smoothing graph from DMPlex topology.
  * Cells whose material_id matches any entry in iparams->fixedMaterials

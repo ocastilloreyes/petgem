@@ -60,16 +60,12 @@ typedef struct {
  *                bundled input HDF5.
  *   dm         : H(curl) DM the solution lives on
  *   grid       : Grid struct produced by setupCsemGrid
- *   verbose    : when PETSC_TRUE, prints DMLocatePoints + Q-matrix
- *                Frobenius / nnz diagnostics used for MPI-invariance
- *                debugging. Production runs pass PETSC_FALSE.
  *   Q          : output struct; caller invokes
  *                destroyReceiverInterpolationMatrices when done. */
 PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                                   Vec         receivers,
                                                   const DM    dm,
                                                   const Grid *grid,
-                                                  PetscBool   verbose,
                                                   ReceiverInterpolationMatrices *Q);
 
 /* Free Q matrices. */

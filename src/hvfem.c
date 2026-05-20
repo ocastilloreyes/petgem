@@ -2535,9 +2535,9 @@ PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature) {
 
 /**
  * @brief Computes the elemental mass and stiffness matrices for a tetrahedral cell
- *        using first-order Nédélec edge basis functions (H(curl)-conforming).
+ *        using the Nédélec edge basis (H(curl)-conforming).
  *
- * @param[in] nord Polynomial order of the Nédélec basis functions (currently supports 1).
+ * @param[in] nord Polynomial order of the Nédélec basis functions (1..6, dispatched via fem->ops).
  * @param[in] numDofInCell Number of degrees of freedom per cell (edges).
  * @param[in] cell Pointer to the Cell structure containing:
  *                 - Jacobian matrix and determinant
@@ -2740,7 +2740,7 @@ PetscReal vectorNorm(const PetscReal v[NUM_DIMENSIONS]) {
  * @brief Computes the elemental gradient matrix mapping H1 scalar basis functions
  *        (nodal) to H(curl) Nédélec edge basis functions for a tetrahedral element.
  *
- * @param[in] nord Polynomial order of the H1 basis functions (currently supports 1).
+ * @param[in] nord Polynomial order of the H1 basis functions (1..6, dispatched via fem->ops).
  * @param[in] numDofInCell Number of H(curl) degrees of freedom (edges) in the tetrahedral cell.
  * @param[in] numH1DofInCell Number of H1 degrees of freedom (vertices) in the tetrahedral cell.
  * @param[in] cell Pointer to the Cell structure containing:

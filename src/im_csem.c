@@ -110,27 +110,24 @@ int runInverse(int argc, char **argv)
   /* ---------------------------------------------------------------- */
   PetscCall(readInversionParams(&iparams));
 
-  /* ---------------------------------------------------------------- */
-  /* Parse inversion sources (8-field format: freq x y z I L dip az)   */
-  /* ---------------------------------------------------------------- */
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 4);
-#endif
+  /* Stash the bundle path on iparams so runCsemInversion can load
+   * /observed/Ex from the same file (avoids threading params into the
+   * inversion driver). */
+  PetscCall(PetscStrncpy(iparams.bundleFile, params.inputFile,
+                         sizeof(iparams.bundleFile)));
 
-  PetscCall(PetscTime(&start_timer));
-  PetscCall(setupInversionSources(params.sourceFilename, &iparams));
-  PetscCall(PetscTime(&end_timer));
-  timers[1] = end_timer - start_timer;
-
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
+  /* Pull case-property defaults out of the bundle (error_level,
+   * fixed_materials) — CLI overrides applied by readInversionParams
+   * already take precedence via the *FromCLI provenance flags. */
+  PetscCall(loadInversionMetaFromBundle(iparams.bundleFile, &iparams));
 
   /* ---------------------------------------------------------------- */
   /* Load unified PETGEM input: mesh + sigma + materials_id +          */
-  /* receivers. Multi-frequency sources come from setupInversionSources */
-  /* above (different file format), so we pass NULL for the sources    */
-  /* output.                                                            */
+  /* receivers from the bundle. The bundle's inv_sources group and     */
+  /* observed Ex dataset are read below via setupInversionSources and  */
+  /* (later, once numReceivers is known) loadObservedData inside       */
+  /* runCsemInversion. The forward /sources group is skipped (NULL) —  */
+  /* the inverse kernel uses the multi-frequency inv_sources records.  */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 5);
@@ -138,7 +135,7 @@ int runInverse(int argc, char **argv)
 
   PetscCall(PetscTime(&start_timer));
   PetscCall(loadCsemInputs(&params, &dm, &resistivity, &materials_id,
-                           NULL,           /* sources: im uses its own multi-freq reader */
+                           NULL,           /* skip /sources; we read /inv_sources next */
                            &receivers));
   /* Sync the basis order into invParams: the bundle's /nord (read by
    * loadCsemInputs into params.nord) is the source of truth, unless the
@@ -146,6 +143,22 @@ int runInverse(int argc, char **argv)
   if (iparams.nord == 0) iparams.nord = params.nord;
   PetscCall(PetscTime(&end_timer));
   timers[2] = end_timer - start_timer;
+
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 0);
+#endif
+
+  /* ---------------------------------------------------------------- */
+  /* Load multi-frequency inversion sources from bundle /inv_sources   */
+  /* ---------------------------------------------------------------- */
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 4);
+#endif
+
+  PetscCall(PetscTime(&start_timer));
+  PetscCall(setupInversionSources(params.inputFile, &iparams));
+  PetscCall(PetscTime(&end_timer));
+  timers[1] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);

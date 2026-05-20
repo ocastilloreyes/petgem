@@ -8,23 +8,18 @@ users to validate the code and learn the typical workflow for setting up and run
 Canonical CSEM example
 ----------------------
 These test cases validate **PETGEM** using 3D CSEM models
-with simple stratified resistivity structures. The setup reproduces the canonical model described in:
-
-Castillo-Reyes, O., de la Puente, J. M., Cela, J. M. (2018). *PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements.* Computers & Geosciences, 119, 123–136. `DOI 10.1016/j.cageo.2018.07.005 <https://doi.org/10.1016/j.cageo.2018.07.005>`_.
-
+with simple conductivity structures. 
 
 Model description
 *****************
 
 - Frequency: 2 Hz
-- Source position at xyz=[0.0, 0.0,-975.0] m
+- Source position at xyz = [0.0, 0.0, 0.0] m
 - Conductivity structures
 
-   - Seawater: 3.33 S/m
-   - Sediments: 1.0 S/m
-   - Oil reservoir: 0.01 S/m
-   - Sediments: 1.0 S/m
-
+   - Resistive block: 0.01 S/m
+   - Half-space: 1.0 S/m
+   
 The domain is discretized with an unstructured tetrahedral mesh generated using `Gmsh <http://gmsh.info/>`_.
 
 Execution steps
@@ -51,7 +46,9 @@ Set the desired polynomial order by modifying the ``NORD`` variable:
       -case_dir ${CSEM_TEST_DIR} \
       -mesh_filename mesh_p${NORD}.msh \
       -source_filename sources.txt \
-      -receiver_filename receivers.txt
+      -receiver_filename receivers.txt \
+      -output_vtk model.vtu \
+      -dm_view True
 
    # Forward modeling (parallel example)
    mpirun -n 4 build/fm.csem \

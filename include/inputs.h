@@ -23,11 +23,6 @@ typedef struct {
   char outputDirectory[PETSC_MAX_PATH_LEN];
   char outputFilename[PETSC_MAX_PATH_LEN];
 
-  /* Multi-frequency sources file used by the inverse kernel only (separate
-   * format from the forward bundle: 8 fields per row including frequency).
-   * Forward kernel ignores this — sources come from /sources in inputFile. */
-  char sourceFilename[PETSC_MAX_PATH_LEN];
-
   PetscInt    nord;
   PetscMPIInt numMPITasks;
 

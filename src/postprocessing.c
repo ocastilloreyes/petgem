@@ -102,9 +102,7 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
    * indexing, irrespective of partition. */
   PetscCall(buildReceiverInterpolationMatrices(params.nord,
                                                 receivers,
-                                                dm, &grid,
-                                                PETSC_TRUE, /* fm.csem: keep verbose diagnostics */
-                                                &Q));
+                                                dm, &grid, &Q));
 
   /* Allocate output Vecs sized to match Q's row layout (left vector). */
   PetscCall(MatCreateVecs(Q.QEx, NULL, &Ex));
