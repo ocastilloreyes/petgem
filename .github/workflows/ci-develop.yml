@@ -24,6 +24,11 @@ env:
   CSEM_CASE_DIR: tests/cases/csem_model
   EXTRAE_CASE_DIR: tests/cases/csem_model/extrae
   DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+  # Forces JavaScript actions still declaring Node 20 (e.g.
+  # dorny/paths-filter@v3, which has no Node 24 release yet) to run on
+  # Node 24 — silences the Node 20 deprecation warning until upstream
+  # ships a v4. Remove once all actions natively support Node 24.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 # ====
 # Jobs
@@ -40,7 +45,7 @@ jobs:
       pytest: ${{ steps.filter.outputs.pytest }}
       cases: ${{ steps.filter.outputs.cases }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dorny/paths-filter@v3
         id: filter
@@ -69,7 +74,7 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -107,7 +112,7 @@ jobs:
         extrae: [0, 1]
       fail-fast: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Pull Docker image
         run: docker pull ${{ env.DOCKER_IMAGE }}
@@ -145,7 +150,7 @@ jobs:
     needs: [docker-build, changes]
     if: needs.changes.outputs.src == 'true' || needs.changes.outputs.pytest == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Pull Docker image
         run: docker pull ${{ env.DOCKER_IMAGE }}
@@ -190,7 +195,7 @@ jobs:
       fail-fast: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download PETGEM binary
         uses: actions/download-artifact@v4
@@ -283,7 +288,7 @@ jobs:
     needs: [docker-build, changes]
     if: needs.changes.outputs.docs == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Pull Docker image
         run: docker pull ${{ env.DOCKER_IMAGE }}
       - name: Generate documentation
@@ -301,7 +306,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [docker-build, compile-docs, compile-petgem, test-unit, test-petgem]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq
