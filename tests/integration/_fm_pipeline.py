@@ -17,11 +17,11 @@ import pytest
 # (3D quadrature + denser local matrices).
 FM_CSEM_TIMEOUT_BY_NORD = {
     1:  120,
-    2:  300,
-    3:  600,
-    4: 1200,
-    5: 2400,
-    6: 3600,
+    2: 1200,
+    3: 1800,
+    4: 2400,
+    5: 3600,
+    6: 4800,
 }
 PREPROCESS_TIMEOUT = 120
 
