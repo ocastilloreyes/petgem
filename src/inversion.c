@@ -278,6 +278,28 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
     }
   }
 
+  /* ---- K, Ms (template), G_BDDC built once ----
+   * K is σ-independent (μ_r = I, no σ enters the curl-curl integrand).
+   * G_BDDC is integer ±1 vertex incidence — purely topological.
+   * Both can be reused for every L-BFGS iteration.
+   *
+   * Ms's values produced here come from whatever σ is in `conductivity`
+   * at setup time (= the initial σ derived from X0).  Those values get
+   * overwritten by the per-iter assembleCsemMsRefill call, so we only
+   * actually keep Ms for its sparsity pattern (= K's pattern, attached
+   * to the right local-to-global mapping). */
+  csemParams kandmStub;
+  PetscCall(PetscMemzero(&kandmStub, sizeof(kandmStub)));
+  kandmStub.nord        = ctx->iparams->nord;
+  kandmStub.numMPITasks = stub.numMPITasks;
+  kandmStub.quiet       = PETSC_TRUE;
+  PetscCall(assembleCsemKandM(kandmStub, ctx->dm, ctx->grid,
+                               ctx->conductivity,
+                               0.0,             /* constFactor (unused: K/Ms mode) */
+                               &ctx->Kmat, &ctx->Msmat,
+                               NULL /* canonical G — skip */,
+                               &ctx->Gmat_BDDC));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -313,6 +335,10 @@ static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx)
   PetscCall(PetscFree(ctx->Wf_per_freq));
   PetscCall(PetscFree(ctx->dObsRow_per_freq));
   ctx->numFreqsAlloc = 0;
+
+  PetscCall(MatDestroy(&ctx->Kmat));
+  PetscCall(MatDestroy(&ctx->Msmat));
+  PetscCall(MatDestroy(&ctx->Gmat_BDDC));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -444,32 +470,29 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
                               c->graph, fwdDiagWeight, c->XPostSmooth));
   }
 
-  /* ---- 2. Assemble K (stiffness) and M(σ) (mass) once per iteration.
-   *         These are frequency-independent; only the scalar iωμ changes
-   *         per frequency. assembleCsemKandM is the unified forward/
-   *         inverse assembly function (forward kernel uses the same
-   *         call site in fm_csem.c). */
+  /* ---- 2. Refill Ms(σ) with the current iterate's σ ----
+   * K (curl-curl stiffness, σ-independent) and G_BDDC (topological,
+   * σ-independent) were built once in setupInversionWorkspace and live
+   * on the context — they are reused for every L-BFGS iteration.
+   * Only Ms needs to be recomputed when σ changes.
+   *
+   * assembleCsemMsRefill walks the local cells, shares the per-cell
+   * setup helper (prepareCellForAssembly) with assembleCsemKandM, and
+   * overwrites Ms in-place using the cached sparsity pattern. */
   csemParams fwdParams;
   PetscCall(PetscMemzero(&fwdParams, sizeof(fwdParams)));
   fwdParams.nord = c->iparams->nord;
   PetscCallMPI(MPI_Comm_size(comm, &fwdParams.numMPITasks));
-  /* Suppress per-call assembly headers in the L-BFGS loop; otherwise
-   * every iteration spams the log with "Assembly RHS / Vector size /
-   * Initiated / Finished" × Nfreq. */
   fwdParams.quiet = PETSC_TRUE;
 
-  /* Inverse kernel needs K and Ms separately (forms A_f per frequency
-   * via MatDuplicate + MatAXPY inside the frequency loop below). Pass
-   * a non-NULL Ms pointer to select K/Ms mode; constFactor is unused
-   * in that mode. The canonical Π^Ned G is skipped (NULL); only the
-   * BDDC structural-hint gradient (G_BDDC) is built. */
-  Mat Kmat = NULL, Msmat = NULL, Gmat = NULL;
-  PetscCall(assembleCsemKandM(fwdParams, c->dm, c->grid,
-                              c->conductivity,
-                              0.0,            /* constFactor (unused in K/Ms mode) */
-                              &Kmat, &Msmat,
-                              NULL /* canonical G — skip */,
-                              &Gmat /* G_BDDC for PCBDDC */));
+  PetscCall(assembleCsemMsRefill(fwdParams, c->dm, c->grid,
+                                  c->conductivity,
+                                  &c->quad3d, c->MeRows, c->KeRows,
+                                  c->Msmat));
+
+  Mat Kmat = c->Kmat;
+  Mat Msmat = c->Msmat;
+  Mat Gmat  = c->Gmat_BDDC;
 
   /* ---- 3. Zero gradient accumulator ---- */
   PetscCall(VecZeroEntries(c->DfDm));
@@ -583,12 +606,9 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscCall(KSPDestroy(&ksp));
   } /* end frequency loop */
 
-  /* Destroy iteration-level matrices (A is per-iter; K/Ms/G are rebuilt
-   * every callback because they depend on σ). */
+  /* Destroy A (per-iter scratch). K, Ms and G_BDDC live on the context
+   * and are released once at runCsemInversion teardown. */
   PetscCall(MatDestroy(&A));
-  PetscCall(MatDestroy(&Kmat));
-  PetscCall(MatDestroy(&Msmat));
-  PetscCall(MatDestroy(&Gmat));
 
   /* ---- 5. RMS ---- */
   /* RMS = sqrt( sum_freq sum_rec |W*(d_obs - E_x)|^2 / Ndata )

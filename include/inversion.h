@@ -184,6 +184,15 @@ typedef struct {
   Vec                            *Wf_per_freq;       /* numFreqs, sized seq Nrec */
   Vec                            *dObsRow_per_freq;  /* numFreqs, sized seq Nrec */
   PetscInt                        numFreqsAlloc;     /* size of the arrays above */
+
+  /* Cached LHS matrices.  K (stiffness, σ-independent) and G_BDDC
+   * (topological vertex incidence, σ-independent) are built ONCE at
+   * setup via assembleCsemKandM and reused across all L-BFGS iters.
+   * Ms keeps the sparsity from that build but its values are refilled
+   * every callback via assembleCsemMsRefill against the current σ. */
+  Mat                             Kmat;
+  Mat                             Msmat;
+  Mat                             Gmat_BDDC;
 } InversionContext;
 
 /* ------------------------------------------------------------------ */

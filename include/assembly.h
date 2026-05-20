@@ -58,4 +58,33 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
                                  Mat *KorA, Mat *Ms,
                                  Mat *G, Mat *G_BDDC);
 
+#include "hvfem.h"  /* Quadrature3D used by assembleCsemMsRefill */
+
+/* Refill an existing Ms matrix with mass-matrix entries for the current
+ * conductivity field.  Used by the inverse kernel inside the L-BFGS
+ * loop: K and G_BDDC are σ-independent and built once at setup via
+ * assembleCsemKandM, while Ms must be re-computed every iteration when
+ * σ changes.  fm.csem does NOT use this — its fused single-pass call
+ * to assembleCsemKandM is unchanged.
+ *
+ * Preconditions:
+ *   - `Ms` is already allocated with the same sparsity pattern as the
+ *     K produced by assembleCsemKandM for the same mesh / nord
+ *     (typically `MatDuplicate(K, MAT_DO_NOT_COPY_VALUES, &Ms)`).
+ *   - `quadrature_3d`, `Me`, `Ke` are caller-owned workspace buffers
+ *     of the same shape used inside assembleCsemKandM (numDofInCell²
+ *     for Me / Ke). Passed in so a single allocation on the inversion
+ *     context can serve all iterations.
+ *
+ * On return Ms's values are the σ-dependent mass-matrix entries; its
+ * sparsity is preserved.  Ke is computed by computeElementalMatrices
+ * but is unused by this function (kept in the signature so the caller
+ * can share the same scratch buffer as the gradient pass). */
+PetscErrorCode assembleCsemMsRefill(const csemParams params,
+                                    const DM dm, const Grid grid,
+                                    const Vec conductivity,
+                                    const Quadrature3D *quadrature_3d,
+                                    PetscReal **Me, PetscReal **Ke,
+                                    Mat Ms);
+
 #endif

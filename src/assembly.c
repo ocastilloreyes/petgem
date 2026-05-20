@@ -65,6 +65,27 @@
  *   is partially implemented and can be extended.
  * - The caller is responsible for managing the lifetime of the returned matrix `B`.
  */
+/* Shared per-cell setup used by every LHS-assembly path (forward + inverse).
+ * Reads geometry, builds the Jacobian, pulls the per-cell conductivity slice
+ * out of the conductivity Vec, walks the cell's transitive closure for the
+ * vertex ordering, and computes the orientation table. After this returns,
+ * `cell` is ready to be handed to computeElementalMatrices / the basis
+ * dispatch. */
+static PetscErrorCode prepareCellForAssembly(const DM dm,
+                                              const DM dmConductivity,
+                                              const Vec conductivity,
+                                              PetscInt cellID,
+                                              Cell *cell)
+{
+  PetscFunctionBeginUser;
+  PetscCall(extractCellCoordinates(dm, cellID, cell));
+  PetscCall(computeCellJacobian(cell));
+  PetscCall(extractCellConductivity(dmConductivity, conductivity, cellID, cell));
+  PetscCall(extractCellClousure(dm, cellID, cell));
+  PetscCall(computeCellOrientation(cell));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B) {
   PetscFunctionBeginUser;
 
@@ -455,20 +476,8 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
   /* Perform finite element assembly for LHS */
   for (PetscInt i = grid.cellStart; i < grid.cellEnd; ++i) {
 
-    /* Get vertices coordinates for cell i */
-    PetscCall(extractCellCoordinates(dm, i, &cell));
-
-    /* Compute jacobian, inverse jacobian and jacobian determinand for cell i */
-    PetscCall(computeCellJacobian(&cell));
-
-    /* Get conductivity for cell i */
-    PetscCall(extractCellConductivity(dmConductivity, conductivity, i, &cell));
-
-    /* Get transitive clousure for cell i */
-    PetscCall(extractCellClousure(dm, i, &cell));
-
-    /* Compute cell orientation */
-    PetscCall(computeCellOrientation(&cell));
+    /* Geometry, conductivity, closure and orientation for cell i */
+    PetscCall(prepareCellForAssembly(dm, dmConductivity, conductivity, i, &cell));
 
     /* Compute mass and stifness matrices for cell i */
     PetscCall(computeElementalMatrices(&grid.fem, &cell, &quadrature_3d, Me, Ke));
@@ -625,6 +634,80 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
     PetscCall(PetscFree(gradientMatrixBDDC));
   }
   if (closureGBDDC) PetscCall(PetscFree(closureGBDDC));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* ================================================================== */
+/* assembleCsemMsRefill                                                */
+/*                                                                     */
+/* Inverse-kernel companion to assembleCsemKandM: walks the local      */
+/* cells, computes only the mass-matrix entries for the current σ,    */
+/* and writes them into the supplied Ms matrix. K and G_BDDC are NOT  */
+/* touched — those are σ-independent and built once at setup, then     */
+/* reused for every L-BFGS iteration.                                  */
+/*                                                                     */
+/* The per-cell setup is shared with assembleCsemKandM via             */
+/* prepareCellForAssembly (single source of truth for cell geometry,   */
+/* conductivity slice, closure, and orientation).  Ke is computed by   */
+/* computeElementalMatrices (it shares basis evaluations with Me) but  */
+/* is discarded — the small extra work is offset by not having to     */
+/* duplicate the basis-evaluation code.                                */
+/* ================================================================== */
+PetscErrorCode assembleCsemMsRefill(const csemParams params,
+                                    const DM dm, const Grid grid,
+                                    const Vec conductivity,
+                                    const Quadrature3D *quadrature_3d,
+                                    PetscReal **Me, PetscReal **Ke,
+                                    Mat Ms)
+{
+  PetscFunctionBeginUser;
+  (void)params; /* nord lives in grid->fem.ops via the quadrature */
+
+  /* Zero stale values from the previous L-BFGS iteration; sparsity is
+   * preserved (no allocation churn).  MatSetValuesLocal with ADD_VALUES
+   * below would otherwise accumulate on top of the previous iter. */
+  PetscCall(MatZeroEntries(Ms));
+
+  PetscSection section;
+  DM dmConductivity;
+  PetscCall(DMGetLocalSection(dm, &section));
+  PetscCall(VecGetDM(conductivity, &dmConductivity));
+
+  PetscScalar *closureM;
+  PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureM));
+
+  for (PetscInt i = grid.cellStart; i < grid.cellEnd; ++i) {
+    Cell cell;
+
+    /* Shared per-cell setup: same call as in assembleCsemKandM. */
+    PetscCall(prepareCellForAssembly(dm, dmConductivity, conductivity, i, &cell));
+
+    /* Compute mass and stifness matrices; only Me is consumed here. */
+    PetscCall(computeElementalMatrices(&grid.fem, &cell, quadrature_3d, Me, Ke));
+
+    PetscInt numDofIndices, *dofIndices;
+    PetscCall(DMPlexGetClosureIndices(dm, section, section, i, PETSC_TRUE,
+                                      &numDofIndices, &dofIndices,
+                                      NULL, NULL));
+
+    for (PetscInt j = 0; j < grid.numDofInCell; j++)
+      for (PetscInt k = 0; k < grid.numDofInCell; k++)
+        closureM[j * grid.numDofInCell + k] = Me[j][k];
+
+    PetscCall(MatSetValuesLocal(Ms, numDofIndices, dofIndices,
+                                numDofIndices, dofIndices,
+                                closureM, ADD_VALUES));
+
+    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, i, PETSC_TRUE,
+                                          &numDofIndices, &dofIndices,
+                                          NULL, NULL));
+  }
+
+  PetscCall(PetscFree(closureM));
+
+  PetscCall(MatAssemblyBegin(Ms, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(Ms,   MAT_FINAL_ASSEMBLY));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
