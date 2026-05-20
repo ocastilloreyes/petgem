@@ -75,14 +75,6 @@ typedef struct {
    * 0 (default) disables snapshots.  Output dir is taken from -output_dir. */
   PetscInt  snapshotInterval;                      /* 0 = disabled           */
 
-  /* Verbosity level.  When PETSC_FALSE (default), the L-BFGS loop emits
-   * one summary line per iteration; setup-time histograms, per-frequency
-   * assembly headers, and Q-matrix diagnostics are suppressed.  When
-   * PETSC_TRUE, everything previously printed unconditionally is restored
-   * (Material-ID / centroid / neighbor-count histograms, DMLocatePoints,
-   * Q-norms, per-iteration / per-frequency banners). */
-  PetscBool verbose;                               /* -inv_verbose flag      */
-
   /* Developer-only finite-difference gradient check.  When > 0, runs a
    * one-shot FD sweep on this many non-fixed cells at iter 0, prints
    * ratios (FD approx / adjoint G[i]), then skips L-BFGS.  Production

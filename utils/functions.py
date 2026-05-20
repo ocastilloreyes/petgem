@@ -525,10 +525,21 @@ def runPreprocessing(*, mode, nord, case_dir,
     if mode not in ("forward", "inverse"):
         raise ValueError(f"runPreprocessing: mode must be 'forward' or 'inverse' "
                          f"(got {mode!r})")
-    if mode == "forward" and source_filename is None:
-        raise ValueError("runPreprocessing: -source_filename is required "
-                         "when mode='forward'")
+    if mode == "forward":
+        if source_filename is None:
+            raise ValueError("runPreprocessing: -source_filename is required "
+                             "when mode='forward'")
+        if inv_source_filename is not None or observed_filename is not None:
+            raise ValueError(
+                "runPreprocessing: -inv_source_filename and -observed_filename "
+                "are valid only with mode='inverse'.")
     if mode == "inverse":
+        if source_filename is not None:
+            raise ValueError(
+                "runPreprocessing: -source_filename is forward-mode only. "
+                "The inverse kernel reads multi-freq sources from "
+                "/inv_sources/* in the bundle; pass -inv_source_filename "
+                "instead.")
         if inv_source_filename is None:
             raise ValueError("runPreprocessing: -inv_source_filename is required "
                              "when mode='inverse'")

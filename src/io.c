@@ -457,11 +457,6 @@ PetscErrorCode readInversionParams(invParams *iparams)
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-inv_snapshot_interval",
                                &iparams->snapshotInterval, NULL));
 
-  /* Verbosity (default off — concise one-line-per-iter output) */
-  iparams->verbose = PETSC_FALSE;
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-inv_verbose",
-                                &iparams->verbose, NULL));
-
   /* Developer-only FD gradient check */
   iparams->fdCheckCells = 0;
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-inv_dev_fd_check",
@@ -496,8 +491,6 @@ PetscErrorCode readInversionParams(invParams *iparams)
                           iparams->snapshotInterval));
   else
     PetscCall(PetscPrintf(comm, "   VTU snapshot        = disabled\n"));
-  PetscCall(PetscPrintf(comm, "   Verbose output      = %s\n",
-                        iparams->verbose ? "on" : "off"));
   if (iparams->fdCheckCells > 0)
     PetscCall(PetscPrintf(comm, "   FD gradient check   = %" PetscInt_FMT
                           " cells (DEV; L-BFGS will be skipped)\n",
@@ -1087,10 +1080,6 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx,
   PetscCall(VecDestroy(&xPostGlobal));
   PetscCall(VecDestroy(&dfRawGlobal));
   PetscCall(VecDestroy(&dfFinalGlobal));
-
-  if (ctx->iparams->verbose)
-    PetscCall(PetscPrintf(comm,
-      "   Snapshot written: %s\n", filename));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

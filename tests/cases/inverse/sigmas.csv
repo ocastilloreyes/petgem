@@ -1,9 +1,14 @@
 # Starting conductivity for the inversion test case (4 materials).
 # Row index = 0-based material id (gmsh:physical - 1).
-# Columns: sigma_x, sigma_y, sigma_z
+# Columns: sigma_x, sigma_y, sigma_z, fixed
+#   sigma_*  starting conductivity per axis (S/m)
+#   fixed    1 = material excluded from inversion (e.g. air),
+#            0 = material is inverted.  The fixed-material list is
+#            embedded in the bundle's /inv_meta/fixed_materials and
+#            consumed by im.csem (overridable with -inv_fixed_materials).
 # NOTE: this is a HALF-SPACE GUESS used to seed the inversion, not the
 # truth model that synthesised observed_data.h5.
-1.e-8, 1.e-8, 1.e-8
-0.01,  0.01,  0.01
-0.01,  0.01,  0.01
-0.01,  0.01,  0.01
+1.e-8, 1.e-8, 1.e-8, 1   # air         (fixed)
+0.01,  0.01,  0.01,  1   # ocean       (fixed)
+0.01,  0.01,  0.01,  0   # sediments   (invertable)
+0.01,  0.01,  0.01,  0   # basement    (invertable)

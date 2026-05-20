@@ -53,7 +53,6 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
   PetscFunctionBeginUser;
 
   /* Variables declaration */
-  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
   PetscInt numCells = grid->numCellsLocal;
 
   graph->numLocalCells = numCells;
@@ -106,95 +105,6 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
       if (matCell.material_id == iparams->fixedMaterials[k]) {
         graph->isFixed[li] = PETSC_TRUE;
         break;
-      }
-    }
-  }
-
-  /* ---- Diagnostic: per-material cell-count histogram (global) ----
-   * Prints the distribution of material_id values across all ranks.
-   * A well-behaved load produces an MPI-count-invariant histogram; any
-   * variation pinpoints a DMPlex HDF5 load / SF-composition bug. */
-  {
-    const PetscInt HIST_CAP = 16;  /* max material ids tracked */
-    PetscInt localHist[16];
-    PetscInt globalHist[16];
-    for (PetscInt k = 0; k < HIST_CAP; k++) localHist[k] = 0;
-
-    for (PetscInt i = grid->cellStart; i < grid->cellEnd; i++) {
-      Cell matCell;
-      PetscCall(extractCellMaterialID(dmMaterialsID, materialsID, i, &matCell));
-      if (matCell.material_id >= 0 && matCell.material_id < HIST_CAP)
-        localHist[matCell.material_id]++;
-    }
-    PetscCallMPI(MPI_Allreduce(localHist, globalHist, HIST_CAP,
-                                MPIU_INT, MPI_SUM, comm));
-
-    PetscInt nFixedLocal = 0, nFreeLocal = 0;
-    for (PetscInt li = 0; li < numCells; li++) {
-      if (graph->isFixed[li]) nFixedLocal++;
-      else                    nFreeLocal++;
-    }
-    PetscInt nFixedGlobal, nFreeGlobal;
-    PetscCallMPI(MPI_Allreduce(&nFixedLocal, &nFixedGlobal, 1, MPIU_INT,
-                                MPI_SUM, comm));
-    PetscCallMPI(MPI_Allreduce(&nFreeLocal,  &nFreeGlobal,  1, MPIU_INT,
-                                MPI_SUM, comm));
-
-    if (iparams->verbose) {
-      PetscCall(PetscPrintf(comm, "\n Material-ID histogram (global):\n"));
-      for (PetscInt k = 0; k < HIST_CAP; k++) {
-        if (globalHist[k] > 0)
-          PetscCall(PetscPrintf(comm,
-            "   id %2" PetscInt_FMT " : %" PetscInt_FMT " cells\n",
-            k, globalHist[k]));
-      }
-      PetscCall(PetscPrintf(comm,
-        "   Fixed: %" PetscInt_FMT "  Non-fixed: %" PetscInt_FMT
-        "  Total: %" PetscInt_FMT "\n",
-        nFixedGlobal, nFreeGlobal, nFixedGlobal + nFreeGlobal));
-    } else {
-      PetscCall(PetscPrintf(comm,
-        "\n Cells: total=%" PetscInt_FMT "  fixed=%" PetscInt_FMT
-        "  non-fixed=%" PetscInt_FMT "  (-inv_verbose for per-id histogram)\n",
-        nFixedGlobal + nFreeGlobal, nFixedGlobal, nFreeGlobal));
-    }
-
-    /* Centroid-of-mass per material_id.  Cell numbering changes with MPI
-     * rank count, but the physical centroid of each cell does not.  So if
-     * the load correctly maps material_id to the right PHYSICAL cells,
-     * these means are MPI-invariant.  A shift across rank counts is proof
-     * of a data-to-cell scramble. */
-    PetscReal localSum[16 * 3];
-    PetscReal globalSum[16 * 3];
-    for (PetscInt k = 0; k < HIST_CAP * 3; k++) localSum[k] = 0.0;
-
-    for (PetscInt i = grid->cellStart; i < grid->cellEnd; i++) {
-      PetscInt li = i - grid->cellStart;
-      Cell     matCell;
-      PetscCall(extractCellMaterialID(dmMaterialsID, materialsID, i, &matCell));
-      if (matCell.material_id < 0 || matCell.material_id >= HIST_CAP) continue;
-      PetscInt base = matCell.material_id * 3;
-      localSum[base + 0] += centroids[li * NUM_DIMENSIONS + 0];
-      localSum[base + 1] += centroids[li * NUM_DIMENSIONS + 1];
-      localSum[base + 2] += centroids[li * NUM_DIMENSIONS + 2];
-    }
-    PetscCallMPI(MPI_Allreduce(localSum, globalSum, HIST_CAP * 3,
-                                MPIU_REAL, MPI_SUM, comm));
-
-    if (iparams->verbose) {
-      PetscCall(PetscPrintf(comm, "\n Mean centroid per material (global):\n"));
-      PetscCall(PetscPrintf(comm,
-        "   id    N      mean_x          mean_y          mean_z\n"));
-      for (PetscInt k = 0; k < HIST_CAP; k++) {
-        if (globalHist[k] == 0) continue;
-        PetscReal nInv = 1.0 / (PetscReal)globalHist[k];
-        PetscCall(PetscPrintf(comm,
-          "   %2" PetscInt_FMT "  %6" PetscInt_FMT
-          "  %+.6e  %+.6e  %+.6e\n",
-          k, globalHist[k],
-          (double)(globalSum[k * 3 + 0] * nInv),
-          (double)(globalSum[k * 3 + 1] * nInv),
-          (double)(globalSum[k * 3 + 2] * nInv)));
       }
     }
   }
@@ -314,50 +224,9 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
       graph->neighborWeights[start + k] /= wsum;
   }
 
-  /* Diagnostic: per-cell neighbor-count distribution (non-fixed cells only).
-   * Boundary cells with very few neighbors are the ones that produce sharp
-   * anomaly contours — they have weak averaging support.  Healthy mesh
-   * regions show most non-fixed cells in the 10-19 buckets. */
-  {
-    const PetscInt NB_BINS = 8;
-    PetscInt nbHist[8] = {0,0,0,0,0,0,0,0};
-    /* Bin edges: [0], [1-2], [3-5], [6-9], [10-14], [15-19], [20-29], [30+] */
-    for (PetscInt i = 0; i < numCells; i++) {
-      if (graph->isFixed[i]) continue;
-      PetscInt c = graph->neighborStart[i + 1] - graph->neighborStart[i];
-      PetscInt b = (c == 0) ? 0
-                : (c <  3) ? 1
-                : (c <  6) ? 2
-                : (c < 10) ? 3
-                : (c < 15) ? 4
-                : (c < 20) ? 5
-                : (c < 30) ? 6 : 7;
-      nbHist[b]++;
-    }
-    PetscInt nbHistG[8];
-    PetscCallMPI(MPI_Allreduce(nbHist, nbHistG, NB_BINS, MPIU_INT,
-                                MPI_SUM, comm));
-    if (iparams->verbose) {
-      PetscCall(PetscPrintf(comm,
-        "\n Smoother neighbor-count histogram (non-fixed cells, global):\n"
-        "       0      1-2     3-5     6-9   10-14   15-19   20-29   30+\n"
-        "   %6" PetscInt_FMT " %6" PetscInt_FMT " %6" PetscInt_FMT
-        " %6" PetscInt_FMT " %6" PetscInt_FMT " %6" PetscInt_FMT
-        " %6" PetscInt_FMT " %6" PetscInt_FMT "\n",
-        nbHistG[0], nbHistG[1], nbHistG[2], nbHistG[3],
-        nbHistG[4], nbHistG[5], nbHistG[6], nbHistG[7]));
-    }
-  }
-
   PetscCall(PetscFree(tmpNeighbors));
   PetscCall(PetscFree(tmpCount));
   PetscCall(PetscFree(centroids));
-
-  PetscCall(PetscPrintf(comm,
-    "\n Neighbor smoothing graph:\n"
-    "   Local cells         = %" PetscInt_FMT "\n"
-    "   Total neighbor arcs = %" PetscInt_FMT "\n",
-    numCells, totalNeighbors));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -699,22 +568,6 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
   PetscCall(DMCreateGlobalVector(dmInvOver, &graph->oGlobalScratch));
 
   graph->hasParallelGraph = PETSC_TRUE;
-
-  /* Per-rank report (collective via PetscPrintf with PETSC_COMM_WORLD).
-   * Each rank's owned-cell + arc count differs by partition; emit on
-   * rank 0 only as a summary. */
-  PetscMPIInt rank;
-  PetscCallMPI(MPI_Comm_rank(comm, &rank));
-  PetscInt totalArcsGlobal = 0;
-  PetscCallMPI(MPI_Reduce(&totalArcs, &totalArcsGlobal, 1, MPIU_INT,
-                           MPI_SUM, 0, comm));
-  if (rank == 0) {
-    PetscCall(PetscPrintf(PETSC_COMM_SELF,
-      "\n Parallel smoother graph (block-Jacobi, overlap=1):\n"
-      "   Total arcs (global) = %" PetscInt_FMT "\n"
-      "   Per-iter cost       = 2 ghost exchanges + local sweep\n",
-      totalArcsGlobal));
-  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

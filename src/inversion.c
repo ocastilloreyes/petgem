@@ -295,9 +295,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   PetscFunctionBeginUser;
 
   c->iterCount++;
-  if (c->iparams->verbose)
-    PetscCall(PetscPrintf(comm,
-      "\n Inversion iteration %" PetscInt_FMT ":\n", c->iterCount));
 
   /* ---- 1. Recover conductivity from smoothed X (1-DOF → 4-DOF) ----
    * applyLogToSigma applies the same GS smoothing MATLAB uses on tempX
@@ -320,10 +317,10 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   PetscCall(PetscMemzero(&fwdParams, sizeof(fwdParams)));
   fwdParams.nord = c->iparams->nord;
   PetscCallMPI(MPI_Comm_size(comm, &fwdParams.numMPITasks));
-  /* Suppress per-call assembly headers in the L-BFGS loop unless the user
-   * asked for verbose output; otherwise every iteration spams the log
-   * with "Assembly RHS / Vector size / Initiated / Finished" × Nfreq. */
-  fwdParams.quiet = c->iparams->verbose ? PETSC_FALSE : PETSC_TRUE;
+  /* Suppress per-call assembly headers in the L-BFGS loop; otherwise
+   * every iteration spams the log with "Assembly RHS / Vector size /
+   * Initiated / Finished" × Nfreq. */
+  fwdParams.quiet = PETSC_TRUE;
 
   /* Inverse kernel needs K and Ms separately (forms A_f per frequency
    * via MatDuplicate + MatAXPY inside the frequency loop below). Pass
@@ -364,11 +361,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
 
     PetscReal   omega = isrc->freq * 2.0 * PETSC_PI;
     PetscScalar Const = PETSC_i * omega * MU;
-
-    if (c->iparams->verbose)
-      PetscCall(PetscPrintf(comm,
-        "   Frequency %" PetscInt_FMT " = %g Hz\n", ifre + 1,
-        (double)isrc->freq));
 
     /* Form A_f = K - iωμ·Ms via MatDuplicate + MatAXPY.
      * SAME_NONZERO_PATTERN lets PETSc skip symbolic analysis. */
@@ -416,18 +408,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     /* Compute Ex at receivers: Ex_recv = QEx * x */
     PetscCall(MatMult(c->Q->QEx, x, Ex_recv));
 
-    /* ---- Iter-0 per-frequency norms diagnostic (verbose only).
-     * Useful for MPI-invariance debugging; norms are global reductions
-     * so any rank-count drift localizes the bug.  See -inv_verbose. */
-    PetscReal iter0_aFnorm = 0.0, iter0_bNorm = 0.0, iter0_xNorm = 0.0,
-              iter0_exNorm = 0.0;
-    if (c->iterCount == 1 && c->iparams->verbose) {
-      PetscCall(MatNorm(A,       NORM_FROBENIUS, &iter0_aFnorm));
-      PetscCall(VecNorm(b,       NORM_2,         &iter0_bNorm));
-      PetscCall(VecNorm(x,       NORM_2,         &iter0_xNorm));
-      PetscCall(VecNorm(Ex_recv, NORM_2,         &iter0_exNorm));
-    }
-
     /* Get observed Ex for this frequency */
     {
       const PetscScalar *arr;
@@ -438,23 +418,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
         rArr[r] = arr[ifre + numFreqs * r];
       PetscCall(VecRestoreArray(dObs_row, &rArr));
       PetscCall(MatDenseRestoreArrayRead(c->dObs, &arr));
-    }
-
-    /* ---- Iter-0 per-frequency norms diagnostic (verbose only).
-     * Each row that differs across MPI rank counts localizes the bug:
-     *   ||A||_F     diff -> K or M(sigma) assembly (shared forward code)
-     *   ||b||_2     diff -> source RHS assembly
-     *   ||x||_2     diff -> solver (unexpected with MUMPS + seq. analysis)
-     *   ||Ex||_2    diff -> receiver interpolation Q_Ex
-     *   ||dObs||_2  diff -> observed-data load                       */
-    if (c->iterCount == 1 && c->iparams->verbose) {
-      PetscReal dobsNorm;
-      PetscCall(VecNorm(dObs_row, NORM_2, &dobsNorm));
-      PetscCall(PetscPrintf(comm,
-        "     [iter-0] ||A||_F = %.8e  ||b|| = %.8e  ||x|| = %.8e\n"
-        "              ||Ex||  = %.8e  ||dObs|| = %.8e\n",
-        (double)iter0_aFnorm, (double)iter0_bNorm, (double)iter0_xNorm,
-        (double)iter0_exNorm, (double)dobsNorm));
     }
 
     /* Data weights: W_f = 1 / (|dObs_f| * errorLevel) */
@@ -550,12 +513,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   PetscReal dataMisfit = reduil_fi / (PetscReal)numData;
   PetscReal rms        = PetscSqrtReal(dataMisfit);
   if (c->allRMS) c->allRMS[c->iterCount - 1] = rms;
-  if (c->iparams->verbose)
-    PetscCall(PetscPrintf(comm,
-      "   RMS  = %g"
-      "  [Ndata = %" PetscInt_FMT " = %" PetscInt_FMT " rec * %" PetscInt_FMT
-      " freq * 2]\n",
-      (double)rms, numData, numReceivers, numFreqs));
 
   /* ---- 6. Objective function (Tikhonov regularization) ---- */
   /* F = dataMisfit + lambda * ||X||^2 / N_cells
@@ -567,10 +524,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   PetscCall(VecGetSize(X, &nGlobal));
   PetscReal regTerm = lambda * xNorm2 / (PetscReal)nGlobal;
   *F = dataMisfit + regTerm;
-  if (c->iparams->verbose)
-    PetscCall(PetscPrintf(comm,
-      "   F    = %g  (data = %g  reg = %g)\n",
-      (double)*F, (double)dataMisfit, (double)regTerm));
   /* Stash data/reg split so lbfgsOptimize can render the one-line summary. */
   c->lastDataMisfit = dataMisfit;
   c->lastRegTerm    = regTerm;
