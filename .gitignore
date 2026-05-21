@@ -13,14 +13,26 @@ tests/cases/csem_model/*.msh
 tests/cases/csem_model/params_p*
 tests/cases/csem_model/responses_p*
 tests/cases/csem_model/*.vtu
+tests/cases/csem_model/*.png
+logo_proposals/*
+petgem-logo-BIG-430x480.png
+results.txt
+
+
+
 
 # Run-time artifacts dropped at repo root
 petgem.err
 petgem.out
 petgem_*.err
 petgem_*.out
+petgem*.err
+petgem*.out
+
+
 session.txt
 inversion_output/
+results/
 
 # Python module (preprocessing and postprocessing)
 utils/__pycache__

@@ -25,28 +25,14 @@
 
 /* ---------------------------------------------------------------------------
  * Shared geometric / linear-algebra helpers (defined in hvfem.c).
- *   - 3-vector products and norm
- *   - barycentric mapping from Cartesian
- *   - dense matrix inversion + 3x3 solve with 3x6 RHS (used by the
- *     reference-to-physical pullback in nord=1)
+ *   - 3-vector cross product
+ *   - dense matrix inversion
  * ------------------------------------------------------------------------- */
-PetscErrorCode dotProduct(const PetscReal vector1[NUM_DIMENSIONS],
-                          const PetscReal vector2[NUM_DIMENSIONS],
-                          PetscReal *result);
-
 PetscErrorCode crossProduct(const PetscReal a[NUM_DIMENSIONS],
                             const PetscReal b[NUM_DIMENSIONS],
                             PetscReal result[NUM_DIMENSIONS]);
 
-PetscReal vectorNorm(const PetscReal v[NUM_DIMENSIONS]);
-
-PetscErrorCode cartesianToVolumetricCoordinates(const PetscReal r[NUM_DIMENSIONS],
-                                                PetscReal L[4]);
-
 PetscErrorCode invertMatrix(const PetscInt N, const PetscReal A[], PetscReal invA[]);
-
-PetscErrorCode solve3x3MatrixSystem3x6RHS(const PetscReal matrix1[NUM_DIMENSIONS][NUM_DIMENSIONS],
-                                          PetscReal **matrix2, PetscReal **result);
 
 /* H1 hierarchical shape functions on the reference tetrahedron — used by the
  * order-1 gradient-matrix builder and (eventually) higher orders that need

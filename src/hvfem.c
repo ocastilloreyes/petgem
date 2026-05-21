@@ -24,9 +24,8 @@
 /* ============================================================================
  * Forward declarations of file-local (static) helpers.
  *
- * Helpers shared with the hierarchical Nédélec TU — dotProduct, crossProduct,
- * vectorNorm, invertMatrix, cartesianToVolumetricCoordinates,
- * solve3x3MatrixSystem3x6RHS, shape3DHTet — are declared in hvfem_internal.h
+ * Helpers shared with the hierarchical Nédélec TU — crossProduct,
+ * invertMatrix, shape3DHTet — are declared in hvfem_internal.h
  * and have external linkage.
  *
  * The remaining helpers stay file-local; their definitions follow below in
@@ -64,32 +63,6 @@ static PetscErrorCode AncPhiE(const PetscReal S[2], const PetscReal DS[NUM_DIMEN
                               PetscReal* PhiE, PetscReal** DPhiE);
 static PetscErrorCode AncPhiTri(const PetscReal S[NUM_DIMENSIONS], const PetscReal DS[NUM_DIMENSIONS][NUM_DIMENSIONS],
                                 const PetscInt nordFace, const PetscBool IdecF, PetscReal** PhiTri, PetscReal*** DPhiTri);
-
-/**
- * @brief Computes the dot product of two vectors in `NUM_DIMENSIONS`-dimensional space.
- *
- * This function calculates the standard Euclidean inner product between
- * two real-valued vectors of fixed dimension `NUM_DIMENSIONS` and stores
- * the result in the provided output variable.
- *
- * @param[in]  vector1  Array of length `NUM_DIMENSIONS` representing the first vector.
- * @param[in]  vector2  Array of length `NUM_DIMENSIONS` representing the second vector.
- * @param[out] result   Pointer to a PetscReal where the computed dot product will be stored.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
- *
- * @note The function assumes both input vectors have exactly `NUM_DIMENSIONS` entries.
- */
-PetscErrorCode dotProduct(const PetscReal vector1[NUM_DIMENSIONS], const PetscReal vector2[NUM_DIMENSIONS], PetscReal* result) {
-  PetscFunctionBeginUser;
-
-  *result = 0.0;
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    *result += vector1[i] * vector2[i];
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 /**
  * @brief Computes the scalar triple product of three 3D vectors.
@@ -277,135 +250,6 @@ PetscErrorCode invertMatrix(const PetscInt N, const PetscReal A[], PetscReal inv
       invA[i * N + j] = aug[i][j + N];
     }
   }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Converts Cartesian coordinates to volumetric (barycentric) coordinates in a tetrahedron.
- *
- * This function computes the barycentric coordinates \(L = [L_0, L_1, L_2, L_3]\) of
- * a point `r` within the reference tetrahedral element. The transformation solves
- * the linear system `M * L = [x, y, z, 1]`, where `M` contains the reference tetrahedron
- * vertices and `L` represents the volumetric coordinates.
- *
- * @param[in]  r  Array of length NUM_DIMENSIONS containing the Cartesian coordinates [x, y, z].
- * @param[out] L  Array of length 4 where the computed barycentric coordinates will be stored.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or an error code otherwise.
- *
- * @note The function uses `invertMatrix` to invert the 4×4 reference matrix.
- * @note The input point `r` is assumed to lie inside or near the reference tetrahedron.
- * @note The reference tetrahedron vertices are taken from the `REFERENCE_CELL` global array.
- */
-PetscErrorCode cartesianToVolumetricCoordinates(const PetscReal r[NUM_DIMENSIONS], PetscReal L[4]) {
-  PetscFunctionBeginUser;
-
-  /* Variables declaration */
-  PetscReal M[16], invM[16];
-  const PetscReal rhs[4] = {r[0], r[1], r[2], 1.0};
-
-  /* Build reference matrix M (column-major) */
-  for (PetscInt i = 0; i < NUM_VERTICES_PER_CELL; i++) {
-    M[i + 0 * 4] = REFERENCE_CELL[0][i];
-    M[i + 1 * 4] = REFERENCE_CELL[1][i];
-    M[i + 2 * 4] = REFERENCE_CELL[2][i];
-    M[i + 3 * 4] = 1.0;
-  }
-
-  /* Invert M */
-  PetscCall(invertMatrix(4, M, invM));
-
-  /* Compute L = invM * rhs */
-  for (PetscInt i = 0; i < 4; i++) {
-    L[i] = 0.0;
-    for (PetscInt j = 0; j < 4; j++) {
-      L[i] += invM[i * 4 + j] * rhs[j];
-    }
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Solves a small linear system A * X = B with A 3×3 and B 3×6 using PETSc dense matrices.
- *
- * This function computes the solution of the linear system
- * \f$A \cdot X = B\f$, where `A` is a 3×3 matrix, `B` is a 3×6 matrix,
- * and `X` is the unknown 3×6 matrix to solve for. The computation
- * is performed using PETSc dense matrices with LU factorization of `A`.
- *
- * @param[in]  matrix1  3×3 array representing the matrix `A`.
- * @param[in]  matrix2  3×6 array representing the right-hand side matrix `B`.
- * @param[out] matrix3  3×6 array where the solution matrix `X` will be stored.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
- *
- * @note The function internally converts arrays to PETSc dense matrices in column-major order,
- *       performs LU factorization on `A`, solves for `X = A^{-1} B`, and then copies the
- *       result back to `matrix3` in row-major order.
- * @note Intended for small matrices (3×3 system with 3×6 RHS). For larger systems,
- *       other PETSc solvers should be used.
- */
-PetscErrorCode solve3x3MatrixSystem3x6RHS(const PetscReal matrix1[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscReal** matrix2,
-                                                 PetscReal** matrix3) {
-  PetscFunctionBeginUser;
-
-  /* Variable declarations */
-  PetscScalar matrix1_data[NUM_DIMENSIONS * NUM_DIMENSIONS];
-  PetscScalar matrix2_data[NUM_DIMENSIONS * (NUM_DIMENSIONS * 2)];
-  Mat A, B, C;
-  IS row, col;
-  PetscScalar* coef_array;
-
-  /* Flatten input arrays (column major order for dense
-   * PETSc matrices) */
-  for (PetscInt j = 0; j < NUM_DIMENSIONS; j++) {
-    for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-      matrix1_data[j * NUM_DIMENSIONS + i] = matrix1[i][j];
-    }
-  }
-
-  for (PetscInt j = 0; j < NUM_DIMENSIONS * 2; j++) {
-    for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-      matrix2_data[j * NUM_DIMENSIONS + i] = matrix2[i][j];
-    }
-  }
-
-  /* Create PETSc dense matrices corresponding to A (3x3)
-   * and B (3x6) */
-  PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, NUM_DIMENSIONS, NUM_DIMENSIONS, matrix1_data, &A));
-  PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, NUM_DIMENSIONS, NUM_DIMENSIONS * 2, matrix2_data, &B));
-  PetscCall(MatDuplicate(B, MAT_DO_NOT_COPY_VALUES, &C));
-
-  /* Compute index sets for LU factorization */
-  PetscCall(ISCreateStride(PETSC_COMM_SELF, NUM_DIMENSIONS, 0, 1, &row));
-  PetscCall(ISCreateStride(PETSC_COMM_SELF, NUM_DIMENSIONS, 0, 1, &col));
-
-  /* Factorize A (LU decomposition) */
-  PetscCall(MatLUFactor(A, row, col, NULL));
-
-  /* Solve A * C = B → C = A \ B */
-  PetscCall(MatMatSolve(A, B, C));
-
-  /* Extract results from C */
-  PetscCall(MatDenseGetArray(C, &coef_array));
-
-  /* Copy results back to matrix3 in row-major order */
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    for (PetscInt j = 0; j < NUM_DIMENSIONS * 2; j++) {
-      matrix3[i][j] = coef_array[j * NUM_DIMENSIONS + i];
-    }
-  }
-
-  PetscCall(MatDenseRestoreArray(C, &coef_array));
-
-  /* Free memory */
-  PetscCall(MatDestroy(&A));
-  PetscCall(MatDestroy(&B));
-  PetscCall(MatDestroy(&C));
-  PetscCall(ISDestroy(&col));
-  PetscCall(ISDestroy(&row));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -2568,19 +2412,20 @@ PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature) {
  * 3. **Reset Elemental Matrices**
  *    - Initialize `Me` and `Ke` to zero.
  *
- * 4. **First-Order Nédélec Coefficients**
- *    - Compute the Nédélec basis function coefficients and derivatives
- *      using `computeNedelecOrder1Coefficients`.
+ * 4. **Nédélec Coefficients**
+ *    - Compute the cell-local Nédélec basis coefficients (and, for nord=1,
+ *      the monomial derivatives) via the per-order dispatch table
+ *      `fem->ops->computeCoefficients`.
  *
  * 5. **Loop Over Quadrature Points**
  *    - For each Gauss point:
  *      - Transform coordinates to the physical element.
- *      - Compute basis functions at the Gauss point using
- *        `computeNedelecOrder1BasisFunctions`.
+ *      - Compute basis functions at the Gauss point via
+ *        `fem->ops->computeBasis`.
  *      - Compute the mass matrix contribution:
  *          Me_ij += w_q * (N_i · (ε_r * N_j)) * sign_i * sign_j * det(J)
- *      - Compute the curls of the basis functions using
- *        `computeNedelecOrder1BasisFunctionCurls`.
+ *      - Compute the curls of the basis functions via
+ *        `fem->ops->computeCurls`.
  *      - Compute the stiffness matrix contribution:
  *          Ke_ij += w_q * (curl(N_i) · μ_r * curl(N_j)) * sign_i * sign_j * det(J)
  *      - Edge orientation signs from `cell->orientation` are applied
@@ -2726,95 +2571,23 @@ PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, c
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscReal vectorNorm(const PetscReal v[NUM_DIMENSIONS]) {
-  return PetscSqrtReal(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-}
-
-
-
-
-/* Nédélec nord=2 static data (EDGE_ROWS, FACE_NORMALS_REF, FACE*_AUX_*,
- * FACE_AUX_X/Y/Z) lives in constants.c and is declared in constants.h. */
 
 /**
- * @brief Computes the elemental gradient matrix mapping H1 scalar basis functions
- *        (nodal) to H(curl) Nédélec edge basis functions for a tetrahedral element.
+ * @brief Fill the per-DOF sign vector consumed by elemental-matrix assembly.
  *
- * @param[in] nord Polynomial order of the H1 basis functions (1..6, dispatched via fem->ops).
- * @param[in] numDofInCell Number of H(curl) degrees of freedom (edges) in the tetrahedral cell.
- * @param[in] numH1DofInCell Number of H1 degrees of freedom (vertices) in the tetrahedral cell.
- * @param[in] cell Pointer to the Cell structure containing:
- *                 - Edge orientations
- *                 - Jacobian mapping (from reference to real cell)
- * @param[in] quadrature Pointer to the 1D quadrature rule for edge integration:
- *                       - quadrature points along each edge
- *                       - quadrature weights
- * @param[out] gradientMatrix Elemental gradient matrix (numDofInCell x numH1DofInCell),
- *                            representing the line integral of Nédélec basis functions
- *                            projected along H1 gradients:
- *                            \f$ G_{ij} = \int_{edge} N_i \cdot \nabla \phi_j \, ds \f$
+ * For the unified hierarchical Nédélec basis (nord = 1..6) all per-DOF
+ * sign multipliers are +1: orientation is already encoded inside the
+ * reference shape functions (OrientE / OrientTri inside shape3DETet),
+ * so multiplying by `cell->orientation.edgeSigns[]` here would double-
+ * apply orientation and break tangential continuity across shared faces.
  *
+ * @param[in]  cell   Cell (unused under the hierarchical basis; kept for
+ *                    API symmetry with hypothetical non-hierarchical paths).
+ * @param[in]  fem    FEM space — only `fem->numDofInCell` is consulted.
+ * @param[out] signs  Array of length `fem->numDofInCell`; all entries
+ *                    set to +1 on return.
  * @return PetscErrorCode PETSC_SUCCESS on success.
- *
- * @details
- * This function assembles the elemental gradient matrix by performing the following steps:
- *
- * 1. **Setup**
- *    - Allocate arrays for H1 shape functions (`ShapH`) and their gradients (`GradH`).
- *    - Reset `gradientMatrix` to zero.
- *
- * 2. **Loop over H1 basis functions**
- *    - For each H1 degree of freedom `i` (associated with tetrahedron vertices):
- *
- *      a. **Loop over edges**
- *         - Retrieve local vertex indices for the edge.
- *         - Compute the edge vector in reference coordinates (`edgeJacobian`) and its length.
- *         - Compute the unit vector along the edge.
- *         - Set the edge origin coordinates.
- *
- *      b. **Loop over quadrature points along the edge**
- *         - Map the 1D quadrature point to 3D reference coordinates along the edge.
- *         - Evaluate H1 shape function gradients at this point using `shape3DHTet`.
- *         - For first-order elements (nord = 1):
- *             - Compute the dot product of the gradient with the edge unit vector.
- *             - Multiply by quadrature weight, edge orientation sign, and edge Jacobian length.
- *             - Accumulate into `gradientMatrix`.
- *
- *      c. **Increment edge index in gradient matrix**
- *         - Only needed for first-order elements (1 dof per edge).
- *
- * 3. **Memory cleanup**
- *    - Free temporary arrays `ShapH` and `GradH`.
- *
- * @note
- * - The matrix represents a mapping from scalar H1 basis gradients to vector H(curl)
- *   edge functions, used in mixed FEM formulations (e.g., for curl-conforming discretizations).
- * - Orientation signs from `cell->orientation` are applied to ensure global assembly consistency.
  */
-PetscErrorCode computeElementalGradientMatrix(const FEMSpace* fem, const Cell* cell, const Quadrature1D* quadrature1d,
-                                              PetscReal** gradientMatrix) {
-  PetscFunctionBeginUser;
-
-  const PetscInt numDofInCell    = fem->numDofInCell;
-  const PetscInt numH1DofInCell  = fem->numH1DofInCell;
-
-  for (PetscInt i = 0; i < numDofInCell; ++i) {
-    for (PetscInt j = 0; j < numH1DofInCell; ++j) {
-      gradientMatrix[i][j] = 0.;
-    }
-  }
-
-  if (fem->ops && fem->ops->buildGradientMatrix) {
-    PetscCall(fem->ops->buildGradientMatrix(fem, cell, quadrature1d, gradientMatrix));
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-
-
-
-
 PetscErrorCode buildDofSigns(const Cell* cell, const FEMSpace* fem, PetscInt signs[]) {
   PetscFunctionBeginUser;
   (void)cell;

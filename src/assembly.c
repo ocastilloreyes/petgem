@@ -106,10 +106,33 @@ PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sour
   omega = sources.freq * 2.0 * PETSC_PI;
   constFactor = (0.0 + 1.0 * PETSC_i) * (omega * MU);
 
-  /* Create vector to store one right-hand side */
+  /* Create vector to store one right-hand side.
+   *
+   * The DM's L2G mapping inherits its block size from the section's
+   * per-stratum DOF count (= params.nord at nord ≥ 2).  Vec b's
+   * layout has block size 1.  PETSc 3.21+ enforces a strict block-size
+   * match in VecSetLocalToGlobalMapping (must match OR mapping bs == 1).
+   * At nord ≥ 4 the mismatch trips
+   *   "Blocksize of layout 1 must match that of mapping N".
+   *
+   * VecSetValuesLocal below passes SCALAR (single-entry) dofIndices, so
+   * a block-size-1 mapping is what we actually need.  Rebuild the
+   * mapping with bs=1 from the DM mapping's expanded indices; the
+   * global indices themselves are unchanged. */
   PetscCall(DMCreateGlobalVector(dm, &b));
   PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
-  PetscCall(VecSetLocalToGlobalMapping(b, mapping));
+  {
+    ISLocalToGlobalMapping mappingBS1;
+    const PetscInt        *l2gIndices;
+    PetscInt               l2gSize;
+    PetscCall(ISLocalToGlobalMappingGetSize(mapping, &l2gSize));
+    PetscCall(ISLocalToGlobalMappingGetIndices(mapping, &l2gIndices));
+    PetscCall(ISLocalToGlobalMappingCreate(comm, 1, l2gSize, l2gIndices,
+                                            PETSC_COPY_VALUES, &mappingBS1));
+    PetscCall(ISLocalToGlobalMappingRestoreIndices(mapping, &l2gIndices));
+    PetscCall(VecSetLocalToGlobalMapping(b, mappingBS1));
+    PetscCall(ISLocalToGlobalMappingDestroy(&mappingBS1));
+  }
   PetscCall(VecSetOption(b, VEC_IGNORE_NEGATIVE_INDICES, PETSC_TRUE));
   PetscCall(VecSetFromOptions(b));
 
@@ -338,12 +361,14 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
     PetscCall(MatSetOption(*Ms, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
   }
 
-  /* Create vector to store one right-hand side */
+  /* Create a Vec on the H(curl) DM just to query its sizes (M, m) for
+   * the G / G_BDDC matrix layout below.  The DM's L2G mapping is also
+   * fetched here for the Mat-side calls (Mats do not enforce the strict
+   * block-size match that trips VecSetLocalToGlobalMapping at nord ≥ 4
+   * — see assembleCsemRHS for the equivalent workaround on the Vec
+   * side). */
   PetscCall(DMCreateGlobalVector(dm, &b));
   PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
-  PetscCall(VecSetLocalToGlobalMapping(b, mapping));
-  PetscCall(VecSetOption(b, VEC_IGNORE_NEGATIVE_INDICES, PETSC_TRUE));
-  PetscCall(VecSetFromOptions(b));
 
   /* Order-k discrete gradient G : S_h^k → V_h^k.
    * Rows index V_h (Nédélec, mapping); columns index S_h^k (P_nord H1

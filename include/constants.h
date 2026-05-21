@@ -24,7 +24,6 @@
 #define NUM_VERTICES_PER_FACE 3
 #define NUM_DIMENSIONS 3
 #define NUM_H1_DOF_PER_CELL 4
-#define NUM_EM_FIELD_COMPONENTS 6
 #define NUM_CONDUCTIVITY_COMPONENTS 3
 #define NUM_MATERIALS_ID_COMPONENTS 1
 #define MAX_TRANSITIVE_CLOSURE_SIZE 90
@@ -71,25 +70,6 @@ extern const PetscReal NORD16_2DGAUSSPOINTS[52][3];
 extern const PetscReal NORD17_2DGAUSSPOINTS[61][3];
 extern const PetscReal NORD18_2DGAUSSPOINTS[70][3];
 extern const PetscReal NORD19_2DGAUSSPOINTS[73][3];
-
-/* Second-order Nédélec element static data (used by hvfem.c) */
-extern const PetscReal EDGE_ROWS[12][20];
-extern const PetscReal FACE_NORMALS_REF[4][3];
-extern const PetscReal FACE0_AUX_X[20];
-extern const PetscReal FACE0_AUX_Y[20];
-extern const PetscReal FACE0_AUX_Z[20];
-extern const PetscReal FACE1_AUX_X[20];
-extern const PetscReal FACE1_AUX_Y[20];
-extern const PetscReal FACE1_AUX_Z[20];
-extern const PetscReal FACE2_AUX_X[20];
-extern const PetscReal FACE2_AUX_Y[20];
-extern const PetscReal FACE2_AUX_Z[20];
-extern const PetscReal FACE3_AUX_X[20];
-extern const PetscReal FACE3_AUX_Y[20];
-extern const PetscReal FACE3_AUX_Z[20];
-extern const PetscReal *const FACE_AUX_X[4];
-extern const PetscReal *const FACE_AUX_Y[4];
-extern const PetscReal *const FACE_AUX_Z[4];
 
 /* 3D quadrature gauss points */
 extern const PetscReal NORD1_3DGAUSSPOINTS[1][4];

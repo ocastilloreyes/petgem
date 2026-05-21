@@ -35,9 +35,9 @@ def case_workspace(tmp_path_factory, cases_dir):
     return copy_case_workspace(tmp_path_factory, cases_dir, "csem_model")
 
 
-@pytest.mark.parametrize("nord", [1, 2])
+@pytest.mark.parametrize("nord", [1, 2, 3])
 def test_fm_csem_smoke(repo_root, fm_csem_binary, case_workspace, nord):
-    """Kernel runs at nord ∈ {1, 2}; field components exist, are finite,
+    """Kernel runs at nord ∈ {1, 2, 3}; field components exist, are finite,
     and sized to the receivers vector."""
     skip_if_no_binary(fm_csem_binary)
 

@@ -58,31 +58,6 @@ PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal di
 PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, const Quadrature3D* quadrature,
                                         PetscReal** Me, PetscReal** Ke);
 
-PetscErrorCode computeNedelecOrder1Coefficients(const PetscInt nord, PetscReal** coeffs, PetscReal** Dx_Ni, PetscReal** Dy_Ni,
-                                                PetscReal** Dz_Ni);
-
-PetscErrorCode computeNedelecOrder1BasisFunctions(const PetscInt nord, const PetscReal point[NUM_DIMENSIONS],
-                                                  const PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscReal* const* coeffs,
-                                                  PetscReal** Ni);
-
-PetscErrorCode computeNedelecOrder1BasisFunctionCurls(const PetscInt nord, const PetscReal* const* Dx_Ni, const PetscReal* const* Dy_Ni,
-                                                      const PetscReal* const* Dz_Ni,
-                                                      const PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscReal detJacobian,
-                                                      PetscReal** NiCurl);
-
-PetscErrorCode computeNedelecOrder2Coefficients(const PetscInt nord, const Cell* cell, PetscReal **coeffs);
-
-PetscErrorCode computeNedelecOrder2BasisFunctions(const PetscInt nord,  const PetscReal point[NUM_DIMENSIONS], 
-                                                  const PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscReal *const *coeffs, 
-                                                  PetscReal** Ni);
-
-PetscErrorCode computeNedelecOrder2BasisFunctionCurls(const PetscInt nord, const PetscReal *const *coeffs, const PetscReal point[NUM_DIMENSIONS],
-                                                      const PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS],
-                                                      const PetscReal detJacobian, PetscReal **NiCurl);
-
-PetscErrorCode computeElementalGradientMatrix(const FEMSpace* fem, const Cell* cell, const Quadrature1D* quadrature1d,
-                                              PetscReal** gradientMatrix);
-
 PetscErrorCode printCellEntities(const DM dm, const PetscInt cell);
 
 /* Build the per-DOF sign vector for a cell under the chosen Nédélec order.

@@ -3,7 +3,7 @@
 * Mesh for 3D CSEM modelling using PETGEM.
 *
 * Frequency: 2 Hz
-* Target FEM order: nord=3 (use mesh_p1.geo as the source-of-truth geometry)
+* Target FEM order: nord=3 
 * Source position: (0.0, 0.0, 0.0)
 * Conductivity:
 *   - Resistive block: 0.1 S/m

@@ -30,6 +30,14 @@
 #include <petscdmplex.h>
 #include <petscviewerhdf5.h>
 
+/* Build the six receiver-interpolation matrices Q = {QEx, QEy, QEz,
+ * QHx, QHy, QHz} that map an H(curl) DOF vector to the electric/magnetic
+ * field components evaluated at the receiver positions.  Used by both
+ * kernels (fm.csem in postprocessing.c, im.csem in inversion.c).
+ *
+ * See the full contract — receiver-location semantics, sign convention,
+ * MPI-invariance argument, and the divide-by-(iωμ) factor for H — in
+ * include/receiver_interp.h. */
 PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                                   Vec         receivers,
                                                   const DM    dm,
@@ -310,6 +318,9 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* Free the six Mats owned by a ReceiverInterpolationMatrices struct.
+ * Idempotent on individual fields (MatDestroy handles NULL). The Q
+ * struct itself is stack-owned by the caller and is not freed. */
 PetscErrorCode destroyReceiverInterpolationMatrices(ReceiverInterpolationMatrices *Q)
 {
   PetscFunctionBeginUser;

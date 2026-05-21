@@ -1270,6 +1270,13 @@ static PetscErrorCode hcurlAddVolumeMoments(const FEMSpace *fem, const Cell *cel
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* Per-cell builder for the EXACT commuting discrete-gradient matrix
+ * Ge_K[l, j] = σ_l(∇φ_j) using the Ainsworth–Coyle moment functionals.
+ * Full mathematical derivation, cross-cell-consistency argument, and
+ * canonical-frame strategy live in the section banner at the top of
+ * this builder family (~600 lines above; search for "Exact commuting
+ * discrete-gradient builder"). Registered on every NedelecOps table
+ * via HIERARCHICAL_ORDER_OPS at the bottom of this file. */
 static PetscErrorCode hierarchicalBuildExactGradientMatrix(const FEMSpace *fem, const Cell *cell,
                                                            PetscReal **gradientMatrix) {
   PetscFunctionBeginUser;

@@ -307,8 +307,8 @@ PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
     }
 
     /* Per-order Nédélec dispatch table. Hot paths (computeElementalMatrices,
-     * evaluateNedelecBasis, computeElementalGradientMatrix) call through this
-     * pointer instead of switching on nord. */
+     * evaluateNedelecBasis) call through this pointer instead of switching
+     * on nord. */
     grid->fem.ops = nedelecOpsForOrder(params.nord);
   }
 
@@ -774,6 +774,17 @@ PetscErrorCode printCellEntities(const DM dm, const PetscInt cell) {
 
 
 
+/**
+ * @brief Compute the geometric centroid (vertex barycenter) of a tetrahedral cell.
+ *
+ * Writes the result into `cell->centroid` (NUM_DIMENSIONS reals).  The
+ * input `cell->coordinates` must already be populated by
+ * extractCellCoordinates.  Used by the inversion smoother to weight
+ * neighbour graph edges by inverse cell-to-cell distance.
+ *
+ * @param[in,out] cell  Cell struct; coordinates read, centroid written.
+ * @return PetscErrorCode PETSC_SUCCESS on success.
+ */
 PetscErrorCode computeCellCentroid(Cell* cell) {
   PetscFunctionBeginUser;
 

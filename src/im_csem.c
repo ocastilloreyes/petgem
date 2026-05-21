@@ -38,6 +38,24 @@ static char imHelp[] = "PETGEM inverse CSEM kernel (runInverse / im.csem).\n\
 #include "extrae_user_events.h"
 #endif
 
+/**
+ * @brief Main execution routine for the CSEM inverse-modeling kernel.
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return int 0 on success, non-zero on failure.
+ * @details Initializes PETSc, parses command-line arguments
+ * (including `--version`).  Reads the unified bundle (mesh +
+ * conductivity + materials_id + receivers + /inv_sources +
+ * /observed/Ex + case-property defaults), sets up the H(curl)
+ * grid, the inversion DM (1 DOF/cell), the smoother neighbor
+ * graph, the receiver-interpolation matrices, and the cached
+ * K / Ms-template / G_BDDC matrices.  Runs custom L-BFGS
+ * (Nocedal 1980) with an adjoint-state gradient until the
+ * configured RMS-tolerance or max-iter is hit.  Writes the
+ * recovered conductivity, the log-perturbation X, and the
+ * RMS history to HDF5, then finalizes PETSc.  Includes Extrae
+ * instrumentation hooks if compiled with USE_EXTRAE.
+ */
 int runInverse(int argc, char **argv)
 {
   /* ---------------------------------------------------------------- */

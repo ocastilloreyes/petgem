@@ -15,8 +15,8 @@ petgem.readResponses; only the comparison + plot live here.
 
 Usage:
     python3 tests/cases/csem_model/postprocess.py \\
-        -case_dir tests/cases/csem_model \\
         -responses_filename responses_p1_src1.h5 \\
+        [-case_dir tests/cases/csem_model]   \\  # default: directory of this script
         [-input_filename input.h5] \\
         [-reference_filename reference.h5] \\
         [-figure_filename figure.png] \\
@@ -34,9 +34,17 @@ import numpy as np
 import petgem
 
 
+# Default case dir = the directory this script lives in.  The script ships
+# inside its own case (tests/cases/csem_model/), so callers running it
+# directly never need to repeat that path with -case_dir.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("-case_dir",           required=True)
+    p.add_argument("-case_dir",           default=SCRIPT_DIR,
+                   help="Directory holding the bundle / responses / reference "
+                        "files. Default: directory of this script.")
     p.add_argument("-input_filename",     default="input.h5")
     p.add_argument("-responses_filename", required=True)
     p.add_argument("-reference_filename", default="reference.h5")

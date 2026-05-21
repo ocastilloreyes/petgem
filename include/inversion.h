@@ -66,8 +66,9 @@ typedef struct {
   PetscBool errorLevelFromCLI;
   PetscBool fixedMaterialsFromCLI;
 
-  /* Source-frequency pairs (parsed from sources.txt, 8-field format:
-   * freq  x  y  z  current  length  dip  azimuth)                    */
+  /* Source-frequency pairs loaded from the unified bundle's /inv_sources
+   * group (freq, position, current, length, dipAngle, azimuthAngle).
+   * Populated by setupInversionSources.                                */
   PetscInt       numFreqs;                         /* number of entries      */
   PetscReal      allFreqs[INV_MAX_FREQUENCIES];    /* frequency per entry    */
   InvCsemSource  invSources[INV_MAX_FREQUENCIES];  /* source per entry       */

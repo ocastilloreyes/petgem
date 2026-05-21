@@ -82,16 +82,17 @@ You can build and run PETGEM inside Docker for a consistent development and test
 
    # Setup environment
    export CSEM_TEST_DIR=tests/cases/csem_model
+   export NORD=1
 
    # Mesh generation (specific to nord=1)
-   gmsh ${CSEM_TEST_DIR}/mesh_p1.geo -3
+   gmsh ${CSEM_TEST_DIR}/mesh_p${NORD}.geo -3
 
    # Generate input data (mesh, params file. Specific to nord=1)
    python3 utils/preprocess.py \
         -mode forward \
-        -nord 1 \
+        -nord ${NORD} \
         -case_dir  ${CSEM_TEST_DIR} \
-        -mesh_filename mesh_p1.msh \
+        -mesh_filename mesh_p${NORD}.msh \
         -source_filename sources.txt \
         -receiver_filename receivers.txt \
         -sigma_file sigmas.csv \

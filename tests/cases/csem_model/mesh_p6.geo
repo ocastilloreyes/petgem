@@ -3,7 +3,7 @@
 * Mesh for 3D CSEM modelling using PETGEM.
 *
 * Frequency: 2 Hz
-* Target FEM order: nord=6 (use mesh_p1.geo as the source-of-truth geometry)
+* Target FEM order: nord=6
 * Source position: (0.0, 0.0, 0.0)
 * Conductivity:
 *   - Resistive block: 0.1 S/m
@@ -24,9 +24,9 @@
 *********************************************************************/
 
 // ============ Characteristic mesh size ===================
-lc_max = 1100.;
-lc_min = 22.;
-lc_block = 220.;
+lc_max = 500.;
+lc_min = 14.;
+lc_block = 80.;
 
 // ================= Resistive block =======================
 Point (1) = {400.,  100., -200., lc_block};
@@ -159,7 +159,7 @@ Field[2].IField = 1;
 Field[2].LcMin = lc_min;     // finest near source
 Field[2].LcMax = lc_max;     // coarse far away
 Field[2].DistMin = 10;       // radius of finest mesh
-Field[2].DistMax = 500;      // smooth transition to coarse
+Field[2].DistMax = 300;      // smooth transition to coarse
 
 // ----------------- Resistive block refinement ------------
 Field[3] = Box;

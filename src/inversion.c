@@ -303,6 +303,11 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* Tear-down counterpart to setupInversionWorkspace: free everything that
+ * helper allocated on the context (quadrature, Me/Ke buffers, per-iter
+ * reusable Vecs, per-frequency precomputes, and the cached K / Ms / G_BDDC
+ * matrices).  Safe to call on a context that was zero-initialised but
+ * never set up (every PetscFree/VecDestroy/MatDestroy handles NULL). */
 static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx)
 {
   PetscFunctionBeginUser;

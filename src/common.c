@@ -254,6 +254,16 @@ PetscErrorCode printHeader(void) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints the PETGEM closing banner with run timestamp + author/affiliation.
+ *
+ * Called once at the end of every kernel run (fm.csem, im.csem, petgem) to
+ * mark the end of stdout output.  Output goes to PETSC_COMM_WORLD via the
+ * centered-text helpers, so it is collectively printed by rank 0 only.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful completion, or a
+ *         PETSc error code if any of the underlying print helpers fail.
+ */
 PetscErrorCode printFooter(void) {
 
   PetscFunctionBeginUser;
@@ -378,6 +388,18 @@ PetscErrorCode printTimers(const PetscLogDouble timers[]) {
 
 
 
+/**
+ * @brief Prints a one-screen CLI usage summary for the unified `petgem` dispatcher.
+ *
+ * Lists the positional-subcommand form (`petgem modeling | inverse`), the
+ * equivalent `-mode <m>` PETSc-option form, and `--version`.  Called when
+ * the dispatcher in src/petgem.c receives no recognized subcommand, or
+ * when `--help` is requested.
+ *
+ * @param[in] progname Executable basename (typically argv[0]) used as the
+ *                     leading word of each example line.
+ * @return PetscErrorCode PETSC_SUCCESS on success.
+ */
 PetscErrorCode printUsage(const char *progname) {
   PetscFunctionBeginUser;
 
@@ -395,6 +417,19 @@ PetscErrorCode printUsage(const char *progname) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Parse the dispatcher mode argument into a numeric code.
+ *
+ * Accepts the user-friendly synonyms for each kernel:
+ *   - "modeling", "forward", "fm"  → *mode = 0 (forward)
+ *   - "inverse", "im"              → *mode = 1 (inverse)
+ *   - anything else                → *mode = -1 (unknown; caller can
+ *                                    then call printUsage())
+ *
+ * @param[in]  s     Mode string from argv. Must be non-NULL.
+ * @param[out] mode  Receives the numeric mode code (see above).
+ * @return PetscErrorCode PETSC_SUCCESS, or PETSC_ERR_ARG_NULL when `s` is NULL.
+ */
 PetscErrorCode parseModeArg(const char *s, PetscInt *mode)
 {
   PetscFunctionBeginUser;
