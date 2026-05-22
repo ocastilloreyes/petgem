@@ -23,7 +23,7 @@
  *
  * Extracted from src/inversion.c during the refactor that split the
  * 2400-line monolith into focused translation units. Behavior preserved
- * byte-for-byte — only the file boundary moved.
+ * byte-for-byte - only the file boundary moved.
  */
 
 #include <math.h>
@@ -150,7 +150,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     PetscReal gTd = PetscRealPart(gTd_scalar);
 
     if (gTd >= 0.0) {
-      /* Not a descent direction — fall back to steepest descent */
+      /* Not a descent direction - fall back to steepest descent */
       PetscCall(PetscPrintf(comm,
         "   L-BFGS: positive curvature detected, resetting to steepest descent\n"));
       PetscCall(VecCopy(G, d));
@@ -211,7 +211,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
       ptr   = (ptr + 1) % M;
       bound = PetscMin(bound + 1, M);
     } else {
-      /* Curvature condition not met — skip storing this pair but keep
+      /* Curvature condition not met - skip storing this pair but keep
        * existing history.  Resetting to steepest descent was too
        * aggressive: stale history is still better than no history. */
       PetscCall(PetscPrintf(comm,

@@ -172,7 +172,7 @@ def main():
         ex_noisy = add_noise(ex_matrix, args.error_level, rng)
         print(f"\nNoise added: error_level={args.error_level}, seed={args.seed}")
 
-    # Save to HDF5 — complex128 stored as compound type {r, i}
+    # Save to HDF5 - complex128 stored as compound type {r, i}
     print(f"Writing: {args.output}")
     print(f"  Frequencies:  {num_freqs} ({frequencies})")
     print(f"  Receivers:    {num_receivers}")

@@ -24,8 +24,8 @@
 /* ============================================================================
  * Forward declarations of file-local (static) helpers.
  *
- * Helpers shared with the hierarchical Nédélec TU — crossProduct,
- * invertMatrix, shape3DHTet — are declared in hvfem_internal.h
+ * Helpers shared with the hierarchical Nédélec TU - crossProduct,
+ * invertMatrix, shape3DHTet - are declared in hvfem_internal.h
  * and have external linkage.
  *
  * The remaining helpers stay file-local; their definitions follow below in
@@ -678,7 +678,7 @@ PetscErrorCode ProjectTetE(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscR
   PetscFunctionBeginUser;
 
   /* Edge slot ↔ vertex pair must match the PETGEM canonical labeling in
-   * EDGE_VERTICES (constants.c) — that is the convention used by the cell
+   * EDGE_VERTICES (constants.c) - that is the convention used by the cell
    * closure traversal, the global DOF assignment, and the Block-A debug
    * dump. Any mismatch here produces Whitney functions for the wrong
    * physical edge at each slot.
@@ -742,7 +742,7 @@ PetscErrorCode ProjectTetF(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscR
   PetscFunctionBeginUser;
 
   /* Face slot ↔ vertex triple must match the PETGEM canonical labeling in
-   * FACE_VERTICES (constants.c) — same convention used by the cell closure
+   * FACE_VERTICES (constants.c) - same convention used by the cell closure
    * traversal, the global face-DOF assignment, and the OrientTri permutation
    * codes 0..5 produced by computeCellOrientation.
    *
@@ -752,12 +752,12 @@ PetscErrorCode ProjectTetF(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscR
    *
    * For each slot f the i-th component is Lam[v_i] for v_i = FACE_VERTICES[f][i].
    * The hierarchical face-bubble construction (AncETri / OrientTri) treats
-   * NoriF=0 as "vertices in canonical order" — so canonical here MUST be
+   * NoriF=0 as "vertices in canonical order" - so canonical here MUST be
    * FACE_VERTICES, otherwise NoriF=0 silently means "some other permutation"
    * and adjacent cells disagree on face-DOF orientation.
    *
    * Historical note: an earlier convention (v1->v0->v2, v1->v3->v0,
-   * v1->v2->v3, v2->v0->v3) silently mismatched FACE_VERTICES — slots 2 and
+   * v1->v2->v3, v2->v0->v3) silently mismatched FACE_VERTICES - slots 2 and
    * 3 referenced different physical faces, slots 0 and 1 used permuted
    * vertices. Invisible at nord=1 (no face DOFs); breaks nord >= 2. */
   for (PetscInt f = 0; f < NUM_FACES_PER_CELL; f++) {
@@ -1564,7 +1564,7 @@ PetscErrorCode shape3DHTet(const PetscReal X[NUM_DIMENSIONS], const PetscInt nor
    * PETSc DMPlex closure traversal at a cell yields DOFs in the
    * REVERSE depth order
    *     [volume, face, edge, vertex]
-   * — see the symmetric perm table in shape3DETet (hierarchical
+   * - see the symmetric perm table in shape3DETet (hierarchical
    * H(curl) basis) for the same idea on the H(curl) side. Without
    * this fixup the column indices passed to MatSetValuesLocal (which
    * come from DMPlexGetClosureIndices, i.e. PETSc closure order)
@@ -1918,7 +1918,7 @@ PetscErrorCode computeCellOrientation(Cell* cell) {
    * IMPORTANT: we do NOT derive this from PETSc's orientation flag in the
    * cell closure. PETSc's triangle-polytope orientation convention has
    * shifted across versions and an earlier cast (raw -3..2 -> {4,3,5,0,1,2})
-   * was never validated end-to-end — the legacy nord=2 path bypassed
+   * was never validated end-to-end - the legacy nord=2 path bypassed
    * OrientTri entirely (canonical face tangents from sorted vertices), and
    * shape3DHTet at H1 nord >= 2 was never exercised in production. The
    * hierarchical H(curl) basis is the first to actually consume faces[f],
@@ -1927,11 +1927,11 @@ PetscErrorCode computeCellOrientation(Cell* cell) {
    *
    * Instead, we mirror the legacy canonical-face-tangent strategy: lex-sort
    * the three face vertices by their physical coordinates. That ordering
-   * is cell-invariant — both K+ and K- sharing F see the same three
+   * is cell-invariant - both K+ and K- sharing F see the same three
    * physical points and sort them identically. The permutation that takes
    * (FACE_VERTICES[f][0], FACE_VERTICES[f][1], FACE_VERTICES[f][2]) into
    * the sorted order, expressed as one of OrientTri's 6 permutation codes
-   * (0..5 — see comments around OrientTri), is what we store as faces[f].
+   * (0..5 - see comments around OrientTri), is what we store as faces[f].
    *
    * After this, OrientTri produces the SAME canonical (GS[0],GS[1],GS[2])
    * triple from both cells on the shared face, so AncETri / HomIJacobi
@@ -2583,7 +2583,7 @@ PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, c
  *
  * @param[in]  cell   Cell (unused under the hierarchical basis; kept for
  *                    API symmetry with hypothetical non-hierarchical paths).
- * @param[in]  fem    FEM space — only `fem->numDofInCell` is consulted.
+ * @param[in]  fem    FEM space - only `fem->numDofInCell` is consulted.
  * @param[out] signs  Array of length `fem->numDofInCell`; all entries
  *                    set to +1 on return.
  * @return PetscErrorCode PETSC_SUCCESS on success.

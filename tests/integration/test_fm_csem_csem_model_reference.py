@@ -7,7 +7,7 @@ tests/cases/csem_model/) within a configured NRMSD tolerance.  This is the
 canonical "did fm.csem produce the right numbers?" check, complementary to
 the structural smoke test in test_fm_csem_smoke.py.
 
-The same ModEM reference is used at every order — the receiver line is
+The same ModEM reference is used at every order - the receiver line is
 fixed, so the reference Ex is order-independent and each nord's solution
 is compared against it.  nord >= 4 is intentionally NOT exercised here:
 those orders need a direct solver (BDDC degrades) and/or longer runs, so
@@ -35,7 +35,7 @@ pytestmark = pytest.mark.integration
 
 # Orders validated numerically in CI.  The tuned per-nord meshes
 # (tests/cases/csem_model/mesh_p{1,2,3}.geo) keep each run feasible:
-# observed NRMSD is 1.55e-3 / 5.79e-3 / 1.51e-2 for nord 1/2/3 — all
+# observed NRMSD is 1.55e-3 / 5.79e-3 / 1.51e-2 for nord 1/2/3 - all
 # comfortably under the shared 0.03 threshold.
 NORDS = [1, 2, 3]
 NRMSD_TOLERANCE = 0.03   # 3 %, matches the legacy postprocess threshold
@@ -61,7 +61,7 @@ def _load_reference(case_dir):
 
 
 def _nrmsd(reference, simulated):
-    """Normalized RMSD of |·| — matches the legacy postprocess threshold."""
+    """Normalized RMSD of |·| - matches the legacy postprocess threshold."""
     mag_ref = np.abs(reference)
     mag_sim = np.abs(simulated)
     rmsd = np.sqrt(np.mean((mag_sim - mag_ref) ** 2))

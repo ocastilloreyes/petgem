@@ -25,7 +25,7 @@ def parsePreprocessingArgs():
                         default="forward",
                         help="Selects the params-file template (default: forward)")
     parser.add_argument("-nord",              type=int, required=True,
-                        help="Polynomial order (1..6) — written into the params file only")
+                        help="Polynomial order (1..6) - written into the params file only")
     parser.add_argument("-case_dir",          type=str, required=True,
                         help="Directory containing case data (also output directory)")
     parser.add_argument("-mesh_filename",     type=str, required=True,
@@ -37,7 +37,7 @@ def parsePreprocessingArgs():
                              "case_dir. Format: first non-comment line = frequency "
                              "(Hz); subsequent lines = 'x y z current length dip "
                              "azimuth'. Required when -mode forward; optional "
-                             "(skipped) when -mode inverse — the inverse kernel "
+                             "(skipped) when -mode inverse - the inverse kernel "
                              "reads multi-frequency sources from /inv_sources/* "
                              "via -inv_source_filename.")
     parser.add_argument("-inv_source_filename", type=str, default=None,
@@ -232,7 +232,7 @@ def writeInversionPayload(filename, inv_sources_arr, observed_Ex,
 
     Called after writePetgemInputFile (which writes the mesh + sigma +
     receivers + forward sources). Uses h5py to append because /observed/Ex
-    is an HDF5 compound complex128 — easier to express directly than via
+    is an HDF5 compound complex128 - easier to express directly than via
     the PETSc viewer.
 
     Bundle additions:
@@ -290,7 +290,7 @@ def writeInversionPayload(filename, inv_sources_arr, observed_Ex,
         g.create_dataset("azimuthAngle", data=inv[:, 7].astype(np.float64))
 
         obs = f.create_group("/observed")
-        # Compound complex128 ({r,i} float64) — matches what
+        # Compound complex128 ({r,i} float64) - matches what
         # loadObservedData reads via the raw H5 API.
         obs.create_dataset("Ex", data=ex)
         if error_level is not None:
@@ -316,7 +316,7 @@ def _writeVTKFields(cells, coords, conductivity, materials_id, output_vtk):
     PETSc's VTK viewer is unsuitable here because:
       * For a plain section-based DMPlex (no PetscFE/FV discretization)
         VecView_Plex_Local_VTK writes the whole Vec as a single multi-
-        component array — materials_id never gets a separate VTK field.
+        component array - materials_id never gets a separate VTK field.
       * Building per-field sub-DMs and viewing each into a shared VTK
         viewer trips PetscViewerVTKAddField_VTK's same-DM check
         ("Refusing to write a field from more than one grid"); there
@@ -348,8 +348,8 @@ def writePetgemInputFile(plex, conductivity, materials_id,
       /petgem_mesh/...     mesh topology, labels, coordinates, sections, fields
                             (HDF5_PETSC format, written via DMPlex *View routines)
       /receivers           Vec, length 3*N_recv, layout [x0 y0 z0 x1 y1 z1 ...]
-      /nord                Vec, length 1 — polynomial order used to size the case
-      /sources/...         OPTIONAL — written only when both `freq` and
+      /nord                Vec, length 1 - polynomial order used to size the case
+      /sources/...         OPTIONAL - written only when both `freq` and
                             `sources_arr` are non-None (typical for forward
                             modeling; inverse mode skips the group and relies
                             on /inv_sources/* added later by writeInversionPayload).
@@ -357,21 +357,21 @@ def writePetgemInputFile(plex, conductivity, materials_id,
     Parameters
     ----------
     plex          : DMPlex (2-field section, from createDM)
-    conductivity  : ndarray (num_cells, dim) — sigma_x, sigma_y, sigma_z per cell
-    materials_id  : ndarray (num_cells,)     — integer material id per cell
-    receivers_arr : ndarray (num_recv, 3)    — receiver positions
-    freq          : float or None            — single source frequency (Hz);
+    conductivity  : ndarray (num_cells, dim) - sigma_x, sigma_y, sigma_z per cell
+    materials_id  : ndarray (num_cells,)     - integer material id per cell
+    receivers_arr : ndarray (num_recv, 3)    - receiver positions
+    freq          : float or None            - single source frequency (Hz);
                                                 None skips the /sources/* group
-    sources_arr   : ndarray (num_src, 7) or None — x y z current length dip azimuth;
+    sources_arr   : ndarray (num_src, 7) or None - x y z current length dip azimuth;
                                                    None skips the /sources/* group
     output_filename : path to the unified .h5 file
-    cells, coords : ndarrays — required when output_vtk is set (passed to meshio)
+    cells, coords : ndarrays - required when output_vtk is set (passed to meshio)
     output_vtk    : optional VTU filename for conductivity+materials_id view
     """
     num_cells = conductivity.shape[0]
     dim_cond  = conductivity.shape[1]
 
-    # Combined global vec [σx, σy, σz, mat_id] per cell — for the 2-field section.
+    # Combined global vec [σx, σy, σz, mat_id] per cell - for the 2-field section.
     v_model = plex.createGlobalVec()
     arr = v_model.getArray()
     combined = np.zeros((num_cells, dim_cond + 1))
@@ -402,11 +402,11 @@ def writePetgemInputFile(plex, conductivity, materials_id,
     # Receivers (top-level dataset).
     _writeArrayAsVec(viewer, receivers_arr.reshape(-1), "receivers")
 
-    # Polynomial order (top-level scalar, 1-element Vec) — postprocess
+    # Polynomial order (top-level scalar, 1-element Vec) - postprocess
     # reads it from here to annotate figures and pick the right responses.
     _writeArrayAsVec(viewer, np.array([nord], dtype=float), "nord")
 
-    # Sources (under /sources group) — only written when forward sources
+    # Sources (under /sources group) - only written when forward sources
     # are supplied. The inverse kernel skips this group (it consumes
     # multi-frequency sources from /inv_sources/* added later).
     if freq is not None and sources_arr is not None:
@@ -429,7 +429,7 @@ def writeForwardModelingParamsFile(nord, output_dir, output_filename,
 
     `input_filename` is the bundle written by writePetgemInputFile; the
     same name is fed back to the kernel via -input_filename. The basis
-    order is no longer written here — the C kernel reads it from the
+    order is no longer written here - the C kernel reads it from the
     bundle's /nord dataset (loadCsemInputs). `nord` is still accepted as
     an argument because the caller uses it to compose other defaults,
     but it is not emitted into the params file."""
@@ -452,7 +452,7 @@ def writeForwardModelingParamsFile(nord, output_dir, output_filename,
 def writeInverseModelingParamsFile(nord, output_dir, output_filename,
                                    input_filename, params_filename):
     """Emit the im.csem params file. The inverse kernel now reads EVERYTHING
-    case-specific from `input_filename` — multi-frequency sources
+    case-specific from `input_filename` - multi-frequency sources
     (/inv_sources/*), observed Ex (/observed/Ex), the noise level
     (/observed @error_level) and the fixed-material list
     (/inv_meta/fixed_materials).  The emitted params.txt only carries
@@ -493,7 +493,7 @@ def runPreprocessing(*, mode, nord, case_dir,
                      output_vtk=None, dm_view=False):
     """Shared preprocessing pipeline for the PETGEM forward / inverse kernels.
 
-    Pure library function — no CLI parsing.  Builds the DMPlex, assigns the
+    Pure library function - no CLI parsing.  Builds the DMPlex, assigns the
     per-cell conductivity from `sigma_{x,y,z}` indexed by the gmsh:physical
     tag, parses the receivers and sources text files, and bundles everything
     into a single HDF5 input file (`<case_dir>/<input_filename>`).  Also
@@ -576,7 +576,7 @@ def runPreprocessing(*, mode, nord, case_dir,
     print(f"  Mesh file              : {input_mesh_filename}")
     print(f"  Receivers file         : {input_receivers_filename}")
     print(f"  Sources file           : "
-          f"{input_sources_filename if input_sources_filename else '(skipped — inverse mode)'}")
+          f"{input_sources_filename if input_sources_filename else '(skipped - inverse mode)'}")
     if mode == "inverse":
         print(f"  Inv sources file       : {input_inv_sources_filename}")
         print(f"  Observed data file     : {input_observed_filename}")
@@ -616,7 +616,7 @@ def runPreprocessing(*, mode, nord, case_dir,
 
     # 4. Sources (text → freq + ndarray of 7-col rows).
     # Skipped when no forward source file is provided (typical for
-    # inverse-mode preprocessing — the kernel pulls multi-frequency
+    # inverse-mode preprocessing - the kernel pulls multi-frequency
     # records from /inv_sources/* instead and ignores /sources/*).
     if input_sources_filename is not None:
         print("\nReading sources")
@@ -700,7 +700,7 @@ def readBundle(filename):
       sources   : (N_src, 7) ndarray, columns =
                   [x, y, z, current, length, dipAngle, azimuthAngle]
 
-    The DMPlex / model_data fields inside the bundle are not returned —
+    The DMPlex / model_data fields inside the bundle are not returned -
     those are consumed by the C kernel via loadCsemInputs. This loader is
     for the Python postprocessing side and exposes only the parameters a
     case-specific validation script actually needs.
@@ -782,7 +782,7 @@ def readVectorH5(filename, dataset_name, group=None):
     """
     tmp = PETSc.Vec().create(comm=PETSc.COMM_SELF)
     tmp.setName(dataset_name)
-    # Use the dedicated ViewerHDF5 subclass — only that one exposes
+    # Use the dedicated ViewerHDF5 subclass - only that one exposes
     # pushGroup / popGroup in petsc4py. The generic Viewer.createHDF5
     # returns a Viewer whose group methods are missing.
     viewer = PETSc.ViewerHDF5().create(str(filename), mode='r', comm=PETSc.COMM_SELF)

@@ -135,7 +135,7 @@ PetscErrorCode setupCsemGrid(const csemParams params, DM* dm, Grid* grid) {
   PetscCall(DMSetLocalSection(H1dm, section));
   PetscCall(PetscSectionDestroy(&section));
 
-  /* DM for the order-k S_h^k space — P_nord nodal + edge/face/volume
+  /* DM for the order-k S_h^k space - P_nord nodal + edge/face/volume
    * bubbles, sized so ∇P_nord = curl-kernel of Nédélec_nord (the De Rham
    * complex). The forward-kernel discrete gradient G : S_h^k → V_h^k
    * built against this basis satisfies K·G = 0 element-wise. For

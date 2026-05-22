@@ -297,11 +297,11 @@ PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sour
  * Single-pass element loop that assembles the frequency-INDEPENDENT
  * pieces of the CSEM operator and the discrete-gradient hint matrices:
  *
- *   K       — stiffness (curl–curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
- *   Ms      — mass × σ matrix, ∫ (ε_r ⊙ N_i)·N_j where ε_r encodes σ.
- *   G       — canonical Π^Ned order-k discrete gradient against the
+ *   K       - stiffness (curl–curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
+ *   Ms      - mass × σ matrix, ∫ (ε_r ⊙ N_i)·N_j where ε_r encodes σ.
+ *   G       - canonical Π^Ned order-k discrete gradient against the
  *             P_nord H¹ space (grid.H1dm_Pnord). K·G = 0 by construction.
- *   G_BDDC  — topological lowest-Whitney gradient against the SAME
+ *   G_BDDC  - topological lowest-Whitney gradient against the SAME
  *             P_nord H¹ DM with vertex incidence only (inter-bubble
  *             columns dropped by MatFilter). Consumed by
  *             PCBDDCSetDiscreteGradient at order = 1.
@@ -309,7 +309,7 @@ PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sour
  * The caller forms A_f = K − iωμ·Ms per frequency via
  *     MatDuplicate(K, MAT_COPY_VALUES, &A);
  *     MatAXPY(A, -iωμ, Ms, SAME_NONZERO_PATTERN);
- * — the forward kernel does this once for the source frequency,
+ * - the forward kernel does this once for the source frequency,
  * the inverse kernel does it inside a frequency loop.
  *
  * Any of G or G_BDDC may be passed as NULL to skip its construction
@@ -365,7 +365,7 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
    * the G / G_BDDC matrix layout below.  The DM's L2G mapping is also
    * fetched here for the Mat-side calls (Mats do not enforce the strict
    * block-size match that trips VecSetLocalToGlobalMapping at nord ≥ 4
-   * — see assembleCsemRHS for the equivalent workaround on the Vec
+   * - see assembleCsemRHS for the equivalent workaround on the Vec
    * side). */
   PetscCall(DMCreateGlobalVector(dm, &b));
   PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
@@ -397,7 +397,7 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
    * LAST 4 closure positions per row (PETSc closure for P_nord H1 is
    * volume → face → edge → vertex). Each row has at most 4 nonzeros
    * regardless of nord, so we preallocate d_nnz = o_nnz = 4 and turn
-   * on MAT_IGNORE_ZERO_ENTRIES — that way the insertion's full
+   * on MAT_IGNORE_ZERO_ENTRIES - that way the insertion's full
    * P_nord-wide closure buffer doesn't trigger storage for the
    * inter-bubble columns, and no MatFilter pass is needed. */
   if (G_BDDC) {
@@ -571,7 +571,7 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
      * The topological builder fills gradientMatrixBDDC[*][0..3] with
      * the ±1 vertex incidence in PETGEM cell-local vertex order. In
      * the P_nord H1 closure (volume → face → edge → vertex) those 4
-     * vertex DOFs sit at the END of H1dofIndices — at positions
+     * vertex DOFs sit at the END of H1dofIndices - at positions
      *   [numH1DofIndices − 4 .. numH1DofIndices − 1].
      * We only pass that 4-column slice to MatSetValuesLocal (instead
      * of the full P_nord row width), so PETSc walks 4·numDofInCell
@@ -669,14 +669,14 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
 /* Inverse-kernel companion to assembleCsemKandM: walks the local      */
 /* cells, computes only the mass-matrix entries for the current σ,    */
 /* and writes them into the supplied Ms matrix. K and G_BDDC are NOT  */
-/* touched — those are σ-independent and built once at setup, then     */
+/* touched - those are σ-independent and built once at setup, then     */
 /* reused for every L-BFGS iteration.                                  */
 /*                                                                     */
 /* The per-cell setup is shared with assembleCsemKandM via             */
 /* prepareCellForAssembly (single source of truth for cell geometry,   */
 /* conductivity slice, closure, and orientation).  Ke is computed by   */
 /* computeElementalMatrices (it shares basis evaluations with Me) but  */
-/* is discarded — the small extra work is offset by not having to     */
+/* is discarded - the small extra work is offset by not having to     */
 /* duplicate the basis-evaluation code.                                */
 /* ================================================================== */
 PetscErrorCode assembleCsemMsRefill(const csemParams params,

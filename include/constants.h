@@ -28,7 +28,7 @@
 #define NUM_MATERIALS_ID_COMPONENTS 1
 #define MAX_TRANSITIVE_CLOSURE_SIZE 90
 
-/* Inversion-kernel array caps — sized at struct-definition time so they
+/* Inversion-kernel array caps - sized at struct-definition time so they
  * must be compile-time constants. Bump and recompile if a use case
  * exceeds these. setupInversionSources errors when exceeded; the
  * fixed-materials option array is sized to the cap on read. */

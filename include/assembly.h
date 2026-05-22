@@ -38,12 +38,12 @@ PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sour
  *     MatDuplicate, and one global MatAXPY. The caller passes
  *     `constFactor = iωμ`.
  *
- *   K       — curl-curl stiffness, ∫_K (μ⁻¹ curl Ni)·curl Nj.
- *   Ms      — mass × σ,           ∫_K (ε_r ⊙ Ni)·Nj.
- *   G       — order-k canonical Π^Ned gradient G : S_h^k → V_h^k
+ *   K       - curl-curl stiffness, ∫_K (μ⁻¹ curl Ni)·curl Nj.
+ *   Ms      - mass × σ,           ∫_K (ε_r ⊙ Ni)·Nj.
+ *   G       - order-k canonical Π^Ned gradient G : S_h^k → V_h^k
  *             (Ainsworth–Coyle DOF moments, K·G = 0 by construction).
  *             Used for analysis and the K_e·G_e verification.
- *   G_BDDC  — lowest-Whitney topological gradient consumed by
+ *   G_BDDC  - lowest-Whitney topological gradient consumed by
  *             PCBDDCSetDiscreteGradient at order = 1. Each H(curl)
  *             edge DOF couples to its two endpoint vertex H1 DOFs
  *             (±1); higher-order rows and inter-bubble columns are
@@ -64,7 +64,7 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
  * conductivity field.  Used by the inverse kernel inside the L-BFGS
  * loop: K and G_BDDC are σ-independent and built once at setup via
  * assembleCsemKandM, while Ms must be re-computed every iteration when
- * σ changes.  fm.csem does NOT use this — its fused single-pass call
+ * σ changes.  fm.csem does NOT use this - its fused single-pass call
  * to assembleCsemKandM is unchanged.
  *
  * Preconditions:

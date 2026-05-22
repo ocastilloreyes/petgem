@@ -97,7 +97,7 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
 
   /* Build the receiver interpolation operator (shared with im.csem).
    * One global Q assembly handles all receivers and all sources at this
-   * frequency.  Per-receiver Ex = QEx * x, etc. — MPI-invariant by
+   * frequency.  Per-receiver Ex = QEx * x, etc. - MPI-invariant by
    * construction because each Q row is decided once with global column
    * indexing, irrespective of partition. */
   PetscCall(buildReceiverInterpolationMatrices(params.nord,
@@ -241,7 +241,7 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
       PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "azimuth_angle",PETSC_REAL, &s->azimuthAngle));
     }
 
-    /* Top-level provenance attributes — lowercase + underscore, matching
+    /* Top-level provenance attributes - lowercase + underscore, matching
      * the bundle's naming idiom. */
     sprintf(version, "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
     PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "petgem_version", PETSC_STRING, version));

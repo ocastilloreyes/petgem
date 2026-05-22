@@ -14,7 +14,7 @@
 #include <petsc.h>
 
 typedef struct {
-  /* Unified PETGEM input bundle (HDF5) — contains mesh topology, sections,
+  /* Unified PETGEM input bundle (HDF5) - contains mesh topology, sections,
    * per-cell conductivity + materials_id, receivers (under /receivers), and
    * single-frequency forward sources (under /sources/...). Produced by
    * runPreprocessing() on the Python side. Consumed by loadCsemInputs(). */

@@ -66,7 +66,7 @@ def main():
         raise ValueError(
             f"Row count {data.shape[0]} != number of frequencies {num_freqs}")
 
-    # Column 0 is the frequency index label — skip it
+    # Column 0 is the frequency index label - skip it
     # Remaining columns are Re/Im pairs
     values = data[:, 1:]
     num_receivers = values.shape[1] // 2
@@ -83,7 +83,7 @@ def main():
     print(f"Receivers:    {num_receivers}")
     print(f"Data shape:   {ex.shape}")
 
-    # Write HDF5 — h5py stores complex128 as compound type {r, i}
+    # Write HDF5 - h5py stores complex128 as compound type {r, i}
     with h5py.File(args.output, "w") as f:
         f.create_dataset("Ex", data=ex)
         f.create_dataset("frequencies", data=frequencies)

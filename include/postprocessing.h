@@ -18,7 +18,7 @@
 
 /* Compute electric and magnetic fields at receivers for the forward kernel.
  * `receivers` is the serial Vec (PETSC_COMM_SELF, length 3·N_recv) returned
- * by loadCsemInputs — passed through so postprocessing does not re-open
+ * by loadCsemInputs - passed through so postprocessing does not re-open
  * the input HDF5. */
 PetscErrorCode computeFields(const csemParams params, const CsemSourceSet sources,
                              const DM dm, const Grid grid,

@@ -9,18 +9,18 @@
 
 /*
  * Public surface:
- *   buildNeighborSmoothingGraph — DMPlex vertex-star adjacency on the
+ *   buildNeighborSmoothingGraph - DMPlex vertex-star adjacency on the
  *                                 owned-cell DM, 1/dist weights
- *   setupParallelSmoothingGraph — overlap=1 graph + ghost-aware Vec
+ *   setupParallelSmoothingGraph - overlap=1 graph + ghost-aware Vec
  *                                 workspace; production path for MPI > 1
- *   applyGaussSeidelSmoothing   — forward+reverse Gauss-Seidel.
+ *   applyGaussSeidelSmoothing   - forward+reverse Gauss-Seidel.
  *                                 At MPI > 1 uses the parallel block-Jacobi
  *                                 path with one ghost exchange between
  *                                 sweeps; at MPI == 1 uses a direct
  *                                 sequential sweep on the owned cells.
- *   destroyNeighborGraph        — frees both graph variants
- *   buildNotFixedMask           — 0/1 Vec used to zero gradient at fixed cells
- *   applyLogToSigma             — sigma = 1/exp(smoothed_X + X0), MATLAB tempX path
+ *   destroyNeighborGraph        - frees both graph variants
+ *   buildNotFixedMask           - 0/1 Vec used to zero gradient at fixed cells
+ *   applyLogToSigma             - sigma = 1/exp(smoothed_X + X0), MATLAB tempX path
  */
 
 #include <stdio.h>
@@ -148,7 +148,7 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
         if (neighbor == i) continue;
         if (neighbor < grid->cellStart || neighbor >= grid->cellEnd) continue;
         PetscInt ln = neighbor - grid->cellStart;
-        /* Keep fixed (air/padding) neighbors in the list — they act as a
+        /* Keep fixed (air/padding) neighbors in the list - they act as a
          * fixed-value bath the smoother averages non-fixed boundary cells
          * toward.  applyGaussSeidelSmoothing skips updating fixed cells
          * themselves (their stored value is preserved), so dropping them
@@ -235,7 +235,7 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
 /* applyGaussSeidelSmoothing                                           */
 /*                                                                     */
 /* Forward + reverse Gauss-Seidel sweep using the precomputed CSR      */
-/* neighbor graph.  Operates on a partition-local Vec — non-owned     */
+/* neighbor graph.  Operates on a partition-local Vec - non-owned     */
 /* DOFs not visited.                                                   */
 /* diagWeight < 0 is a sentinel that bypasses the smoother (used by   */
 /* the dev FD-gradient check).                                        */
@@ -382,7 +382,7 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
 /*      indices); compute 1/dist weights and normalize.               */
 /*   4. Allocate persistent local + global Vec scratch on the new DM. */
 /*                                                                     */
-/* Result is NOT bit-identical to the sequential rank-0 sweep —       */
+/* Result is NOT bit-identical to the sequential rank-0 sweep -       */
 /* parallel GS uses one-step-stale ghost values during each sweep,    */
 /* whereas sequential GS sees the most recently updated value of      */
 /* every neighbor. Recovered model still matches; same convergence.   */
@@ -594,7 +594,7 @@ PetscErrorCode buildNotFixedMask(const NeighborGraph *graph,
   PetscCall(VecSet(*maskLocal, 1.0));
 
   /* Zero the local mask entry for each fixed cell using the
-   * section offset — local section has exactly 1 DOF/cell. */
+   * section offset - local section has exactly 1 DOF/cell. */
   PetscSection localSec;
   PetscCall(DMGetLocalSection(dmInversion, &localSec));
 
@@ -609,7 +609,7 @@ PetscErrorCode buildNotFixedMask(const NeighborGraph *graph,
   }
   PetscCall(VecRestoreArray(*maskLocal, &arr));
 
-  /* Global mirror — INSERT_VALUES is unambiguous because each cell
+  /* Global mirror - INSERT_VALUES is unambiguous because each cell
    * is owned by exactly one rank for a cell-based 1-DOF section. */
   PetscCall(DMCreateGlobalVector(dmInversion, maskGlobal));
   PetscCall(VecSet(*maskGlobal, 0.0));
@@ -652,7 +652,7 @@ PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity,
    * model perturbation (tempX = X_lbfgs) before converting to sigma.
    * Apply the same sweep here on a local copy so that the assembled
    * conductivity is always spatially smooth, matching the reference.
-   * The optimizer's X is not modified — only the physical sigma changes. */
+   * The optimizer's X is not modified - only the physical sigma changes. */
   PetscCall(applyGaussSeidelSmoothing(graph, diagWeight, xLocal));
 
   /* Expose the smoothed tempX to the caller for VTU diagnostics (MATLAB

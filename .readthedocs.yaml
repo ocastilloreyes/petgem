@@ -11,7 +11,7 @@ build:
   jobs:
     # Doxygen XML + Sphinx API .rst generation. Delegated to the shared
     # script so this stays in lockstep with the Makefile `docs_prep`
-    # target (single source of truth — no command duplication to drift).
+    # target (single source of truth - no command duplication to drift).
     pre_build:
       - bash scripts/auto_doc/prepare_docs.sh
 

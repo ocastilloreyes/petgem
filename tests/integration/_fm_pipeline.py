@@ -14,7 +14,7 @@ import pytest
 
 
 # Per-nord wall-clock budget for the kernel (seconds).  These are ceilings
-# that guard against a genuine hang, NOT expected runtimes — a healthy run
+# that guard against a genuine hang, NOT expected runtimes - a healthy run
 # finishes well inside them.
 #
 # Total DOFs (≈ elements × DOFs-per-cell) drive the cost, and the two factors
@@ -36,7 +36,7 @@ PREPROCESS_TIMEOUT = 120
 
 # MPI ranks for the kernel runs. Default 2: GitHub-hosted runners have few
 # vCPUs, and oversubscribing (e.g. -n 4 on a 2-core box) makes MPI ranks
-# busy-wait against each other and inflates wall time — which is what pushed
+# busy-wait against each other and inflates wall time - which is what pushed
 # the nord=1 smoke run past its timeout. fm.csem is MPI-invariant (BDDC +
 # MUMPS), so rank count does not change the numerical result, only speed.
 # Override with PETGEM_TEST_MPI_NPROC=N (e.g. on a many-core cluster).
@@ -113,7 +113,7 @@ def ensure_mesh_for_nord(case_workspace, nord):
 
     The case directory ships per-nord `.geo` files (tuned for each FEM
     order so higher-nord meshes are appropriately coarser).  The .msh
-    files are NOT shipped — they're large, regenerable, and order-
+    files are NOT shipped - they're large, regenerable, and order-
     specific.  This helper runs `gmsh mesh_p{nord}.geo -3` once per
     workspace, writing the .msh next to the .geo in the tmp workspace.
 
@@ -130,7 +130,7 @@ def ensure_mesh_for_nord(case_workspace, nord):
     if not geo.exists():
         pytest.skip(
             f"mesh_p{nord}.geo not present in {case_workspace} "
-            f"and {msh.name} not pre-generated — cannot run at nord={nord}"
+            f"and {msh.name} not pre-generated - cannot run at nord={nord}"
         )
     gmsh = shutil.which("gmsh")
     if gmsh is None:

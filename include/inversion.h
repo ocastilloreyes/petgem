@@ -68,9 +68,9 @@ typedef struct {
 
   /* Source-frequency pairs loaded from the unified bundle's /inv_sources
    * group (freq, position, current, length, dipAngle, azimuthAngle).
-   * Populated by setupInversionSources.                                */
+   * Populated by setupInversionSources.  Each entry's frequency lives in
+   * invSources[i].freq; no separate frequency array is kept.            */
   PetscInt       numFreqs;                         /* number of entries      */
-  PetscReal      allFreqs[INV_MAX_FREQUENCIES];    /* frequency per entry    */
   InvCsemSource  invSources[INV_MAX_FREQUENCIES];  /* source per entry       */
 
   /* VTU snapshot: write conductivity model every N accepted L-BFGS steps.
@@ -180,7 +180,7 @@ typedef struct {
 
   /* Per-frequency precomputed inputs. The RHS Vec, weights Vec, and
    * observed-Ex row depend only on the source, the observed data, and
-   * iparams->errorLevel — all constant across L-BFGS iterations. */
+   * iparams->errorLevel - all constant across L-BFGS iterations. */
   Vec                            *Bvec_per_freq;     /* numFreqs, sized on dm   */
   Vec                            *Wf_per_freq;       /* numFreqs, sized seq Nrec */
   Vec                            *dObsRow_per_freq;  /* numFreqs, sized seq Nrec */
@@ -207,7 +207,7 @@ PetscErrorCode readInversionParams(invParams *iparams);
  * /observed, fixed_materials array under /inv_meta) and apply to iparams
  * UNLESS the corresponding CLI override was present (see the
  * *FromCLI provenance flags above).  Safe to call even when the bundle
- * has no such entries — iparams just keeps the readInversionParams
+ * has no such entries - iparams just keeps the readInversionParams
  * defaults. */
 PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
                                             invParams  *iparams);
@@ -215,7 +215,7 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
 /* Load multi-frequency inversion sources from the unified bundle's
  * /inv_sources group (replaces the legacy text-file format).
  * `bundleFile` is the same HDF5 path consumed by loadCsemInputs.
- * Populates iparams->numFreqs, allFreqs[], invSources[]. */
+ * Populates iparams->numFreqs and invSources[]. */
 PetscErrorCode setupInversionSources(const char *bundleFile,
                                      invParams  *iparams);
 
@@ -241,8 +241,7 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM dm,
  * Plain transpose (no conjugate), matching MATLAB iG.'*inx.
  * `quadrature_3d`, `Me`, `Ke` are workspace buffers owned by the caller
  * (set up once on InversionContext via setupInversionWorkspace). */
-PetscErrorCode computeGradientContribution(const invParams *iparams,
-                                           const DM dm,
+PetscErrorCode computeGradientContribution(const DM dm,
                                            const Grid *grid,
                                            const Vec conductivity,
                                            const Vec xLocal,
@@ -306,7 +305,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec G, void *ctx);
  * Replaces PETSc TAO which is unavailable with complex scalars.
  *
  * If rmsPtr != NULL and rmsTol > 0, the optimizer exits as soon as
- * *rmsPtr <= rmsTol after an accepted step — matches MATLAB's
+ * *rmsPtr <= rmsTol after an accepted step - matches MATLAB's
  * `rms <= 1.05` exit in Ex_inv.m. The callback is expected to update
  * *rmsPtr before returning. */
 PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,

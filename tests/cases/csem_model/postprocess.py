@@ -89,7 +89,7 @@ def main():
                  marker='o', linestyle='', markersize=6)
     plt.xlabel('Offset (m)')
     plt.ylabel('|Ex| (V/m)')
-    plt.title(f'csem_model — nord={nord}')
+    plt.title(f'csem_model - nord={nord}')
     plt.legend()
     plt.savefig(fig_path, dpi=300)
 

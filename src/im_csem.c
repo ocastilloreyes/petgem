@@ -135,7 +135,7 @@ int runInverse(int argc, char **argv)
                          sizeof(iparams.bundleFile)));
 
   /* Pull case-property defaults out of the bundle (error_level,
-   * fixed_materials) — CLI overrides applied by readInversionParams
+   * fixed_materials) - CLI overrides applied by readInversionParams
    * already take precedence via the *FromCLI provenance flags. */
   PetscCall(loadInversionMetaFromBundle(iparams.bundleFile, &iparams));
 
@@ -144,7 +144,7 @@ int runInverse(int argc, char **argv)
   /* receivers from the bundle. The bundle's inv_sources group and     */
   /* observed Ex dataset are read below via setupInversionSources and  */
   /* (later, once numReceivers is known) loadObservedData inside       */
-  /* runCsemInversion. The forward /sources group is skipped (NULL) —  */
+  /* runCsemInversion. The forward /sources group is skipped (NULL) -  */
   /* the inverse kernel uses the multi-frequency inv_sources records.  */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE

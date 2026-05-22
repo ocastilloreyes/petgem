@@ -3,7 +3,7 @@
 Writes a tiny bundle via writePetgemInputFile, reads it back through
 readBundle, and asserts every field round-trips exactly.
 
-The mesh is a single tetrahedron — minimum viable DMPlex — which is enough
+The mesh is a single tetrahedron - minimum viable DMPlex - which is enough
 to exercise the HDF5 plumbing without requiring a real Gmsh file.
 """
 import numpy as np

@@ -61,7 +61,7 @@ def create_api_rst_files():
     # A missing-headers situation is almost always a misconfiguration
     # (wrong SOURCE_CODE_DIR, headers moved) rather than a legitimate
     # "no API yet" state.  Emitting a silent placeholder + exit 0 is what
-    # let the src/-vs-include/ path bug hide for so long — the docs build
+    # let the src/-vs-include/ path bug hide for so long - the docs build
     # "succeeded" with an empty API reference.  Raise instead so both
     # `make docs` and the Read the Docs build fail visibly.
     if not generated_rst_basenames:
@@ -99,6 +99,6 @@ def create_master_api_index(rst_basenames):
 
 
 if __name__ == "__main__":
-    # All paths are absolute (derived from REPO_ROOT), so no chdir needed —
+    # All paths are absolute (derived from REPO_ROOT), so no chdir needed -
     # the script works regardless of the caller's working directory.
     create_api_rst_files()

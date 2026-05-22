@@ -59,7 +59,7 @@ PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, c
                                         PetscReal** Me, PetscReal** Ke);
 
 /* printCellEntities is declared in grid.h (its definition lives in
- * grid.c); hvfem.h already includes grid.h, so no re-declaration here —
+ * grid.c); hvfem.h already includes grid.h, so no re-declaration here -
  * a duplicate caused a Sphinx "Duplicate C declaration" warning. */
 
 /* Build the per-DOF sign vector for a cell under the chosen Nédélec order.
@@ -84,7 +84,7 @@ PetscErrorCode evaluateNedelecBasis(const FEMSpace* fem, const Cell* cell,
  * hvfem.c, build a NedelecOps instance for them, and register it in
  * nedelecOpsForOrder().
  *
- * Uniform signatures — some fields are unused for a given order:
+ * Uniform signatures - some fields are unused for a given order:
  *   - computeCoefficients: nord=1 fills coeffs AND Dx/Dy/Dz; nord>=2 only
  *     fills coeffs (Dx/Dy/Dz still passed but untouched).
  *   - computeBasis      : evaluates Ni at a reference-cell point.
@@ -101,7 +101,7 @@ PetscErrorCode evaluateNedelecBasis(const FEMSpace* fem, const Cell* cell,
  *     interpolation Π^Ned(∇φ_j), evaluated via Ainsworth–Coyle DOF
  *     moments (tangential edge Legendre moments + canonical-tangent
  *     face moments against barycentric polynomials + cell-local volume
- *     moments) — see hierarchicalBuildExactGradientMatrix. Cross-cell
+ *     moments) - see hierarchicalBuildExactGradientMatrix. Cross-cell
  *     consistency is enforced by computing every shared moment in the
  *     CANONICAL geometric frame (sorted-vertex face ordering, canonical
  *     edge direction), so the assembled global G satisfies K·G = 0 to

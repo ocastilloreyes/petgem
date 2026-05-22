@@ -28,16 +28,16 @@
  * sections, and the combined model-data vector (which is split into the
  * per-cell conductivity and materials_id local Vecs). Opens the same file
  * a second time on PETSC_COMM_SELF (each rank reads independently) to load
- *   /nord                — single-element Vec; written into params->nord
+ *   /nord                - single-element Vec; written into params->nord
  *                          (so the kernel no longer needs -nord in the
  *                          params file)
- *   /receivers           — Vec of 3·N_recv reals
- *   /sources/frequency   — single-frequency scalar
- *   /sources/position    — Vec of 3·N_src reals
- *   /sources/current     — Vec of N_src reals
- *   /sources/length      — Vec of N_src reals
- *   /sources/dipAngle    — Vec of N_src reals
- *   /sources/azimuthAngle — Vec of N_src reals
+ *   /receivers           - Vec of 3·N_recv reals
+ *   /sources/frequency   - single-frequency scalar
+ *   /sources/position    - Vec of 3·N_src reals
+ *   /sources/current     - Vec of N_src reals
+ *   /sources/length      - Vec of N_src reals
+ *   /sources/dipAngle    - Vec of N_src reals
+ *   /sources/azimuthAngle - Vec of N_src reals
  *
  * `params` is in/out: inputFile is read, nord is written (from the bundle's
  * /nord dataset).  `sources` and `receivers` are optional: pass NULL for

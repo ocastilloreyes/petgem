@@ -72,10 +72,10 @@ ifeq ($(USE_INTEL), 1)
     #           -Wpedantic from PETSc's own configure-time flags; we
     #           cannot easily strip it, so we silence the warning).
     #   11074 = "Inlining inhibited by limit max-size / max-total-size"
-    #           — informational IPO remark fired on the largest TUs
+    #           - informational IPO remark fired on the largest TUs
     #           (hvfem, hvfem_hierarchical, inversion).
     #   11076 = "To get full report use -qopt-report=4 -qopt-report-phase ipo"
-    #           — companion to 11074; harmless suggestion.
+    #           - companion to 11074; harmless suggestion.
     # INTEL_DIAG is propagated to both CFLAGS and the link command.
     INTEL_DIAG := -diag-disable=10441,10148,11074,11076
     BASE_CFLAGS := $(PETSC_CC_INCLUDES) -O3 -g $(INTEL_DIAG)
@@ -278,7 +278,7 @@ clean_doc:                                              ## Clean documentation o
 # Help
 # -----------------------------------------------------------------------------
 help:              ## Show this help message
-	@echo "$(C_BOLD)PETGEM — make targets$(C_RESET)"
+	@echo "$(C_BOLD)PETGEM - make targets$(C_RESET)"
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) \
         	| awk 'BEGIN {FS = ":.*?## "}; {printf "  $(C_CC)%-12s$(C_RESET) %s\n", $$1, $$2}'
 	@echo ""
@@ -295,7 +295,7 @@ help:              ## Show this help message
 	@echo "$(C_BOLD)Documentation$(C_RESET):  make docs    (output: $(SPHINX_OUT)/index.html)"
 
 # -----------------------------------------------------------------------------
-# Phony targets — these never correspond to files, so always run regardless
+# Phony targets - these never correspond to files, so always run regardless
 # of any same-named file in the tree.
 # -----------------------------------------------------------------------------
 .PHONY: all _preamble clean help docs docs_prep sphinx_html clean_doc

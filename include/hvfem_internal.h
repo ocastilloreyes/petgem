@@ -34,7 +34,7 @@ PetscErrorCode crossProduct(const PetscReal a[NUM_DIMENSIONS],
 
 PetscErrorCode invertMatrix(const PetscInt N, const PetscReal A[], PetscReal invA[]);
 
-/* H1 hierarchical shape functions on the reference tetrahedron — used by the
+/* H1 hierarchical shape functions on the reference tetrahedron - used by the
  * order-1 gradient-matrix builder and (eventually) higher orders that need
  * P_k nodal values & gradients at quadrature points. */
 PetscErrorCode shape3DHTet(const PetscReal X[NUM_DIMENSIONS], const PetscInt nord,
@@ -89,7 +89,7 @@ PetscErrorCode HomIJacobi(const PetscReal S[2],
  * each captures its order at the adapter and shares the same shape3DETet
  * kernel via the order-parameterized Piola adapters. Orientation is
  * encoded inside the reference shape functions (OrientE / OrientTri), so
- * callers MUST set DOF signs to +1 — handled centrally in buildDofSigns.
+ * callers MUST set DOF signs to +1 - handled centrally in buildDofSigns.
  * ------------------------------------------------------------------------- */
 extern const NedelecOps nedelecOps_order1;
 extern const NedelecOps nedelecOps_order2;

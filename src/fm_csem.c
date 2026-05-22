@@ -185,7 +185,7 @@ int runForward(int argc, char** argv) {
                                 constFactor,
                                 &A,    /* fused output: A = K − constFactor·Ms */
                                 NULL,  /* Ms == NULL selects fused mode        */
-                                NULL,  /* canonical G — skip                    */
+                                NULL,  /* canonical G - skip                    */
                                 &G_BDDC));
   }
   PetscCall(PetscTime(&end_timer));

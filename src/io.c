@@ -97,7 +97,7 @@ PetscErrorCode readCsemParams(const PetscMPIInt size, csemParams* params) {
              "Exiting: -output_filename missing. Mandatory parameter required for simulation.\n");
   PetscCall(PetscStrncpy(params->outputFilename, outputFilename, sizeof(params->outputFilename)));
 
-  /* Basis order is optional here — the bundle's /nord dataset is the
+  /* Basis order is optional here - the bundle's /nord dataset is the
    * normal source of truth and is read by loadCsemInputs. -nord on the
    * command line is honored as an override (handy for debug runs that
    * want to mismatch on purpose). Leave params->nord = 0 to signal
@@ -190,13 +190,13 @@ PetscErrorCode loadCsemInputs(csemParams     *params,
 
     /* 2-field section: field 0 = conductivity (3 dofs/cell),
      *                  field 1 = materials_id (1 dof/cell).
-     * DMSetNumFields is intentionally NOT called — for plain section-based
+     * DMSetNumFields is intentionally NOT called - for plain section-based
      * DMs (no PetscFE/FV) it triggers DMCreateLocalSection_Plex which fails
      * without a discretization object.  The 2-field layout is recovered
      * from the loaded section directly. */
     PetscCall(DMPlexSectionLoad(dm, viewer, NULL, sfXC, &sfG, NULL));
 
-    /* Combined global vector — 4 dofs/cell [sigma_x sigma_y sigma_z mat_id]. */
+    /* Combined global vector - 4 dofs/cell [sigma_x sigma_y sigma_z mat_id]. */
     PetscCall(DMCreateGlobalVector(dm, &combinedGlobal));
     PetscCall(PetscObjectSetName((PetscObject)combinedGlobal, "model_data"));
     PetscCall(DMPlexGlobalVectorLoad(dm, viewer, NULL, sfG, combinedGlobal));
@@ -298,7 +298,7 @@ PetscErrorCode loadCsemInputs(csemParams     *params,
     PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, params->inputFile,
                                   FILE_MODE_READ, &viewer));
 
-    /* /nord — single-element Vec. Bundle is the source of truth unless
+    /* /nord - single-element Vec. Bundle is the source of truth unless
      * the caller explicitly set -nord on the command line (params->nord
      * non-zero at entry). */
     if (params->nord <= 0) {
@@ -462,8 +462,8 @@ PetscErrorCode readInversionParams(invParams *iparams)
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-inv_dev_fd_check",
                                &iparams->fdCheckCells, NULL));
 
-  /* numFreqs/allFreqs/invSources are populated later by
-   * setupInversionSources (from the unified bundle's /inv_sources group). */
+  /* numFreqs/invSources are populated later by setupInversionSources
+   * (from the unified bundle's /inv_sources group). */
   iparams->numFreqs = 0;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -511,7 +511,7 @@ PetscErrorCode readInversionParams(invParams *iparams)
 /* datasets are written by h5py without the "complex" attribute PETSc  */
 /* expects on a complex-scalar build.                                  */
 /*                                                                     */
-/* Populates iparams->numFreqs, allFreqs[], invSources[].             */
+/* Populates iparams->numFreqs and invSources[].                      */
 /* ================================================================== */
 static PetscErrorCode readF64Dataset1D(hid_t file, const char *path,
                                        PetscInt expected_len,
@@ -591,7 +591,6 @@ PetscErrorCode setupInversionSources(const char *bundleFile,
     s->length            = lenArr[i];
     s->dipAngle          = dipArr[i];
     s->azimuthAngle      = azArr[i];
-    iparams->allFreqs[i] = s->freq;
   }
 
   PetscCall(PetscFree6(freqArr, posArr, curArr, lenArr, dipArr, azArr));

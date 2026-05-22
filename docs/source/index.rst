@@ -4,7 +4,7 @@
 Welcome to PETGEM's documentation!
 ##################################
 
-**PETGEM** (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is an open-source software for large-scale 3D electromagnetic (EM) forward modeling. It implements a high-order edge finite element method on unstructured tetrahedral meshes, enabling accurate simulations for active-source EM problems.
+**PETGEM** (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is an open-source software for large-scale 3D electromagnetic (EM) modeling. It implements a high-order edge finite element method on unstructured tetrahedral meshes, enabling accurate simulations for active-source EM problems in both **forward modeling** and **inverse modeling** (inversion).
 
 Originally developed in Python, **PETGEM** has been refactored in C and integrated with `PETSc <https://petsc.org/release/>`_ to improve scalability on massively parallel architectures, memory efficiency, and mesh handling. These advances make **PETGEM** well suited for current and future exascale systems.
 
@@ -13,6 +13,7 @@ Originally developed in Python, **PETGEM** has been refactored in C and integrat
 Key features
 ------------
 - High-order edge finite element method
+- Forward modeling and inversion (L-BFGS with adjoint-state gradients)
 - Unstructured tetrahedral mesh support (`Gmsh <http://gmsh.info/>`_)
 - Parallel computing with MPI and `PETSc <https://petsc.org/release/>`_
 - Python bindings for pre- and post-processing
@@ -28,18 +29,31 @@ More information
 
 .. toctree::
    :maxdepth: 2
-   :caption: Manual:
+   :caption: Getting started:
 
    manual/install
-   manual/guide
+   manual/overview
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Forward modeling:
+
+   manual/forward_modeling
    manual/examples
-   manual/publications
-   manual/contact
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Inverse modeling:
+
+   manual/inverse_modeling
+   manual/examples_inverse
 
 .. toctree::
    :maxdepth: 1
-   :caption: API Reference:
+   :caption: Reference:
 
+   manual/publications
+   manual/contact
    api/index
 
 

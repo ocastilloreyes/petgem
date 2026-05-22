@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# prepare_docs.sh — generate the Doxygen XML + the Sphinx API .rst pages.
+# prepare_docs.sh - generate the Doxygen XML + the Sphinx API .rst pages.
 #
 # Single source of truth for the documentation-prep steps, shared by:
 #   - the Makefile `docs` target (local builds), and
@@ -8,7 +8,7 @@
 #
 # Deliberately PETSc-free: it must run in the RTD build environment, which
 # has no PETSc. (The repo Makefile `include`s PETSc's conf at the top, so
-# RTD cannot call `make docs` directly — hence this standalone script.)
+# RTD cannot call `make docs` directly - hence this standalone script.)
 #
 # It does NOT run the final Sphinx HTML build: locally that is the
 # Makefile `sphinx_html` target; on RTD it is the native `sphinx:` step.

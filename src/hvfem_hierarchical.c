@@ -44,7 +44,7 @@
 #include "hvfem_internal.h"
 
 /* ---------------------------------------------------------------------------
- * Local helpers — small wrappers over hvfem.c machinery exposed via
+ * Local helpers - small wrappers over hvfem.c machinery exposed via
  * hvfem_internal.h. AncEE / AncETri are unique to the hierarchical basis
  * and live here as file-local statics.
  * ------------------------------------------------------------------------- */
@@ -187,7 +187,7 @@ static PetscErrorCode AncETri(const PetscReal S[NUM_DIMENSIONS],
 }
 
 /* ---------------------------------------------------------------------------
- * shape3DETet — full hierarchical H(curl) basis on the reference cell.
+ * shape3DETet - full hierarchical H(curl) basis on the reference cell.
  *
  * Inputs:
  *   X[3]              : reference-cell point (xi, eta, zeta).
@@ -623,7 +623,7 @@ static PetscErrorCode hierarchicalComputeCurlsOrder(PetscInt nord, const Cell *c
  *
  * Sign convention: edges in canonical orientation (NoriE=0, edgeSigns >= 0)
  * get -1 at the start vertex and +1 at the end vertex of EDGE_VERTICES[e].
- * Reversed edges get the opposite — the standard Whitney tangential
+ * Reversed edges get the opposite - the standard Whitney tangential
  * direction. */
 static PetscErrorCode hierarchicalBuildGradientMatrixTopological(const FEMSpace *fem, const Cell *cell,
                                                                   const Quadrature1D *quadrature1d,
@@ -704,7 +704,7 @@ static PetscErrorCode hierarchicalBuildGradientMatrixTopological(const FEMSpace 
  *   * Face DOFs (spatial (p,q) with p+q ≤ nord-2, tangent α ∈ {1,2}):
  *         σ_F^{(p,q),α}(u) = ∫_F (u · e_α^F) · ψ_{p,q}^Dubiner(λ) dA
  *     with (v_a, v_b, v_c) the CANONICAL face vertex order (sorted by
- *     physical coordinates — see computeCellOrientation), tangents
+ *     physical coordinates - see computeCellOrientation), tangents
  *     e_1^F = v_b - v_a, e_2^F = v_c - v_a, and ψ_{p,q} the Dubiner
  *     polynomial basis on the canonical triangle (L²-orthogonal, see
  *     hcurlDubinerFace below).
@@ -736,7 +736,7 @@ static PetscErrorCode hierarchicalBuildGradientMatrixTopological(const FEMSpace 
  * entries to ~1e100+ magnitudes that overflow the squared-sum
  * Frobenius norm of the global G. After the solve we scan Ge and
  * replace any entry that is non-finite OR whose magnitude exceeds
- * an unphysical threshold (1e6 — two orders above any legitimate
+ * an unphysical threshold (1e6 - two orders above any legitimate
  * Nédélec coefficient at supported orders) with zero; the cell
  * contributes a
  * degraded (but finite) row to the global G with a diagnostic line
@@ -764,12 +764,12 @@ static PetscErrorCode hierarchicalBuildGradientMatrixTopological(const FEMSpace 
  *
  * References:
  *   * L. Demkowicz, "Computing with hp-Adaptive Finite Elements", Vol.1
- *     (2006) — hierarchical H1/H(curl) basis construction.
+ *     (2006) - hierarchical H1/H(curl) basis construction.
  *   * M. Ainsworth & J. Coyle, "Hierarchic finite element bases on
- *     unstructured tetrahedral meshes", IJNME 58 (2003) — operational
+ *     unstructured tetrahedral meshes", IJNME 58 (2003) - operational
  *     DOF moment definitions used here.
  *   * J.-C. Nédélec, "Mixed finite elements in R^3", Numer. Math. 35
- *     (1980) — original Nédélec_1 first-kind space & DOFs.
+ *     (1980) - original Nédélec_1 first-kind space & DOFs.
  * ========================================================================= */
 
 /* Reference-tetrahedron vertex coordinates (PETGEM convention). Matches
@@ -808,7 +808,7 @@ static inline void hcurlFaceCanonicalVertices(const Cell *cell, PetscInt f,
  * Replace the natural monomial choices (λ_a^i λ_b^j λ_c^k on the face,
  * x^i y^j z^k in the volume) with Dubiner / Koornwinder bases. The
  * monomial bases are L²-spanning but become near-linearly-dependent at
- * high order — their Gram matrix is the Hilbert / Hilbert-like matrix
+ * high order - their Gram matrix is the Hilbert / Hilbert-like matrix
  * with κ ~ exp(n). The moment-duality matrix D inherits that
  * conditioning, and at nord ≥ 5 even Wilkinson iterative refinement
  * diverges on some CSEM cells.
@@ -830,7 +830,7 @@ static inline void hcurlFaceCanonicalVertices(const Cell *cell, PetscInt f,
  *     orthogonal polynomials", Theory and Application of Special
  *     Functions (1975).
  *   * G. Karniadakis, S. Sherwin, "Spectral/hp Element Methods for
- *     CFD" (2005), Ch. 3 — collapsed-coordinate construction.
+ *     CFD" (2005), Ch. 3 - collapsed-coordinate construction.
  * ------------------------------------------------------------------------- */
 
 /* Jacobi polynomial P_n^{(α,β)}(x) via the classical 3-term recurrence
@@ -1338,7 +1338,7 @@ static PetscErrorCode hierarchicalBuildExactGradientMatrix(const FEMSpace *fem, 
    * D is the duality matrix between the hierarchical Nédélec basis
    * and the Ainsworth-Coyle moment functionals. For well-conditioned
    * cells (nord ≤ 4 everywhere, nord ≥ 5 on uniform meshes) LU is
-   * exact to machine precision — using LAPACK directly instead of
+   * exact to machine precision - using LAPACK directly instead of
    * MatLUFactor + MatMatSolve sidesteps Mat object overhead and
    * gives the same numerical result.
    *
@@ -1348,8 +1348,8 @@ static PetscErrorCode hierarchicalBuildExactGradientMatrix(const FEMSpace *fem, 
    * approach zero, producing NaN/Inf in B (and sometimes D) during
    * moment accumulation. LU then either reports a singular pivot
    * (INFO > 0) or silently writes NaN into the solution. Rather than
-   * propagating these into the global G — which poisons every
-   * downstream diagnostic — we sanitize the solution post-hoc:
+   * propagating these into the global G - which poisons every
+   * downstream diagnostic - we sanitize the solution post-hoc:
    * non-finite entries are replaced with zero, the cell contributes
    * a degraded (but finite) gradient row to the global G, and a
    * single diagnostic line tells us how many cells / entries were
@@ -1388,7 +1388,7 @@ static PetscErrorCode hierarchicalBuildExactGradientMatrix(const FEMSpace *fem, 
      * ||G||_F = 8e3, nord=6 produces 3e4, both with per-entry
      * magnitudes O(1)–O(100); per-cell Ge entries at any supported
      * order do not legitimately exceed 1e3. We set the threshold to
-     * 1e6 — two orders above any legitimate value, but well below
+     * 1e6 - two orders above any legitimate value, but well below
      * the pathological-cell scale (entries reaching 1e6–1e10 at
      * nord ≥ 5) that drives the global Frobenius norm to 1e10+. */
     const PetscReal HUGE_THRESHOLD = 1.0e6;

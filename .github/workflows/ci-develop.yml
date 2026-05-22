@@ -26,7 +26,7 @@ env:
   DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
   # Forces JavaScript actions still declaring Node 20 (e.g.
   # dorny/paths-filter@v3, which has no Node 24 release yet) to run on
-  # Node 24 — silences the Node 20 deprecation warning until upstream
+  # Node 24 - silences the Node 20 deprecation warning until upstream
   # ships a v4. Remove once all actions natively support Node 24.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -102,7 +102,7 @@ jobs:
   # ==============================
   # Compile PETGEM (Extrae matrix)
   # ==============================
-  # NOTE: im.csem is intentionally not built/tested here yet — the
+  # NOTE: im.csem is intentionally not built/tested here yet - the
   # inverse-kernel CI lands in a follow-up.  We build the two targets
   # we exercise (fm.csem for forward, petgem as the unified dispatcher).
   compile-petgem:
@@ -145,7 +145,7 @@ jobs:
   # ==========================
   # Python unit tests (pytest)
   # ==========================
-  # No compiled kernel needed — exercises the utils/ python layer
+  # No compiled kernel needed - exercises the utils/ python layer
   # (readBundle, readSigmaCSV, readSourcesText, …).
   test-unit:
     runs-on: ubuntu-latest
@@ -169,8 +169,8 @@ jobs:
   # PETGEM tests
   # ============
   # `normal` runs two things in sequence: the pytest integration suite
-  # (primary — parametrized over nord, owns timeouts and reference
-  # comparison) and a minimal inline shell pipeline (smoke — proves the
+  # (primary - parametrized over nord, owns timeouts and reference
+  # comparison) and a minimal inline shell pipeline (smoke - proves the
   # raw preprocess → mpirun → postprocess invocation still works without
   # the pytest harness in the middle).
   # `extrae` keeps the inline shell pipeline only; the pytest suite

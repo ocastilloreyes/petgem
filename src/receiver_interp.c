@@ -35,8 +35,8 @@
  * field components evaluated at the receiver positions.  Used by both
  * kernels (fm.csem in postprocessing.c, im.csem in inversion.c).
  *
- * See the full contract — receiver-location semantics, sign convention,
- * MPI-invariance argument, and the divide-by-(iωμ) factor for H — in
+ * See the full contract - receiver-location semantics, sign convention,
+ * MPI-invariance argument, and the divide-by-(iωμ) factor for H - in
  * include/receiver_interp.h. */
 PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                                   Vec         receivers,
@@ -49,7 +49,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);
 
   /* Basis evaluation is dispatched through evaluateNedelecBasis (see
-   * include/hvfem.h) which routes to the per-order ops table — works for
+   * include/hvfem.h) which routes to the per-order ops table - works for
    * any nord that registers a NedelecOps entry. The unified hierarchical
    * basis covers nord = 1..6. */
   PetscCheck(nord >= 1 && nord <= 6, comm, PETSC_ERR_SUP,
@@ -192,7 +192,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
       } else {
         PetscCall(PetscPrintf(PETSC_COMM_SELF,
           "   Warning: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
-          " (|detJ|=%.2e, coords=[%.4e,%.4e,%.4e]), no valid neighbor found — skipping\n",
+          " (|detJ|=%.2e, coords=[%.4e,%.4e,%.4e]), no valid neighbor found - skipping\n",
           ridx, cellID, (double)PetscAbsReal(cell.detJacobian),
           (double)recvCoords[0], (double)recvCoords[1], (double)recvCoords[2]));
         numSkipped++;
@@ -212,7 +212,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                    coeffs, Dx_Ni, Dy_Ni, Dz_Ni,
                                    Ni, NiCurl));
 
-    /* Per-DOF sign convention — same routine the forward assembly uses,
+    /* Per-DOF sign convention - same routine the forward assembly uses,
      * so Q aligns with the physical (signed) field evaluation. */
     PetscCall(buildDofSigns(&cell, &grid->fem, dofSigns));
 

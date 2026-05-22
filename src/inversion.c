@@ -47,11 +47,10 @@
 /*                                                                     */
 /* The 3D quadrature and Me/Ke buffers are provided by the caller     */
 /* (allocated once on the InversionContext, see setupInversionWorkspace).*/
-/* That hoist is purely a lifetime change — the values produced by    */
+/* That hoist is purely a lifetime change - the values produced by    */
 /* each cell evaluation are byte-identical to the previous version.   */
 /* ================================================================== */
-PetscErrorCode computeGradientContribution(const invParams *iparams,
-                                           const DM          dm,
+PetscErrorCode computeGradientContribution(const DM          dm,
                                            const Grid       *grid,
                                            const Vec         conductivity,
                                            const Vec         xLocal,
@@ -64,7 +63,7 @@ PetscErrorCode computeGradientContribution(const invParams *iparams,
                                            PetscReal       **Ke)
 {
   PetscFunctionBeginUser;
-  (void)iparams; /* nord lives in grid->fem.ops via the quadrature */
+  /* nord lives in grid->fem.ops via the supplied quadrature */
 
   /* Get local section and conductivity DM */
   PetscSection section;
@@ -208,7 +207,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   PetscCall(PetscCalloc1(numFreqs, &ctx->dObsRow_per_freq));
 
   /* Build a quiet csemParams stub for assembleCsemRHS (it only reads
-   * nord, numMPITasks and quiet — same fields the iter loop used to fill). */
+   * nord, numMPITasks and quiet - same fields the iter loop used to fill). */
   csemParams stub;
   PetscCall(PetscMemzero(&stub, sizeof(stub)));
   stub.nord = ctx->iparams->nord;
@@ -219,7 +218,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
     const InvCsemSource *isrc = &ctx->iparams->invSources[ifre];
 
     /* Build a single-source CsemSourceSet so assembleCsemRHS can do its
-     * usual work.  Lives on the stack — assembleCsemRHS copies what it
+     * usual work.  Lives on the stack - assembleCsemRHS copies what it
      * needs into the returned Mat. */
     CsemSource one;
     one.position[0]  = isrc->position[0];
@@ -280,7 +279,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
 
   /* ---- K, Ms (template), G_BDDC built once ----
    * K is σ-independent (μ_r = I, no σ enters the curl-curl integrand).
-   * G_BDDC is integer ±1 vertex incidence — purely topological.
+   * G_BDDC is integer ±1 vertex incidence - purely topological.
    * Both can be reused for every L-BFGS iteration.
    *
    * Ms's values produced here come from whatever σ is in `conductivity`
@@ -297,7 +296,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
                                ctx->conductivity,
                                0.0,             /* constFactor (unused: K/Ms mode) */
                                &ctx->Kmat, &ctx->Msmat,
-                               NULL /* canonical G — skip */,
+                               NULL /* canonical G - skip */,
                                &ctx->Gmat_BDDC));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -478,7 +477,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   /* ---- 2. Refill Ms(σ) with the current iterate's σ ----
    * K (curl-curl stiffness, σ-independent) and G_BDDC (topological,
    * σ-independent) were built once in setupInversionWorkspace and live
-   * on the context — they are reused for every L-BFGS iteration.
+   * on the context - they are reused for every L-BFGS iteration.
    * Only Ms needs to be recomputed when σ changes.
    *
    * assembleCsemMsRefill walks the local cells, shares the per-cell
@@ -508,7 +507,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
 
   /* Pre-allocated workspace (lives on InversionContext, set up once
    * before the L-BFGS loop). The five Vecs and the per-freq RHS / Wf /
-   * dObsRow arrays are all reused across iterations — identical numerical
+   * dObsRow arrays are all reused across iterations - identical numerical
    * values to recomputing them each call, just without the allocations. */
   Vec b       = c->bVec;
   Vec x       = c->xVec;
@@ -536,7 +535,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscCall(MatAXPY(A, -Const, Msmat, SAME_NONZERO_PATTERN));
 
     /* RHS, observed-Ex row, and per-freq weights are all precomputed
-     * in setupInversionWorkspace — they only depend on source + dObs +
+     * in setupInversionWorkspace - they only depend on source + dObs +
      * errorLevel, none of which change during L-BFGS. */
     PetscCall(VecCopy(c->Bvec_per_freq[ifre], b));
     Vec dObs_row = c->dObsRow_per_freq[ifre];
@@ -599,7 +598,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscCall(DMGlobalToLocal(c->dm, nx, INSERT_VALUES, nxLocal));
 
     /* Accumulate per-element gradient (1 DOF/cell) */
-    PetscCall(computeGradientContribution(c->iparams, c->dm, &c->grid,
+    PetscCall(computeGradientContribution(c->dm, &c->grid,
                                           c->conductivity,
                                           xLocal, nxLocal, Const,
                                           c->dmInversion, c->DfDm,
@@ -664,7 +663,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   PetscCall(VecPointwiseMult(c->DfDm, c->DfDm, c->notFixedMaskLocal));
 
   /* ---- 8. Gradient smoothing (forward + reverse Gauss-Seidel) ----
-   * DfDm is already 1 value per cell — apply smoothing directly.
+   * DfDm is already 1 value per cell - apply smoothing directly.
    * bypassSmoother (FD check mode) passes the sentinel -1.0 to skip it. */
   {
     PetscReal gradDiagWeight = c->bypassSmoother
@@ -822,7 +821,7 @@ PetscErrorCode runFdGradientCheck(InversionContext *ctx, Vec X,
     "   --------   --------------   --------------   --------------"
     "   ----------   ------------\n"));
 
-  /* Ownership range for targeted VecSetValue — only the owner sets the
+  /* Ownership range for targeted VecSetValue - only the owner sets the
    * value so INSERT_VALUES stays unambiguous under MPI. */
   PetscInt lo, hi;
   PetscCall(VecGetOwnershipRange(X, &lo, &hi));
@@ -925,13 +924,13 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
    * and materialsID only if it was called with an empty inputFile, which
    * readCsemParams already errors out on. Re-check here for safety. */
   PetscCheck(conductivity, comm, PETSC_ERR_ARG_NULL,
-             "conductivity Vec is NULL — loadCsemInputs did not populate "
+             "conductivity Vec is NULL - loadCsemInputs did not populate "
              "the model. Check that -input_filename is valid.");
   PetscCheck(materialsID, comm, PETSC_ERR_ARG_NULL,
-             "materialsID Vec is NULL — loadCsemInputs did not populate "
+             "materialsID Vec is NULL - loadCsemInputs did not populate "
              "the model. Check that -input_filename is valid.");
   PetscCheck(receivers, comm, PETSC_ERR_ARG_NULL,
-             "receivers Vec is NULL — loadCsemInputs did not return /receivers.");
+             "receivers Vec is NULL - loadCsemInputs did not return /receivers.");
 
   /* ---- Build neighbor smoothing graph ---- */
   NeighborGraph graph;
@@ -959,13 +958,13 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
   /* ---- Build the parallel block-Jacobi smoother graph (multi-rank only).
    * No-op on a single rank; on >1 ranks, switches applyGaussSeidelSmoothing
    * to a fully-parallel forward+reverse Gauss-Seidel path that uses one
-   * layer of ghost cells (overlap=1) and exchanges them between sweeps —
+   * layer of ghost cells (overlap=1) and exchanges them between sweeps -
    * O(local cells) per call, no rank-0 bottleneck. Eliminates the partition-
    * boundary seams that the original partition-local sweep produced.
    *
    * Result is mathematically NOT bit-identical to the sequential rank-0
    * path (any fully-parallel GS variant differs in summation order / use
-   * of one-step-stale ghost values), but the recovered model matches —
+   * of one-step-stale ghost values), but the recovered model matches -
    * same constraint already accepted for MUMPS-induced trajectory drift. */
   PetscCall(setupParallelSmoothingGraph(&graph, dm, grid));
 
@@ -1018,7 +1017,7 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
   PetscCall(buildNotFixedMask(&graph, dmInversion, grid,
                                &notFixedMaskGlobal, &notFixedMaskLocal));
 
-  /* Diagnostic snapshot buffers — allocated only when VTU snapshots
+  /* Diagnostic snapshot buffers - allocated only when VTU snapshots
    * are enabled. NULL entries in the context disable the corresponding
    * capture inside inversionObjGrad / applyLogToSigma. */
   Vec DfDmRaw = NULL, DfDmFinal = NULL, XPreSmooth = NULL, XPostSmooth = NULL;
