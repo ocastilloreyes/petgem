@@ -32,6 +32,7 @@ More information
    :caption: Getting started:
 
    manual/install
+   manual/quickstart
    manual/overview
 
 .. toctree::
@@ -49,12 +50,31 @@ More information
    manual/examples_inverse
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Reference:
 
-   manual/publications
-   manual/contact
+   manual/method
+   manual/formats
+   manual/meshing
+   manual/solver
+   manual/troubleshooting
+   manual/python_api
    api/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Development:
+
+   manual/testing
+   manual/contributing
+
+.. toctree::
+   :maxdepth: 1
+   :caption: About:
+
+   manual/publications
+   manual/changelog
+   manual/contact
 
 
 Indices and tables

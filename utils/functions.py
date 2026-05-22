@@ -74,11 +74,12 @@ def readSigmaCSV(path):
     """Read per-material conductivity from a CSV file.
 
     Expected layout (comments allowed, blank lines allowed, 0-based row =
-    material id):
+    material id)::
+
         # sigma_x, sigma_y, sigma_z [, fixed]
         0.1, 0.1, 0.1, 1     # fixed in inversion (e.g. air, ocean)
         1.0, 1.0, 1.0, 0     # invertable
-        2.0, 2.0, 2.0        # 'fixed' column omitted → defaults to 0
+        2.0, 2.0, 2.0        # 'fixed' column omitted -> defaults to 0
 
     The 4th column (`fixed`) is optional and only meaningful for inverse
     modeling: a non-zero entry marks the material as held fixed during
@@ -693,7 +694,8 @@ def runPreprocessing(*, mode, nord, case_dir,
 def readBundle(filename):
     """Read the case-independent payload of a PETGEM input bundle HDF5.
 
-    Returns a dict with keys:
+    Returns a dict with keys::
+
       receivers : (N_recv, 3) ndarray of receiver positions (real-valued)
       nord      : int polynomial order
       frequency : float source frequency (Hz)
@@ -731,7 +733,8 @@ def readBundle(filename):
 def readResponses(filename):
     """Read a PETGEM responses HDF5 file (written by fm.csem postprocessing).
 
-    Returns a dict with keys:
+    Returns a dict with keys::
+
       Ex, Ey, Ez, Hx, Hy, Hz : ndarrays (complex in PETSc complex builds)
       source      : dict of /source attributes
                     (frequency, x_pos, y_pos, z_pos, current, length,
