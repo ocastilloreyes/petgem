@@ -2,25 +2,22 @@
 version: 2
 
 build:
-  os: ubuntu-20.04
+  os: ubuntu-24.04
   tools:
-    python: "3.8"
+    python: "3.12"
   apt_packages:
     - doxygen
     - graphviz
   jobs:
+    # Doxygen XML + Sphinx API .rst generation. Delegated to the shared
+    # script so this stays in lockstep with the Makefile `docs_prep`
+    # target (single source of truth — no command duplication to drift).
     pre_build:
-      - echo "Pre build"
-      - echo "Cleaning..."
-      - rm -rf $READTHEDOCS_OUTPUT/html docs/doxygen/* docs/source/api/* docs/source/readme/*
-      - echo "Doxygen..."
-      - doxygen Doxyfile
-      - echo "Api generation..."
-      - python3 scripts/auto_doc/api_rst_generator.py
+      - bash scripts/auto_doc/prepare_docs.sh
 
 sphinx:
   configuration: docs/source/conf.py
 
 python:
   install:
-    - requirements: docs/requirements.txt    
+    - requirements: docs/requirements.txt

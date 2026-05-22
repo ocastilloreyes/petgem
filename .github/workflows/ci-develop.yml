@@ -60,6 +60,8 @@ jobs:
               - 'docs/**'
               - 'scripts/auto_doc/**'
               - 'Doxyfile'
+              - 'include/**'
+              - 'src/**'
             pytest:
               - 'tests/unit/**'
               - 'tests/integration/**'

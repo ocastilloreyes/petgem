@@ -13,10 +13,19 @@ import sys
 import pytest
 
 
-# Per-nord runtime budget for the kernel.  Higher orders need more time
-# (3D quadrature + denser local matrices).
+# Per-nord wall-clock budget for the kernel (seconds).  These are ceilings
+# that guard against a genuine hang, NOT expected runtimes — a healthy run
+# finishes well inside them.
+#
+# Total DOFs (≈ elements × DOFs-per-cell) drive the cost, and the two factors
+# pull opposite ways across nord: the mesh coarsens with order (mesh_p1 ~70k
+# elements down to mesh_p6 ~2k) while DOFs-per-cell grows (6 at nord=1 → 210
+# at nord=6).  nord=1 therefore has the FINEST mesh; its 120 s budget was an
+# under-estimate that made the CI run flaky right at the boundary (one of two
+# identical nord=1 pipelines passed, the other was SIGKILL'd at 120 s).  All
+# orders now get a generous ceiling well under the GitHub 6 h job limit.
 FM_CSEM_TIMEOUT_BY_NORD = {
-    1:  120,
+    1: 1800,
     2: 4800,
     3: 4800,
     4: 4800,
@@ -24,6 +33,14 @@ FM_CSEM_TIMEOUT_BY_NORD = {
     6: 4800,
 }
 PREPROCESS_TIMEOUT = 120
+
+# MPI ranks for the kernel runs. Default 2: GitHub-hosted runners have few
+# vCPUs, and oversubscribing (e.g. -n 4 on a 2-core box) makes MPI ranks
+# busy-wait against each other and inflates wall time — which is what pushed
+# the nord=1 smoke run past its timeout. fm.csem is MPI-invariant (BDDC +
+# MUMPS), so rank count does not change the numerical result, only speed.
+# Override with PETGEM_TEST_MPI_NPROC=N (e.g. on a many-core cluster).
+DEFAULT_MPI_NPROC = int(os.environ.get("PETGEM_TEST_MPI_NPROC", "2"))
 
 # Per-nord runtime budget for gmsh.  The mesh sizes scale down with nord
 # (fewer elements as the basis order increases), so higher-order generation
@@ -129,7 +146,7 @@ def ensure_mesh_for_nord(case_workspace, nord):
 
 
 def run_pipeline_for_nord(repo_root, fm_csem_binary, case_workspace, nord,
-                          mpi_nproc=4):
+                          mpi_nproc=None):
     """Driver shared by the smoke test and the reference-regression test.
 
     Runs gmsh → preprocess → fm.csem for the given polynomial order
@@ -138,6 +155,8 @@ def run_pipeline_for_nord(repo_root, fm_csem_binary, case_workspace, nord,
 
     Returns (responses_path, bundle_path).
     """
+    if mpi_nproc is None:
+        mpi_nproc = DEFAULT_MPI_NPROC
     bundle_name    = f"input_p{nord}.h5"
     params_name    = f"params_p{nord}.txt"
     responses_base = f"responses_p{nord}"

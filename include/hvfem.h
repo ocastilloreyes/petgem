@@ -58,7 +58,9 @@ PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal di
 PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, const Quadrature3D* quadrature,
                                         PetscReal** Me, PetscReal** Ke);
 
-PetscErrorCode printCellEntities(const DM dm, const PetscInt cell);
+/* printCellEntities is declared in grid.h (its definition lives in
+ * grid.c); hvfem.h already includes grid.h, so no re-declaration here —
+ * a duplicate caused a Sphinx "Duplicate C declaration" warning. */
 
 /* Build the per-DOF sign vector for a cell under the chosen Nédélec order.
  *   nord=1: one DOF per edge; signs[e] = cell->orientation.edgeSigns[e].
