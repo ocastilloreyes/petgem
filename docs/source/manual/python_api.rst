@@ -19,6 +19,8 @@ Readers
 
 .. autofunction:: petgem.readResponses
 
-.. autofunction:: petgem.readSigmaCSV
+.. autofunction:: petgem.readSigmaTable
 
 .. autofunction:: petgem.readObservedDataH5
+
+.. autofunction:: petgem.readInvExDat

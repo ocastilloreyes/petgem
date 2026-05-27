@@ -45,7 +45,7 @@ static char imHelp[] = "PETGEM inverse CSEM kernel (runInverse / im.csem).\n\
  * @return int 0 on success, non-zero on failure.
  * @details Initializes PETSc, parses command-line arguments
  * (including `--version`).  Reads the unified bundle (mesh +
- * conductivity + materials_id + receivers + /inv_sources +
+ * conductivity + materials_id + receivers + /sources +
  * /observed/Ex + case-property defaults), sets up the H(curl)
  * grid, the inversion DM (1 DOF/cell), the smoother neighbor
  * graph, the receiver-interpolation matrices, and the cached
@@ -141,11 +141,12 @@ int runInverse(int argc, char **argv)
 
   /* ---------------------------------------------------------------- */
   /* Load unified PETGEM input: mesh + sigma + materials_id +          */
-  /* receivers from the bundle. The bundle's inv_sources group and     */
+  /* receivers from the bundle. The bundle's /sources group and        */
   /* observed Ex dataset are read below via setupInversionSources and  */
   /* (later, once numReceivers is known) loadObservedData inside       */
-  /* runCsemInversion. The forward /sources group is skipped (NULL) -  */
-  /* the inverse kernel uses the multi-frequency inv_sources records.  */
+  /* runCsemInversion. loadCsemInputs is passed NULL for its forward   */
+  /* CsemSourceSet - the inverse kernel reads the same /sources group  */
+  /* into its multi-frequency invSources[] via setupInversionSources.  */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 5);
@@ -153,7 +154,7 @@ int runInverse(int argc, char **argv)
 
   PetscCall(PetscTime(&start_timer));
   PetscCall(loadCsemInputs(&params, &dm, &resistivity, &materials_id,
-                           NULL,           /* skip /sources; we read /inv_sources next */
+                           NULL,           /* no forward CsemSourceSet; setupInversionSources reads /sources */
                            &receivers));
   /* Sync the basis order into invParams: the bundle's /nord (read by
    * loadCsemInputs into params.nord) is the source of truth, unless the
@@ -167,7 +168,7 @@ int runInverse(int argc, char **argv)
 #endif
 
   /* ---------------------------------------------------------------- */
-  /* Load multi-frequency inversion sources from bundle /inv_sources   */
+  /* Load multi-frequency inversion sources from bundle /sources       */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 4);
@@ -205,20 +206,26 @@ int runInverse(int argc, char **argv)
   Extrae_event(1000, 7);
 #endif
 
+  PetscLogDouble tAssembly = 0.0, tSolver = 0.0;
   PetscCall(PetscTime(&start_timer));
   PetscCall(runCsemInversion(&iparams,
                               dm, &grid, resistivity, materials_id,
-                              receivers));
+                              receivers, &tAssembly, &tSolver));
   PetscCall(PetscTime(&end_timer));
-  timers[4] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
 
-  /* Unused timer slots */
-  timers[5] = 0.0;
-  timers[6] = 0.0;
+  /* Split the inversion wall time across the same buckets fm.csem uses, so
+   * the two kernels' timer reports are consistent. tAssembly and tSolver are
+   * accumulated inside the L-BFGS loop (Ms refill + A build, and factorize +
+   * forward/adjoint solves); the remainder (gradient, smoothing, line search,
+   * results I/O, L-BFGS overhead) lands in the "Postprocessing" bucket. */
+  timers[4] = tAssembly;
+  timers[5] = tSolver;
+  timers[6] = (end_timer - start_timer) - tAssembly - tSolver;
+  if (timers[6] < 0.0) timers[6] = 0.0;
 
   /* ---------------------------------------------------------------- */
   /* Print timers and footer                                           */

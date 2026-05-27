@@ -35,9 +35,10 @@ def tiny_case(tmp_path):
     ], dtype=float)
 
     freq = 1.25
+    # Unified (N, 8) layout: [freq, x, y, z, current, length, dip, azimuth].
     sources = np.array([
-        [10.0, 20.0, -30.0, 1.0, 100.0, 0.0,  0.0],
-        [11.0, 21.0, -31.0, 2.0, 200.0, 5.0, 90.0],
+        [freq, 10.0, 20.0, -30.0, 1.0, 100.0, 0.0,  0.0],
+        [freq, 11.0, 21.0, -31.0, 2.0, 200.0, 5.0, 90.0],
     ], dtype=float)
 
     nord = 2
@@ -46,7 +47,7 @@ def tiny_case(tmp_path):
     bundle_path = tmp_path / "bundle.h5"
     petgem.writePetgemInputFile(
         plex, conductivity, materials_id,
-        receivers, freq, sources, nord,
+        receivers, sources, nord,
         str(bundle_path),
         cells=cells, coords=coords,
         output_vtk=None,
@@ -73,7 +74,7 @@ def test_bundle_returns_dict_shape(tiny_case):
     assert isinstance(bundle, dict)
     assert set(bundle.keys()) == {'receivers', 'nord', 'frequency', 'sources'}
     assert bundle['receivers'].shape[1] == 3
-    assert bundle['sources'].shape[1] == 7
+    assert bundle['sources'].shape[1] == 8
     assert isinstance(bundle['nord'], int)
     assert isinstance(bundle['frequency'], float)
 

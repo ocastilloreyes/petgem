@@ -81,3 +81,23 @@ You can set optional flags when invoking `make`: `make <target> OPTION=1`
      - Use Intel MPI compiler (`mpiicc`) instead of PETSc default
    * - USE_EXTRAE=1
      - Enable Extrae instrumentation for performance tracing
+
+Python helpers
+--------------
+The pre- and post-processing scripts under ``utils/`` (e.g.
+``utils/preprocess.py``) run directly from a clone - they add the in-tree
+package to the path automatically, so no installation step is required:
+
+.. code-block:: bash
+
+   python3 utils/preprocess.py -mode forward ...
+
+Optionally, install the Python layer so it is importable as ``petgem`` from
+your own scripts (e.g. ``import petgem; petgem.readResponses(...)``):
+
+.. code-block:: bash
+
+   pip install -e .
+
+This requires ``numpy``, ``meshio``, and ``petsc4py`` (already present in the
+Docker image).

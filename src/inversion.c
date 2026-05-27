@@ -489,10 +489,14 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   PetscCallMPI(MPI_Comm_size(comm, &fwdParams.numMPITasks));
   fwdParams.quiet = PETSC_TRUE;
 
+  PetscLogDouble tA0, tA1;   /* phase-timer scratch (assembly / solver) */
+  PetscCall(PetscTime(&tA0));
   PetscCall(assembleCsemMsRefill(fwdParams, c->dm, c->grid,
                                   c->conductivity,
                                   &c->quad3d, c->MeRows, c->KeRows,
                                   c->Msmat));
+  PetscCall(PetscTime(&tA1));
+  c->tAssembly += tA1 - tA0;
 
   Mat Kmat = c->Kmat;
   Mat Msmat = c->Msmat;
@@ -521,7 +525,10 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
    * MatCopy(K → A) + MatAXPY(-Const · Ms). Replaces numFreqs× MatDuplicate
    * (COPY_VALUES) with one allocation + numFreqs× value copy. */
   Mat A;
+  PetscCall(PetscTime(&tA0));
   PetscCall(MatDuplicate(Kmat, MAT_DO_NOT_COPY_VALUES, &A));
+  PetscCall(PetscTime(&tA1));
+  c->tAssembly += tA1 - tA0;
 
   /* ---- 5. Frequency loop ---- */
   for (PetscInt ifre = 0; ifre < numFreqs; ifre++) {
@@ -531,8 +538,11 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscScalar Const = PETSC_i * omega * MU;
 
     /* A_f = K - iωμ·Ms.  SAME_NONZERO_PATTERN lets PETSc skip symbolic. */
+    PetscCall(PetscTime(&tA0));
     PetscCall(MatCopy(Kmat, A, SAME_NONZERO_PATTERN));
     PetscCall(MatAXPY(A, -Const, Msmat, SAME_NONZERO_PATTERN));
+    PetscCall(PetscTime(&tA1));
+    c->tAssembly += tA1 - tA0;
 
     /* RHS, observed-Ex row, and per-freq weights are all precomputed
      * in setupInversionWorkspace - they only depend on source + dObs +
@@ -543,8 +553,11 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
 
     /* Factorize and solve forward system: A_f * x = b */
     KSP ksp;
+    PetscCall(PetscTime(&tA0));
     PetscCall(createInvKSP(c->iparams, c->dm, A, Gmat, &ksp));
     PetscCall(solveInvSystem(ksp, b, x));
+    PetscCall(PetscTime(&tA1));
+    c->tSolver += tA1 - tA0;
 
     /* Convert global x to local for field interpolation & gradient */
     Vec xLocal;
@@ -590,7 +603,10 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscCall(MatMultTranspose(c->Q->QEx, wcdtD_mpi, nB));
 
     /* Adjoint solve: A_f * nx = nB  (reuse factorization from forward) */
+    PetscCall(PetscTime(&tA0));
     PetscCall(solveInvSystem(ksp, nB, nx));
+    PetscCall(PetscTime(&tA1));
+    c->tSolver += tA1 - tA0;
 
     /* Local adjoint solution for gradient accumulation */
     Vec nxLocal;
@@ -914,7 +930,9 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
                                 const Grid       *grid,
                                 Vec               conductivity,
                                 Vec               materialsID,
-                                Vec               receivers)
+                                Vec               receivers,
+                                PetscLogDouble   *tAssemblyOut,
+                                PetscLogDouble   *tSolverOut)
 {
   PetscFunctionBeginUser;
 
@@ -1053,7 +1071,10 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
     .lastRegTerm        = 0.0,
     .iterCount          = 0,
     .acceptedIter       = 0,
-    .bypassSmoother     = PETSC_FALSE,
+    /* -inv_no_smoother disables both smoothers for the whole run (diagnostic
+     * for the nord>=2 / multi-rank boundary-artifact investigation). The FD
+     * check still toggles bypassSmoother around its own evaluations. */
+    .bypassSmoother     = iparams->smootherOff,
     /* Workspace fields (quad3d, MeRows, KeRows, b/x/nB/nx/Ex_recv,
      * Bvec_per_freq, Wf_per_freq, dObsRow_per_freq) are zero-initialized
      * by C designated-init and populated by setupInversionWorkspace next. */
@@ -1082,6 +1103,9 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
   PetscCall(PetscPrintf(comm, "\n L-BFGS inversion started"
     " (M=%" PetscInt_FMT ", maxIter=%" PetscInt_FMT ")\n",
     iparams->lbfgsMemory, iparams->maxIter));
+  if (iparams->smootherOff)
+    PetscCall(PetscPrintf(comm,
+      "   [diagnostic] -inv_no_smoother: BOTH smoothers disabled this run\n"));
 
   PetscInt    numIters;
   const char *reasonStr;
@@ -1120,6 +1144,11 @@ fd_cleanup:
   PetscCall(PetscFree(allRMS));
   PetscCall(destroyNeighborGraph(&graph));
   PetscCall(destroyReceiverInterpolationMatrices(&Q));
+
+  /* Hand the accumulated phase timers back to the caller (im.csem) so it
+   * can report an Assembly/Solver breakdown consistent with fm.csem. */
+  if (tAssemblyOut) *tAssemblyOut = ctx.tAssembly;
+  if (tSolverOut)   *tSolverOut   = ctx.tSolver;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

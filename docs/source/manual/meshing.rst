@@ -2,17 +2,19 @@
 Mesh generation
 ===============
 
-**PETGEM** operates on unstructured tetrahedral meshes generated with
-`Gmsh <http://gmsh.info/>`_. This page covers the meshing conventions that
-connect a ``.geo`` geometry to a **PETGEM** case: how physical groups map to
-material ids, and how element sizing is chosen per polynomial order.
+**PETGEM** operates on unstructured tetrahedral meshes. The canonical workflow
+generates them with `Gmsh <http://gmsh.info/>`_ (``.msh``), but the preprocess
+stage also accepts **VTK** meshes (``.vtk``/``.vtu``); the format is
+auto-detected from the file. This page covers the meshing conventions that
+connect a geometry to a **PETGEM** case: how regions map to material ids, and
+how element sizing is chosen per polynomial order.
 
 Physical groups and material ids
 ---------------------------------
 Each volumetric region of the model is tagged with a Gmsh **physical volume**.
 **PETGEM** maps each physical tag to a **0-based material id** as
 ``material_id = gmsh:physical - 1``, and that id is the row index into
-``sigmas.csv`` (see :doc:`formats`).
+``sigmas.txt`` (see :doc:`formats`).
 
 For example, the canonical case declares two regions:
 
@@ -21,9 +23,19 @@ For example, the canonical case declares two regions:
    Physical Volume("Resistive_block", 1) = {1};        // -> material id 0
    Physical Volume("Homogeneous_half_space", 2) = {2}; // -> material id 1
 
-so ``sigmas.csv`` row 0 is the resistive block and row 1 the half-space.
-Number physical volumes consecutively from 1, and provide one ``sigmas.csv``
+so ``sigmas.txt`` row 0 is the resistive block and row 1 the half-space.
+Number physical volumes consecutively from 1, and provide one ``sigmas.txt``
 row per material.
+
+For a **VTK** mesh there are no Gmsh physical tags; the per-cell region is read
+from an integer **cell-data array** (auto-detected, commonly ``cell_scalars`` -
+also ``materials_id``, ``material_id``, ``MaterialID``, ``material`` or
+``CellEntityIds``). Its distinct codes need not be contiguous or 0-based: the
+preprocess stage maps them to 0-based ids in **ascending order**, so
+``sigmas.txt`` row ``i`` corresponds to the ``i``-th smallest code. For example
+codes ``{10, 20, 30, 40}`` map to rows ``{0, 1, 2, 3}``. The preprocess run
+prints the resulting ``code -> row`` table (with per-region cell counts), and
+errors if the number of codes does not match the ``sigmas.txt`` row count.
 
 Element sizing
 --------------
@@ -63,6 +75,33 @@ Generate the 3D mesh from a ``.geo`` file with Gmsh:
 
 The resulting ``.msh`` is passed to ``utils/preprocess.py`` via
 ``-mesh_filename``, which embeds the mesh and the per-cell conductivity (looked
-up from ``sigmas.csv`` by material id) into the input bundle. A pre-generated
+up from ``sigmas.txt`` by material id) into the input bundle. A pre-generated
 ``.msh`` can be used directly when a ``.geo`` is not shipped (as in the inverse
 case, which ships ``mesh_p1.msh``).
+
+VTK input
+---------
+A tetrahedral **VTK** mesh (legacy ``.vtk`` or XML ``.vtu``) can be passed to
+the same ``-mesh_filename`` argument - no separate script or flag is needed, and
+the rest of the command is unchanged:
+
+.. code-block:: bash
+
+   python3 utils/preprocess.py \
+       -mode forward -nord 1 \
+       -case_dir ${CASE_DIR} \
+       -mesh_filename model.vtk \
+       -receiver_filename receivers.txt \
+       -source_filename sources.txt \
+       -sigma_file sigmas.txt
+
+Requirements and behaviour:
+
+- The file must contain a **tetrahedral** cell block (any accompanying
+  triangle/line blocks are ignored). Mixed-element meshes are not supported.
+- The per-cell material id comes from a cell-data array, mapped to 0-based rows
+  as described under *Physical groups and material ids* above. Provide one
+  ``sigmas.txt`` row per distinct region code, ordered by ascending code.
+- Reading is handled by `meshio <https://github.com/nschloe/meshio>`_ (already a
+  preprocess dependency), so any tetrahedral format meshio supports works in
+  principle; ``.vtk``/``.vtu`` are the tested paths.

@@ -20,6 +20,9 @@ Major refactor of **PETGEM** to C and PETSc.
   (``petgem modeling`` / ``petgem inverse``).
 - Unified HDF5 input bundle assembled by ``utils/preprocess.py`` for both modes
   (see :doc:`formats`).
+- Mesh input accepts both Gmsh ``.msh`` and VTK ``.vtk``/``.vtu`` (tetrahedral);
+  the format is auto-detected and VTK region codes are mapped to 0-based
+  material ids in ascending order (see :doc:`meshing`).
 - BDDC-preconditioned iterative solve for forward modeling; direct (MUMPS)
   solve for inversion and for high polynomial order (see :doc:`solver`).
 - Optional `Extrae <https://tools.bsc.es/extrae>`_ instrumentation

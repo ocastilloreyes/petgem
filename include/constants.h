@@ -34,7 +34,7 @@
  * fixed-materials option array is sized to the cap on read. */
 #define INV_MAX_FIXED_MATERIALS  8
 #define INV_MAX_FREQUENCIES      64
-#define INV_MAX_FD_CHECK_CELLS   64
+#define INV_MAX_FD_CHECK_CELLS   1024
 extern const PetscInt EDGE_VERTICES[NUM_EDGES_PER_CELL][NUM_VERTICES_PER_EDGE];
 extern const PetscInt FACE_VERTICES[NUM_FACES_PER_CELL][NUM_VERTICES_PER_FACE];
 extern const PetscInt REFERENCE_CELL[NUM_DIMENSIONS][NUM_VERTICES_PER_CELL];

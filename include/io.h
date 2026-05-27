@@ -44,7 +44,7 @@
  * either when the caller does not need it (e.g. im.csem passes NULL for
  * `sources` because it pulls multi-frequency sources via
  * setupInversionSources, which now reads from the same bundle's
- * /inv_sources group). */
+ * /sources group). */
 PetscErrorCode loadCsemInputs(csemParams     *params,
                               DM             *dm,
                               Vec            *conductivity,

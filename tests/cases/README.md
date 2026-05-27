@@ -13,7 +13,7 @@ against a reference solution.
 | `mesh_p{N}.msh`   | Gmsh mesh at polynomial order `N` (sometimes `.geo` too). |
 | `sources.txt`     | Forward-source list (frequency + dipole rows).             |
 | `receivers.txt`   | Receiver positions (`x y z` per row).                      |
-| `sigmas.csv`      | Per-material conductivity table (one row per material).    |
+| `sigmas.txt`      | Per-material conductivity table (one row per material).    |
 | `reference.h5`    | Optional analytical / external reference for validation.  |
 | `postprocess.py`  | Optional case-specific validation + plotting.              |
 | `README.md`       | Optional case notes.                                        |
@@ -29,7 +29,7 @@ python3 utils/preprocess.py \
     -mode forward -nord 1 -case_dir tests/cases/<case> \
     -mesh_filename mesh_p1.msh \
     -source_filename sources.txt -receiver_filename receivers.txt \
-    -sigma_file sigmas.csv
+    -sigma_file sigmas.txt
 
 # 2. Solve
 mpirun -n N fm.csem -options_file tests/cases/<case>/params.txt

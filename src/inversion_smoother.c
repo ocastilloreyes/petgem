@@ -234,11 +234,19 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
 /* ================================================================== */
 /* applyGaussSeidelSmoothing                                           */
 /*                                                                     */
-/* Forward + reverse Gauss-Seidel sweep using the precomputed CSR      */
-/* neighbor graph.  Operates on a partition-local Vec - non-owned     */
-/* DOFs not visited.                                                   */
-/* diagWeight < 0 is a sentinel that bypasses the smoother (used by   */
-/* the dev FD-gradient check).                                        */
+/* Forward + reverse JACOBI sweep using the precomputed CSR neighbor   */
+/* graph. Each updated value is computed from a frozen snapshot of the  */
+/* array (not in place), so the result is independent of the visiting  */
+/* order. This is the key property that makes the smoother bit-        */
+/* reproducible across any MPI partition: an in-place Gauss-Seidel     */
+/* sweep depends on the (partition-derived) cell order and on stale    */
+/* ghost values, which at high rank counts under-regularizes the many  */
+/* partition boundaries and drives runaway overfitting there (observed */
+/* rho up to ~1e6 at 336 ranks). Jacobi removes that order dependence. */
+/* The name is retained for call-site stability.                       */
+/* Operates on a partition-local Vec - non-owned DOFs not visited.     */
+/* diagWeight < 0 is a sentinel that bypasses the smoother (used by    */
+/* the dev FD-gradient check).                                         */
 /* ================================================================== */
 PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
                                          PetscReal            diagWeight,
@@ -252,16 +260,21 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
   if (diagWeight < 0.0) PetscFunctionReturn(PETSC_SUCCESS);
 
   /* ============================================================== */
-  /* Fully-parallel block-Jacobi Gauss-Seidel path. Each rank does  */
-  /* a forward sweep on its OWNED cells using local + ghost values, */
-  /* exchanges ghosts, does a reverse sweep, exchanges ghosts. No   */
-  /* rank-0 bottleneck. Result is a valid GS smoother but not bit-  */
-  /* identical to the sequential rank-0 path (sequential ordering   */
-  /* across all cells is impossible to replicate in parallel; see   */
-  /* setupParallelSmoothingGraph docstring).                        */
+  /* Fully-parallel Jacobi path. Each rank refreshes ghosts, then    */
+  /* applies a Jacobi sweep on its OWNED cells reading a frozen       */
+  /* snapshot of (owned+ghost) values, exchanges ghosts, and applies */
+  /* a second Jacobi sweep. Because each cell's new value depends     */
+  /* only on the snapshot (never on already-updated cells), the       */
+  /* result is identical to the single-rank sequential path up to     */
+  /* floating-point summation order - i.e. partition-independent. No  */
+  /* rank-0 bottleneck.                                              */
   /* ============================================================== */
   if (graph->hasParallelGraph) {
-    PetscInt nOwned = graph->numLocalCells;
+    PetscInt     nOwned = graph->numLocalCells;
+    PetscInt     nOver;
+    PetscScalar *snap;
+    PetscCall(VecGetLocalSize(graph->oLocalScratch, &nOver));
+    PetscCall(PetscMalloc1(nOver, &snap));
 
     /* 1. Copy owned values from input local Vec into the overlap-1
      *    local scratch (owned slot only; ghost slot still stale). */
@@ -275,22 +288,24 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
       PetscCall(VecRestoreArrayRead(v, &arrIn));
     }
 
-    /* 2. Refresh ghosts: L→G (owners contribute) then G→L (pull ghosts). */
+    /* 2. Refresh ghosts: L->G (owners contribute) then G->L (pull ghosts). */
     PetscCall(DMLocalToGlobal(graph->dmInversionOver, graph->oLocalScratch,
                                INSERT_VALUES, graph->oGlobalScratch));
     PetscCall(DMGlobalToLocal(graph->dmInversionOver, graph->oGlobalScratch,
                                INSERT_VALUES, graph->oLocalScratch));
 
-    /* 3. Forward sweep on owned cells. */
+    /* 3. Forward Jacobi sweep: snapshot the (owned+ghost) array, then
+     *    write each owned cell from the frozen snapshot. */
     {
       PetscScalar *arrOver;
       PetscCall(VecGetArray(graph->oLocalScratch, &arrOver));
+      PetscCall(PetscArraycpy(snap, arrOver, nOver));
       for (PetscInt i = 0; i < nOwned; i++) {
         if (graph->isFixed[i]) continue;
-        PetscScalar newVal = diagWeight * arrOver[i];
+        PetscScalar newVal = diagWeight * snap[i];
         for (PetscInt k = graph->oNeighborStart[i];
              k < graph->oNeighborStart[i + 1]; k++)
-          newVal += graph->oNeighborWeights[k] * arrOver[graph->oNeighborList[k]];
+          newVal += graph->oNeighborWeights[k] * snap[graph->oNeighborList[k]];
         arrOver[i] = newVal;
       }
       PetscCall(VecRestoreArray(graph->oLocalScratch, &arrOver));
@@ -302,16 +317,17 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
     PetscCall(DMGlobalToLocal(graph->dmInversionOver, graph->oGlobalScratch,
                                INSERT_VALUES, graph->oLocalScratch));
 
-    /* 5. Reverse sweep. */
+    /* 5. Reverse Jacobi sweep (frozen snapshot again). */
     {
       PetscScalar *arrOver;
       PetscCall(VecGetArray(graph->oLocalScratch, &arrOver));
+      PetscCall(PetscArraycpy(snap, arrOver, nOver));
       for (PetscInt i = nOwned - 1; i >= 0; i--) {
         if (graph->isFixed[i]) continue;
-        PetscScalar newVal = diagWeight * arrOver[i];
+        PetscScalar newVal = diagWeight * snap[i];
         for (PetscInt k = graph->oNeighborStart[i];
              k < graph->oNeighborStart[i + 1]; k++)
-          newVal += graph->oNeighborWeights[k] * arrOver[graph->oNeighborList[k]];
+          newVal += graph->oNeighborWeights[k] * snap[graph->oNeighborList[k]];
         arrOver[i] = newVal;
       }
 
@@ -323,45 +339,51 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
       PetscCall(VecRestoreArray(graph->oLocalScratch, &arrOver));
     }
 
+    PetscCall(PetscFree(snap));
     PetscFunctionReturn(PETSC_SUCCESS);
   }
 
   /* ============================================================== */
-  /* Single-rank path: forward+reverse sweep on the input local Vec. */
-  /* The setup phase leaves hasParallelGraph=false at MPI=1 because  */
-  /* the local mesh IS the global mesh; this loop produces the       */
-  /* correct sequential GS result with no overhead.                  */
+  /* Single-rank path: forward+reverse Jacobi sweep on the input    */
+  /* local Vec. The setup phase leaves hasParallelGraph=false at     */
+  /* MPI=1 because the local mesh IS the global mesh. Each sweep      */
+  /* reads a frozen snapshot, matching the parallel path so the      */
+  /* smoothed result is the same at any rank count.                  */
   /* ============================================================== */
   PetscInt     N;
-  PetscScalar *arr;
+  PetscScalar *arr, *snap;
   PetscCall(VecGetLocalSize(v, &N));
   PetscCall(VecGetArray(v, &arr));
+  PetscCall(PetscMalloc1(N, &snap));
 
-  /* Forward sweep */
+  /* Forward Jacobi sweep (frozen snapshot -> order-independent). */
+  PetscCall(PetscArraycpy(snap, arr, N));
   for (PetscInt i = 0; i < graph->numLocalCells && i < N; i++) {
     if (graph->isFixed[i]) continue;
-    PetscScalar newVal = diagWeight * arr[i];
+    PetscScalar newVal = diagWeight * snap[i];
     for (PetscInt k = graph->neighborStart[i];
          k < graph->neighborStart[i + 1]; k++) {
       PetscInt nb = graph->neighborList[k];
-      if (nb < N) newVal += graph->neighborWeights[k] * arr[nb];
+      if (nb < N) newVal += graph->neighborWeights[k] * snap[nb];
     }
     arr[i] = newVal;
   }
 
-  /* Reverse sweep */
+  /* Reverse Jacobi sweep (frozen snapshot again). */
+  PetscCall(PetscArraycpy(snap, arr, N));
   for (PetscInt i = graph->numLocalCells - 1; i >= 0; i--) {
     if (i >= N) continue;
     if (graph->isFixed[i]) continue;
-    PetscScalar newVal = diagWeight * arr[i];
+    PetscScalar newVal = diagWeight * snap[i];
     for (PetscInt k = graph->neighborStart[i];
          k < graph->neighborStart[i + 1]; k++) {
       PetscInt nb = graph->neighborList[k];
-      if (nb < N) newVal += graph->neighborWeights[k] * arr[nb];
+      if (nb < N) newVal += graph->neighborWeights[k] * snap[nb];
     }
     arr[i] = newVal;
   }
 
+  PetscCall(PetscFree(snap));
   PetscCall(VecRestoreArray(v, &arr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -369,7 +391,7 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
 /* setupParallelSmoothingGraph                                        */
 /*                                                                     */
 /* Builds the per-rank overlap=1 neighbor graph used by the fully-    */
-/* parallel block-Jacobi GS path of applyGaussSeidelSmoothing. Steps: */
+/* parallel Jacobi path of applyGaussSeidelSmoothing. Steps:          */
 /*   1. DMPlexDistributeOverlap(dm, 1, …) → permanent overlap=1 EM-DM */
 /*      kept alive for the lifetime of the inversion run.             */
 /*   2. Clone the EM-DM-over and install a 1-DOF/cell PetscSection on */
@@ -382,10 +404,12 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
 /*      indices); compute 1/dist weights and normalize.               */
 /*   4. Allocate persistent local + global Vec scratch on the new DM. */
 /*                                                                     */
-/* Result is NOT bit-identical to the sequential rank-0 sweep -       */
-/* parallel GS uses one-step-stale ghost values during each sweep,    */
-/* whereas sequential GS sees the most recently updated value of      */
-/* every neighbor. Recovered model still matches; same convergence.   */
+/* The smoother sweep itself is Jacobi (reads a frozen snapshot per   */
+/* sweep, with a ghost refresh between sweeps), so the smoothed result */
+/* matches the single-rank sequential path up to floating-point       */
+/* summation order and is independent of the MPI partition. The       */
+/* refreshed ghosts give each owned cell the correct (non-stale)       */
+/* neighbor values, identical to what the sequential sweep sees.      */
 /* ================================================================== */
 PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
                                             const DM       dm,

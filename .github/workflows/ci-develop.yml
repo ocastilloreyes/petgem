@@ -146,7 +146,7 @@ jobs:
   # Python unit tests (pytest)
   # ==========================
   # No compiled kernel needed - exercises the utils/ python layer
-  # (readBundle, readSigmaCSV, readSourcesText, …).
+  # (readBundle, readSigmaTable, readSourcesText, …).
   test-unit:
     runs-on: ubuntu-latest
     needs: [docker-build, changes]
@@ -240,7 +240,7 @@ jobs:
                 -mesh_filename mesh_p\${NORD}.msh \
                 -source_filename sources.txt \
                 -receiver_filename receivers.txt \
-                -sigma_file sigmas.csv \
+                -sigma_file sigmas.txt \
                 -input_filename input_p\${NORD}.h5 \
                 -params_filename params_p\${NORD}.txt && \
               mpirun -n 4 build/${{ matrix.exe }} \
@@ -276,7 +276,7 @@ jobs:
                 -mesh_filename mesh_p\${NORD}.msh \
                 -source_filename sources.txt \
                 -receiver_filename receivers.txt \
-                -sigma_file sigmas.csv \
+                -sigma_file sigmas.txt \
                 -input_filename input_p\${NORD}.h5 \
                 -params_filename params_p\${NORD}.txt && \
               mpirun -n 4 build/${{ matrix.exe }} \

@@ -8,7 +8,7 @@ split into fast unit tests and end-to-end integration tests.
 Layout
 ------
 - ``tests/unit/`` - fast, dependency-light tests of the Python helpers
-  (bundle/CSV/source readers). No compiled kernel required.
+  (bundle/sigma/source readers). No compiled kernel required.
 - ``tests/integration/`` - end-to-end pipeline tests
   (preprocess :math:`\rightarrow` ``fm.csem`` :math:`\rightarrow` postprocess),
   including a structural smoke test and a numerical regression against the

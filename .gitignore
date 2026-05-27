@@ -17,9 +17,15 @@ tests/cases/csem_model/*.png
 logo_proposals/*
 petgem-logo-BIG-430x480.png
 results.txt
-
-
-
+model_inv/
+src_previous_only_nord1_different_basis/
+tests/cases/inverse/input_p1.h5
+tests/cases/inverse/out_p1_14cpus/
+tests/cases/inverse/out_p1_1cpus/
+tests/cases/inverse/out_p1_7cpus/
+tests/cases/inverse/out_p2_14cpus/
+tests/cases/inverse/params_p1.txt
+utils/convert_invex_to_hdf5.py
 
 # Run-time artifacts dropped at repo root
 petgem.err

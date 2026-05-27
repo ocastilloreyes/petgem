@@ -5,7 +5,7 @@ Reference CSEM forward-modeling case for PETGEM validation.
 ## Layout
 
 - `mesh_p{N}.geo`, `mesh_p{N}.msh`  Gmsh inputs / generated meshes.
-- `sigmas.csv`                        Per-material conductivity table.
+- `sigmas.txt`                        Per-material conductivity table.
 - `sources.txt`                       Source-frequency + dipole records.
 - `receivers.txt`                     Receiver positions (x y z per row).
 - `reference.h5`                      ModEM reference Ex (`/reference_real`
@@ -22,7 +22,7 @@ python3 utils/preprocess.py \
     -mode forward -nord 1 -case_dir tests/cases/csem_model \
     -mesh_filename mesh_p1.msh \
     -source_filename sources.txt -receiver_filename receivers.txt \
-    -sigma_file sigmas.csv
+    -sigma_file sigmas.txt
 
 # 2. Solve (reads input.h5; writes responses_p1_src1.h5)
 mpirun -n 4 fm.csem -options_file tests/cases/csem_model/params.txt

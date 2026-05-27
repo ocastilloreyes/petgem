@@ -25,7 +25,7 @@ python3 utils/preprocess.py \
     -mode forward -nord 1 -case_dir tests/cases/csem_model \
     -mesh_filename mesh_p1.msh \
     -source_filename sources.txt -receiver_filename receivers.txt \
-    -sigma_file sigmas.csv
+    -sigma_file sigmas.txt
 
 # Run the kernel under Extrae. EXTRAE_HOME must be set; LD_PRELOAD pulls
 # in the MPI tracer. EXTRAE_CONFIG_FILE points at the XML in this folder.

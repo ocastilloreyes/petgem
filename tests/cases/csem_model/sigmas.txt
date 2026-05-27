@@ -1,8 +1,8 @@
 # Per-material conductivity table for the csem_model test case.
 # Row index = 0-based material id (gmsh:physical tag - 1).
-# Columns: sigma_x, sigma_y, sigma_z
+# Columns: sigma_x sigma_y sigma_z
 #
 # Material 0: air / background
 # Material 1: subsurface
-0.1, 0.1, 0.1
-1.0, 1.0, 1.0
+0.1 0.1 0.1
+1.0 1.0 1.0

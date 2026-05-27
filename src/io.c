@@ -14,7 +14,7 @@
  *
  *   Inverse kernel (im.csem):
  *     readInversionParams        parser for -inv_* options
- *     setupInversionSources      bundle reader for /inv_sources group (multi-freq sources)
+ *     setupInversionSources      bundle reader for /sources group (multi-freq sources)
  *     loadObservedData           bundle reader for /observed/Ex (HDF5 compound complex128)
  *     writeInversionResults      final HDF5 dump (conductivity, X, RMS history)
  *     writeInversionSnapshotVTU  per-accepted-iter ParaView VTU snapshot
@@ -325,7 +325,10 @@ PetscErrorCode loadCsemInputs(csemParams     *params,
     if (sources) {
       Vec freqV, posV, curV, lenV, dipV, azV;
       PetscCall(PetscViewerHDF5PushGroup(viewer, "/sources"));
-      PetscCall(loadSelfVecByName(viewer, "frequency",    &freqV));
+      /* Unified /sources schema: per-entry frequency (one row per
+       * transmitter). Forward modeling is monochromatic - all entries
+       * share the same frequency - so we use freq[0] for the whole set. */
+      PetscCall(loadSelfVecByName(viewer, "freq",         &freqV));
       PetscCall(loadSelfVecByName(viewer, "position",     &posV));
       PetscCall(loadSelfVecByName(viewer, "current",      &curV));
       PetscCall(loadSelfVecByName(viewer, "length",       &lenV));
@@ -462,8 +465,13 @@ PetscErrorCode readInversionParams(invParams *iparams)
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-inv_dev_fd_check",
                                &iparams->fdCheckCells, NULL));
 
+  /* Diagnostic: disable both smoothers for the whole run */
+  iparams->smootherOff = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-inv_no_smoother",
+                                &iparams->smootherOff, NULL));
+
   /* numFreqs/invSources are populated later by setupInversionSources
-   * (from the unified bundle's /inv_sources group). */
+   * (from the unified bundle's /sources group). */
   iparams->numFreqs = 0;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -503,40 +511,17 @@ PetscErrorCode readInversionParams(invParams *iparams)
 /* setupInversionSources                                               */
 /*                                                                     */
 /* Reads multi-frequency inversion sources from the unified bundle's   */
-/* /inv_sources group. Each row in /inv_sources/freq is one (freq,     */
-/* dipole) record; /inv_sources/{position,current,length,dipAngle,    */
-/* azimuthAngle} hold the corresponding dipole parameters.            */
+/* /sources group (shared with the forward kernel). Each row in        */
+/* /sources/freq is one (freq, dipole) record; the sibling datasets    */
+/* {position,current,length,dipAngle,azimuthAngle} hold the dipole     */
+/* parameters.                                                         */
 /*                                                                     */
-/* Uses raw HDF5 reads (not PetscViewerHDF5+VecLoad) because the       */
-/* datasets are written by h5py without the "complex" attribute PETSc  */
-/* expects on a complex-scalar build.                                  */
+/* Uses PetscViewerHDF5 + VecLoad (like loadCsemInputs) because the    */
+/* datasets are PETSc Vecs carrying the complex/real marking VecLoad   */
+/* needs on a complex-scalar build.                                    */
 /*                                                                     */
 /* Populates iparams->numFreqs and invSources[].                      */
 /* ================================================================== */
-static PetscErrorCode readF64Dataset1D(hid_t file, const char *path,
-                                       PetscInt expected_len,
-                                       double *out)
-{
-  PetscFunctionBeginUser;
-  hid_t   dset = H5Dopen2(file, path, H5P_DEFAULT);
-  PetscCheck(dset >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-             "Cannot find dataset %s in bundle", path);
-  hid_t   sp   = H5Dget_space(dset);
-  hsize_t dims[1] = {0};
-  int     nd   = H5Sget_simple_extent_ndims(sp);
-  PetscCheck(nd == 1, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-             "%s must be 1D, got %d", path, nd);
-  H5Sget_simple_extent_dims(sp, dims, NULL);
-  PetscCheck((PetscInt)dims[0] == expected_len, PETSC_COMM_SELF,
-             PETSC_ERR_FILE_READ,
-             "%s length %llu != expected %" PetscInt_FMT,
-             path, (unsigned long long)dims[0], expected_len);
-  H5Sclose(sp);
-  H5Dread(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, out);
-  H5Dclose(dset);
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 PetscErrorCode setupInversionSources(const char *bundleFile,
                                      invParams  *iparams)
 {
@@ -546,60 +531,72 @@ PetscErrorCode setupInversionSources(const char *bundleFile,
              PETSC_ERR_ARG_NULL,
              "setupInversionSources: bundleFile is empty.");
 
-  hid_t file = H5Fopen(bundleFile, H5F_ACC_RDONLY, H5P_DEFAULT);
-  PetscCheck(file >= 0, PETSC_COMM_WORLD, PETSC_ERR_FILE_OPEN,
-             "Cannot open bundle HDF5 file: %s", bundleFile);
+  /* Read the unified /sources group (per-entry frequency), shared with the
+   * forward kernel. These datasets are PETSc Vecs written by the preprocess,
+   * so they carry the complex/real marking VecLoad needs - hence the PETSc
+   * HDF5 viewer + loadSelfVecByName here (mirroring loadCsemInputs), rather
+   * than the raw H5Dread used previously for the plain-float64 /inv_sources. */
+  PetscViewer viewer;
+  PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, bundleFile, FILE_MODE_READ, &viewer));
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "/sources"));
 
-  /* Probe /inv_sources/freq to get N_freq, then read each dataset. */
-  hid_t freqDset = H5Dopen2(file, "/inv_sources/freq", H5P_DEFAULT);
-  PetscCheck(freqDset >= 0, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ,
-             "Cannot find /inv_sources/freq in %s", bundleFile);
-  hid_t   freqSpace = H5Dget_space(freqDset);
-  hsize_t freqDims[1] = {0};
-  H5Sget_simple_extent_dims(freqSpace, freqDims, NULL);
-  PetscInt count = (PetscInt)freqDims[0];
-  H5Sclose(freqSpace);
-  H5Dclose(freqDset);
+  Vec freqV, posV, curV, lenV, dipV, azV;
+  PetscCall(loadSelfVecByName(viewer, "freq",         &freqV));
+  PetscCall(loadSelfVecByName(viewer, "position",     &posV));
+  PetscCall(loadSelfVecByName(viewer, "current",      &curV));
+  PetscCall(loadSelfVecByName(viewer, "length",       &lenV));
+  PetscCall(loadSelfVecByName(viewer, "dipAngle",     &dipV));
+  PetscCall(loadSelfVecByName(viewer, "azimuthAngle", &azV));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
 
+  PetscInt count;
+  PetscCall(VecGetSize(freqV, &count));
   PetscCheck(count > 0, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ,
-             "/inv_sources/freq is empty in %s", bundleFile);
+             "/sources/freq is empty in %s", bundleFile);
   PetscCheck(count <= INV_MAX_FREQUENCIES, PETSC_COMM_WORLD, PETSC_ERR_SUP,
              "Too many inversion sources (%" PetscInt_FMT " > max %d); "
              "bump INV_MAX_FREQUENCIES in include/constants.h to raise the cap",
              count, INV_MAX_FREQUENCIES);
 
-  double *freqArr, *posArr, *curArr, *lenArr, *dipArr, *azArr;
-  PetscCall(PetscMalloc6(count, &freqArr, 3 * count, &posArr, count, &curArr,
-                         count, &lenArr, count, &dipArr, count, &azArr));
-
-  PetscCall(readF64Dataset1D(file, "/inv_sources/freq",         count,     freqArr));
-  PetscCall(readF64Dataset1D(file, "/inv_sources/position",     3 * count, posArr));
-  PetscCall(readF64Dataset1D(file, "/inv_sources/current",      count,     curArr));
-  PetscCall(readF64Dataset1D(file, "/inv_sources/length",       count,     lenArr));
-  PetscCall(readF64Dataset1D(file, "/inv_sources/dipAngle",     count,     dipArr));
-  PetscCall(readF64Dataset1D(file, "/inv_sources/azimuthAngle", count,     azArr));
-
-  H5Fclose(file);
+  const PetscScalar *freqArr, *posArr, *curArr, *lenArr, *dipArr, *azArr;
+  PetscCall(VecGetArrayRead(freqV, &freqArr));
+  PetscCall(VecGetArrayRead(posV,  &posArr));
+  PetscCall(VecGetArrayRead(curV,  &curArr));
+  PetscCall(VecGetArrayRead(lenV,  &lenArr));
+  PetscCall(VecGetArrayRead(dipV,  &dipArr));
+  PetscCall(VecGetArrayRead(azV,   &azArr));
 
   for (PetscInt i = 0; i < count; i++) {
     InvCsemSource *s = &iparams->invSources[i];
-    s->freq              = freqArr[i];
-    s->position[0]       = posArr[i * 3 + 0];
-    s->position[1]       = posArr[i * 3 + 1];
-    s->position[2]       = posArr[i * 3 + 2];
-    s->current           = curArr[i];
-    s->length            = lenArr[i];
-    s->dipAngle          = dipArr[i];
-    s->azimuthAngle      = azArr[i];
+    s->freq              = PetscRealPart(freqArr[i]);
+    s->position[0]       = PetscRealPart(posArr[i * 3 + 0]);
+    s->position[1]       = PetscRealPart(posArr[i * 3 + 1]);
+    s->position[2]       = PetscRealPart(posArr[i * 3 + 2]);
+    s->current           = PetscRealPart(curArr[i]);
+    s->length            = PetscRealPart(lenArr[i]);
+    s->dipAngle          = PetscRealPart(dipArr[i]);
+    s->azimuthAngle      = PetscRealPart(azArr[i]);
   }
 
-  PetscCall(PetscFree6(freqArr, posArr, curArr, lenArr, dipArr, azArr));
+  PetscCall(VecRestoreArrayRead(freqV, &freqArr));
+  PetscCall(VecRestoreArrayRead(posV,  &posArr));
+  PetscCall(VecRestoreArrayRead(curV,  &curArr));
+  PetscCall(VecRestoreArrayRead(lenV,  &lenArr));
+  PetscCall(VecRestoreArrayRead(dipV,  &dipArr));
+  PetscCall(VecRestoreArrayRead(azV,   &azArr));
+  PetscCall(VecDestroy(&freqV));
+  PetscCall(VecDestroy(&posV));
+  PetscCall(VecDestroy(&curV));
+  PetscCall(VecDestroy(&lenV));
+  PetscCall(VecDestroy(&dipV));
+  PetscCall(VecDestroy(&azV));
 
   iparams->numFreqs = count;
 
   /* Print parsed source data */
   MPI_Comm comm = PETSC_COMM_WORLD;
-  PetscCall(PetscPrintf(comm, "\n Inversion sources (from bundle /inv_sources):\n"));
+  PetscCall(PetscPrintf(comm, "\n Inversion sources (from bundle /sources):\n"));
   PetscCall(PetscPrintf(comm, "   Bundle file         = %s\n", bundleFile));
   PetscCall(PetscPrintf(comm, "   Num entries         = %" PetscInt_FMT "\n",
                         iparams->numFreqs));
@@ -965,6 +962,31 @@ PetscErrorCode writeInversionResults(const invParams *iparams,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* Copy the first n real parts of a Vec into out[] (no-op if v is NULL).
+ * For a 1-DOF/cell vector on dmInversion the first nOwned entries are the
+ * owned cells in cellStart..cellEnd order (matches the rho fill below). */
+static PetscErrorCode copyOwnedReal(Vec v, PetscInt n, PetscReal *out)
+{
+  PetscFunctionBeginUser;
+  if (v) {
+    const PetscScalar *a;
+    PetscCall(VecGetArrayRead(v, &a));
+    for (PetscInt i = 0; i < n; i++) out[i] = PetscRealPart(a[i]);
+    PetscCall(VecRestoreArrayRead(v, &a));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* Write one cell-centered Float64 scalar field as an ascii VTU DataArray
+ * (rank-0 only; plain void since it just emits text). */
+static void writeVtuCellField(FILE *fp, const char *name,
+                              const PetscReal *a, PetscInt n)
+{
+  fprintf(fp, "        <DataArray type=\"Float64\" Name=\"%s\" format=\"ascii\">\n", name);
+  for (PetscInt i = 0; i < n; i++) fprintf(fp, "%.9g\n", (double)a[i]);
+  fprintf(fp, "        </DataArray>\n");
+}
+
 /* ================================================================== */
 /* writeInversionSnapshotVTU                                           */
 /*                                                                     */
@@ -983,9 +1005,14 @@ PetscErrorCode writeInversionResults(const invParams *iparams,
 /* Output filename: {output_dir}/inv_model_iter{N:05d}.vtu            */
 /* The output_dir is read from the -output_dir PETSc option.          */
 /*                                                                     */
-/* With PETSc built for complex scalars the VTK viewer writes real     */
-/* and imaginary parts as separate scalar fields.  All five fields    */
-/* are purely real here; select the "_r" components in ParaView.      */
+/* Parallel output: all five per-cell fields and the cell vertex       */
+/* coordinates are gathered to rank 0, which writes a SINGLE-piece     */
+/* ascii VTU. This avoids PETSc's VTK viewer emitting one <Piece> per  */
+/* rank into one .vtu (a non-standard multi-piece serial file that     */
+/* ParaView/meshio misread as per-partition fragments - the cause of   */
+/* the apparent "boundary artifacts"). Cells are written exploded (each */
+/* tet carries its own 4 vertices) so no global point renumbering is   */
+/* needed; cell-data colouring is unaffected by the duplicated points. */
 /* ================================================================== */
 PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx,
                                           PetscInt                acceptedIter)
@@ -1011,74 +1038,142 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx,
   PetscCall(PetscSNPrintf(filename, sizeof(filename),
     "%sinv_model_iter%05" PetscInt_FMT ".vtu", outputDir, acceptedIter));
 
-  /* ---- Build the rho field (1/sigma_x) as a local Vec on dmInversion ---- */
-  Vec rhoLocal;
-  PetscCall(DMCreateLocalVector(ctx->dmInversion, &rhoLocal));
+  PetscMPIInt rank, size;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  PetscCallMPI(MPI_Comm_size(comm, &size));
 
-  PetscSection resSec;
-  PetscCall(DMGetLocalSection(ctx->dmConductivity, &resSec));
-  const PetscScalar *sArr;
-  PetscScalar       *rArr;
-  PetscCall(VecGetArrayRead(ctx->conductivity, &sArr));
-  PetscCall(VecGetArray(rhoLocal, &rArr));
+  PetscInt nOwned = ctx->grid.cellEnd - ctx->grid.cellStart;
 
-  for (PetscInt i = ctx->grid.cellStart; i < ctx->grid.cellEnd; i++) {
-    PetscInt li = i - ctx->grid.cellStart;
-    PetscInt resOff;
-    PetscCall(PetscSectionGetOffset(resSec, i, &resOff));
-    PetscReal sigma = PetscRealPart(sArr[resOff]); /* component 0 = sigma_x */
-    rArr[li] = (sigma > 0.0) ? 1.0 / sigma : 0.0;
+  /* ---- Per-owned-cell field values + exploded vertex coordinates ---- */
+  PetscReal *rho, *xpre, *xpost, *dfraw, *dffin, *coords;
+  PetscCall(PetscCalloc1(nOwned, &rho));
+  PetscCall(PetscCalloc1(nOwned, &xpre));
+  PetscCall(PetscCalloc1(nOwned, &xpost));
+  PetscCall(PetscCalloc1(nOwned, &dfraw));
+  PetscCall(PetscCalloc1(nOwned, &dffin));
+  PetscCall(PetscCalloc1(12 * nOwned, &coords));
+
+  /* rho = 1/sigma_x */
+  {
+    PetscSection resSec;
+    PetscCall(DMGetLocalSection(ctx->dmConductivity, &resSec));
+    const PetscScalar *sArr;
+    PetscCall(VecGetArrayRead(ctx->conductivity, &sArr));
+    for (PetscInt i = ctx->grid.cellStart; i < ctx->grid.cellEnd; i++) {
+      PetscInt li = i - ctx->grid.cellStart, off;
+      PetscCall(PetscSectionGetOffset(resSec, i, &off));
+      PetscReal sigma = PetscRealPart(sArr[off]); /* component 0 = sigma_x */
+      rho[li] = (sigma > 0.0) ? 1.0 / sigma : 0.0;
+    }
+    PetscCall(VecRestoreArrayRead(ctx->conductivity, &sArr));
   }
 
-  PetscCall(VecRestoreArray(rhoLocal, &rArr));
-  PetscCall(VecRestoreArrayRead(ctx->conductivity, &sArr));
+  /* Diagnostic fields (NULL when snapshots disabled -> left zero). */
+  PetscCall(copyOwnedReal(ctx->XPreSmooth,  nOwned, xpre));
+  PetscCall(copyOwnedReal(ctx->XPostSmooth, nOwned, xpost));
+  PetscCall(copyOwnedReal(ctx->DfDmRaw,     nOwned, dfraw));
+  PetscCall(copyOwnedReal(ctx->DfDmFinal,   nOwned, dffin));
 
-  /* Allocate one global Vec per field (VTK viewer requires global Vecs) */
-  Vec rhoGlobal, xPreGlobal, xPostGlobal, dfRawGlobal, dfFinalGlobal;
-  PetscCall(DMCreateGlobalVector(ctx->dmInversion, &rhoGlobal));
-  PetscCall(DMCreateGlobalVector(ctx->dmInversion, &xPreGlobal));
-  PetscCall(DMCreateGlobalVector(ctx->dmInversion, &xPostGlobal));
-  PetscCall(DMCreateGlobalVector(ctx->dmInversion, &dfRawGlobal));
-  PetscCall(DMCreateGlobalVector(ctx->dmInversion, &dfFinalGlobal));
+  /* Exploded tet vertices: 4 vertices (12 reals) per owned cell. */
+  for (PetscInt i = ctx->grid.cellStart; i < ctx->grid.cellEnd; i++) {
+    PetscInt li = i - ctx->grid.cellStart;
+    Cell cell;
+    PetscCall(extractCellCoordinates(ctx->dm, i, &cell));
+    for (PetscInt k = 0; k < 12; k++) coords[12 * li + k] = cell.coordinates[k];
+  }
 
-  PetscCall(PetscObjectSetName((PetscObject)rhoGlobal,     "rho_ohm_m"));
-  PetscCall(PetscObjectSetName((PetscObject)xPreGlobal,    "X_pre_smooth"));
-  PetscCall(PetscObjectSetName((PetscObject)xPostGlobal,   "X_post_smooth"));
-  PetscCall(PetscObjectSetName((PetscObject)dfRawGlobal,   "DfDm_raw"));
-  PetscCall(PetscObjectSetName((PetscObject)dfFinalGlobal, "DfDm_final"));
+  /* ---- Gather everything to rank 0 ---- */
+  PetscMPIInt nLoc = (PetscMPIInt)nOwned;
+  PetscMPIInt *cnt = NULL, *dsp = NULL, *cntC = NULL, *dspC = NULL;
+  if (rank == 0) {
+    PetscCall(PetscMalloc4(size, &cnt, size, &dsp, size, &cntC, size, &dspC));
+  }
+  PetscCallMPI(MPI_Gather(&nLoc, 1, MPI_INT, cnt, 1, MPI_INT, 0, comm));
 
-  /* Scatter / copy each field into its global Vec.  Missing diagnostics
-   * (e.g. when snapshotInterval == 0, which shouldn't happen here) are
-   * left zero so the file still loads in ParaView. */
-  PetscCall(DMLocalToGlobal(ctx->dmInversion, rhoLocal,
-                             INSERT_VALUES, rhoGlobal));
-  if (ctx->XPreSmooth)
-    PetscCall(VecCopy(ctx->XPreSmooth, xPreGlobal));
-  if (ctx->XPostSmooth)
-    PetscCall(DMLocalToGlobal(ctx->dmInversion, ctx->XPostSmooth,
-                               INSERT_VALUES, xPostGlobal));
-  if (ctx->DfDmRaw)
-    PetscCall(DMLocalToGlobal(ctx->dmInversion, ctx->DfDmRaw,
-                               INSERT_VALUES, dfRawGlobal));
-  if (ctx->DfDmFinal)
-    PetscCall(VecCopy(ctx->DfDmFinal, dfFinalGlobal));
+  PetscInt   Ntot = 0;
+  PetscReal *rhoA = NULL, *xpreA = NULL, *xpostA = NULL,
+            *dfrawA = NULL, *dffinA = NULL, *coordsA = NULL;
+  if (rank == 0) {
+    dsp[0] = 0; dspC[0] = 0; cntC[0] = 12 * cnt[0];
+    for (PetscMPIInt r = 1; r < size; r++) {
+      cntC[r] = 12 * cnt[r];
+      dsp[r]  = dsp[r - 1] + cnt[r - 1];
+      dspC[r] = dspC[r - 1] + cntC[r - 1];
+    }
+    Ntot = dsp[size - 1] + cnt[size - 1];
+    PetscCall(PetscMalloc1(Ntot, &rhoA));
+    PetscCall(PetscMalloc1(Ntot, &xpreA));
+    PetscCall(PetscMalloc1(Ntot, &xpostA));
+    PetscCall(PetscMalloc1(Ntot, &dfrawA));
+    PetscCall(PetscMalloc1(Ntot, &dffinA));
+    PetscCall(PetscMalloc1(12 * Ntot, &coordsA));
+  }
+  PetscCallMPI(MPI_Gatherv(rho,    nLoc, MPIU_REAL, rhoA,    cnt, dsp, MPIU_REAL, 0, comm));
+  PetscCallMPI(MPI_Gatherv(xpre,   nLoc, MPIU_REAL, xpreA,   cnt, dsp, MPIU_REAL, 0, comm));
+  PetscCallMPI(MPI_Gatherv(xpost,  nLoc, MPIU_REAL, xpostA,  cnt, dsp, MPIU_REAL, 0, comm));
+  PetscCallMPI(MPI_Gatherv(dfraw,  nLoc, MPIU_REAL, dfrawA,  cnt, dsp, MPIU_REAL, 0, comm));
+  PetscCallMPI(MPI_Gatherv(dffin,  nLoc, MPIU_REAL, dffinA,  cnt, dsp, MPIU_REAL, 0, comm));
+  PetscCallMPI(MPI_Gatherv(coords, 12 * nLoc, MPIU_REAL, coordsA, cntC, dspC, MPIU_REAL, 0, comm));
 
-  /* Write all five fields to a single VTU via the PETSc VTK viewer. */
-  PetscViewer viewer;
-  PetscCall(PetscViewerVTKOpen(comm, filename, FILE_MODE_WRITE, &viewer));
-  PetscCall(VecView(rhoGlobal,     viewer));
-  PetscCall(VecView(xPreGlobal,    viewer));
-  PetscCall(VecView(xPostGlobal,   viewer));
-  PetscCall(VecView(dfRawGlobal,   viewer));
-  PetscCall(VecView(dfFinalGlobal, viewer));
-  PetscCall(PetscViewerDestroy(&viewer));
+  /* ---- Rank 0 writes a single-piece ascii VTU ---- */
+  if (rank == 0) {
+    FILE *fp = fopen(filename, "w");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN,
+               "writeInversionSnapshotVTU: cannot open %s", filename);
+    PetscInt npts = 4 * Ntot;
+    fprintf(fp, "<?xml version=\"1.0\"?>\n");
+    fprintf(fp, "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">\n");
+    fprintf(fp, "  <UnstructuredGrid>\n");
+    fprintf(fp, "    <Piece NumberOfPoints=\"%" PetscInt_FMT "\" NumberOfCells=\"%" PetscInt_FMT "\">\n",
+            npts, Ntot);
 
-  PetscCall(VecDestroy(&rhoLocal));
-  PetscCall(VecDestroy(&rhoGlobal));
-  PetscCall(VecDestroy(&xPreGlobal));
-  PetscCall(VecDestroy(&xPostGlobal));
-  PetscCall(VecDestroy(&dfRawGlobal));
-  PetscCall(VecDestroy(&dfFinalGlobal));
+    fprintf(fp, "      <Points>\n");
+    fprintf(fp, "        <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n");
+    for (PetscInt c = 0; c < Ntot; c++)
+      for (PetscInt v = 0; v < 4; v++)
+        fprintf(fp, "%.9g %.9g %.9g\n",
+                (double)coordsA[12 * c + 3 * v + 0],
+                (double)coordsA[12 * c + 3 * v + 1],
+                (double)coordsA[12 * c + 3 * v + 2]);
+    fprintf(fp, "        </DataArray>\n      </Points>\n");
+
+    fprintf(fp, "      <Cells>\n");
+    fprintf(fp, "        <DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">\n");
+    for (PetscInt p = 0; p < npts; p++) fprintf(fp, "%" PetscInt_FMT " ", p);
+    fprintf(fp, "\n        </DataArray>\n");
+    fprintf(fp, "        <DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">\n");
+    for (PetscInt c = 1; c <= Ntot; c++) fprintf(fp, "%" PetscInt_FMT " ", 4 * c);
+    fprintf(fp, "\n        </DataArray>\n");
+    fprintf(fp, "        <DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n");
+    for (PetscInt c = 0; c < Ntot; c++) fprintf(fp, "10 ");   /* VTK_TETRA */
+    fprintf(fp, "\n        </DataArray>\n      </Cells>\n");
+
+    fprintf(fp, "      <CellData Scalars=\"rho_ohm_m\">\n");
+    writeVtuCellField(fp, "rho_ohm_m",     rhoA,   Ntot);
+    writeVtuCellField(fp, "X_pre_smooth",  xpreA,  Ntot);
+    writeVtuCellField(fp, "X_post_smooth", xpostA, Ntot);
+    writeVtuCellField(fp, "DfDm_raw",      dfrawA, Ntot);
+    writeVtuCellField(fp, "DfDm_final",    dffinA, Ntot);
+    fprintf(fp, "      </CellData>\n");
+
+    fprintf(fp, "    </Piece>\n  </UnstructuredGrid>\n</VTKFile>\n");
+    fclose(fp);
+
+    PetscCall(PetscFree4(cnt, dsp, cntC, dspC));
+    PetscCall(PetscFree(rhoA));
+    PetscCall(PetscFree(xpreA));
+    PetscCall(PetscFree(xpostA));
+    PetscCall(PetscFree(dfrawA));
+    PetscCall(PetscFree(dffinA));
+    PetscCall(PetscFree(coordsA));
+  }
+
+  PetscCall(PetscFree(rho));
+  PetscCall(PetscFree(xpre));
+  PetscCall(PetscFree(xpost));
+  PetscCall(PetscFree(dfraw));
+  PetscCall(PetscFree(dffin));
+  PetscCall(PetscFree(coords));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

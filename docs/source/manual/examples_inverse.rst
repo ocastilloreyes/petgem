@@ -17,7 +17,7 @@ Model description
 
 - Frequencies: 50, 300, 800, 1500 Hz
 - Source position at xyz = [0.0, -4000.0, 0.0] m
-- Four materials in ``sigmas.csv``:
+- Four materials in ``sigmas.txt``:
 
    - Air: fixed (excluded from inversion)
    - Ocean: fixed (excluded from inversion)
@@ -46,7 +46,7 @@ Run the following commands to execute the inversion. The case is provided at
 
    # Generate the input bundle and parameter file (inverse mode).
    # The bundle embeds the multi-frequency sources, observed data,
-   # noise level, and the fixed-material list from sigmas.csv.
+   # noise level, and the fixed-material list from sigmas.txt.
    python3 utils/preprocess.py \
       -mode inverse \
       -nord ${NORD} \
@@ -55,7 +55,7 @@ Run the following commands to execute the inversion. The case is provided at
       -receiver_filename receivers.txt \
       -inv_source_filename sources.txt \
       -observed_filename observed_data.h5 \
-      -sigma_file sigmas.csv \
+      -sigma_file sigmas.txt \
       -input_filename input_p${NORD}.h5 \
       -params_filename params_p${NORD}.txt
 
@@ -84,7 +84,12 @@ Step-by-step
    receivers, the bundle embeds the multi-frequency sources
    (``-inv_source_filename``), the observed data (``-observed_filename``), the
    noise level, and the fixed-material list derived from the ``fixed`` column
-   of ``sigmas.csv``. The mesh ships pre-generated as ``mesh_p1.msh``.
+   of ``sigmas.txt``. The mesh ships pre-generated as ``mesh_p1.msh``.
+
+   Here ``-observed_filename`` is the shipped HDF5 (``observed_data.h5``), but a
+   raw MATLAB-style ``invEx.dat`` can be passed directly instead (parsed inline,
+   with ``-error_level`` for the noise level) - no separate conversion step
+   (see :doc:`formats`).
 
 4. **Inverse modeling**
 

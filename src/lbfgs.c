@@ -103,6 +103,21 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     goto cleanup;
   }
 
+  /* Adaptive RMS-plateau stop: in addition to the absolute rmsTol, stop
+   * when the data misfit stops improving (relative drop below rmsRelTol for
+   * `rmsStallWindow` consecutive iterations). This is model-adaptive - it
+   * derives the stopping point from the RMS history itself rather than a
+   * fixed threshold - so a case that plateaus above rmsTol (e.g. nord>=2
+   * settling near RMS~1.15) stops once it has converged instead of grinding
+   * to maxIter and overfitting. Disable with -inv_rms_rtol 0. */
+  PetscReal rmsRelTol     = 1.0e-3;   /* <0.1% improvement/iter => plateau */
+  PetscInt  rmsStallWindow = 3;
+  PetscCall(PetscOptionsGetReal(NULL, NULL, "-inv_rms_rtol", &rmsRelTol, NULL));
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-inv_rms_stall_window",
+                               &rmsStallWindow, NULL));
+  PetscReal prevRms     = (rmsPtr) ? *rmsPtr : PETSC_INFINITY;
+  PetscInt  rmsStallCnt = 0;
+
   /* L-BFGS main loop */
   PetscInt bound = 0;   /* number of stored pairs (up to M) */
   PetscInt ptr   = 0;   /* circular buffer pointer */
@@ -268,6 +283,23 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
       *numIters  = iter + 1;
       *reasonStr = "CONVERGED_RMSTOL";
       goto cleanup;
+    }
+
+    /* Adaptive RMS-plateau exit: stop once the misfit stops improving for
+     * `rmsStallWindow` consecutive iterations (relative drop < rmsRelTol).
+     * Prevents over-iterating / overfitting when the absolute rmsTol is
+     * unreachable for this model. */
+    if (rmsPtr && rmsRelTol > 0.0) {
+      PetscReal denom = PetscMax(prevRms, PETSC_SMALL);
+      PetscReal rel   = (prevRms - *rmsPtr) / denom;   /* fractional drop */
+      if (rel < rmsRelTol) rmsStallCnt++;
+      else                 rmsStallCnt = 0;
+      prevRms = *rmsPtr;
+      if (rmsStallCnt >= rmsStallWindow) {
+        *numIters  = iter + 1;
+        *reasonStr = "CONVERGED_RMS_STALL";
+        goto cleanup;
+      }
     }
   }
 

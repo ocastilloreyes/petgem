@@ -17,7 +17,7 @@ The typical workflow for CSEM inversion in **PETGEM** mirrors the forward one
 inputs:
 
 1. Generate or import a mesh using `Gmsh <http://gmsh.info/>`_.
-2. Define the starting/background conductivity model in ``sigmas.csv``,
+2. Define the starting/background conductivity model in ``sigmas.txt``,
    marking any materials to be held fixed with the ``fixed`` column.
 3. Run ``utils/preprocess.py -mode inverse`` to assemble the input bundle. In
    addition to the model and receivers, the bundle embeds the multi-frequency
@@ -33,18 +33,22 @@ embedded into the bundle:
 - ``-inv_source_filename``: a **multi-frequency** sources text file. Unlike the
   forward source file (one frequency, many dipoles), each row carries 8 fields
   - ``freq x y z current length dip azimuth`` - one per (frequency, dipole)
-  pair. Stored in the bundle under ``/inv_sources/*``.
-- ``-observed_filename``: an observed-data HDF5 file containing
-  ``/Ex [N_freq, N_recv]`` as ``complex128`` ({r,i} compound). Stored in the
-  bundle under ``/observed/Ex``.
+  pair. Stored in the bundle under ``/sources/*``.
+- ``-observed_filename``: the observed field, as either an HDF5 file with
+  ``/Ex [N_freq, N_recv]`` (``complex128``, {r,i} compound) **or** a raw
+  MATLAB-style ``invEx.dat`` text file (parsed inline - no separate conversion
+  step). Stored in the bundle under ``/observed/Ex``. See :doc:`formats` for
+  both layouts.
 
 Two further inversion inputs are derived during preprocessing and embedded into
 the bundle, each overridable on the kernel command line:
 
 - **Noise level** (``/observed`` ``@error_level``): the relative data error used
-  to weight the misfit. Override with ``-inv_error_level``.
+  to weight the misfit. Set at preprocessing time with ``-error_level`` (or read
+  from an HDF5 observed file's attribute); override at run time with
+  ``-inv_error_level``.
 - **Fixed materials** (``/inv_meta/fixed_materials``): the 0-based material ids
-  flagged in the ``fixed`` column of ``sigmas.csv``; their gradient is zeroed
+  flagged in the ``fixed`` column of ``sigmas.txt``; their gradient is zeroed
   and the smoother treats them as self-referencing. Override with
   ``-inv_fixed_materials``.
 

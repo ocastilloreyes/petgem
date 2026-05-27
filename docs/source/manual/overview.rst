@@ -30,7 +30,7 @@ Shared workflow
 Regardless of mode, a **PETGEM** run follows the same high-level stages:
 
 1. Generate or import a tetrahedral mesh using `Gmsh <http://gmsh.info/>`_.
-2. Describe the subsurface conductivity model in a CSV table (``sigmas.csv``).
+2. Describe the subsurface conductivity model in a text table (``sigmas.txt``).
 3. Run ``utils/preprocess.py`` to assemble a single **input bundle** and a
    matching **parameter file**.
 4. Execute the appropriate kernel (``fm.csem`` or ``im.csem``).
@@ -59,16 +59,16 @@ The mode is selected with ``-mode``:
 
 Conductivity model
 *******************
-The conductivity model is a CSV table passed via ``-sigma_file`` (relative to
+The conductivity model is a whitespace text table passed via ``-sigma_file`` (relative to
 ``-case_dir``). Each row is one material, indexed by 0-based material id
 (``gmsh:physical - 1``):
 
 .. code-block::
 
-   # sigma_x, sigma_y, sigma_z [, fixed]
-   0.1, 0.1, 0.1, 1     # held fixed during inversion (e.g. air, ocean)
-   1.0, 1.0, 1.0, 0     # invertable
-   2.0, 2.0, 2.0        # 'fixed' column omitted -> defaults to 0
+   # sigma_x sigma_y sigma_z [fixed]
+   0.1 0.1 0.1 1     # held fixed during inversion (e.g. air, ocean)
+   1.0 1.0 1.0 0     # invertable
+   2.0 2.0 2.0       # 'fixed' column omitted -> defaults to 0
 
 The optional fourth column (``fixed``) is only meaningful for inverse modeling:
 a non-zero entry marks the material as held fixed during inversion. Forward
@@ -80,7 +80,7 @@ Pre- and post-processing
 scripts) for:
 
 - Mesh conversion into the bundle's expected layout.
-- Conductivity model assembly from ``sigmas.csv``.
+- Conductivity model assembly from ``sigmas.txt``.
 - Visualization of the model in VTK format (``-output_vtk``).
 - Comparison of responses against a reference (per-case ``postprocess.py``).
 

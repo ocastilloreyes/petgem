@@ -10,12 +10,12 @@ from petsc4py import PETSc
 def parsePreprocessingArgs():
     """CLI surface for the centralized utils/preprocess.py entry point.
 
-    Conductivity is read from a CSV file (-sigma_file) instead of being
-    hard-coded in a per-case Python script. CSV layout (one row per
+    Conductivity is read from a text table (-sigma_file) instead of being
+    hard-coded in a per-case Python script. Whitespace layout (one row per
     material, 0-based row index = material id, comments allowed):
-        # sigma_x, sigma_y, sigma_z
-        0.1, 0.1, 0.1
-        1.0, 1.0, 1.0
+        # sigma_x sigma_y sigma_z
+        0.1 0.1 0.1
+        1.0 1.0 1.0
     """
     parser = argparse.ArgumentParser(
         description="Preprocess mesh, conductivity, receivers and sources into a "
@@ -29,7 +29,10 @@ def parsePreprocessingArgs():
     parser.add_argument("-case_dir",          type=str, required=True,
                         help="Directory containing case data (also output directory)")
     parser.add_argument("-mesh_filename",     type=str, required=True,
-                        help="Gmsh mesh filename inside case_dir")
+                        help="Mesh filename inside case_dir. Gmsh '.msh' or VTK "
+                             "'.vtk'/'.vtu' (tetrahedral); format auto-detected. "
+                             "Gmsh uses 'gmsh:physical' tags; VTK uses a material "
+                             "cell-data array (e.g. 'cell_scalars').")
     parser.add_argument("-receiver_filename", type=str, required=True,
                         help="Receivers text file (x y z per row) inside case_dir")
     parser.add_argument("-source_filename",   type=str, default=None,
@@ -38,23 +41,33 @@ def parsePreprocessingArgs():
                              "(Hz); subsequent lines = 'x y z current length dip "
                              "azimuth'. Required when -mode forward; optional "
                              "(skipped) when -mode inverse - the inverse kernel "
-                             "reads multi-frequency sources from /inv_sources/* "
+                             "reads multi-frequency sources from /sources/* "
                              "via -inv_source_filename.")
     parser.add_argument("-inv_source_filename", type=str, default=None,
                         help="Multi-frequency sources text file inside case_dir, "
                              "required when -mode inverse. Format: one row per "
                              "(freq, dipole) pair with 8 fields: "
                              "'freq x y z current length dip azimuth'. "
-                             "Embedded into the bundle under /inv_sources/*.")
+                             "Embedded into the bundle under /sources/*.")
     parser.add_argument("-observed_filename", type=str, default=None,
-                        help="Observed-data HDF5 inside case_dir, required when "
-                             "-mode inverse. Must contain /Ex [N_freq, N_recv] "
-                             "complex128 ({r,i} compound). Embedded into the "
-                             "bundle under /observed/Ex.")
+                        help="Observed-data file inside case_dir, required when "
+                             "-mode inverse. Either an HDF5 (.h5/.hdf5) with "
+                             "/Ex [N_freq, N_recv] complex128 ({r,i} compound), "
+                             "OR a raw MATLAB-style invEx.dat text file (parsed "
+                             "inline - no separate conversion step). Embedded "
+                             "into the bundle under /observed/Ex.")
+    parser.add_argument("-error_level", type=float, default=None,
+                        help="Amplitude-relative noise level written to the "
+                             "bundle's /observed @error_level (inverse mode). "
+                             "Overrides an HDF5 file's attribute; for a raw "
+                             "invEx.dat it is the only way to set it. Omit to "
+                             "leave the kernel default (overridable later with "
+                             "-inv_error_level).")
     parser.add_argument("-sigma_file",        type=str, required=True,
-                        help="CSV of per-material conductivity (sigma_x, sigma_y, "
-                             "sigma_z), relative to case_dir. Row index = 0-based "
-                             "material id (gmsh:physical - 1).")
+                        help="Whitespace text table of per-material conductivity "
+                             "(sigma_x sigma_y sigma_z [fixed]), relative to "
+                             "case_dir. Row index = 0-based material id "
+                             "(gmsh:physical - 1).")
     parser.add_argument("-input_filename",    type=str, default="input.h5",
                         help="Output bundle filename inside case_dir. Same name is "
                              "written into the params file as the kernel's "
@@ -70,16 +83,16 @@ def parsePreprocessingArgs():
     return parser.parse_args()
 
 
-def readSigmaCSV(path):
-    """Read per-material conductivity from a CSV file.
+def readSigmaTable(path):
+    """Read the per-material conductivity table (``sigmas.txt``).
 
-    Expected layout (comments allowed, blank lines allowed, 0-based row =
-    material id)::
+    Whitespace-delimited, one row per material (0-based row index = material
+    id = gmsh:physical - 1), ``#`` comments and blank lines allowed::
 
-        # sigma_x, sigma_y, sigma_z [, fixed]
-        0.1, 0.1, 0.1, 1     # fixed in inversion (e.g. air, ocean)
-        1.0, 1.0, 1.0, 0     # invertable
-        2.0, 2.0, 2.0        # 'fixed' column omitted -> defaults to 0
+        # sigma_x sigma_y sigma_z [fixed]
+        0.1 0.1 0.1 1     # fixed in inversion (e.g. air, ocean)
+        1.0 1.0 1.0 0     # invertable
+        2.0 2.0 2.0       # 'fixed' column omitted -> defaults to 0
 
     The 4th column (`fixed`) is optional and only meaningful for inverse
     modeling: a non-zero entry marks the material as held fixed during
@@ -88,20 +101,25 @@ def readSigmaCSV(path):
 
     Returns (sigma_x, sigma_y, sigma_z, fixed_ids) where fixed_ids is
     a sorted list of 0-based material IDs flagged as fixed (empty list
-    when the CSV has no 4th column).
+    when the table has no 4th column).
     """
-    data = np.loadtxt(path, delimiter=",", comments="#", ndmin=2)
-    if data.shape[1] not in (3, 4):
+    rows = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.split('#', 1)[0].strip()
+            if line:
+                rows.append([float(v) for v in line.split()])
+    if not rows:
+        raise ValueError(f"{path}: no material rows found")
+    ncol = len(rows[0])
+    if ncol not in (3, 4) or any(len(r) != ncol for r in rows):
         raise ValueError(
-            f"{path}: expected 3 or 4 columns (sigma_x, sigma_y, sigma_z[, fixed]), "
-            f"got {data.shape[1]}"
-        )
-    sx = data[:, 0].astype(float)
-    sy = data[:, 1].astype(float)
-    sz = data[:, 2].astype(float)
-    if data.shape[1] == 4:
-        fixed_flags = data[:, 3].astype(int)
-        fixed_ids = sorted(int(i) for i, f in enumerate(fixed_flags) if f)
+            f"{path}: expected 3 or 4 columns (sigma_x sigma_y sigma_z [fixed]) "
+            f"on every row")
+    data = np.asarray(rows, dtype=float)
+    sx, sy, sz = data[:, 0], data[:, 1], data[:, 2]
+    if ncol == 4:
+        fixed_ids = sorted(int(i) for i, f in enumerate(data[:, 3].astype(int)) if f)
     else:
         fixed_ids = []
     return sx, sy, sz, fixed_ids
@@ -139,63 +157,95 @@ def createDM(numDimensions, cells, coords, dm_view=False):
 
 
 def readSourcesText(path):
-    """Parse the forward-kernel source.txt:
-         (comments and blank lines allowed)
-         <freq>
-         x y z current length dip azimuth
-         ...
-    Returns (frequency, ndarray of shape (N, 7))."""
-    freq = None
-    rows = []
-    with open(path) as f:
-        for raw in f:
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-            if freq is None:
-                # First non-comment line: frequency (single float).
-                vals = line.split()
-                freq = float(vals[0])
-                continue
-            vals = line.split()
-            if len(vals) != 7:
-                raise ValueError(
-                    f"{path}: expected 7 fields per source row "
-                    f"(x y z current length dip azimuth), got {len(vals)}: {line!r}"
-                )
-            rows.append([float(v) for v in vals])
-    if freq is None or not rows:
-        raise ValueError(f"{path}: missing frequency or source rows")
-    return freq, np.asarray(rows, dtype=float)
+    """Parse a transmitter file into a unified ``(N, 8)`` array with columns
+    ``freq x y z current length dip azimuth`` (one row per transmitter).
 
+    Two on-disk layouts are accepted (auto-detected), so a single canonical
+    representation feeds both forward and inverse preprocessing:
 
-def readInverseSourcesText(path):
-    """Parse the inverse-kernel multi-frequency sources file.
+    1. **8-field** (canonical) - frequency on every row::
 
-    Format (comments '#' and blank lines allowed):
-        freq  x  y  z  current  length  dip  azimuth
-        ...
-    One row per (frequency, dipole) pair. Returns an (N, 8) ndarray with
-    columns in the same order as the file. The C kernel previously read
-    this format directly via setupInversionSources; we now parse it on
-    the Python side and embed the data in the bundle under /inv_sources/*.
+           freq x y z current length dip azimuth
+           ...
+
+    2. **Legacy forward** - a lone frequency line followed by 7-field rows::
+
+           <freq>
+           x y z current length dip azimuth
+           ...
+
+       parsed into the same ``(N, 8)`` shape with that frequency on each row.
+
+    Forward modeling uses a single (repeated) frequency with one or more
+    transmitters; inverse modeling carries one row per (frequency, dipole).
     """
-    rows = []
+    data_lines = []
     with open(path) as f:
         for raw in f:
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-            vals = line.split()
-            if len(vals) != 8:
-                raise ValueError(
-                    f"{path}: expected 8 fields per source row "
-                    f"(freq x y z current length dip azimuth), got {len(vals)}: {line!r}"
-                )
-            rows.append([float(v) for v in vals])
-    if not rows:
+            line = raw.split('#', 1)[0].strip()
+            if line:
+                data_lines.append(line.split())
+
+    if not data_lines:
         raise ValueError(f"{path}: no source rows found")
+
+    widths = {len(toks) for toks in data_lines}
+    if widths == {8}:
+        rows = [[float(v) for v in toks] for toks in data_lines]
+    elif data_lines[0] and len(data_lines[0]) == 1:
+        # Legacy: first line is the scalar frequency, rest are 7-field rows.
+        freq = float(data_lines[0][0])
+        rows = []
+        for toks in data_lines[1:]:
+            if len(toks) != 7:
+                raise ValueError(
+                    f"{path}: legacy format expects 7 fields per source row "
+                    f"(x y z current length dip azimuth), got {len(toks)}: {toks}")
+            rows.append([freq] + [float(v) for v in toks])
+        if not rows:
+            raise ValueError(f"{path}: frequency line but no source rows")
+    else:
+        raise ValueError(
+            f"{path}: unrecognized source format - use 8 fields per row "
+            f"(freq x y z current length dip azimuth) or a legacy "
+            f"<freq> header followed by 7-field rows; got column widths {widths}")
     return np.asarray(rows, dtype=float)
+
+
+# Inverse sources use the same unified (N, 8) layout; kept as an alias of
+# readSourcesText so existing callers keep working.
+def readInverseSourcesText(path):
+    """Alias of :func:`readSourcesText` (unified 8-field source format)."""
+    return readSourcesText(path)
+
+
+def readInvExDat(path):
+    """Parse a MATLAB-style ``invEx.dat`` observed-data text file.
+
+    Format (one row per frequency)::
+
+        freq_label  Re(Ex_1) Im(Ex_1)  Re(Ex_2) Im(Ex_2)  ...  Re(Ex_N) Im(Ex_N)
+
+    The leading frequency label is dropped (the bundle's frequencies come
+    from the inversion sources file); the remaining Re/Im pairs build the
+    ``[N_freq, N_recv]`` complex array.  Returns ``(Ex, None)`` to mirror
+    :func:`readObservedDataH5` - a raw .dat carries no error-level attribute,
+    so the noise level is supplied separately (``-error_level`` /
+    ``-inv_error_level``) or left to the kernel default.
+
+    Folding this in lets ``preprocess.py`` consume ``invEx.dat`` directly, so
+    no separate convert-to-HDF5 step is required (the standalone
+    ``utils/convert_invex_to_hdf5.py`` remains available for producing a
+    reusable .h5).
+    """
+    data = np.loadtxt(path, comments="#", ndmin=2)
+    values = data[:, 1:]                       # drop the freq label column
+    if values.shape[1] % 2 != 0:
+        raise ValueError(
+            f"{path}: expected an even number of data columns "
+            f"(Re/Im pairs), got {values.shape[1]}")
+    ex = values[:, 0::2] + 1j * values[:, 1::2]
+    return ex.astype(np.complex128), None
 
 
 def readObservedDataH5(path):
@@ -227,17 +277,17 @@ def readObservedDataH5(path):
     return data, error_level
 
 
-def writeInversionPayload(filename, inv_sources_arr, observed_Ex,
+def writeInversionPayload(filename, observed_Ex,
                           error_level=None, fixed_materials=()):
-    """Append the inverse-kernel payload to an existing PETGEM bundle.
+    """Append the inverse-only payload to an existing PETGEM bundle.
 
-    Called after writePetgemInputFile (which writes the mesh + sigma +
-    receivers + forward sources). Uses h5py to append because /observed/Ex
-    is an HDF5 compound complex128 - easier to express directly than via
-    the PETSc viewer.
+    Called after writePetgemInputFile, which already wrote the unified
+    /sources group (per-entry frequency) shared by both modes. This adds
+    only the data that has no forward counterpart. Uses h5py to append
+    because /observed/Ex is an HDF5 compound complex128 - easier to express
+    directly than via the PETSc viewer.
 
     Bundle additions:
-        /inv_sources/{freq, position, current, length, dipAngle, azimuthAngle}
         /observed/Ex                          (HDF5 compound complex128)
         /observed @error_level                (HDF5 group attribute, float64; omitted if None)
         /inv_meta/fixed_materials             (int32[], 0-based material ids; omitted if empty)
@@ -246,8 +296,6 @@ def writeInversionPayload(filename, inv_sources_arr, observed_Ex,
     ----------
     filename : str
         Bundle path (writes append-mode).
-    inv_sources_arr : ndarray (N_freq, 8)
-        Columns = [freq, x, y, z, current, length, dipAngle, azimuthAngle].
     observed_Ex : ndarray (N_freq, N_recv), complex
         Per (freq, receiver) observed Ex.
     error_level : float or None
@@ -260,17 +308,7 @@ def writeInversionPayload(filename, inv_sources_arr, observed_Ex,
         C kernel (overridable with -inv_fixed_materials).  Skipped when
         empty.
     """
-    inv = np.asarray(inv_sources_arr, dtype=float)
-    if inv.ndim != 2 or inv.shape[1] != 8:
-        raise ValueError(f"inv_sources_arr must be (N, 8), got {inv.shape}")
     ex  = np.asarray(observed_Ex, dtype=np.complex128)
-    n_freq = inv.shape[0]
-    if ex.shape[0] != n_freq:
-        raise ValueError(
-            f"observed_Ex.shape[0]={ex.shape[0]} disagrees with "
-            f"inv_sources rows={n_freq}"
-        )
-
     fixed_arr = np.asarray(sorted(set(int(i) for i in fixed_materials)),
                            dtype=np.int32)
 
@@ -278,17 +316,6 @@ def writeInversionPayload(filename, inv_sources_arr, observed_Ex,
         for grp in ("/inv_sources", "/observed", "/inv_meta"):
             if grp in f:
                 del f[grp]
-
-        g = f.create_group("/inv_sources")
-        # Stored as plain float64 datasets, one per field.  The C reader
-        # uses raw H5Dread (not VecLoad) because PETSc complex builds
-        # reject "real"-marked datasets that lack the `complex` attribute.
-        g.create_dataset("freq",         data=inv[:, 0].astype(np.float64))
-        g.create_dataset("position",     data=inv[:, 1:4].reshape(-1).astype(np.float64))
-        g.create_dataset("current",      data=inv[:, 4].astype(np.float64))
-        g.create_dataset("length",       data=inv[:, 5].astype(np.float64))
-        g.create_dataset("dipAngle",     data=inv[:, 6].astype(np.float64))
-        g.create_dataset("azimuthAngle", data=inv[:, 7].astype(np.float64))
 
         obs = f.create_group("/observed")
         # Compound complex128 ({r,i} float64) - matches what
@@ -340,7 +367,7 @@ def _writeVTKFields(cells, coords, conductivity, materials_id, output_vtk):
 
 
 def writePetgemInputFile(plex, conductivity, materials_id,
-                         receivers_arr, freq, sources_arr, nord,
+                         receivers_arr, sources8, nord,
                          output_filename, cells=None, coords=None,
                          output_vtk=None):
     """Write the unified PETGEM input file.
@@ -350,10 +377,10 @@ def writePetgemInputFile(plex, conductivity, materials_id,
                             (HDF5_PETSC format, written via DMPlex *View routines)
       /receivers           Vec, length 3*N_recv, layout [x0 y0 z0 x1 y1 z1 ...]
       /nord                Vec, length 1 - polynomial order used to size the case
-      /sources/...         OPTIONAL - written only when both `freq` and
-                            `sources_arr` are non-None (typical for forward
-                            modeling; inverse mode skips the group and relies
-                            on /inv_sources/* added later by writeInversionPayload).
+      /sources/...         transmitters, one entry per row of `sources8`
+                            (per-entry frequency). Same group for forward and
+                            inverse; inverse adds /observed and /inv_meta later
+                            via writeInversionPayload.
 
     Parameters
     ----------
@@ -361,10 +388,11 @@ def writePetgemInputFile(plex, conductivity, materials_id,
     conductivity  : ndarray (num_cells, dim) - sigma_x, sigma_y, sigma_z per cell
     materials_id  : ndarray (num_cells,)     - integer material id per cell
     receivers_arr : ndarray (num_recv, 3)    - receiver positions
-    freq          : float or None            - single source frequency (Hz);
-                                                None skips the /sources/* group
-    sources_arr   : ndarray (num_src, 7) or None - x y z current length dip azimuth;
-                                                   None skips the /sources/* group
+    sources8      : ndarray (num_src, 8) or None - one transmitter per row,
+                    columns freq x y z current length dip azimuth. Forward uses
+                    one (repeated) frequency with one or more transmitters;
+                    inverse carries one row per (frequency, dipole). None skips
+                    the /sources group.
     output_filename : path to the unified .h5 file
     cells, coords : ndarrays - required when output_vtk is set (passed to meshio)
     output_vtk    : optional VTU filename for conductivity+materials_id view
@@ -407,17 +435,22 @@ def writePetgemInputFile(plex, conductivity, materials_id,
     # reads it from here to annotate figures and pick the right responses.
     _writeArrayAsVec(viewer, np.array([nord], dtype=float), "nord")
 
-    # Sources (under /sources group) - only written when forward sources
-    # are supplied. The inverse kernel skips this group (it consumes
-    # multi-frequency sources from /inv_sources/* added later).
-    if freq is not None and sources_arr is not None:
+    # Sources (under /sources group) - unified per-entry layout for both
+    # forward and inverse. Each row of sources8 is one transmitter; the
+    # frequency is stored per entry (forward repeats a single frequency).
+    if sources8 is not None:
+        s = np.asarray(sources8, dtype=float)
+        if s.ndim != 2 or s.shape[1] != 8:
+            raise ValueError(
+                f"sources8 must be (N, 8) [freq x y z current length dip "
+                f"azimuth], got shape {s.shape}")
         viewer.pushGroup("/sources")
-        _writeArrayAsVec(viewer, np.array([freq], dtype=float),    "frequency")
-        _writeArrayAsVec(viewer, sources_arr[:, 0:3].reshape(-1),  "position")
-        _writeArrayAsVec(viewer, sources_arr[:, 3],                "current")
-        _writeArrayAsVec(viewer, sources_arr[:, 4],                "length")
-        _writeArrayAsVec(viewer, sources_arr[:, 5],                "dipAngle")
-        _writeArrayAsVec(viewer, sources_arr[:, 6],                "azimuthAngle")
+        _writeArrayAsVec(viewer, s[:, 0],               "freq")
+        _writeArrayAsVec(viewer, s[:, 1:4].reshape(-1), "position")
+        _writeArrayAsVec(viewer, s[:, 4],               "current")
+        _writeArrayAsVec(viewer, s[:, 5],               "length")
+        _writeArrayAsVec(viewer, s[:, 6],               "dipAngle")
+        _writeArrayAsVec(viewer, s[:, 7],               "azimuthAngle")
         viewer.popGroup()
 
     viewer.destroy()
@@ -454,7 +487,7 @@ def writeInverseModelingParamsFile(nord, output_dir, output_filename,
                                    input_filename, params_filename):
     """Emit the im.csem params file. The inverse kernel now reads EVERYTHING
     case-specific from `input_filename` - multi-frequency sources
-    (/inv_sources/*), observed Ex (/observed/Ex), the noise level
+    (/sources/*), observed Ex (/observed/Ex), the noise level
     (/observed @error_level) and the fixed-material list
     (/inv_meta/fixed_materials).  The emitted params.txt only carries
     runtime/tuning knobs; -inv_error_level and -inv_fixed_materials are
@@ -483,6 +516,60 @@ def writeInverseModelingParamsFile(nord, output_dir, output_filename,
         f.write(content)
 
 
+def _loadXYZText(path):
+    """Load an ``x y z`` table from a text file, tolerant of the delimiter.
+
+    Accepts whitespace- or comma-separated columns (or a mix), allows ``#``
+    comments and blank lines.  Returns an ``(N, 3)`` float ndarray.  This is
+    more forgiving than ``np.loadtxt`` (whitespace-only), so receiver files
+    exported from MATLAB/other tools (often comma-separated) load directly
+    without a manual conversion step.
+    """
+    rows = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.split('#', 1)[0].strip()
+            if not line:
+                continue
+            rows.append([float(tok) for tok in line.replace(',', ' ').split()])
+    return np.asarray(rows, dtype=float)
+
+
+def _extractTetraMaterial(mesh, tetra_idx, path):
+    """Return the 0-based per-tetra material id from a meshio mesh.
+
+    Two input conventions are supported transparently so the preprocess
+    stage accepts both Gmsh ``.msh`` and VTK ``.vtk``/``.vtu`` meshes:
+
+    * Gmsh: the canonical 1-based ``gmsh:physical`` tag is used as before
+      (``id = tag - 1``), preserving existing behaviour exactly.
+    * VTK: an arbitrary integer cell-data array (auto-detected, commonly
+      ``cell_scalars``) carries region codes that need not be contiguous
+      or 0-based (e.g. ``{10, 20, 30, 40}``). ``np.unique`` maps the
+      distinct codes to a sorted 0-based index, so sigma-table row ``i``
+      corresponds to the ``i``-th smallest code.
+
+    Returns ``(materials_id, codes)`` where ``codes`` is the sorted array of
+    distinct VTK material codes (for a remap report) or ``None`` for the
+    Gmsh path.
+    """
+    cdd = mesh.cell_data_dict
+    if "gmsh:physical" in cdd and "tetra" in cdd["gmsh:physical"]:
+        mat = np.asarray(cdd["gmsh:physical"]["tetra"]).reshape(-1).astype(int) - 1
+        return mat, None
+
+    candidates = ("cell_scalars", "materials_id", "material_id", "MaterialID",
+                  "material", "CellEntityIds")
+    name = next((n for n in candidates if n in mesh.cell_data), None)
+    if name is None:
+        raise ValueError(
+            f"{path}: no material cell-data array found (looked for "
+            f"{candidates}; available {list(mesh.cell_data.keys())}).")
+    raw = np.asarray(mesh.cell_data[name][tetra_idx]).reshape(-1)
+    codes, mat = np.unique(raw, return_inverse=True)
+    return mat.astype(int), codes
+
+
 def runPreprocessing(*, mode, nord, case_dir,
                      mesh_filename, receiver_filename, source_filename=None,
                      sigma_x, sigma_y, sigma_z,
@@ -491,6 +578,7 @@ def runPreprocessing(*, mode, nord, case_dir,
                      params_filename="params.txt",
                      inv_source_filename=None,
                      observed_filename=None,
+                     error_level=None,
                      output_vtk=None, dm_view=False):
     """Shared preprocessing pipeline for the PETGEM forward / inverse kernels.
 
@@ -539,7 +627,7 @@ def runPreprocessing(*, mode, nord, case_dir,
             raise ValueError(
                 "runPreprocessing: -source_filename is forward-mode only. "
                 "The inverse kernel reads multi-freq sources from "
-                "/inv_sources/* in the bundle; pass -inv_source_filename "
+                "/sources/* in the bundle; pass -inv_source_filename "
                 "instead.")
         if inv_source_filename is None:
             raise ValueError("runPreprocessing: -inv_source_filename is required "
@@ -584,20 +672,43 @@ def runPreprocessing(*, mode, nord, case_dir,
     print(f"  Output bundle          : {output_filename}")
     print(f"\n  Number of materials    : {len(sigma_x)}")
 
-    # 1. Import mesh
+    # 1. Import mesh (Gmsh .msh or VTK .vtk/.vtu - meshio auto-detects the
+    #    format from the extension/header). PETGEM is tetrahedral-only, so
+    #    select the tetra connectivity block explicitly (a VTK/Gmsh file may
+    #    also carry lower-dimensional triangle/line blocks).
     print("\nReading mesh")
     mesh = meshio.read(input_mesh_filename)
-    num_cells = sum(block.data.shape[0] for block in mesh.cells)
     coords = mesh.points
+    tetra_idx = next((i for i, b in enumerate(mesh.cells) if b.type == "tetra"),
+                     None)
+    if tetra_idx is None:
+        raise ValueError(
+            f"{input_mesh_filename}: no tetrahedral cell block found "
+            f"(blocks: {[b.type for b in mesh.cells]}); PETGEM is tetra-only.")
+    cells = mesh.cells[tetra_idx].data
+    num_cells = cells.shape[0]
     print(f"  Total elements          : {num_cells}")
     print(f"  Total vertices          : {coords.shape[0]}")
-    cells = mesh.cells[-1].data  # last block: tetrahedra
 
-    # 2. Per-cell conductivity from gmsh:physical
+    # 2. Per-cell conductivity from the material id (Gmsh gmsh:physical or a
+    #    VTK cell-data array; see _extractTetraMaterial).
     print("\nAssigning conductivity per cell")
+    materials_id, codes = _extractTetraMaterial(mesh, tetra_idx,
+                                                input_mesh_filename)
+    nmat = len(sigma_x)
+    if codes is not None:
+        counts = np.bincount(materials_id, minlength=len(codes))
+        print("  Material codes -> rows  : " + ", ".join(
+            f"{int(c)}->{i} ({int(n)} cells)"
+            for i, (c, n) in enumerate(zip(codes, counts))))
+    mn, mx = int(materials_id.min()), int(materials_id.max())
+    if mn < 0 or mx >= nmat:
+        raise ValueError(
+            f"{input_mesh_filename}: material ids span [{mn},{mx}] but "
+            f"-sigma_file has {nmat} row(s) (need ids in [0,{nmat - 1}]). "
+            f"For VTK, sigma row i = i-th smallest material code; for Gmsh, "
+            f"row i = physical tag (i+1).")
     conductivity = np.zeros((num_cells, NUM_DIMENSIONS), dtype=float)
-    materials_id = np.copy(mesh.cell_data_dict["gmsh:physical"]["tetra"])
-    materials_id -= 1  # 1-based -> 0-based
     conductivity[:, 0] = sigma_x[materials_id]
     conductivity[:, 1] = sigma_y[materials_id]
     conductivity[:, 2] = sigma_z[materials_id]
@@ -605,7 +716,7 @@ def runPreprocessing(*, mode, nord, case_dir,
 
     # 3. Receivers (text → ndarray)
     print("\nReading receivers")
-    receivers_arr = np.loadtxt(input_receivers_filename, comments='#')
+    receivers_arr = _loadXYZText(input_receivers_filename)
     if receivers_arr.ndim == 1:
         receivers_arr = receivers_arr.reshape(1, -1)
     if receivers_arr.shape[1] != NUM_DIMENSIONS:
@@ -615,26 +726,25 @@ def runPreprocessing(*, mode, nord, case_dir,
         )
     print(f"  Number of receivers     : {receivers_arr.shape[0]}")
 
-    # 4. Sources (text → freq + ndarray of 7-col rows).
-    # Skipped when no forward source file is provided (typical for
-    # inverse-mode preprocessing - the kernel pulls multi-frequency
-    # records from /inv_sources/* instead and ignores /sources/*).
-    if input_sources_filename is not None:
-        print("\nReading sources")
-        freq, sources_arr = readSourcesText(input_sources_filename)
-        print(f"  Source frequency (Hz)   : {freq}")
-        print(f"  Number of sources       : {sources_arr.shape[0]}")
-    else:
-        freq, sources_arr = None, None
+    # 4. Sources (text → unified (N, 8) [freq x y z current length dip az]).
+    # The same /sources group is written for both modes; forward repeats a
+    # single frequency across its transmitters, inverse carries one row per
+    # (frequency, dipole).
+    src_path = input_sources_filename if mode == "forward" else input_inv_sources_filename
+    print("\nReading sources")
+    sources8 = readSourcesText(src_path)
+    uniq_freqs = np.unique(sources8[:, 0])
+    print(f"  Transmitters            : {sources8.shape[0]}")
+    print(f"  Frequencies (Hz)        : {uniq_freqs.tolist()}")
 
     # 5. Build the DMPlex
     print("\nCreating PETSc DM (DMPlex)")
     plex = createDM(NUM_DIMENSIONS, cells, coords, dm_view=dm_view)
 
-    # 6. Write the unified bundle
+    # 6. Write the unified bundle (mesh + model + receivers + /sources)
     print("\nWriting unified PETGEM input HDF5")
     writePetgemInputFile(plex, conductivity, materials_id,
-                         receivers_arr, freq, sources_arr, nord,
+                         receivers_arr, sources8, nord,
                          output_filename,
                          cells=cells, coords=coords,
                          output_vtk=output_vtk_filename)
@@ -642,23 +752,32 @@ def runPreprocessing(*, mode, nord, case_dir,
     if output_vtk_filename:
         print(f"  VTU view  : {output_vtk_filename}")
 
-    # 6b. Inverse-mode payload: append /inv_sources/* and /observed/Ex
+    # 6b. Inverse-only payload: append /observed/Ex and /inv_meta.
+    # (The sources already live in the unified /sources group above.)
     if mode == "inverse":
-        print("\nReading inversion sources")
-        inv_sources_arr = readInverseSourcesText(input_inv_sources_filename)
-        print(f"  Number of (freq, dipole) records: {inv_sources_arr.shape[0]}")
-
         print("\nReading observed data")
-        observed_Ex, observed_error_level = readObservedDataH5(input_observed_filename)
+        # Accept either a prebuilt HDF5 (.h5/.hdf5) or a raw MATLAB-style
+        # invEx.dat text file - the .dat is parsed inline, so no separate
+        # convert-to-HDF5 step is needed.
+        if input_observed_filename.lower().endswith((".h5", ".hdf5")):
+            observed_Ex, file_error_level = readObservedDataH5(input_observed_filename)
+            src_kind = "HDF5"
+        else:
+            observed_Ex, file_error_level = readInvExDat(input_observed_filename)
+            src_kind = "invEx.dat (text)"
+        # -error_level on the CLI overrides the file's attribute (and is the
+        # only way to set it for a raw .dat).
+        observed_error_level = error_level if error_level is not None else file_error_level
+        print(f"  Observed source         : {src_kind}")
         print(f"  Observed Ex shape       : {observed_Ex.shape}  (N_freq, N_recv)")
-        print(f"  Error level (from attr) : "
+        print(f"  Error level             : "
               f"{observed_error_level if observed_error_level is not None else '(absent, kernel default)'}")
 
-        n_freq_src = inv_sources_arr.shape[0]
+        n_freq_src = sources8.shape[0]
         n_freq_obs = observed_Ex.shape[0]
         if n_freq_src != n_freq_obs:
             raise ValueError(
-                f"Mismatch between inversion sources rows ({n_freq_src}) and "
+                f"Mismatch between source rows ({n_freq_src}) and "
                 f"observed Ex frequencies ({n_freq_obs})"
             )
         if observed_Ex.shape[1] != receivers_arr.shape[0]:
@@ -669,11 +788,11 @@ def runPreprocessing(*, mode, nord, case_dir,
 
         print("\nEmbedding inverse payload into bundle")
         if fixed_materials:
-            print(f"  Fixed material IDs       : {list(fixed_materials)} (from sigmas.csv)")
-        writeInversionPayload(output_filename, inv_sources_arr, observed_Ex,
+            print(f"  Fixed material IDs       : {list(fixed_materials)} (from sigmas.txt)")
+        writeInversionPayload(output_filename, observed_Ex,
                               error_level=observed_error_level,
                               fixed_materials=fixed_materials)
-        print(f"  Wrote /inv_sources/*, /observed/Ex, /inv_meta/fixed_materials "
+        print(f"  Wrote /observed/Ex, /inv_meta/fixed_materials "
               f"into {output_filename}")
 
     # 7. Params file
@@ -698,9 +817,10 @@ def readBundle(filename):
 
       receivers : (N_recv, 3) ndarray of receiver positions (real-valued)
       nord      : int polynomial order
-      frequency : float source frequency (Hz)
-      sources   : (N_src, 7) ndarray, columns =
-                  [x, y, z, current, length, dipAngle, azimuthAngle]
+      frequency : float - first transmitter frequency (Hz); for a single-
+                  frequency forward case this is the operating frequency
+      sources   : (N_src, 8) ndarray, columns =
+                  [freq, x, y, z, current, length, dipAngle, azimuthAngle]
 
     The DMPlex / model_data fields inside the bundle are not returned -
     those are consumed by the C kernel via loadCsemInputs. This loader is
@@ -712,20 +832,19 @@ def readBundle(filename):
     nord_arr = readVectorH5(filename, 'nord')
     nord = int(round(float(np.real(np.array(nord_arr)).flatten()[0])))
 
-    freq_arr = readVectorH5(filename, 'frequency', group='/sources')
-    frequency = float(np.real(np.array(freq_arr)).flatten()[0])
-
+    # Unified /sources group: per-entry frequency.
+    freq    = np.real(np.array(readVectorH5(filename, 'freq',         group='/sources'))).reshape(-1)
     pos     = np.real(np.array(readVectorH5(filename, 'position',     group='/sources'))).reshape(-1, 3)
     current = np.real(np.array(readVectorH5(filename, 'current',      group='/sources'))).reshape(-1)
     length  = np.real(np.array(readVectorH5(filename, 'length',       group='/sources'))).reshape(-1)
     dip     = np.real(np.array(readVectorH5(filename, 'dipAngle',     group='/sources'))).reshape(-1)
     az      = np.real(np.array(readVectorH5(filename, 'azimuthAngle', group='/sources'))).reshape(-1)
-    sources = np.column_stack([pos, current, length, dip, az])
+    sources = np.column_stack([freq, pos, current, length, dip, az])
 
     return {
         'receivers': receivers,
         'nord':      nord,
-        'frequency': frequency,
+        'frequency': float(freq[0]),
         'sources':   sources,
     }
 

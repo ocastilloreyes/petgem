@@ -52,7 +52,7 @@ order (``1`` through ``6``) by modifying the ``NORD`` variable:
       -mesh_filename mesh_p${NORD}.msh \
       -receiver_filename receivers.txt \
       -source_filename sources.txt \
-      -sigma_file sigmas.csv \
+      -sigma_file sigmas.txt \
       -input_filename input_p${NORD}.h5 \
       -params_filename params_p${NORD}.txt \
       -output_vtk model.vtu
@@ -165,7 +165,7 @@ execution exercised in CI.
        -mesh_filename mesh_p${NORD}.msh \
        -receiver_filename receivers.txt \
        -source_filename sources.txt \
-       -sigma_file sigmas.csv \
+       -sigma_file sigmas.txt \
        -input_filename input_p${NORD}.h5 \
        -params_filename params_p${NORD}.txt
 

@@ -174,7 +174,7 @@ def run_pipeline_for_nord(repo_root, fm_csem_binary, case_workspace, nord,
         "-mesh_filename", f"mesh_p{nord}.msh",
         "-source_filename", "sources.txt",
         "-receiver_filename", "receivers.txt",
-        "-sigma_file", "sigmas.csv",
+        "-sigma_file", "sigmas.txt",
         "-input_filename", bundle_name,
         "-params_filename", params_name,
     ]

@@ -17,7 +17,7 @@ The typical workflow for CSEM forward modeling in **PETGEM** consists of the
 following steps (the shared stages are described in :doc:`overview`):
 
 1. Generate or import a mesh using `Gmsh <http://gmsh.info/>`_.
-2. Define the subsurface conductivity model in ``sigmas.csv``.
+2. Define the subsurface conductivity model in ``sigmas.txt``.
 3. Run ``utils/preprocess.py -mode forward`` to produce the input bundle and
    the parameter file.
 4. Execute the CSEM kernel (``fm.csem``) to perform the forward simulation.

@@ -56,7 +56,7 @@ typedef struct {
   /* Fixed material IDs: cells whose material_id matches one of these values
    * are excluded from gradient smoothing (treated as self-referencing).
    * Defaults come from the bundle's /inv_meta/fixed_materials dataset
-   * (written by the preprocess from sigmas.csv's `fixed` column);
+   * (written by the preprocess from sigmas.txt's `fixed` column);
    * -inv_fixed_materials on the CLI is an override.                       */
   PetscInt  numFixedMaterials;                     /* number of fixed IDs    */
   PetscInt  fixedMaterials[INV_MAX_FIXED_MATERIALS]; /* fixed material ID list */
@@ -66,7 +66,7 @@ typedef struct {
   PetscBool errorLevelFromCLI;
   PetscBool fixedMaterialsFromCLI;
 
-  /* Source-frequency pairs loaded from the unified bundle's /inv_sources
+  /* Source-frequency pairs loaded from the unified bundle's /sources
    * group (freq, position, current, length, dipAngle, azimuthAngle).
    * Populated by setupInversionSources.  Each entry's frequency lives in
    * invSources[i].freq; no separate frequency array is kept.            */
@@ -82,6 +82,12 @@ typedef struct {
    * ratios (FD approx / adjoint G[i]), then skips L-BFGS.  Production
    * runs leave this at 0; enable via -inv_dev_fd_check N. */
   PetscInt  fdCheckCells;                          /* 0 = disabled           */
+
+  /* Diagnostic: disable BOTH smoothers (model recovery + gradient) for the
+   * whole run. Lets a multi-rank nord>=2 inversion be compared with/without
+   * smoothing to separate a gradient-side artifact from a smoother/
+   * regularization-coupling one. Enable via -inv_no_smoother. */
+  PetscBool smootherOff;                           /* PETSC_FALSE = smoothing on */
 } invParams;
 
 /* ------------------------------------------------------------------ */
@@ -149,6 +155,12 @@ typedef struct {
    * self-consistent objective F(sigma(X,X0)) vs its true adjoint gradient. */
   PetscBool                       bypassSmoother;
 
+  /* Phase timers accumulated across all objgrad evaluations (seconds), so
+   * im.csem can report an Assembly/Solver breakdown consistent with
+   * fm.csem instead of lumping the whole inversion into one bucket. */
+  PetscLogDouble                  tAssembly;   /* Ms refill + A = K - iwu*Ms     */
+  PetscLogDouble                  tSolver;     /* factorize + fwd/adjoint solves */
+
   /* ---- Pre-allocated workspace ----
    * Owned by setupInversionWorkspace; freed by destroyInversionWorkspace.
    * All fields below are populated once before the L-BFGS loop and reused
@@ -213,7 +225,7 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
                                             invParams  *iparams);
 
 /* Load multi-frequency inversion sources from the unified bundle's
- * /inv_sources group (replaces the legacy text-file format).
+ * /sources group (replaces the legacy text-file format).
  * `bundleFile` is the same HDF5 path consumed by loadCsemInputs.
  * Populates iparams->numFreqs and invSources[]. */
 PetscErrorCode setupInversionSources(const char *bundleFile,
@@ -331,7 +343,9 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
                                 const Grid       *grid,
                                 Vec               conductivity,
                                 Vec               materialsID,
-                                Vec               receivers);
+                                Vec               receivers,
+                                PetscLogDouble   *tAssemblyOut,
+                                PetscLogDouble   *tSolverOut);
 
 /* Free NeighborGraph memory */
 PetscErrorCode destroyNeighborGraph(NeighborGraph *graph);

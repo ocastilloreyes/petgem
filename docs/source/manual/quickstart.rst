@@ -40,7 +40,7 @@ Run the canonical forward example
       -mesh_filename mesh_p${NORD}.msh \
       -receiver_filename receivers.txt \
       -source_filename sources.txt \
-      -sigma_file sigmas.csv \
+      -sigma_file sigmas.txt \
       -input_filename input_p${NORD}.h5 \
       -params_filename params_p${NORD}.txt
 
