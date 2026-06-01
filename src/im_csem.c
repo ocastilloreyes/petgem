@@ -72,8 +72,7 @@ int runInverse(int argc, char **argv)
   PetscMPIInt     rank, size;
   DM              dm;
   Vec             resistivity, materials_id, receivers;
-  csemParams      params;
-  invParams       iparams;
+  imParams        iparams;   /* embeds the shared fmParams base as iparams.fm */
   Grid            grid;
   PetscLogDouble  timers[7];
   PetscLogDouble  start_timer, end_timer;
@@ -114,9 +113,20 @@ int runInverse(int argc, char **argv)
   Extrae_event(1000, 3);
 #endif
 
+  PetscLogStage stage_parse, stage_load, stage_grid;
+  PetscLogStage stage_assembly, stage_solve, stage_postproc;
+  PetscCall(PetscLogStageRegister("Read parameters",       &stage_parse));
+  PetscCall(PetscLogStageRegister("Load input bundle",     &stage_load));
+  PetscCall(PetscLogStageRegister("Setup grid",            &stage_grid));
+  PetscCall(PetscLogStageRegister("Assembly",              &stage_assembly));
+  PetscCall(PetscLogStageRegister("Linear solve",          &stage_solve));
+  PetscCall(PetscLogStageRegister("Field interpolation",   &stage_postproc));
+
+  PetscCall(PetscLogStagePush(stage_parse));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(readCsemParams(size, &params));
+  PetscCall(readfmParams(size, &iparams.fm));
   PetscCall(PetscTime(&end_timer));
+  PetscCall(PetscLogStagePop());
   timers[0] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
@@ -128,16 +138,11 @@ int runInverse(int argc, char **argv)
   /* ---------------------------------------------------------------- */
   PetscCall(readInversionParams(&iparams));
 
-  /* Stash the bundle path on iparams so runCsemInversion can load
-   * /observed/Ex from the same file (avoids threading params into the
-   * inversion driver). */
-  PetscCall(PetscStrncpy(iparams.bundleFile, params.inputFile,
-                         sizeof(iparams.bundleFile)));
-
   /* Pull case-property defaults out of the bundle (error_level,
    * fixed_materials) - CLI overrides applied by readInversionParams
-   * already take precedence via the *FromCLI provenance flags. */
-  PetscCall(loadInversionMetaFromBundle(iparams.bundleFile, &iparams));
+   * already take precedence via the *FromCLI provenance flags. The bundle
+   * path is the shared base's input file (iparams.fm.inputFile). */
+  PetscCall(loadInversionMetaFromBundle(iparams.fm.inputFile, &iparams));
 
   /* ---------------------------------------------------------------- */
   /* Load unified PETGEM input: mesh + sigma + materials_id +          */
@@ -152,15 +157,15 @@ int runInverse(int argc, char **argv)
   Extrae_event(1000, 5);
 #endif
 
+  PetscCall(PetscLogStagePush(stage_load));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(loadCsemInputs(&params, &dm, &resistivity, &materials_id,
+  PetscCall(loadCsemInputs(&iparams.fm, &dm, &resistivity, &materials_id,
                            NULL,           /* no forward CsemSourceSet; setupInversionSources reads /sources */
                            &receivers));
-  /* Sync the basis order into invParams: the bundle's /nord (read by
-   * loadCsemInputs into params.nord) is the source of truth, unless the
-   * user supplied -nord on the command line (handled in readInversionParams). */
-  if (iparams.nord == 0) iparams.nord = params.nord;
+  /* Basis order is now single-source: loadCsemInputs fills iparams.fm.nord
+   * from the bundle's /nord when the user did not pass -nord (sentinel 0). */
   PetscCall(PetscTime(&end_timer));
+  PetscCall(PetscLogStagePop());
   timers[2] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
@@ -174,9 +179,11 @@ int runInverse(int argc, char **argv)
   Extrae_event(1000, 4);
 #endif
 
+  PetscCall(PetscLogStagePush(stage_load));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(setupInversionSources(params.inputFile, &iparams));
+  PetscCall(setupInversionSources(iparams.fm.inputFile, &iparams));
   PetscCall(PetscTime(&end_timer));
+  PetscCall(PetscLogStagePop());
   timers[1] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
@@ -190,9 +197,11 @@ int runInverse(int argc, char **argv)
   Extrae_event(1000, 6);
 #endif
 
+  PetscCall(PetscLogStagePush(stage_grid));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(setupCsemGrid(params, &dm, &grid));
+  PetscCall(setupCsemGrid(iparams.fm, &dm, &grid));
   PetscCall(PetscTime(&end_timer));
+  PetscCall(PetscLogStagePop());
   timers[3] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
@@ -207,11 +216,18 @@ int runInverse(int argc, char **argv)
 #endif
 
   PetscLogDouble tAssembly = 0.0, tSolver = 0.0;
+  /* The inversion driver internally pushes its own Assembly + Solve sub-
+   * stages via runCsemInversion's PetscLogEventBegin/End on every L-BFGS
+   * callback; here we wrap the whole driver as the "Linear solve" outer
+   * stage so -log_view's hierarchy mirrors what the user sees in the
+   * printTimers table (timers[4]/[5] are populated from tAssembly/tSolver). */
+  PetscCall(PetscLogStagePush(stage_solve));
   PetscCall(PetscTime(&start_timer));
   PetscCall(runCsemInversion(&iparams,
                               dm, &grid, resistivity, materials_id,
                               receivers, &tAssembly, &tSolver));
   PetscCall(PetscTime(&end_timer));
+  PetscCall(PetscLogStagePop());
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -236,7 +252,6 @@ int runInverse(int argc, char **argv)
   /* ---------------------------------------------------------------- */
   /* Free memory                                                       */
   /* ---------------------------------------------------------------- */
-  PetscCall(DMDestroy(&grid.H1dm));
   PetscCall(DMDestroy(&grid.H1dm_Pnord));
   PetscCall(DMDestroy(&dm));
   PetscCall(VecDestroy(&resistivity));

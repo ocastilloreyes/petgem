@@ -15,7 +15,7 @@ petgem.readResponses; only the comparison + plot live here.
 
 Usage:
     python3 tests/cases/csem_model/postprocess.py \\
-        -responses_filename responses_p1_src1.h5 \\
+        -responses_filename responses_p1.h5 \\
         [-case_dir tests/cases/csem_model]   \\  # default: directory of this script
         [-input_filename input.h5] \\
         [-reference_filename reference.h5] \\

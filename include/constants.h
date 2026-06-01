@@ -12,34 +12,40 @@
 
 #include <petsc.h>
 
-/* Physical constants */
+/** @brief Magnetic permeability of free space μ₀ (H/m). */
 #define MU (4.0 * PETSC_PI * 1.0e-7)
 
-/* Reference cell */
-#define NUM_FACES_PER_CELL 4
-#define NUM_EDGES_PER_CELL 6
-#define NUM_VERTICES_PER_CELL 4
-#define NUM_EDGES_PER_FACE 3
-#define NUM_VERTICES_PER_EDGE 2
-#define NUM_VERTICES_PER_FACE 3
-#define NUM_DIMENSIONS 3
-#define NUM_H1_DOF_PER_CELL 4
-#define NUM_CONDUCTIVITY_COMPONENTS 3
-#define NUM_MATERIALS_ID_COMPONENTS 1
-#define MAX_TRANSITIVE_CLOSURE_SIZE 90
+/** @brief Reference tetrahedral-cell topology counts and fixed array sizes. */
+#define NUM_FACES_PER_CELL 4           /**< Faces per tetrahedron. */
+#define NUM_EDGES_PER_CELL 6           /**< Edges per tetrahedron. */
+#define NUM_VERTICES_PER_CELL 4        /**< Vertices per tetrahedron. */
+#define NUM_EDGES_PER_FACE 3           /**< Edges per triangular face. */
+#define NUM_VERTICES_PER_EDGE 2        /**< Vertices per edge. */
+#define NUM_VERTICES_PER_FACE 3        /**< Vertices per triangular face. */
+#define NUM_DIMENSIONS 3               /**< Spatial dimensions. */
+#define NUM_H1_DOF_PER_CELL 4          /**< P1 H1 (vertex) DOFs per cell. */
+#define NUM_CONDUCTIVITY_COMPONENTS 3  /**< Conductivity components (σx, σy, σz). */
+#define NUM_MATERIALS_ID_COMPONENTS 1  /**< Material-id components per cell. */
+#define MAX_TRANSITIVE_CLOSURE_SIZE 90 /**< Upper bound on DMPlex closure size. */
+#define INV_VTU_NUM_FIELDS 1           /**< Cell-data fields written per VTU piece (rho_ohm_m). */
 
-/* Inversion-kernel array caps - sized at struct-definition time so they
- * must be compile-time constants. Bump and recompile if a use case
- * exceeds these. setupInversionSources errors when exceeded; the
- * fixed-materials option array is sized to the cap on read. */
-#define INV_MAX_FIXED_MATERIALS  8
-#define INV_MAX_FREQUENCIES      64
-#define INV_MAX_FD_CHECK_CELLS   1024
+/**
+ * @brief Inversion-kernel array caps (compile-time constants).
+ *
+ * Sized at struct-definition time so they must be compile-time constants.
+ * Bump and recompile if a use case exceeds these; setupInversionSources
+ * errors when exceeded, and the fixed-materials option array is sized to
+ * the cap on read.
+ */
+#define INV_MAX_FIXED_MATERIALS  8  /**< Max number of held-fixed materials. */
+#define INV_MAX_FREQUENCIES      64 /**< Max number of inversion frequencies. */
+
+/** @brief Reference-cell local connectivity tables (defined in constants.c). */
 extern const PetscInt EDGE_VERTICES[NUM_EDGES_PER_CELL][NUM_VERTICES_PER_EDGE];
 extern const PetscInt FACE_VERTICES[NUM_FACES_PER_CELL][NUM_VERTICES_PER_FACE];
 extern const PetscInt REFERENCE_CELL[NUM_DIMENSIONS][NUM_VERTICES_PER_CELL];
 
-/* 1D quadrature gauss points */
+/** @brief 1D Gauss quadrature points/weights by order (defined in constants.c). */
 extern const PetscReal NORD1_1DGAUSSPOINTS[1][2];
 extern const PetscReal NORD2_1DGAUSSPOINTS[2][2];
 extern const PetscReal NORD3_1DGAUSSPOINTS[3][2];
@@ -50,7 +56,7 @@ extern const PetscReal NORD7_1DGAUSSPOINTS[7][2];
 extern const PetscReal NORD8_1DGAUSSPOINTS[8][2];
 extern const PetscReal NORD11_1DGAUSSPOINTS[11][2];
 
-/* 2D quadrature gauss points */
+/** @brief 2D (triangle) Gauss quadrature points/weights by order. */
 extern const PetscReal NORD1_2DGAUSSPOINTS[1][3];
 extern const PetscReal NORD2_2DGAUSSPOINTS[3][3];
 extern const PetscReal NORD3_2DGAUSSPOINTS[4][3];
@@ -71,7 +77,7 @@ extern const PetscReal NORD17_2DGAUSSPOINTS[61][3];
 extern const PetscReal NORD18_2DGAUSSPOINTS[70][3];
 extern const PetscReal NORD19_2DGAUSSPOINTS[73][3];
 
-/* 3D quadrature gauss points */
+/** @brief 3D (tetrahedron) Gauss quadrature points/weights by order. */
 extern const PetscReal NORD1_3DGAUSSPOINTS[1][4];
 extern const PetscReal NORD2_3DGAUSSPOINTS[4][4];
 extern const PetscReal NORD3_3DGAUSSPOINTS[5][4];

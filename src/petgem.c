@@ -29,6 +29,18 @@
 #include "version.h"
 #include "common.h" 
 
+/**
+ * @brief Unified PETGEM dispatcher entry point.
+ *
+ * Parses --version / --help / positional-subcommand / -mode and forwards
+ * argv (with the mode token stripped) to runForward or runInverse.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector.
+ *
+ * @return int the kernel's exit status, 0 for --version/--help, or 2 on
+ *         invalid CLI usage.
+ */
 int main(int argc, char **argv) {
   /* --version short-circuit (no PETSc init) */
   if (argc > 1 && strcmp(argv[1], "--version") == 0) {

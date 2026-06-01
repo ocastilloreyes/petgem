@@ -15,6 +15,14 @@
  */
 #include "kernels.h"
 
+/**
+ * @brief Standalone entry point for fm.csem; delegates to runForward.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector.
+ *
+ * @return int the PetscErrorCode (cast to int) as the process exit status.
+ */
 int main(int argc, char **argv) {
   return runForward(argc, argv);
 }

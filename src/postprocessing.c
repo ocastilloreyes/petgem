@@ -24,54 +24,46 @@
 #include "version.h"
 
 /**
- * @brief Computes electric (E) and magnetic (H) fields at specified receiver locations.
+ * @brief Computes electric and magnetic fields at receivers (forward kernel).
  *
- * @param[in] params A `csemParams` struct containing simulation parameters such as
- *                   finite element order, output filenames, and MPI task information.
- * @param[in] sources A `CsemSourceSet` struct containing information about sources,
- *                    including number of sources, frequency, positions, and currents.
- * @param[in] dm The PETSc DMPlex object representing the mesh and H(curl) discretization.
- * @param[in] grid A `Grid` struct containing mesh statistics, number of DOFs per cell,
- *                 and other relevant discretization information.
- * @param[in] X The solution matrix (Mat), where each column corresponds to the solution
- *              vector for a specific source.
+ * Locates the receivers in the mesh, interpolates the H(curl) solution X to
+ * obtain E at each receiver, derives H via H = curl(E)/(iωμ), and writes a
+ * SINGLE HDF5 response file containing every source. The file groups the
+ * responses by source (one subgroup per transmitter) and carries run-wide
+ * provenance attributes at the root:
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or an appropriate PETSc error code.
+ *   /                              root attrs: petgem_version, input_filename,
+ *                                              date, nord, mpi_tasks,
+ *                                              num_sources, frequency
+ *   /sources/src{k}/               attrs: frequency, x_pos, y_pos, z_pos,
+ *                                         current, length, dip_angle,
+ *                                         azimuth_angle
+ *   /sources/src{k}/fields/        Ex, Ey, Ez, Hx, Hy, Hz (PETSc Vec)
  *
- * @details
- * This function performs the following steps:
- * 1. Loads the receiver coordinates from an HDF5 file into a PETSc Vec.
- * 2. Locates receivers in the computational mesh using `DMLocatePoints`.
- * 3. Allocates PETSc vectors to store the electric (Ex, Ey, Ez) and magnetic (Hx, Hy, Hz) fields.
- * 4. Loops over each source:
- *    - Extracts the solution vector for the source.
- *    - Converts the global solution vector to a local representation.
- *    - Loops over receivers:
- *        * Determines the cell containing the receiver.
- *        * Computes the reference coordinates (Xi, Eta, Zeta) for the receiver.
- *        * Computes Nédélec basis functions and their curls at the receiver location.
- *        * Interpolates the E and H fields using the DOFs in the cell.
- *        * Applies Maxwell's equations to compute H from E (scaling by frequency and permeability).
- *    - Performs parallel assembly of field vectors.
- *    - Writes the computed fields to an HDF5 file, including metadata attributes such as:
- *        + PETGEM version
- *        + Mesh and receivers filenames
- *        + Simulation date
- *        + Source frequency and position
- *        + FEM order and number of MPI tasks
- * 5. Frees all allocated memory and PETSc objects.
+ * The output filename is `{output_directory}/{output_filename}.h5`; the
+ * per-source `_src{k}` suffix used by the legacy one-file-per-source layout
+ * is gone. All Vec writes are collective on the kernel's MPI communicator
+ * and go through PETSc's native HDF5 viewer (parallel HDF5 when PETSc is
+ * built against a parallel HDF5 library); no rank-0 gather happens.
  *
- * @note
- * - This function assumes 3D simulations (NUM_DIMENSIONS = 3) and H(curl) elements.
- * - Only receivers located inside the computational domain are considered; others
- *   generate a warning and are ignored.
- * - The magnetic field is computed via H = (1 / (i * omega * mu)) curl(E), following
- *   standard Maxwell equations.
- * - Output files are written in HDF5 format with one file per source, and the filename
- *   is constructed using the output directory, base filename, and source index.
+ * `receivers` is the serial Vec (PETSC_COMM_SELF, length 3·N_recv) returned
+ * by loadCsemInputs - passed through so postprocessing does not re-open the
+ * input HDF5.
  *
+ * @param[in] params     Forward-modeling parameters (nord, output paths, MPI tasks).
+ * @param[in] sources    Transmitter set (one solution column per source).
+ * @param[in] dm         DMPlex mesh and H(curl) discretization.
+ * @param[in] grid       Finite-element grid descriptor.
+ * @param[in] receivers  Serial Vec of 3·N_recv receiver coordinates.
+ * @param[in] X          Solution matrix (one column per source).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ *
+ * @note Assumes 3D H(curl) Nédélec elements. Receivers outside the
+ *       computational domain trigger a warning and are skipped.
  */
-PetscErrorCode computeFields(const csemParams params, const CsemSourceSet sources,
+PetscErrorCode computeFields(const fmParams params, const CsemSourceSet sources,
                              const DM dm, const Grid grid,
                              Vec receivers, const Mat X) {
   PetscFunctionBeginUser;
@@ -84,9 +76,10 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
   PetscBool flag;
   Vec Ex, Ey, Ez, Hx, Hy, Hz;
   PetscViewer viewerOutput;
-  char date[30], monthStr[4], version[50], idSource[20];
+  char date[30], monthStr[4], version[50];
   char formattedDate[11]; // YYYY-MM-DD format (10 chars + null terminator)
   char outFileName[PETSC_MAX_PATH_LEN];
+  char groupPath[64];
   ReceiverInterpolationMatrices Q;
 
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);
@@ -104,7 +97,9 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
                                                 receivers,
                                                 dm, &grid, &Q));
 
-  /* Allocate output Vecs sized to match Q's row layout (left vector). */
+  /* Allocate output Vecs sized to match Q's row layout (left vector).
+   * These are parallel Vecs on the kernel communicator, so VecView through
+   * the HDF5 viewer below performs collective MPI-IO writes. */
   PetscCall(MatCreateVecs(Q.QEx, NULL, &Ex));
   PetscCall(MatCreateVecs(Q.QEy, NULL, &Ey));
   PetscCall(MatCreateVecs(Q.QEz, NULL, &Ez));
@@ -112,11 +107,53 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
   PetscCall(MatCreateVecs(Q.QHy, NULL, &Hy));
   PetscCall(MatCreateVecs(Q.QHz, NULL, &Hz));
 
+  /* Build the single output file name: {output_dir}/{output_filename}.h5 */
+  PetscCall(PetscStrncpy(outFileName, params.outputDirectory, sizeof(outFileName)));
+  size_t len = strlen(outFileName);
+  if (len > 0 && outFileName[len - 1] != '/') {
+    PetscCall(PetscStrlcat(outFileName, "/", sizeof(outFileName)));
+  }
+  PetscCall(PetscStrlcat(outFileName, params.outputFilename, sizeof(outFileName)));
+  PetscCall(PetscStrlcat(outFileName, ".h5", sizeof(outFileName)));
+
+  /* Run-wide timestamp (recorded once for the root provenance attrs). */
+  PetscCall(PetscGetDate(date, sizeof(date)));
+  sscanf(date, "%*s %3s %" PetscInt_FMT "%*s %" PetscInt_FMT, monthStr, &day, &year);
+  PetscCall(PetscStrcmp(monthStr, "Jan", &flag)); if (flag) month = 1;
+  PetscCall(PetscStrcmp(monthStr, "Feb", &flag)); if (flag) month = 2;
+  PetscCall(PetscStrcmp(monthStr, "Mar", &flag)); if (flag) month = 3;
+  PetscCall(PetscStrcmp(monthStr, "Apr", &flag)); if (flag) month = 4;
+  PetscCall(PetscStrcmp(monthStr, "May", &flag)); if (flag) month = 5;
+  PetscCall(PetscStrcmp(monthStr, "Jun", &flag)); if (flag) month = 6;
+  PetscCall(PetscStrcmp(monthStr, "Jul", &flag)); if (flag) month = 7;
+  PetscCall(PetscStrcmp(monthStr, "Aug", &flag)); if (flag) month = 8;
+  PetscCall(PetscStrcmp(monthStr, "Sep", &flag)); if (flag) month = 9;
+  PetscCall(PetscStrcmp(monthStr, "Oct", &flag)); if (flag) month = 10;
+  PetscCall(PetscStrcmp(monthStr, "Nov", &flag)); if (flag) month = 11;
+  PetscCall(PetscStrcmp(monthStr, "Dec", &flag)); if (flag) month = 12;
+  snprintf(formattedDate, sizeof(formattedDate), "%04" PetscInt_FMT "-%02" PetscInt_FMT "-%02" PetscInt_FMT, year, month, day);
+
   /* Print message */
-  PetscCall(PetscPrintf(comm, "\n Compute electric and magnetic fields:\n"));
-  PetscCall(PetscPrintf(comm, "   Input file                  = %s\n", params.inputFile));
-  PetscCall(PetscPrintf(comm, "   Number of receivers         = %" PetscInt_FMT "\n", Q.numReceivers));
-  PetscCall(PetscPrintf(comm, "   Postprocessing status       = Initiated\n"));
+  PetscCall(PetscPrintf(comm, "\n Field interpolation:\n"));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Input file",          params.inputFile));
+  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "Number of receivers", Q.numReceivers));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Output file",         outFileName));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",              "Started"));
+
+  /* Open the single HDF5 output file on the kernel communicator. PETSc's
+   * HDF5 viewer routes the collective VecView calls below through MPI-IO
+   * when PETSc is linked against a parallel HDF5 build. */
+  PetscCall(PetscViewerHDF5Open(comm, outFileName, FILE_MODE_WRITE, &viewerOutput));
+
+  /* Root provenance attributes - written ONCE for the whole file. */
+  sprintf(version, "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "petgem_version", PETSC_STRING, version));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "input_filename", PETSC_STRING, params.inputFile));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "date",           PETSC_STRING, date));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "nord",           PETSC_INT,    &params.nord));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "mpi_tasks",      PETSC_INT,    &params.numMPITasks));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "num_sources",    PETSC_INT,    &sources.numSources));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "frequency",      PETSC_REAL,   &sources.freq));
 
   /* Postprocessing fields for each source */
   for (PetscInt i = 0; i < sources.numSources; i++) {
@@ -127,7 +164,8 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
     /* Get the solution column for this source */
     PetscCall(MatDenseGetColumnVecRead(X, i, &x));
 
-    PetscCall(PetscPrintf(comm, "   Computing fields for source = %" PetscInt_FMT "\n", i + 1));
+    PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " of %" PetscInt_FMT "\n",
+                          "Processing source", i + 1, sources.numSources));
 
     /* Apply Q to the H(curl) solution: Ex = QEx*x, Ey = QEy*x, ... */
     PetscCall(MatMult(Q.QEx, x, Ex));
@@ -144,81 +182,18 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
     PetscCall(VecScale(Hy, 1.0 / constFactor));
     PetscCall(VecScale(Hz, 1.0 / constFactor));
 
-    /* Get current date and time */
-    PetscCall(PetscGetDate(date, sizeof(date)));
-
-    /* Parse the date to extract month, day, and year */
-    sscanf(date, "%*s %3s %" PetscInt_FMT "%*s %" PetscInt_FMT, monthStr, &day, &year);
-
-    /* Compare monthStr with each month abbreviation */
-    PetscCall(PetscStrcmp(monthStr, "Jan", &flag));
-    if (flag)
-      month = 1;
-    PetscCall(PetscStrcmp(monthStr, "Feb", &flag));
-    if (flag)
-      month = 2;
-    PetscCall(PetscStrcmp(monthStr, "Mar", &flag));
-    if (flag)
-      month = 3;
-    PetscCall(PetscStrcmp(monthStr, "Apr", &flag));
-    if (flag)
-      month = 4;
-    PetscCall(PetscStrcmp(monthStr, "May", &flag));
-    if (flag)
-      month = 5;
-    PetscCall(PetscStrcmp(monthStr, "Jun", &flag));
-    if (flag)
-      month = 6;
-    PetscCall(PetscStrcmp(monthStr, "Jul", &flag));
-    if (flag)
-      month = 7;
-    PetscCall(PetscStrcmp(monthStr, "Aug", &flag));
-    if (flag)
-      month = 8;
-    PetscCall(PetscStrcmp(monthStr, "Sep", &flag));
-    if (flag)
-      month = 9;
-    PetscCall(PetscStrcmp(monthStr, "Oct", &flag));
-    if (flag)
-      month = 10;
-    PetscCall(PetscStrcmp(monthStr, "Nov", &flag));
-    if (flag)
-      month = 11;
-    PetscCall(PetscStrcmp(monthStr, "Dec", &flag));
-    if (flag)
-      month = 12;
-
-    /* Format the date as YYYY-MM-DD */
-    snprintf(formattedDate, sizeof(formattedDate), "%04" PetscInt_FMT "-%02" PetscInt_FMT "-%02" PetscInt_FMT, year, month, day);
-
-    /* Build output file name robustly */
-    PetscCall(PetscStrncpy(outFileName, params.outputDirectory, sizeof(outFileName)));
-
-    /* Add "/" if missing */
-    size_t len = strlen(outFileName);
-    if (len > 0 && outFileName[len - 1] != '/') {
-      PetscCall(PetscStrlcat(outFileName, "/", sizeof(outFileName)));
-    }
-
-    PetscCall(PetscStrlcat(outFileName, params.outputFilename, sizeof(outFileName)));
-    PetscCall(PetscStrlcat(outFileName, "_src", sizeof(outFileName)));
-    snprintf(idSource, sizeof(idSource), "%" PetscInt_FMT, i + 1);
-    PetscCall(PetscStrlcat(outFileName, idSource, sizeof(outFileName)));
-    PetscCall(PetscStrlcat(outFileName, ".h5", sizeof(outFileName)));
-
-    /* Create hdf5 file */
-    PetscCall(PetscPrintf(comm, "   Output filename             = %s\n", outFileName));
-    PetscCall(PetscViewerHDF5Open(comm, outFileName, FILE_MODE_WRITE, &viewerOutput));
-
-    /* Field components under /fields/, mirroring the bundle's
-     * /fields/model_data layout. */
+    /* Per-source group path. Field components land under
+     * /sources/src{k}/fields/, and the per-source metadata attributes
+     * attach to the /sources/src{k} group itself. */
+    snprintf(groupPath, sizeof(groupPath),
+             "/sources/src%" PetscInt_FMT "/fields", i + 1);
     PetscCall(PetscObjectSetName((PetscObject)Ex, "Ex"));
     PetscCall(PetscObjectSetName((PetscObject)Ey, "Ey"));
     PetscCall(PetscObjectSetName((PetscObject)Ez, "Ez"));
     PetscCall(PetscObjectSetName((PetscObject)Hx, "Hx"));
     PetscCall(PetscObjectSetName((PetscObject)Hy, "Hy"));
     PetscCall(PetscObjectSetName((PetscObject)Hz, "Hz"));
-    PetscCall(PetscViewerHDF5PushGroup(viewerOutput, "/fields"));
+    PetscCall(PetscViewerHDF5PushGroup(viewerOutput, groupPath));
     PetscCall(VecView(Ex, viewerOutput));
     PetscCall(VecView(Ey, viewerOutput));
     PetscCall(VecView(Ez, viewerOutput));
@@ -227,34 +202,26 @@ PetscErrorCode computeFields(const csemParams params, const CsemSourceSet source
     PetscCall(VecView(Hz, viewerOutput));
     PetscCall(PetscViewerHDF5PopGroup(viewerOutput));
 
-    /* Per-source metadata under /source/, parallel to the bundle's
-     * /sources/ group (singular here since each output file is one source). */
+    /* Per-source metadata at /sources/src{k}. */
     {
       const CsemSource *s = &sources.sourceArray[i];
-      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "frequency",    PETSC_REAL, &sources.freq));
-      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "x_pos",        PETSC_REAL, &s->position[0]));
-      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "y_pos",        PETSC_REAL, &s->position[1]));
-      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "z_pos",        PETSC_REAL, &s->position[2]));
-      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "current",      PETSC_REAL, &s->current));
-      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "length",       PETSC_REAL, &s->length));
-      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "dip_angle",    PETSC_REAL, &s->dipAngle));
-      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, "/source", "azimuth_angle",PETSC_REAL, &s->azimuthAngle));
+      snprintf(groupPath, sizeof(groupPath),
+               "/sources/src%" PetscInt_FMT, i + 1);
+      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "frequency",     PETSC_REAL, &sources.freq));
+      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "x_pos",         PETSC_REAL, &s->position[0]));
+      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "y_pos",         PETSC_REAL, &s->position[1]));
+      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "z_pos",         PETSC_REAL, &s->position[2]));
+      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "current",       PETSC_REAL, &s->current));
+      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "length",        PETSC_REAL, &s->length));
+      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "dip_angle",     PETSC_REAL, &s->dipAngle));
+      PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "azimuth_angle", PETSC_REAL, &s->azimuthAngle));
     }
-
-    /* Top-level provenance attributes - lowercase + underscore, matching
-     * the bundle's naming idiom. */
-    sprintf(version, "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-    PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "petgem_version", PETSC_STRING, version));
-    PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "input_filename", PETSC_STRING, params.inputFile));
-    PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "date",           PETSC_STRING, date));
-    PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "nord",           PETSC_INT,    &params.nord));
-    PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "mpi_tasks",      PETSC_INT,    &params.numMPITasks));
-
-    /* Free memory */
-    PetscCall(PetscViewerDestroy(&viewerOutput));
   }
 
-  PetscCall(PetscPrintf(comm, "   Postprocessing status       = Finished\n"));
+  /* Close the single output file. */
+  PetscCall(PetscViewerDestroy(&viewerOutput));
+
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
 
   /* Free memory */
   PetscCall(VecDestroy(&Ex));

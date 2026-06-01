@@ -21,56 +21,24 @@
 
 
 /**
- * @brief Assembles the right-hand side (RHS) matrix for the CSEM system.
+ * @brief Shared per-cell setup used by every LHS-assembly path.
  *
- * This function constructs the RHS vectors for all sources in the
- * simulation. Each column of the output matrix `B` corresponds to a
- * different source. The function performs finite element assembly
- * using H(curl) Nédélec elements, taking into account the source
- * dipole orientation, rotation, and position within the tetrahedral mesh.
- *
- * @param[in] params A csemParams struct containing simulation parameters,
- *                   including the basis order (nord) and number of MPI tasks.
- * @param[in] sources A CsemSourceSet struct containing source positions,
- *                    currents, lengths, and dipole orientation angles.
- * @param[in] dm The DMPlex object representing the mesh topology and H(curl)
- *               discretization.
- * @param[in] grid A Grid struct containing mesh statistics and DOF information.
- * @param[out] B Pointer to a Mat object that will be created and populated
- *               with the RHS vectors for all sources.
- *
- * @return PetscErrorCode PETSC_SUCCESS on successful assembly, or a PETSc
- *         error code if an error occurs during vector/matrix creation,
- *         FEM basis evaluation, or point location.
- *
- * @details
- * The function performs the following steps:
- * 1. Creates a global vector `b` to store a single source's RHS.
- * 2. Allocates memory for Nédélec basis functions, their curls, and coefficients.
- * 3. Iterates over all sources in `sources->sourceArray`.
- *    - Computes the source vector based on current, length, dip, and azimuth.
- *    - Locates the source in the mesh using `locatePoint`.
- *    - Extracts cell coordinates, computes the Jacobian, and transforms
- *      the source position to reference coordinates (XiEtaZeta).
- *    - Computes Nédélec basis functions and, if applicable, their curls.
- *    - Computes the local contributions of the source to the RHS using
- *      `VecSetValuesLocal`.
- *    - Assembles the local vector into the global RHS vector.
- *    - Copies the assembled vector into the corresponding column of `B`.
- * 4. Applies the complex scaling factor for frequency and magnetic permeability.
- * 5. Frees all allocated memory and prints assembly progress messages.
- *
- * @note
- * - Supports multiple sources, each mapped to a column of the dense matrix `B`.
- *   is partially implemented and can be extended.
- * - The caller is responsible for managing the lifetime of the returned matrix `B`.
- */
-/* Shared per-cell setup used by every LHS-assembly path (forward + inverse).
  * Reads geometry, builds the Jacobian, pulls the per-cell conductivity slice
  * out of the conductivity Vec, walks the cell's transitive closure for the
  * vertex ordering, and computes the orientation table. After this returns,
  * `cell` is ready to be handed to computeElementalMatrices / the basis
- * dispatch. */
+ * dispatch.
+ *
+ * @param[in]  dm              DMPlex mesh.
+ * @param[in]  dmConductivity  DM carrying the conductivity field.
+ * @param[in]  conductivity    Per-cell conductivity Vec.
+ * @param[in]  cellID          Cell index.
+ * @param[out] cell            Cell descriptor filled with geometry, jacobian,
+ *                             conductivity, closure, and orientation.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode prepareCellForAssembly(const DM dm,
                                               const DM dmConductivity,
                                               const Vec conductivity,
@@ -86,7 +54,34 @@ static PetscErrorCode prepareCellForAssembly(const DM dm,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B) {
+/**
+ * @brief Assembles the right-hand side matrix for the CSEM system.
+ *
+ * Constructs the RHS vectors for every transmitter in the simulation; each
+ * column of `B` corresponds to one source. Performs finite-element assembly
+ * using H(curl) Nédélec elements, taking the source dipole orientation,
+ * rotation, and position into account.
+ *
+ * For each source the function (a) locates it in the mesh via locatePoint,
+ * (b) extracts cell coordinates and computes the Jacobian, (c) maps the
+ * source position to reference coordinates (ξ, η, ζ), (d) evaluates the
+ * Nédélec basis and its curls there, (e) writes the local contributions
+ * into a per-source RHS Vec, and (f) copies the assembled Vec into the
+ * corresponding column of `B`. A final complex scaling by iωμ is applied.
+ *
+ * @param[in]  params   Forward-modeling parameters (nord, MPI tasks).
+ * @param[in]  sources  Transmitter set (one column of B per source).
+ * @param[in]  dm       DMPlex mesh and H(curl) discretization.
+ * @param[in]  grid     Finite-element grid descriptor.
+ * @param[out] B        Assembled RHS matrix, created and populated by this call.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on successful assembly,
+ *         or a PETSc error code on failure of vector/matrix creation,
+ *         FEM basis evaluation, or point location.
+ *
+ * @note The caller is responsible for destroying the returned matrix `B`.
+ */
+PetscErrorCode assembleCsemRHS(const fmParams params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
@@ -170,10 +165,10 @@ PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sour
 
   /* Print linear system statistics (suppressed when params.quiet) */
   if (!params.quiet) {
-    PetscCall(PetscPrintf(comm, "\n Assembly RHS:\n"));
-    PetscCall(PetscPrintf(comm, "   Num of MPI tasks    = %d\n", params.numMPITasks));
-    PetscCall(PetscPrintf(comm, "   Vector size         = %" PetscInt_FMT "\n", M));
-    PetscCall(PetscPrintf(comm, "   Assembly process    = Initiated\n"));
+    PetscCall(PetscPrintf(comm, "\n RHS assembly:\n"));
+    PetscCall(PetscPrintf(comm, "   %-24s = %d\n",                "MPI tasks",   params.numMPITasks));
+    PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "Vector size", M));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",      "Started"));
   }
 
   /* Perform finite element assembly for RHS (one vector per source) */
@@ -265,7 +260,7 @@ PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sour
 
   /* Print message */
   if (!params.quiet)
-    PetscCall(PetscPrintf(comm, "   Assembly process    = Finished\n"));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
 
   /* Free memory */
   for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
@@ -292,17 +287,15 @@ PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sour
 }
 
 /**
- * @brief Unified CSEM LHS assembly.
+ * @brief CSEM LHS assembly.
  *
  * Single-pass element loop that assembles the frequency-INDEPENDENT
  * pieces of the CSEM operator and the discrete-gradient hint matrices:
  *
  *   K       - stiffness (curl–curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
  *   Ms      - mass × σ matrix, ∫ (ε_r ⊙ N_i)·N_j where ε_r encodes σ.
- *   G       - canonical Π^Ned order-k discrete gradient against the
- *             P_nord H¹ space (grid.H1dm_Pnord). K·G = 0 by construction.
- *   G_BDDC  - topological lowest-Whitney gradient against the SAME
- *             P_nord H¹ DM with vertex incidence only (inter-bubble
+ *   G_BDDC  - topological lowest-Whitney gradient against the P_nord H¹
+ *             DM (grid.H1dm_Pnord) with vertex incidence only (inter-bubble
  *             columns dropped by MatFilter). Consumed by
  *             PCBDDCSetDiscreteGradient at order = 1.
  *
@@ -312,14 +305,16 @@ PetscErrorCode assembleCsemRHS(const csemParams params, const CsemSourceSet sour
  * - the forward kernel does this once for the source frequency,
  * the inverse kernel does it inside a frequency loop.
  *
- * Any of G or G_BDDC may be passed as NULL to skip its construction
- * (e.g. callers that don't go through PCBDDC).
+ * G_BDDC may be passed as NULL to skip its construction (e.g. callers
+ * that don't go through PCBDDC).
  */
-PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Grid grid,
+PetscErrorCode assembleCsemKandM(const fmParams params, 
+                                 const DM dm, 
+                                 const Grid grid,
                                  const Vec conductivity,
                                  const PetscScalar constFactor,
                                  Mat *KorA, Mat *Ms,
-                                 Mat *G, Mat *G_BDDC) {
+                                 Mat *G_BDDC) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
@@ -328,8 +323,8 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
   Quadrature1D quadrature_1d;
   PetscInt m, n, M, N, numDofIndices, numH1DofIndices;
   PetscInt *dofIndices, *H1dofIndices;
-  PetscReal **Me, **Ke, **gradientMatrix, **gradientMatrixBDDC;
-  PetscScalar *closureK, *closureM, *closureG, *closureGBDDC;
+  PetscReal **Me, **Ke, **gradientMatrixBDDC;
+  PetscScalar *closureK, *closureM, *closureGBDDC;
   PetscSection section, H1section;
   DM dmConductivity;
   Vec b, h1v;
@@ -370,21 +365,14 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
   PetscCall(DMCreateGlobalVector(dm, &b));
   PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
 
-  /* Order-k discrete gradient G : S_h^k → V_h^k.
-   * Rows index V_h (Nédélec, mapping); columns index S_h^k (P_nord H1
-   * nodal+bubble, H1mapping_Pnord). */
+  /* Row/column layout for G_BDDC: rows index V_h (Nédélec, mapping);
+   * columns index the P_nord H1 space (nodal+bubble, H1mapping). */
   PetscCall(DMCreateGlobalVector(grid.H1dm_Pnord, &h1v));
   PetscCall(VecGetSize(b, &M));
   PetscCall(VecGetLocalSize(b, &m));
   PetscCall(VecGetSize(h1v, &N));
   PetscCall(VecGetLocalSize(h1v, &n));
   PetscCall(DMGetLocalToGlobalMapping(grid.H1dm_Pnord, &H1mapping));
-  if (G) {
-    PetscCall(MatCreate(comm, G));
-    PetscCall(MatSetSizes(*G, m, n, M, N));
-    PetscCall(MatSetType(*G, MATAIJ));
-    PetscCall(MatSetLocalToGlobalMapping(*G, mapping, H1mapping));
-  }
   PetscCall(VecDestroy(&h1v));
   PetscCall(VecDestroy(&b));
 
@@ -451,19 +439,6 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
   if (!fused) {
     PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureM));
   }
-  gradientMatrix = NULL;
-  closureG       = NULL;
-  if (G) {
-    PetscCall(PetscCalloc1(grid.numDofInCell, &gradientMatrix));
-    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell_Pnord,
-                           &gradientMatrix[0]));
-    for (PetscInt i = 1; i < grid.numDofInCell; i++) {
-      gradientMatrix[i] = gradientMatrix[i - 1] + grid.numH1DofInCell_Pnord;
-    }
-    PetscCall(PetscMalloc1(grid.numDofInCell * grid.numH1DofInCell_Pnord,
-                           &closureG));
-  }
-
   /* Topological gradient scratch.
    *
    * gradientMatrixBDDC is the OUTPUT of the topological builder
@@ -492,10 +467,10 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
 
   /* Print linear system statistics (suppressed when params.quiet) */
   if (!params.quiet) {
-    PetscCall(PetscPrintf(comm, "\n Assembly K + M(sigma):\n"));
-    PetscCall(PetscPrintf(comm, "   Num of MPI tasks    = %d\n", params.numMPITasks));
-    PetscCall(PetscPrintf(comm, "   Matrix size         = %" PetscInt_FMT " x %" PetscInt_FMT "\n", M, M));
-    PetscCall(PetscPrintf(comm, "   Assembly process    = Initiated\n"));
+    PetscCall(PetscPrintf(comm, "\n LHS assembly (K and Ms):\n"));
+    PetscCall(PetscPrintf(comm, "   %-24s = %d\n",                                      "MPI tasks",   params.numMPITasks));
+    PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " x %" PetscInt_FMT "\n",   "Matrix size", M, M));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                                      "Status",      "Started"));
   }
 
   /* Perform finite element assembly for LHS */
@@ -506,17 +481,6 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
 
     /* Compute mass and stifness matrices for cell i */
     PetscCall(computeElementalMatrices(&grid.fem, &cell, &quadrature_3d, Me, Ke));
-
-    /* Build the order-k discrete gradient G_e via the canonical Nédélec
-     * interpolator on ∇P_nord (Ainsworth–Coyle DOF moments, see
-     * hierarchicalBuildExactGradientMatrix in src/hvfem_hierarchical.c).
-     * Cross-cell consistent by construction. Only built when the caller
-     * requested G (forward kernel path); inverse-kernel callers that
-     * ask for K, Ms, G_BDDC only skip this cost. */
-    if (G) {
-      PetscCall(grid.fem.ops->buildExactGradientMatrix(&grid.fem, &cell,
-                                                       gradientMatrix));
-    }
 
     /* Get closure indices for cell i */
     PetscCall(DMPlexGetClosureIndices(dm, section, section, i, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
@@ -551,19 +515,6 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
       PetscCall(MatSetValuesLocal(*Ms,   numDofIndices, dofIndices,
                                   numDofIndices, dofIndices,
                                   closureM, ADD_VALUES));
-    }
-
-    /* Insert closure into the order-k discrete gradient G (canonical
-     * Π^Ned). The (j,k) loop writes every entry, no PetscArrayzero. */
-    if (G) {
-      for (PetscInt j = 0; j < grid.numDofInCell; j++) {
-        for (PetscInt k = 0; k < grid.numH1DofInCell_Pnord; k++) {
-          closureG[j * grid.numH1DofInCell_Pnord + k] = gradientMatrix[j][k];
-        }
-      }
-      PetscCall(MatSetValuesLocal(*G, numDofIndices, dofIndices,
-                                  numH1DofIndices, H1dofIndices,
-                                  closureG, INSERT_VALUES));
     }
 
     /* Build & insert the topological G_BDDC for PCBDDC.
@@ -608,15 +559,6 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
     PetscCall(MatAssemblyBegin(*Ms, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(*Ms,   MAT_FINAL_ASSEMBLY));
   }
-  if (G) {
-    PetscCall(MatAssemblyBegin(*G, MAT_FINAL_ASSEMBLY));
-    PetscCall(MatAssemblyEnd(*G,   MAT_FINAL_ASSEMBLY));
-    /* Drop sub-roundoff fill from the per-cell moment solve so the
-     * filtered G has only the topologically correct couplings (the
-     * canonical Π^Ned produces O(1) entries; 1e-10 clears roundoff fill
-     * at structural zeros without removing genuine small coefficients). */
-    PetscCall(MatFilter(*G, 1e-10, PETSC_TRUE, PETSC_FALSE));
-  }
   if (G_BDDC) {
     PetscCall(MatAssemblyBegin(*G_BDDC, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(*G_BDDC,   MAT_FINAL_ASSEMBLY));
@@ -624,14 +566,13 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
 
   /* End of assembly */
   if (!params.quiet)
-    PetscCall(PetscPrintf(comm, "   Assembly process    = Finished\n"));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
 
   /* Setup matrix views for petgem. In fused mode `KorA` carries A
    * directly; the `-petgem_k_view` option views A. */
   PetscCall(MatViewFromOptions(*KorA, NULL,
                                fused ? "-petgem_a_view" : "-petgem_k_view"));
   if (!fused) PetscCall(MatViewFromOptions(*Ms, NULL, "-petgem_ms_view"));
-  if (G)      PetscCall(MatViewFromOptions(*G,      NULL, "-petgem_grad_view"));
   if (G_BDDC) PetscCall(MatViewFromOptions(*G_BDDC, NULL, "-petgem_grad_bddc_view"));
 
   /* Free memory */
@@ -649,11 +590,6 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
   PetscCall(PetscFree(Ke));
   PetscCall(PetscFree(closureK));
   if (closureM) PetscCall(PetscFree(closureM));
-  if (gradientMatrix) {
-    PetscCall(PetscFree(gradientMatrix[0]));
-    PetscCall(PetscFree(gradientMatrix));
-  }
-  if (closureG) PetscCall(PetscFree(closureG));
   if (gradientMatrixBDDC) {
     PetscCall(PetscFree(gradientMatrixBDDC[0]));
     PetscCall(PetscFree(gradientMatrixBDDC));
@@ -663,23 +599,34 @@ PetscErrorCode assembleCsemKandM(const csemParams params, const DM dm, const Gri
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* assembleCsemMsRefill                                                */
-/*                                                                     */
-/* Inverse-kernel companion to assembleCsemKandM: walks the local      */
-/* cells, computes only the mass-matrix entries for the current σ,    */
-/* and writes them into the supplied Ms matrix. K and G_BDDC are NOT  */
-/* touched - those are σ-independent and built once at setup, then     */
-/* reused for every L-BFGS iteration.                                  */
-/*                                                                     */
-/* The per-cell setup is shared with assembleCsemKandM via             */
-/* prepareCellForAssembly (single source of truth for cell geometry,   */
-/* conductivity slice, closure, and orientation).  Ke is computed by   */
-/* computeElementalMatrices (it shares basis evaluations with Me) but  */
-/* is discarded - the small extra work is offset by not having to     */
-/* duplicate the basis-evaluation code.                                */
-/* ================================================================== */
-PetscErrorCode assembleCsemMsRefill(const csemParams params,
+/**
+ * @brief Refills an existing Ms matrix for the current conductivity field.
+ *
+ * Inverse-kernel companion to assembleCsemKandM: walks the local cells,
+ * computes only the mass-matrix entries for the current σ, and writes them
+ * into the supplied Ms matrix. K and G_BDDC are NOT touched - those are
+ * σ-independent, built once at setup, and reused for every L-BFGS iteration.
+ *
+ * The per-cell setup is shared with assembleCsemKandM via
+ * prepareCellForAssembly (single source of truth for cell geometry,
+ * conductivity slice, closure, and orientation). Ke is computed by
+ * computeElementalMatrices (it shares basis evaluations with Me) but is
+ * discarded - the small extra work is offset by not having to duplicate the
+ * basis-evaluation code.
+ *
+ * @param[in]     params         Forward-modeling parameters (nord).
+ * @param[in]     dm             DMPlex mesh and H(curl) discretization.
+ * @param[in]     grid           Finite-element grid descriptor.
+ * @param[in]     conductivity   Current per-cell conductivity Vec.
+ * @param[in]     quadrature_3d  Caller-owned 3D quadrature workspace.
+ * @param[in,out] Me             Scratch elemental mass buffer (numDofInCell²).
+ * @param[in,out] Ke             Scratch elemental stiffness buffer (unused output).
+ * @param[in,out] Ms             Pre-allocated matrix refilled with mass-σ entries.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode assembleCsemMsRefill(const fmParams params,
                                     const DM dm, const Grid grid,
                                     const Vec conductivity,
                                     const Quadrature3D *quadrature_3d,

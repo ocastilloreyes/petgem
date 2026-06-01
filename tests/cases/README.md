@@ -37,7 +37,7 @@ mpirun -n N fm.csem -options_file tests/cases/<case>/params.txt
 # 3. Postprocess (only for cases that ship a postprocess.py)
 python3 tests/cases/<case>/postprocess.py \
     -case_dir tests/cases/<case> \
-    -responses_filename responses_p1_src1.h5
+    -responses_filename responses_p1.h5
 ```
 
 ## Available cases

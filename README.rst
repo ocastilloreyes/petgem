@@ -11,9 +11,9 @@
    :target: https://github.com/ocastilloreyes/petgem/actions
    :alt: CI Status
 
-.. image:: https://img.shields.io/badge/docs-latest-blue.svg
+.. image:: https://readthedocs.org/projects/petgem/badge/?version=latest
    :target: https://petgem.readthedocs.io/en/latest/index.html
-   :alt: Documentation
+   :alt: Documentation Status
 
 .. image:: https://img.shields.io/github/license/ocastilloreyes/petgem
    :target: https://opensource.org/licenses/BSD-3-Clause
@@ -27,16 +27,16 @@
    :target: https://github.com/ocastilloreyes/petgem/pkgs/container/petgem-ci-env
    :alt: Docker image version
 
-**PETGEM** (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is a high-performance open-source software designed for 
+**PETGEM** (Parallel Exascale Toolkit for Electromagnetic Modeling) is a high-performance open-source software designed for 
 the simulation of electromagnetic (EM) fields in geophysical exploration.  
 It is developed and maintained by researchers at the `Universitat Politècnica de Catalunya (UPC) <https://www.ac.upc.edu/en?set_language=en>`_ and the `Barcelona Supercomputing Center (BSC) <https://www.bsc.es/es/discover-bsc/organisation/scientific-structure/geophysical-applications>`_.
 
 Key features include:
 
-- Parallel and scalable solver for large-scale 3D EM forward modeling
+- Parallel and scalable solver for large-scale 3D EM forward and inverse modeling
 - Support for tetrahedral meshes and high-order edge finite element formulations
 - Optimized for **HPC clusters and exascale architectures**
-- Flexible **C kernel** for performance
+- Flexible **C kernels** for performance
 
 Dependencies
 ------------
@@ -56,7 +56,7 @@ PETGEM requires the following main dependencies:
    - setuptools 
    - wheel
    - sphinx (for documentation)
-   - pytest 
+   - pytest (for testing)
 
 For a fully reproducible environment, a Docker image is provided (see below).
 
@@ -95,13 +95,13 @@ You can build and run PETGEM inside Docker for a consistent development and test
         -mesh_filename mesh_p${NORD}.msh \
         -source_filename sources.txt \
         -receiver_filename receivers.txt \
-        -sigma_file sigmas.csv \
+        -sigma_file sigmas.txt \
         -input_filename input.h5 \
         -params_filename params.txt \
         -output_vtk model.vtu
 
    # Forward modeling (Parallel and specific to nord=1)
-   mpirun -n 4 build/fm.csem -options_file ${CSEM_TEST_DIR}/params.txt
+   mpirun -n 4 build/petgem modeling -options_file ${CSEM_TEST_DIR}/params.txt
 
 Documentation
 -------------

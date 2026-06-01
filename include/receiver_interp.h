@@ -39,36 +39,54 @@
 #include <petscdm.h>
 #include <petscmat.h>
 
-/* ------------------------------------------------------------------ */
-/* Receiver interpolation matrices (frequency-independent).           */
-/* QEx..QHz: (numReceivers x numDof) MATAIJ sparse                    */
-/* Apply: Ex_recv = QEx * x;  Hx_recv = (QHx * x) / constFactor       */
-/* ------------------------------------------------------------------ */
+/**
+ * @brief Frequency-independent receiver-interpolation operators.
+ *
+ * QEx..QHz are (numReceivers x numDof) MATAIJ sparse matrices mapping an
+ * H(curl) DOF vector x to field components at the receivers:
+ * Ex_recv = QEx * x; Hx_recv = (QHx * x) / constFactor (constFactor = iωμ).
+ */
 typedef struct {
-  Mat      QEx, QEy, QEz;
-  Mat      QHx, QHy, QHz;
-  PetscInt numReceivers;
-  PetscInt numDof;
+  Mat      QEx, QEy, QEz; /**< Electric-field interpolation matrices. */
+  Mat      QHx, QHy, QHz; /**< Magnetic-field (curl) interpolation matrices. */
+  PetscInt numReceivers;  /**< Number of receivers (rows of each Q). */
+  PetscInt numDof;        /**< Number of H(curl) DOFs (columns of each Q). */
 } ReceiverInterpolationMatrices;
 
-/* Build QEx..QHz on the same DM as the H(curl) solution vector.
- *   nord       : Nédélec basis order (dispatched via fem->ops, 1..6)
- *   receivers  : serial Vec (PETSC_COMM_SELF) of 3·N_recv reals, layout
- *                [x0 y0 z0 x1 y1 z1 ...]. Caller supplies it; this routine
- *                does not open any file. The unified PETGEM input loader
- *                (loadCsemInputs) produces it from /receivers in the
- *                bundled input HDF5.
- *   dm         : H(curl) DM the solution lives on
- *   grid       : Grid struct produced by setupCsemGrid
- *   Q          : output struct; caller invokes
- *                destroyReceiverInterpolationMatrices when done. */
+/**
+ * @brief Builds the receiver-interpolation matrices QEx..QHz.
+ *
+ * Assembles the Q operators on the same DM as the H(curl) solution vector.
+ * Building Q once with global column indexing makes the operator
+ * MPI-invariant. The routine opens no file; the caller supplies the
+ * receiver coordinates.
+ *
+ * @param[in]  nord       Nédélec basis order (dispatched via fem->ops, 1..6).
+ * @param[in]  receivers  Serial Vec (PETSC_COMM_SELF) of 3·N_recv reals,
+ *                        laid out [x0 y0 z0 x1 y1 z1 ...]; produced by
+ *                        loadCsemInputs from /receivers in the input bundle.
+ * @param[in]  dm         H(curl) DM the solution lives on.
+ * @param[in]  grid       Grid struct produced by setupCsemGrid.
+ * @param[out] Q          Output struct; free with
+ *                        destroyReceiverInterpolationMatrices.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                                   Vec         receivers,
                                                   const DM    dm,
                                                   const Grid *grid,
                                                   ReceiverInterpolationMatrices *Q);
 
-/* Free Q matrices. */
+/**
+ * @brief Destroys the matrices held in a ReceiverInterpolationMatrices struct.
+ *
+ * @param[in,out] Q  Struct whose QEx..QHz matrices are destroyed.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode destroyReceiverInterpolationMatrices(ReceiverInterpolationMatrices *Q);
 
 #endif /* RECEIVER_INTERP_H */

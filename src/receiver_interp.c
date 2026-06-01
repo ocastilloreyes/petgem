@@ -30,14 +30,44 @@
 #include <petscdmplex.h>
 #include <petscviewerhdf5.h>
 
-/* Build the six receiver-interpolation matrices Q = {QEx, QEy, QEz,
- * QHx, QHy, QHz} that map an H(curl) DOF vector to the electric/magnetic
- * field components evaluated at the receiver positions.  Used by both
- * kernels (fm.csem in postprocessing.c, im.csem in inversion.c).
+/**
+ * @brief Decodes a global DOF index returned by DMPlexGetClosureIndices
+ *        against a global PetscSection.
  *
- * See the full contract - receiver-location semantics, sign convention,
- * MPI-invariance argument, and the divide-by-(iωμ) factor for H - in
- * include/receiver_interp.h. */
+ * PETSc encodes ghost DOFs (owned by another rank but reachable through
+ * the closure) as `-(global_offset + 1)`, and owned DOFs as the offset
+ * itself.  This helper restores the positive global offset uniformly,
+ * documenting the convention so the call site doesn't carry the magic
+ * `-(g + 1)` formula inline.
+ *
+ * @param[in] rawIdx Value pulled from the globalIdx[] array.
+ *
+ * @return Non-negative global DOF offset.
+ */
+static inline PetscInt decodeGlobalDOF(PetscInt rawIdx)
+{
+  return (rawIdx >= 0) ? rawIdx : -(rawIdx + 1);
+}
+
+/**
+ * @brief Builds the six receiver-interpolation matrices QEx..QHz.
+ *
+ * Q = {QEx, QEy, QEz, QHx, QHy, QHz} maps an H(curl) DOF vector to the
+ * electric/magnetic field components evaluated at the receiver positions.
+ * Used by both kernels (fm.csem in postprocessing.c, im.csem in inversion.c).
+ * The full contract - receiver-location semantics, sign convention,
+ * MPI-invariance argument, and the divide-by-(iωμ) factor for H - is
+ * documented in include/receiver_interp.h.
+ *
+ * @param[in]  nord       Nédélec basis order (dispatched via fem->ops, 1..6).
+ * @param[in]  receivers  Serial Vec of 3·N_recv reals (caller-owned).
+ * @param[in]  dm         H(curl) DM the solution lives on.
+ * @param[in]  grid       Grid struct produced by setupCsemGrid.
+ * @param[out] Q          Output struct holding QEx..QHz.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                                   Vec         receivers,
                                                   const DM    dm,
@@ -183,16 +213,17 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                                &closureSize, &closure));
       if (altCell >= 0) {
         PetscCall(PetscPrintf(PETSC_COMM_SELF,
-          "   Warning: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
-          " (|detJ|=%.2e), relocated to cell %" PetscInt_FMT "\n",
+          "   WARNING: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
+          " (|detJ| = %.2e); relocated to cell %" PetscInt_FMT ".\n",
           ridx, cellID, (double)PetscAbsReal(cell.detJacobian), altCell));
         cellID = altCell;
         PetscCall(extractCellCoordinates(dm, cellID, &cell));
         PetscCall(computeCellJacobian(&cell));
       } else {
         PetscCall(PetscPrintf(PETSC_COMM_SELF,
-          "   Warning: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
-          " (|detJ|=%.2e, coords=[%.4e,%.4e,%.4e]), no valid neighbor found - skipping\n",
+          "   WARNING: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
+          " (|detJ| = %.2e, coords = [%.4e, %.4e, %.4e]); no valid neighbor"
+          " found, skipping.\n",
           ridx, cellID, (double)PetscAbsReal(cell.detJacobian),
           (double)recvCoords[0], (double)recvCoords[1], (double)recvCoords[2]));
         numSkipped++;
@@ -244,10 +275,9 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
                                       NULL, NULL));
 
     for (PetscInt k = 0; k < grid->numDofInCell; k++) {
-      if (localIdx[k] < 0) continue;         /* BC-constrained: skip */
-      PetscInt gidx = globalIdxRaw[k];
-      if (gidx < 0) gidx = -(gidx + 1);      /* decode ghost DOF */
-      if (gidx < 0 || gidx >= Q->numDof) continue;  /* safety */
+      if (localIdx[k] < 0) continue;                       /* BC-constrained: skip */
+      PetscInt gidx = decodeGlobalDOF(globalIdxRaw[k]);
+      if (gidx >= Q->numDof) continue;                     /* safety */
 
       PetscReal ori = (PetscReal)dofSigns[k];
       PetscCall(MatSetValue(Q->QEx, ridx, gidx,
@@ -276,7 +306,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
 
   if (numSkipped > 0) {
     PetscCall(PetscPrintf(comm,
-      "\n   Warning: %" PetscInt_FMT " receiver(s) skipped due to degenerate cells\n",
+      "\n   WARNING: %" PetscInt_FMT " receiver(s) skipped due to degenerate cells.\n",
       numSkipped));
   }
 
@@ -318,9 +348,17 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Free the six Mats owned by a ReceiverInterpolationMatrices struct.
- * Idempotent on individual fields (MatDestroy handles NULL). The Q
- * struct itself is stack-owned by the caller and is not freed. */
+/**
+ * @brief Destroys the six Mats owned by a ReceiverInterpolationMatrices struct.
+ *
+ * Idempotent on individual fields (MatDestroy handles NULL). The Q struct
+ * itself is stack-owned by the caller and is not freed.
+ *
+ * @param[in,out] Q  Struct whose QEx..QHz matrices are destroyed.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode destroyReceiverInterpolationMatrices(ReceiverInterpolationMatrices *Q)
 {
   PetscFunctionBeginUser;

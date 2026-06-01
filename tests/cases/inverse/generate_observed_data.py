@@ -16,19 +16,21 @@ which the C loader reads directly into PetscScalar buffers.
 
 Usage:
     python generate_observed_data.py \\
-        --input responses_f0.25_src1.h5 responses_f1.0_src1.h5 ... \\
+        --input responses_f0.25.h5 responses_f1.0.h5 ... \\
         --error-level 0.01 \\
         --output observed_data.h5
 
     Or with a glob pattern:
     python generate_observed_data.py \\
-        --input-pattern "output/responses_*_src1.h5" \\
+        --input-pattern "output/responses_*.h5" \\
         --error-level 0.01 \\
         --output observed_data.h5
 
 Notes:
-    - Each input file must be a fm.csem HDF5 output containing /Ex dataset
-      and a Source_frequency attribute.
+    - Each input file is a fm.csem unified HDF5 output. The script pulls
+      the Ex dataset from --ex-dataset (default ``sources/src1/fields/Ex``)
+      and the source frequency from a robust fallback list (see
+      resolve_frequency).
     - Files are sorted by frequency in ascending order.
     - Noise model: std_i = |Ex_i| * error_level  (amplitude-relative,
       matches petgem_inv_new/add_noise_ari.m).
@@ -78,6 +80,58 @@ def read_petsc_complex_vec(dataset):
                      f"shape={raw.shape}, dtype={raw.dtype}")
 
 
+def resolve_frequency(f, fpath):
+    """Read the source frequency from an fm.csem output file, format-robust.
+
+    Tries, in order:
+      1. new unified-file root attribute  frequency  (single-file fm.csem
+         postprocessing.c writes this once at the root)
+      2. new per-source attribute  /sources/src1@frequency  (the same value
+         is mirrored on the source group)
+      3. legacy/root attribute  Source_frequency   (older fm.csem / MATLAB)
+      4. legacy per-file group   /source@frequency  (one-file-per-source layout)
+      5. a /frequencies dataset (first entry) as a last resort
+    """
+    if "frequency" in f.attrs:
+        return float(f.attrs["frequency"])
+    if "/sources/src1" in f and "frequency" in f["/sources/src1"].attrs:
+        return float(f["/sources/src1"].attrs["frequency"])
+    if "Source_frequency" in f.attrs:
+        return float(f.attrs["Source_frequency"])
+    if "source" in f and "frequency" in f["source"].attrs:
+        return float(f["source"].attrs["frequency"])
+    if "frequencies" in f:
+        return float(np.asarray(f["frequencies"]).ravel()[0])
+    raise ValueError(
+        f"Cannot find a source frequency in {fpath}. Looked for root attrs "
+        f"'frequency' / 'Source_frequency', group attrs "
+        f"'/sources/src1@frequency' / '/source@frequency', and dataset "
+        f"'/frequencies'. Available attrs: {list(f.attrs.keys())}, "
+        f"datasets: {list(f.keys())}")
+
+
+def resolve_ex_dataset(f, requested, fpath):
+    """Return the Ex dataset, trying the requested name then known layouts.
+
+    Current fm.csem stores receiver Ex under /sources/src{k}/fields/Ex in a
+    single unified file. Older fm.csem output used /fields/Ex (one file per
+    source). h5py resolves path-like names directly.
+    """
+    candidates = (
+        requested,
+        "sources/src1/fields/Ex",
+        "fields/Ex",
+        "Ex",
+        f"fields/{requested}",
+    )
+    for name in candidates:
+        if name and name in f:
+            return f[name]
+    raise ValueError(
+        f"Dataset '{requested}' (and fallbacks {candidates[1:]}) not found "
+        f"in {fpath}. Available top-level keys: {list(f.keys())}")
+
+
 def add_noise(data, error_level, rng):
     """Add amplitude-relative Gaussian noise to complex data.
 
@@ -109,9 +163,9 @@ def main():
                         help="Random seed for reproducibility (default: 42)")
     parser.add_argument("--no-noise", action="store_true",
                         help="Skip noise addition (use exact forward data)")
-    parser.add_argument("--ex-dataset", default="Ex",
-                        help="Name of the Ex dataset in HDF5 files "
-                             "(default: Ex)")
+    parser.add_argument("--ex-dataset", default="sources/src1/fields/Ex",
+                        help="HDF5 path to the Ex dataset in each input file "
+                             "(default: sources/src1/fields/Ex)")
     args = parser.parse_args()
 
     # Resolve input files
@@ -131,18 +185,8 @@ def main():
     for fpath in input_files:
         print(f"  Reading: {fpath}")
         with h5py.File(fpath, "r") as f:
-            if "Source_frequency" in f.attrs:
-                freq = float(f.attrs["Source_frequency"])
-            else:
-                raise ValueError(
-                    f"No 'Source_frequency' attribute in {fpath}. "
-                    f"Available attributes: {list(f.attrs.keys())}")
-
-            if args.ex_dataset not in f:
-                raise ValueError(
-                    f"Dataset '{args.ex_dataset}' not found in {fpath}. "
-                    f"Available datasets: {list(f.keys())}")
-            ex = read_petsc_complex_vec(f[args.ex_dataset])
+            freq = resolve_frequency(f, fpath)
+            ex = read_petsc_complex_vec(resolve_ex_dataset(f, args.ex_dataset, fpath))
             freq_data.append((freq, ex))
 
     # Sort by frequency

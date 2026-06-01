@@ -13,18 +13,24 @@
 
 #include "inputs.h"
 
+/**
+ * @brief A single CSEM transmitter (electric dipole) record.
+ */
 typedef struct {
-  PetscReal position[3];  /* Transmitter position (x, y, z) */
-  PetscReal current;      /* Electric current          */
-  PetscReal length;       /* Dipole length             */
-  PetscReal dipAngle;     /* Dip angle                 */
-  PetscReal azimuthAngle; /* Azimuth angle             */
+  PetscReal position[3];  /**< Transmitter position (x, y, z). */
+  PetscReal current;      /**< Electric current. */
+  PetscReal length;       /**< Dipole length. */
+  PetscReal dipAngle;     /**< Dip angle. */
+  PetscReal azimuthAngle; /**< Azimuth angle. */
 } CsemSource;
 
+/**
+ * @brief A set of CSEM transmitters sharing one operating frequency.
+ */
 typedef struct {
-  PetscReal freq;          /* Frequency                 */
-  PetscInt numSources;     /* Total number of transmitters */
-  CsemSource* sourceArray; /* Array of sources */
+  PetscReal freq;          /**< Operating frequency (Hz). */
+  PetscInt numSources;     /**< Total number of transmitters. */
+  CsemSource* sourceArray; /**< Array of `numSources` transmitter records. */
 } CsemSourceSet;
 
 #endif

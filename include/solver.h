@@ -15,11 +15,47 @@
 #include <petsc.h>
 #include <petscdmplex.h>
 
-/* Solve A·X = B. The G argument is the topological lowest-Whitney
- * gradient G_BDDC : Nédélec_k → P_nord H1 from assembleCsemKandM, used
- * as the structural hint for PCBDDCSetDiscreteGradient at order = 1
- * (the canonical P_nord G is too dense for PCBDDC's nnz budget at
- * nord ≥ 3). May be NULL when ismatis is false. */
+/**
+ * @brief Solves the linear system A·X = B using PETSc KSP.
+ *
+ * When A is a MATIS matrix and G is provided, the preconditioner is set to
+ * PCBDDC and G is registered via PCBDDCSetDiscreteGradient at order = 1 to
+ * capture the curl kernel for H(curl) problems. G is the topological
+ * lowest-Whitney gradient G_BDDC : Nédélec_k → P_nord H1 from
+ * assembleCsemKandM (the canonical P_nord gradient is too dense for
+ * PCBDDC's nnz budget at nord ≥ 3).
+ *
+ * @param[in]  dm  DMPlex mesh; its communicator drives the parallel solve.
+ * @param[in]  A   System matrix (H(curl) FEM operator).
+ * @param[in]  B   Right-hand side matrix, one column per source.
+ * @param[in]  G   Discrete-gradient hint for PCBDDC; may be NULL when A is
+ *                 not of type MATIS.
+ * @param[out] X   Solution matrix, created internally (caller destroys).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat G, Mat* X);
+
+/**
+ * @brief Configures `ksp`'s PC as PCBDDC with the discrete-gradient hint, if
+ *        the operator is MATIS and a gradient was supplied.
+ *
+ * Shared helper that captures the single BDDC policy used by both the
+ * forward solver (solveCsemSystem) and the inverse solver (createInvKSP):
+ * when A is of type MATIS and Gbddc is non-NULL, set PC to PCBDDC and
+ * register Gbddc via PCBDDCSetDiscreteGradient(..., order, 0,
+ * PETSC_TRUE, PETSC_TRUE). When the conditions are not met the function
+ * is a no-op so the caller's existing default PC stays in place.
+ *
+ * @param[in,out] ksp   KSP whose preconditioner is configured.
+ * @param[in]     A     System matrix (probed for MATIS).
+ * @param[in]     Gbddc Discrete-gradient hint (may be NULL).
+ * @param[in]     order Polynomial order passed to PCBDDCSetDiscreteGradient.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode petgemConfigureBDDCFromGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt order);
 
 #endif

@@ -73,8 +73,7 @@ static PetscErrorCode computeDisplayWidth(const char* s, PetscInt* width) {
  * sections of formatted console output.
  *
  * Output is produced using PETSc parallel printing routines on
- * PETSC_COMM_WORLD, ensuring consistent and collective display
- * across all MPI processes.
+ * PETSC_COMM_WORLD.
  *
  * @param[in] c  Character used to fill the separator line.
  *
@@ -107,8 +106,7 @@ static PetscErrorCode printSeparator(const char c) {
  * blocks while preserving the visual frame.
  *
  * Output is produced using PETSc parallel printing routines on
- * PETSC_COMM_WORLD, ensuring consistent and collective display
- * across all MPI processes.
+ * PETSC_COMM_WORLD.
  *
  * @return PetscErrorCode PETSC_SUCCESS on successful
  *         completion, or a PETSc error code otherwise.
@@ -132,8 +130,7 @@ static PetscErrorCode printEmptyLine(void) {
  * for multi-byte or wide characters.
  *
  * Output is produced using PETSc parallel printing routines on
- * PETSC_COMM_WORLD, ensuring consistent and collective display
- * across all MPI processes.
+ * PETSC_COMM_WORLD.
  *
  * @param[in] text  Null-terminated string to be printed centered
  *                  within the formatted line.
@@ -147,6 +144,7 @@ static PetscErrorCode printCenteredText(const char* text) {
 
   /* Variables declaration */
   PetscInt text_len;
+  
   /* `*` width specifier requires `int` per C standard; PetscInt would
    * be int64_t on 64-bit indices builds and trip strict format checks. */
   int total_space, left_pad, right_pad;
@@ -204,7 +202,8 @@ static PetscErrorCode PrintTimerHMSPercent(const char* label, PetscLogDouble t, 
 
   percent = (total > 0.0) ? (100.0 * t / total) : 0.0;
 
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-16s = %02d:%02d:%06.3f  | %6.2f %% |\n", label, hours, minutes, seconds, percent));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %02d:%02d:%06.3f  | %6.2f %% |\n",
+                        label, hours, minutes, seconds, percent));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -337,8 +336,7 @@ PetscErrorCode createDirectory(const char* path) {
  *
  * The reported stages are:
  *   - Reading user parameters
- *   - Source setup
- *   - Grid import
+ *   - Load input data
  *   - Grid setup
  *   - Assembly
  *   - Solver
@@ -348,16 +346,15 @@ PetscErrorCode createDirectory(const char* path) {
  * ensuring consistent and collective reporting across all
  * MPI processes associated with PETSC_COMM_WORLD.
  *
- * @param[in] timers Array of length 7 containing execution
+ * @param[in] timers Array of length 6 containing execution
  *                   times (in seconds) for each stage, in
  *                   the following order:
  *                   timers[0] = Read user parameters
- *                   timers[1] = Setup source
- *                   timers[2] = Import grid
- *                   timers[3] = Setup grid
- *                   timers[4] = Assembly
- *                   timers[5] = Solver
- *                   timers[6] = Postprocessing
+ *                   timers[1] = Load input data
+ *                   timers[2] = Grid setup
+ *                   timers[3] = Assembly
+ *                   timers[4] = Solver
+ *                   timers[5] = Postprocessing
  *
  * @return PetscErrorCode PETSC_SUCCESS on successful
  *         completion, or a PETSc error code otherwise.
@@ -369,19 +366,18 @@ PetscErrorCode printTimers(const PetscLogDouble timers[]) {
   PetscLogDouble elapsed_time = 0.0;
 
   /* Compute elapsed time */
-  for (PetscInt i = 0; i < 7; i++) {
+  for (PetscInt i = 0; i < 6; i++) {
     elapsed_time += timers[i];
   }
 
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Timers (hh:mm:ss.sss | %% |):\n"));
-  PetscCall(PrintTimerHMSPercent("Read user params", timers[0], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Setup source", timers[1], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Import grid", timers[2], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Setup grid", timers[3], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Assembly", timers[4], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Solver", timers[5], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Postprocessing", timers[6], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Elapsed time", elapsed_time, elapsed_time));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Timers (hh:mm:ss.sss |   %% |):\n"));
+  PetscCall(PrintTimerHMSPercent("Read parameters",     timers[0], elapsed_time));
+  PetscCall(PrintTimerHMSPercent("Load input bundle",   timers[1], elapsed_time));
+  PetscCall(PrintTimerHMSPercent("Setup grid",          timers[2], elapsed_time));
+  PetscCall(PrintTimerHMSPercent("Assembly",            timers[3], elapsed_time));
+  PetscCall(PrintTimerHMSPercent("Linear solve",        timers[4], elapsed_time));
+  PetscCall(PrintTimerHMSPercent("Field interpolation", timers[5], elapsed_time));
+  PetscCall(PrintTimerHMSPercent("Total",               elapsed_time, elapsed_time));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -421,9 +417,9 @@ PetscErrorCode printUsage(const char *progname) {
  * @brief Parse the dispatcher mode argument into a numeric code.
  *
  * Accepts the user-friendly synonyms for each kernel:
- *   - "modeling", "forward", "fm"  → *mode = 0 (forward)
- *   - "inverse", "im"              → *mode = 1 (inverse)
- *   - anything else                → *mode = -1 (unknown; caller can
+ *   - "modeling", "forward", "fm"  : *mode = 0 (forward)
+ *   - "inverse", "im"              : *mode = 1 (inverse)
+ *   - anything else                : *mode = -1 (unknown; caller can
  *                                    then call printUsage())
  *
  * @param[in]  s     Mode string from argv. Must be non-NULL.

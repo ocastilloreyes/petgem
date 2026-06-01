@@ -28,7 +28,30 @@
 
 #include <petsc.h>
 
+/**
+ * @brief Runs the CSEM forward-modeling kernel (fm.csem).
+ *
+ * Owns the complete PETSc lifecycle: calls PetscInitialize at entry and
+ * PetscFinalize at exit.
+ *
+ * @param[in] argc  Argument count from main().
+ * @param[in] argv  Argument vector from main().
+ *
+ * @return int the PetscErrorCode (cast to int) as the process exit status.
+ */
 int runForward(int argc, char **argv);
+
+/**
+ * @brief Runs the CSEM inversion kernel (im.csem).
+ *
+ * Owns the complete PETSc lifecycle: calls PetscInitialize at entry and
+ * PetscFinalize at exit.
+ *
+ * @param[in] argc  Argument count from main().
+ * @param[in] argv  Argument vector from main().
+ *
+ * @return int the PetscErrorCode (cast to int) as the process exit status.
+ */
 int runInverse(int argc, char **argv);
 
 #endif /* KERNELS_H */

@@ -679,9 +679,8 @@ PetscErrorCode ProjectTetE(const PetscReal Lam[NUM_DIMENSIONS + 1], const PetscR
 
   /* Edge slot ↔ vertex pair must match the PETGEM canonical labeling in
    * EDGE_VERTICES (constants.c) - that is the convention used by the cell
-   * closure traversal, the global DOF assignment, and the Block-A debug
-   * dump. Any mismatch here produces Whitney functions for the wrong
-   * physical edge at each slot.
+   * closure traversal and the global DOF assignment. Any mismatch here
+   * produces Whitney functions for the wrong physical edge at each slot.
    *
    * Slot layout (EDGE_VERTICES):
    *   E0: v0->v1   E1: v1->v2   E2: v2->v0

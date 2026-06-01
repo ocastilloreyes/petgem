@@ -125,15 +125,47 @@ populates only the fields it needs.
 
 Responses file
 --------------
-The kernel writes one responses file per source, named
-``<output_filename>_p<nord>_src<N>.h5`` (e.g. ``responses_p1_src1.h5``).
+The forward kernel writes a single unified HDF5 file containing every
+transmitter, named ``<output_filename>.h5`` (e.g. ``responses_p1.h5``). All
+six field components are produced through PETSc's native HDF5 viewer; the
+output Vecs are parallel on the kernel communicator, so writes are
+collective MPI-IO when PETSc is linked against a parallel HDF5 build (no
+rank-0 gather).
 
-- ``/fields/{Ex, Ey, Ez, Hx, Hy, Hz}``: the computed field components at the
-  receivers (complex on a complex PETSc build).
-- ``/source``: attributes describing the transmitter for this file.
-- Top-level attributes (provenance): ``petgem_version``, ``input_filename``,
-  ``date``, ``nord``, ``mpi_tasks``.
+Layout::
 
-``petgem.readResponses(path)`` returns a dict with the six field arrays plus
-``source`` and ``provenance`` attribute dicts. The per-case ``postprocess.py``
-scripts use this reader to compare against a reference.
+    /                              root attrs (provenance + run-wide values)
+    /sources/src1/                 per-source attrs
+    /sources/src1/fields/Ex        complex PETSc Vec, length N_recv
+    /sources/src1/fields/Ey
+    /sources/src1/fields/Ez
+    /sources/src1/fields/Hx
+    /sources/src1/fields/Hy
+    /sources/src1/fields/Hz
+    /sources/src2/                 (one such group per transmitter)
+    ...
+
+Root attributes:
+
+- ``petgem_version``, ``input_filename``, ``date``, ``nord``, ``mpi_tasks``
+  (provenance).
+- ``num_sources`` — number of transmitter groups stored under ``/sources/``.
+- ``frequency`` — operating frequency (Hz); single-frequency forward runs
+  carry one shared value here in addition to the per-source attribute.
+
+Per-source group attributes (``/sources/src{k}``): ``frequency``, ``x_pos``,
+``y_pos``, ``z_pos``, ``current``, ``length``, ``dip_angle``,
+``azimuth_angle``.
+
+Python readers:
+
+- ``petgem.readResponses(path, source=1)`` returns a per-source dict
+  (``Ex..Hz`` arrays + ``source`` and ``provenance`` attribute dicts),
+  preserving the shape used by pre-refactor callers.
+- ``petgem.readAllResponses(path)`` returns ``{'provenance': ...,
+  'num_sources': N, 'sources': {1: {...}, 2: {...}, ...}}`` with each
+  per-source entry shaped like ``readResponses``.
+
+The per-case ``postprocess.py`` scripts use these readers; see
+``tests/cases/csem_model/postprocess.py`` (single-source reference compare)
+and ``cicero_models/model_1/postprocess.py`` (multi-source plotting).

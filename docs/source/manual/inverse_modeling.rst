@@ -86,7 +86,17 @@ The inversion knobs are:
 - ``-inv_gtol``: Gradient-norm convergence tolerance.
 - ``-inv_rms_tol``: RMS misfit early-stop threshold.
 - ``-inv_snapshot_interval``: Write a conductivity VTU snapshot every N accepted
-  steps (``0`` disables snapshots; output goes to ``-output_dir``).
+  steps (``0`` disables snapshots; output goes to ``-output_dir``). Each snapshot
+  carries a single cell field, ``rho_ohm_m`` (the recovered resistivity model).
+- ``-inv_observed_mode``: Source of the observed data. ``external`` (default)
+  reads the bundle's ``/observed/Ex`` dataset prepared by the preprocess;
+  ``fm_native`` reads an ``fm.csem`` responses file directly through its native
+  ``/sources/src{k}/fields/Ex`` layout (source ``k`` → frequency row ``k``),
+  letting a forward run feed the inverse kernel without the Python reshape step.
+- ``-inv_observed_file``: Path to the observed-data file. Optional in
+  ``external`` mode (defaults to ``-input_filename``); **required** in
+  ``fm_native`` mode (the forward responses HDF5). Any measurement noise must
+  already be present in that file.
 
 These may be set in the parameter file or overridden on the command line. The
 data-derived overrides ``-inv_error_level`` and ``-inv_fixed_materials`` are

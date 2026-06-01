@@ -16,45 +16,147 @@
 #include <petsc.h>
 #include <petscdmplex.h>
 
+/** @brief 1D Gauss quadrature rule (points and weights). */
 typedef struct {
-  PetscInt numPoints;
-  PetscReal* points;
-  PetscReal* weights;
+  PetscInt numPoints;  /**< Number of quadrature points. */
+  PetscReal* points;   /**< Quadrature point coordinates. */
+  PetscReal* weights;  /**< Quadrature weights. */
 } Quadrature1D;
 
+/** @brief 2D (triangle) Gauss quadrature rule (points and weights). */
 typedef struct {
-  PetscInt numPoints;
-  PetscReal** points;
-  PetscReal* weights;
+  PetscInt numPoints;  /**< Number of quadrature points. */
+  PetscReal** points;  /**< Quadrature point coordinates (per point). */
+  PetscReal* weights;  /**< Quadrature weights. */
 } Quadrature2D;
 
+/** @brief 3D (tetrahedron) Gauss quadrature rule (points and weights). */
 typedef struct {
-  PetscInt numPoints;
-  PetscReal** points;
-  PetscReal* weights;
+  PetscInt numPoints;  /**< Number of quadrature points. */
+  PetscReal** points;  /**< Quadrature point coordinates (per point). */
+  PetscReal* weights;  /**< Quadrature weights. */
 } Quadrature3D;
 
+/**
+ * @brief Computes a cell's Jacobian matrix, its inverse, and determinant.
+ *
+ * @param[in,out] cell  Cell whose jacobian/invJacobian/detJacobian are filled.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode computeCellJacobian(Cell* cell);
 
+/**
+ * @brief Computes the orientation of faces and edges for a tetrahedral cell.
+ *
+ * @param[in,out] cell  Cell whose orientation (faces, edgeSigns) is filled.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode computeCellOrientation(Cell* cell);
 
+/**
+ * @brief Determines the number of 1D Gauss-Legendre quadrature points.
+ *
+ * @param[in]  nord        Basis order driving the quadrature degree.
+ * @param[out] quadrature  Rule whose numPoints is set.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode computeNum1DQuadraturePoints(const PetscInt nord, Quadrature1D* quadrature);
 
+/**
+ * @brief Determines the number of 2D quadrature points for a triangle.
+ *
+ * @param[in]  nord        Basis order driving the quadrature degree.
+ * @param[out] quadrature  Rule whose numPoints is set.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode computeNum2DQuadraturePoints(const PetscInt nord, Quadrature2D* quadrature);
 
+/**
+ * @brief Determines the number of Gauss quadrature points for a tetrahedron.
+ *
+ * @param[in]  nord        Basis order driving the quadrature degree.
+ * @param[out] quadrature  Rule whose numPoints is set.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode computeNum3DQuadraturePoints(const PetscInt nord, Quadrature3D* quadrature);
 
+/**
+ * @brief Populates 1D Gauss-Legendre quadrature points and weights.
+ *
+ * @param[in,out] quadrature  Rule (numPoints set) whose points/weights fill.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode compute1DQuadraturePoints(Quadrature1D* quadrature);
 
+/**
+ * @brief Populates 2D Gauss quadrature points and weights for a triangle.
+ *
+ * @param[in,out] quadrature  Rule (numPoints set) whose points/weights fill.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode compute2DQuadraturePoints(Quadrature2D* quadrature);
 
+/**
+ * @brief Populates 3D Gauss quadrature points and weights for a tetrahedron.
+ *
+ * @param[in,out] quadrature  Rule (numPoints set) whose points/weights fill.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature);
 
+/**
+ * @brief Maps global Cartesian coordinates to reference-tetrahedron coordinates.
+ *
+ * @param[in]  coordinates  Cell vertex coordinates (4 vertices × 3 dims).
+ * @param[in]  point        Global point to map.
+ * @param[out] XiEtaZeta    Reference coordinates (ξ, η, ζ) of the point.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode tetrahedronXYZToReference(const PetscReal coordinates[NUM_VERTICES_PER_CELL * NUM_DIMENSIONS],
                                          const PetscReal point[NUM_DIMENSIONS], PetscReal XiEtaZeta[NUM_DIMENSIONS]);
 
+/**
+ * @brief Computes a 3D unit vector from sequential azimuth/dip rotations.
+ *
+ * @param[in]  azimuth         Azimuth angle (degrees).
+ * @param[in]  dip             Dip angle (degrees).
+ * @param[out] rotationVector  Resulting unit direction vector.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal dip, PetscReal rotationVector[NUM_DIMENSIONS]);
 
+/**
+ * @brief Computes the elemental mass and stiffness matrices for a cell.
+ *
+ * @param[in]  fem         Finite-element space descriptor (order, DOF counts, ops).
+ * @param[in]  cell        Cell geometry and orientation.
+ * @param[in]  quadrature  3D quadrature rule.
+ * @param[out] Me          Elemental mass matrix (numDofInCell²).
+ * @param[out] Ke          Elemental stiffness matrix (numDofInCell²).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, const Quadrature3D* quadrature,
                                         PetscReal** Me, PetscReal** Ke);
 
@@ -62,63 +164,79 @@ PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, c
  * grid.c); hvfem.h already includes grid.h, so no re-declaration here -
  * a duplicate caused a Sphinx "Duplicate C declaration" warning. */
 
-/* Build the per-DOF sign vector for a cell under the chosen Nédélec order.
- *   nord=1: one DOF per edge; signs[e] = cell->orientation.edgeSigns[e].
- *   nord=2: faces-first with 2 DOFs per entity. Face DOFs are +1 (canonical-
- *           geometry q-vectors agree across adjacent cells); edge-DOF signs
- *           come from cell->orientation.edgeSigns[0..5].
- * The caller provides a signs[] array of length fem->numDofInCell. */
+/**
+ * @brief Builds the per-DOF sign vector for a cell at the chosen Nédélec order.
+ *
+ * nord=1: one DOF per edge; signs[e] = cell->orientation.edgeSigns[e].
+ * nord=2: faces-first with 2 DOFs per entity. Face DOFs are +1 (canonical-
+ *         geometry q-vectors agree across adjacent cells); edge-DOF signs
+ *         come from cell->orientation.edgeSigns[0..5].
+ *
+ * @param[in]  cell   Cell with computed orientation.
+ * @param[in]  fem    Finite-element space descriptor.
+ * @param[out] signs  Caller-provided array of length fem->numDofInCell.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode buildDofSigns(const Cell* cell, const FEMSpace* fem, PetscInt signs[]);
 
-/* Evaluate the Nédélec basis (and optionally curls) at a reference-cell
- * point. Dispatches on fem->nord. Pass NiCurl=NULL to skip curl evaluation. */
+/**
+ * @brief Evaluates the Nédélec basis (and optionally curls) at a reference point.
+ *
+ * Dispatches on fem->nord. Pass NiCurl = NULL to skip curl evaluation.
+ *
+ * @param[in]     fem     Finite-element space descriptor.
+ * @param[in]     cell    Cell geometry and orientation.
+ * @param[in]     point   Reference-cell evaluation point.
+ * @param[in,out] coeffs  Basis-coefficient workspace (order-dependent).
+ * @param[in,out] Dx_Ni   Workspace for ∂/∂x terms (used at nord=1).
+ * @param[in,out] Dy_Ni   Workspace for ∂/∂y terms (used at nord=1).
+ * @param[in,out] Dz_Ni   Workspace for ∂/∂z terms (used at nord=1).
+ * @param[out]    Ni      Basis-function values at the point.
+ * @param[out]    NiCurl  Basis-curl values (NULL to skip).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PetscError code otherwise.
+ */
 PetscErrorCode evaluateNedelecBasis(const FEMSpace* fem, const Cell* cell,
                                     const PetscReal point[NUM_DIMENSIONS],
                                     PetscReal** coeffs,
                                     PetscReal** Dx_Ni, PetscReal** Dy_Ni, PetscReal** Dz_Ni,
                                     PetscReal** Ni, PetscReal** NiCurl);
 
-/* Per-order Nédélec dispatch table. Each supported basis order registers
- * one of these; hot paths call through the table instead of a switch (nord).
- * Adding a new order means: define the four per-order static helpers in
- * hvfem.c, build a NedelecOps instance for them, and register it in
- * nedelecOpsForOrder().
+/**
+ * @brief Per-order Nédélec dispatch table.
+ *
+ * Each supported basis order registers one of these; hot paths call through
+ * the table instead of a switch (nord). Adding a new order means: define the
+ * four per-order static helpers in hvfem.c, build a NedelecOps instance for
+ * them, and register it in nedelecOpsForOrder().
  *
  * Uniform signatures - some fields are unused for a given order:
  *   - computeCoefficients: nord=1 fills coeffs AND Dx/Dy/Dz; nord>=2 only
  *     fills coeffs (Dx/Dy/Dz still passed but untouched).
- *   - computeBasis      : evaluates Ni at a reference-cell point.
- *   - computeCurls      : evaluates NiCurl at a reference-cell point. nord=1
- *     uses Dx/Dy/Dz; nord>=2 uses coeffs+point. Each impl reads what it needs.
+ *   - computeBasis       : evaluates Ni at a reference-cell point.
+ *   - computeCurls       : evaluates NiCurl at a reference-cell point. nord=1
+ *     uses Dx/Dy/Dz; nord>=2 uses coeffs+point.
  *   - buildGradientMatrix: TOPOLOGICAL discrete gradient G against P1 H1
- *     (numDofInCell x NUM_H1_DOF_PER_CELL). Used as the BDDC Nédélec
- *     hint via PCBDDCSetDiscreteGradient. Only the lowest-order Whitney
- *     row per mesh edge is nonzero (±1 vertex incidence); all other rows
- *     are zero. K·G is NOT zero at nord >= 2 by design.
- *   - buildExactGradientMatrix: EXACT commuting discrete gradient G
- *     against the hierarchical P_nord H1 basis (numDofInCell x
- *     numH1DofInCell_Pnord). Computed as the canonical Nédélec
- *     interpolation Π^Ned(∇φ_j), evaluated via Ainsworth–Coyle DOF
- *     moments (tangential edge Legendre moments + canonical-tangent
- *     face moments against barycentric polynomials + cell-local volume
- *     moments) - see hierarchicalBuildExactGradientMatrix. Cross-cell
- *     consistency is enforced by computing every shared moment in the
- *     CANONICAL geometric frame (sorted-vertex face ordering, canonical
- *     edge direction), so the assembled global G satisfies K·G = 0 to
- *     machine precision and G·c = 0 for the constant H1 mode. Consumed
- *     by assembleCsemKandM (the unified forward/inverse LHS assembly)
- *     and surfaced to PCBDDCSetDiscreteGradient via the topological
- *     G_BDDC sibling matrix. */
+ *     (numDofInCell x NUM_H1_DOF_PER_CELL), used as the BDDC Nédélec hint via
+ *     PCBDDCSetDiscreteGradient. Only the lowest-order Whitney row per mesh
+ *     edge is nonzero (±1 vertex incidence); K·G is NOT zero at nord >= 2.
+ */
 typedef struct NedelecOps {
+  /** Computes basis coefficients (and, at nord=1, derivative tables). */
   PetscErrorCode (*computeCoefficients)(const Cell *cell, PetscReal **coeffs,
                                         PetscReal **Dx_Ni, PetscReal **Dy_Ni,
                                         PetscReal **Dz_Ni);
 
+  /** Evaluates basis values Ni at a reference-cell point. */
   PetscErrorCode (*computeBasis)(const Cell *cell,
                                  const PetscReal point[NUM_DIMENSIONS],
                                  const PetscReal *const *coeffs,
                                  PetscReal **Ni);
 
+  /** Evaluates basis curls NiCurl at a reference-cell point. */
   PetscErrorCode (*computeCurls)(const Cell *cell,
                                  const PetscReal point[NUM_DIMENSIONS],
                                  const PetscReal *const *coeffs,
@@ -127,15 +245,19 @@ typedef struct NedelecOps {
                                  const PetscReal *const *Dz_Ni,
                                  PetscReal **NiCurl);
 
+  /** Builds the topological discrete-gradient matrix (BDDC hint). */
   PetscErrorCode (*buildGradientMatrix)(const FEMSpace *fem, const Cell *cell,
                                         const Quadrature1D *quadrature1d,
                                         PetscReal **gradientMatrix);
-
-  PetscErrorCode (*buildExactGradientMatrix)(const FEMSpace *fem, const Cell *cell,
-                                             PetscReal **gradientMatrix);
 } NedelecOps;
 
-/* Returns a pointer to the per-order ops table (NULL if nord is unsupported). */
+/**
+ * @brief Returns the per-order Nédélec ops table.
+ *
+ * @param[in] nord  Basis order.
+ *
+ * @return Pointer to the ops table, or NULL if nord is unsupported.
+ */
 const NedelecOps *nedelecOpsForOrder(PetscInt nord);
 
 #endif

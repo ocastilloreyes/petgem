@@ -35,18 +35,26 @@
 #include "inversion.h"
 #include "inversion_internal.h"
 
-/* ================================================================== */
-/* buildNeighborSmoothingGraph                                         */
-/*                                                                     */
-/* For each local cell i:                                              */
-/*   - find all cells sharing at least one vertex via DMPlex star      */
-/*   - exclude fixed cells (material_id in iparams->fixedMaterials)   */
-/*   - weight w_ij = 1/dist(centroid_i, centroid_j), normalized        */
-/* Fixed cells: those with no valid neighbors keep self-reference.    */
-/* ================================================================== */
+/**
+ * @brief Builds the CSR neighbor smoothing graph from DMPlex topology.
+ *
+ * For each local cell i: finds all cells sharing at least one vertex via the
+ * DMPlex star; excludes fixed cells (material_id in iparams->fixedMaterials);
+ * weights w_ij = 1/dist(centroid_i, centroid_j), normalized. Fixed cells with
+ * no valid neighbors keep a self-reference.
+ *
+ * @param[in]  dm           DMPlex mesh.
+ * @param[in]  grid         Finite-element grid descriptor.
+ * @param[in]  iparams      Inversion parameters (fixed-material list).
+ * @param[in]  materialsID  Per-cell material-id Vec.
+ * @param[out] graph        Neighbor graph populated with CSR data and flags.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
                                            const Grid       *grid,
-                                           const invParams  *iparams,
+                                           const imParams   *iparams,
                                            Vec               materialsID,
                                            NeighborGraph    *graph)
 {
@@ -231,33 +239,31 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* applyGaussSeidelSmoothing                                           */
-/*                                                                     */
-/* Forward + reverse JACOBI sweep using the precomputed CSR neighbor   */
-/* graph. Each updated value is computed from a frozen snapshot of the  */
-/* array (not in place), so the result is independent of the visiting  */
-/* order. This is the key property that makes the smoother bit-        */
-/* reproducible across any MPI partition: an in-place Gauss-Seidel     */
-/* sweep depends on the (partition-derived) cell order and on stale    */
-/* ghost values, which at high rank counts under-regularizes the many  */
-/* partition boundaries and drives runaway overfitting there (observed */
-/* rho up to ~1e6 at 336 ranks). Jacobi removes that order dependence. */
-/* The name is retained for call-site stability.                       */
-/* Operates on a partition-local Vec - non-owned DOFs not visited.     */
-/* diagWeight < 0 is a sentinel that bypasses the smoother (used by    */
-/* the dev FD-gradient check).                                         */
-/* ================================================================== */
+/**
+ * @brief Applies forward + reverse Jacobi smoothing using the neighbor graph.
+ *
+ * Each updated value is computed from a frozen snapshot of the array (not in
+ * place), so the result is independent of the visiting order. This is the key
+ * property that makes the smoother bit-reproducible across any MPI partition:
+ * an in-place Gauss-Seidel sweep depends on the (partition-derived) cell order
+ * and on stale ghost values, which at high rank counts under-regularizes the
+ * many partition boundaries and drives runaway overfitting there (observed ρ
+ * up to ~1e6 at 336 ranks). Jacobi removes that order dependence. The legacy
+ * name is retained for call-site stability. Operates on a partition-local
+ * Vec; non-owned DOFs are not visited.
+ *
+ * @param[in]     graph      Neighbor smoothing graph.
+ * @param[in]     diagWeight Self-weight applied to the diagonal during sweeps.
+ * @param[in,out] v          Vector smoothed in place.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
                                          PetscReal            diagWeight,
                                          Vec                  v)
 {
   PetscFunctionBeginUser;
-
-  /* Sentinel: a negative diagWeight bypasses the smoother entirely.
-   * Used by runFdGradientCheck so the FD test sees a self-consistent
-   * objective/gradient pair (no non-symmetric S confusing the chain rule). */
-  if (diagWeight < 0.0) PetscFunctionReturn(PETSC_SUCCESS);
 
   /* ============================================================== */
   /* Fully-parallel Jacobi path. Each rank refreshes ghosts, then    */
@@ -387,30 +393,34 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
   PetscCall(VecRestoreArray(v, &arr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-/* ================================================================== */
-/* setupParallelSmoothingGraph                                        */
-/*                                                                     */
-/* Builds the per-rank overlap=1 neighbor graph used by the fully-    */
-/* parallel Jacobi path of applyGaussSeidelSmoothing. Steps:          */
-/*   1. DMPlexDistributeOverlap(dm, 1, …) → permanent overlap=1 EM-DM */
-/*      kept alive for the lifetime of the inversion run.             */
-/*   2. Clone the EM-DM-over and install a 1-DOF/cell PetscSection on */
-/*      it, identical in shape to the original dmInversion section.   */
-/*      The owned-cell DOFs are at the SAME local positions as in     */
-/*      dmInversion (0..nOwned-1), so direct memcpy-style transfer    */
-/*      works between them.                                           */
-/*   3. Walk vertex stars on the overlap-1 DM for each owned cell;    */
-/*      neighbor list now includes ghost cells (local-overlap-1       */
-/*      indices); compute 1/dist weights and normalize.               */
-/*   4. Allocate persistent local + global Vec scratch on the new DM. */
-/*                                                                     */
-/* The smoother sweep itself is Jacobi (reads a frozen snapshot per   */
-/* sweep, with a ghost refresh between sweeps), so the smoothed result */
-/* matches the single-rank sequential path up to floating-point       */
-/* summation order and is independent of the MPI partition. The       */
-/* refreshed ghosts give each owned cell the correct (non-stale)       */
-/* neighbor values, identical to what the sequential sweep sees.      */
-/* ================================================================== */
+/**
+ * @brief Builds the per-rank overlap=1 neighbor graph and ghost workspace.
+ *
+ * Used by the fully-parallel Jacobi path of applyGaussSeidelSmoothing.
+ * Steps:
+ *   1. DMPlexDistributeOverlap(dm, 1, …) → permanent overlap=1 EM-DM kept
+ *      alive for the lifetime of the inversion run.
+ *   2. Clone the EM-DM-over and install a 1-DOF/cell PetscSection on it,
+ *      identical in shape to the original dmInversion section. The owned
+ *      DOFs occupy the SAME local positions as in dmInversion
+ *      (0..nOwned-1), so direct memcpy-style transfer works between them.
+ *   3. Walk vertex stars on the overlap-1 DM for each owned cell; the
+ *      neighbor list now includes ghost cells (local-overlap-1 indices);
+ *      compute 1/dist weights and normalize.
+ *   4. Allocate persistent local + global Vec scratch on the new DM.
+ *
+ * The smoother sweep itself is Jacobi (reads a frozen snapshot per sweep with
+ * a ghost refresh between sweeps), so the smoothed result matches the
+ * single-rank sequential path up to floating-point summation order and is
+ * independent of the MPI partition.
+ *
+ * @param[in,out] graph  Neighbor graph extended with overlap=1 parallel state.
+ * @param[in]     dm     DMPlex mesh.
+ * @param[in]     grid   Finite-element grid descriptor.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
                                             const DM       dm,
                                             const Grid    *grid)
@@ -423,11 +433,33 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
 
   if (size == 1) PetscFunctionReturn(PETSC_SUCCESS);
 
-  /* ---- 1. Permanent overlap=1 EM-DM ---- */
+  /* ---- 1. Permanent overlap=1 EM-DM ----
+   * The overlap MUST capture every cell sharing a VERTEX with an owned cell,
+   * because the smoother's neighbour graph is built from vertex stars. The
+   * DM's default basic adjacency is face-based (support-of-cone), which would
+   * leave vertex-only cross-rank neighbours out of the overlap and make the
+   * smoothing operator partition-dependent (boundary seams). We temporarily
+   * force closure (vertex) adjacency - useCone=PETSC_FALSE, useClosure=PETSC_TRUE,
+   * the same adjacency the forward H(curl) assembly uses - for the overlap
+   * distribution, then restore the DM's adjacency exactly as found so the
+   * shared dm is untouched for everything downstream (assembly sets its own
+   * field adjacency later). This makes the parallel smoother graph identical
+   * in CONTENT to the single-rank full-mesh graph at every rank count. */
+  PetscBool savedCone, savedClosure;
+  PetscCall(DMGetBasicAdjacency(dm, &savedCone, &savedClosure));
+  PetscCall(DMSetBasicAdjacency(dm, PETSC_FALSE, PETSC_TRUE));
+
   DM      dmEMOver = NULL;
   PetscSF sfDist;
   PetscCall(DMPlexDistributeOverlap(dm, 1, &sfDist, &dmEMOver));
   PetscCall(PetscSFDestroy(&sfDist));
+
+  PetscCall(DMSetBasicAdjacency(dm, savedCone, savedClosure));
+
+  /* A NULL overlap at size>1 means the mesh was not actually distributed
+   * (all cells on one rank). The single-rank smoother path then sweeps the
+   * full owned-cell graph on that rank (complete vertex stars) and is correct;
+   * empty ranks have nothing to smooth. Safe to leave hasParallelGraph=false. */
   if (!dmEMOver) PetscFunctionReturn(PETSC_SUCCESS);
 
   /* ---- 2. Build dmInversionOver: clone + install 1-DOF/cell section ---- */
@@ -596,16 +628,24 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* buildNotFixedMask                                                   */
-/*                                                                     */
-/* Builds a 0/1 mask vector on dmInversion (1 DOF/cell):              */
-/*   mask[cell] = 0  if cell->isFixed                                 */
-/*   mask[cell] = 1  otherwise                                        */
-/*                                                                     */
-/* The mask replaces the fragile DMPlexVecSetClosure-on-global-Vec    */
-/* pattern for zeroing gradient entries at fixed elements.            */
-/* ================================================================== */
+/**
+ * @brief Builds a 0/1 mask vector that freezes fixed cells.
+ *
+ * Produces a global mask on dmInversion (1 DOF/cell):
+ *   mask[cell] = 0 if cell->isFixed,
+ *   mask[cell] = 1 otherwise.
+ * The mask replaces the fragile DMPlexVecSetClosure-on-global-Vec pattern
+ * for zeroing gradient entries at fixed elements.
+ *
+ * @param[in]  graph        Neighbor graph carrying the isFixed flags.
+ * @param[in]  dmInversion  DM for the inversion field (1 DOF/cell).
+ * @param[in]  grid         Finite-element grid descriptor.
+ * @param[out] maskGlobal   Global 0/1 mask Vec.
+ * @param[out] maskLocal    Ghosted local counterpart of the mask.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode buildNotFixedMask(const NeighborGraph *graph,
                                   DM                  dmInversion,
                                   const Grid         *grid,
@@ -643,19 +683,29 @@ PetscErrorCode buildNotFixedMask(const NeighborGraph *graph,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* applyLogToSigma                                                     */
-/*                                                                     */
-/* sigma = 1 / exp(X_smooth + X0)   (isotropic)                      */
-/*                                                                     */
-/* X and X0 are global Vecs on dmInversion (1 DOF/cell).              */
-/* sigmaModel is a local Vec on dmConductivity (3 DOF/cell).           */
-/* Components 0-2 (res_x, res_y, res_z) are set to sigma.            */
-/*                                                                     */
-/* graph/diagWeight: apply the same Gauss-Seidel smoothing to a local */
-/* copy of X before the exp conversion, matching MATLAB's tempX       */
-/* smoothing after each L-BFGS step. X itself is NOT modified.        */
-/* ================================================================== */
+/**
+ * @brief Recovers conductivity σ = 1 / exp(X_smooth + X0) (isotropic).
+ *
+ * X and X0 are global Vecs on dmInversion (1 DOF/cell); sigmaModel is a
+ * local Vec on dmConductivity (3 DOF/cell), with components 0-2
+ * (res_x, res_y, res_z) set to σ. The smoother (graph/diagWeight) is applied
+ * to a local copy of X before exp, matching MATLAB's tempX smoothing after
+ * each L-BFGS step; X itself is NOT modified.
+ *
+ * @param[in]  dmInversion     DM for the inversion field (1 DOF/cell).
+ * @param[in]  dmConductivity  DM for the conductivity field.
+ * @param[in]  X               Log-perturbation iterate (global).
+ * @param[in]  X0              Initial log(ρ) (global).
+ * @param[out] sigmaModel      Recovered conductivity (local).
+ * @param[in]  grid            Finite-element grid descriptor.
+ * @param[in]  graph           Neighbor smoothing graph.
+ * @param[in]  diagWeight      Smoother self-weight.
+ * @param[out] xPostSmoothOut  Optional: local Vec on dmInversion receiving
+ *                             the smoothed X (pre-X0 add) for VTU snapshots.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity,
                                 const Vec X, const Vec X0,
                                 Vec sigmaModel, const Grid *grid,
@@ -716,9 +766,14 @@ PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* destroyNeighborGraph                                                */
-/* ================================================================== */
+/**
+ * @brief Frees the NeighborGraph memory (owned and overlap-1 buffers).
+ *
+ * @param[in,out] graph  Neighbor graph to destroy.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode destroyNeighborGraph(NeighborGraph *graph)
 {
   PetscFunctionBeginUser;

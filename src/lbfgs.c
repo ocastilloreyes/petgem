@@ -32,21 +32,41 @@
 
 #include "inversion.h"
 
-/* ================================================================== */
-/* lbfgsOptimize                                                       */
-/*                                                                     */
-/* Limited-Memory BFGS optimizer (Nocedal 1980).                      */
-/*                                                                     */
-/* Implements the two-loop recursion for H*g approximation and a       */
-/* backtracking Armijo line search.  Designed to work with complex     */
-/* PetscScalar (TAO is unavailable when PETSC_USE_COMPLEX is set).    */
-/*                                                                     */
-/* All optimization variables are stored with zero imaginary part;     */
-/* VecDot/VecAXPY on such data reduce to standard real operations.    */
-/*                                                                     */
-/* Reference: Nocedal & Wright, "Numerical Optimization", Ch. 7       */
-/*            MATLAB Fortran reference: petgem_inv_new/lbfgs_matlab/   */
-/* ================================================================== */
+/**
+ * @brief Limited-Memory BFGS optimizer (Nocedal 1980).
+ *
+ * Implements the two-loop recursion for H·g approximation with a
+ * backtracking Armijo line search. Designed to work with complex
+ * PetscScalar (TAO is unavailable when PETSC_USE_COMPLEX is set). All
+ * optimization variables are stored with zero imaginary part, so
+ * VecDot/VecAXPY on them reduce to standard real operations.
+ *
+ * Two early-stop modes are supported when the caller maintains an RMS
+ * value via `rmsPtr`:
+ *   - Absolute: stop when *rmsPtr ≤ rmsTol (matches MATLAB's
+ *     `rms <= 1.05` exit in Ex_inv.m).
+ *   - Adaptive plateau: stop when the relative drop is below
+ *     `-inv_rms_rtol` for `-inv_rms_stall_window` consecutive
+ *     iterations (default 1e-3 / 3 iters).
+ *
+ * References: Nocedal & Wright, "Numerical Optimization", Ch. 7;
+ *             MATLAB Fortran reference at petgem_inv_new/lbfgs_matlab/.
+ *
+ * @param[in]     objgrad    Objective/gradient callback.
+ * @param[in]     ctx        Opaque context passed to objgrad (an
+ *                           InversionContext * in current usage).
+ * @param[in,out] X          Initial iterate; final iterate on return.
+ * @param[in]     M          L-BFGS memory size.
+ * @param[in]     maxIter    Maximum number of iterations.
+ * @param[in]     gtol       Gradient-norm convergence tolerance.
+ * @param[in]     rmsPtr     Optional pointer to a caller-updated RMS value.
+ * @param[in]     rmsTol     RMS early-stop threshold (≤0 disables).
+ * @param[out]    numIters   Number of iterations performed.
+ * @param[out]    reasonStr  Human-readable convergence/stop reason.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
                              Vec X, PetscInt M, PetscInt maxIter,
                              PetscReal gtol,
@@ -66,18 +86,16 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
   PetscCall(VecDuplicate(X, &Xnew));
   PetscCall(VecDuplicate(X, &Gnew));
 
-  /* L-BFGS memory: s[i] = X_{k+1} - X_k, y[i] = G_{k+1} - G_k */
+  /* L-BFGS memory: s[i] = X_{k+1} - X_k, y[i] = G_{k+1} - G_k.
+   * VecDuplicateVecs creates the array of Vec handles AND the Vecs in a
+   * single call - one round-trip instead of an explicit per-slot loop. */
   Vec *S, *Y;
   PetscReal *rho;       /* rho[i] = 1 / (y_i^T s_i) */
   PetscReal *alpha;     /* workspace for two-loop recursion */
-  PetscCall(PetscMalloc1(M, &S));
-  PetscCall(PetscMalloc1(M, &Y));
+  PetscCall(VecDuplicateVecs(X, M, &S));
+  PetscCall(VecDuplicateVecs(X, M, &Y));
   PetscCall(PetscMalloc1(M, &rho));
   PetscCall(PetscMalloc1(M, &alpha));
-  for (PetscInt i = 0; i < M; i++) {
-    PetscCall(VecDuplicate(X, &S[i]));
-    PetscCall(VecDuplicate(X, &Y[i]));
-  }
 
   /* Evaluate initial objective and gradient */
   PetscReal f;
@@ -90,10 +108,16 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
 
   {
     InversionContext *ictx0 = (InversionContext *)ctx;
+    /* Tabular trace: header row printed once, then one row per iteration
+     * (including the initial iterate at iter 0 below).  Columns are
+     * iter, RMS, F (objective), reg (Tikhonov term), ||g||, step length. */
     PetscCall(PetscPrintf(comm,
-      "   Iter %3d : RMS = %8.4f  F = %10.4e  reg = %9.3e  ||g|| = %9.3e\n",
+      "   %4s   %10s   %10s   %10s   %10s   %10s\n",
+      "iter", "RMS", "F", "reg", "||g||", "step"));
+    PetscCall(PetscPrintf(comm,
+      "   %4d   %10.4f   %10.4e   %10.4e   %10.4e   %10s\n",
       0, (double)ictx0->lastRMS, (double)f,
-      (double)ictx0->lastRegTerm, (double)gnorm));
+      (double)ictx0->lastRegTerm, (double)gnorm, "-"));
   }
 
   /* Convergence check before iteration */
@@ -167,7 +191,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     if (gTd >= 0.0) {
       /* Not a descent direction - fall back to steepest descent */
       PetscCall(PetscPrintf(comm,
-        "   L-BFGS: positive curvature detected, resetting to steepest descent\n"));
+        "   L-BFGS: positive curvature detected; resetting to steepest descent.\n"));
       PetscCall(VecCopy(G, d));
       PetscCall(VecScale(d, -1.0));
       PetscCall(VecDot(G, d, &gTd_scalar));
@@ -203,7 +227,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
 
     if (!lsOk) {
       PetscCall(PetscPrintf(comm,
-        "   L-BFGS: line search failed at iter %" PetscInt_FMT "\n", iter + 1));
+        "   L-BFGS: line search failed at iter %" PetscInt_FMT ".\n", iter + 1));
       *reasonStr = "DIVERGED_LS_FAILURE";
       *numIters  = iter + 1;
       goto cleanup;
@@ -230,7 +254,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
        * existing history.  Resetting to steepest descent was too
        * aggressive: stale history is still better than no history. */
       PetscCall(PetscPrintf(comm,
-        "   L-BFGS: skipping update (y^T s = %g), keeping history\n",
+        "   L-BFGS: skipping update (y^T s = %g); keeping history.\n",
         (double)ys));
     }
 
@@ -257,15 +281,14 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     {
       InversionContext *ictxIter = (InversionContext *)ctx;
       PetscCall(PetscPrintf(comm,
-        "   Iter %3" PetscInt_FMT " : RMS = %8.4f  F = %10.4e  reg = %9.3e"
-        "  ||g|| = %9.3e  step = %6.3g\n",
+        "   %4" PetscInt_FMT "   %10.4f   %10.4e   %10.4e   %10.4e   %10.4e\n",
         iter + 1, (double)ictxIter->lastRMS, (double)f,
         (double)ictxIter->lastRegTerm, (double)gnorm, (double)stp));
     }
 
     if (PetscIsNanReal(gnorm) || PetscIsNanReal(f)) {
       PetscCall(PetscPrintf(comm,
-        "   L-BFGS: NaN detected at iter %" PetscInt_FMT "\n", iter + 1));
+        "   L-BFGS: NaN detected at iter %" PetscInt_FMT ".\n", iter + 1));
       *reasonStr = "DIVERGED_NAN";
       *numIters  = iter + 1;
       goto cleanup;
@@ -306,14 +329,10 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
   *numIters = maxIter;
 
 cleanup:
-  PetscCall(PetscPrintf(comm, "\n   L-BFGS finished: %s  (%" PetscInt_FMT " iterations)\n",
-                        *reasonStr, *numIters));
-  for (PetscInt i = 0; i < M; i++) {
-    PetscCall(VecDestroy(&S[i]));
-    PetscCall(VecDestroy(&Y[i]));
-  }
-  PetscCall(PetscFree(S));
-  PetscCall(PetscFree(Y));
+  PetscCall(PetscPrintf(comm, "\n   %-24s = %s (%" PetscInt_FMT " iterations)\n",
+                        "L-BFGS exit reason", *reasonStr, *numIters));
+  PetscCall(VecDestroyVecs(M, &S));
+  PetscCall(VecDestroyVecs(M, &Y));
   PetscCall(PetscFree(rho));
   PetscCall(PetscFree(alpha));
   PetscCall(VecDestroy(&G));

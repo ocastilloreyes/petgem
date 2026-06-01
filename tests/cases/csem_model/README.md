@@ -24,13 +24,13 @@ python3 utils/preprocess.py \
     -source_filename sources.txt -receiver_filename receivers.txt \
     -sigma_file sigmas.txt
 
-# 2. Solve (reads input.h5; writes responses_p1_src1.h5)
+# 2. Solve (reads input.h5; writes the unified responses_p1.h5)
 mpirun -n 4 fm.csem -options_file tests/cases/csem_model/params.txt
 
 # 3. Postprocess (case-specific validation)
 python3 tests/cases/csem_model/postprocess.py \
     -case_dir tests/cases/csem_model \
-    -responses_filename responses_p1_src1.h5
+    -responses_filename responses_p1.h5
 ```
 
 The pytest integration test under `tests/integration/test_fm_csem_smoke.py`

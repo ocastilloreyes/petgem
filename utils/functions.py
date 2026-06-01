@@ -849,32 +849,99 @@ def readBundle(filename):
     }
 
 
-def readResponses(filename):
-    """Read a PETGEM responses HDF5 file (written by fm.csem postprocessing).
+def readResponses(filename, source=1):
+    """Read one source's responses from a PETGEM single-file output HDF5.
 
-    Returns a dict with keys::
+    The fm.csem postprocessing writes a single file containing every
+    transmitter under ``/sources/src{k}/`` groups (k is 1-based).  This
+    helper returns the per-source dict for the requested transmitter,
+    keeping the per-source result shape that pre-refactor callers used.
 
-      Ex, Ey, Ez, Hx, Hy, Hz : ndarrays (complex in PETSc complex builds)
-      source      : dict of /source attributes
-                    (frequency, x_pos, y_pos, z_pos, current, length,
-                     dip_angle, azimuth_angle)
-      provenance  : dict of top-level attributes
-                    (petgem_version, input_filename, date, nord, mpi_tasks)
+    Parameters
+    ----------
+    filename : str
+        Path to the responses HDF5 file.
+    source : int, optional
+        1-based source index (default 1).
 
+    Returns
+    -------
+    dict
+        Keys::
+
+          Ex, Ey, Ez, Hx, Hy, Hz : ndarrays (complex in PETSc complex builds)
+          source      : dict of /sources/src{k} attributes
+                        (frequency, x_pos, y_pos, z_pos, current, length,
+                         dip_angle, azimuth_angle)
+          provenance  : dict of root-level attributes
+                        (petgem_version, input_filename, date, nord,
+                         mpi_tasks, num_sources, frequency)
+
+    Notes
+    -----
     Attributes are read via h5py (petsc4py's attribute API is awkward for
-    this read pattern).  The Vec components live under /fields/ in the
-    new output layout.
+    this read pattern). Vec components live under
+    ``/sources/src{k}/fields/`` in the new single-file layout.
     """
     import h5py
 
+    src_group    = f"/sources/src{int(source)}"
+    fields_group = f"{src_group}/fields"
+
     out = {}
     for name in ('Ex', 'Ey', 'Ez', 'Hx', 'Hy', 'Hz'):
-        out[name] = np.array(readVectorH5(filename, name, group='/fields'))
+        out[name] = np.array(readVectorH5(filename, name, group=fields_group))
 
     with h5py.File(filename, 'r') as f:
-        out['source']     = {k: _decodeH5Attr(v) for k, v in f['/source'].attrs.items()} if '/source' in f else {}
+        if src_group not in f:
+            raise KeyError(
+                f"{filename}: missing group {src_group!r} (file holds "
+                f"{int(f.attrs.get('num_sources', -1))} sources)"
+            )
+        out['source']     = {k: _decodeH5Attr(v) for k, v in f[src_group].attrs.items()}
         out['provenance'] = {k: _decodeH5Attr(v) for k, v in f.attrs.items()}
     return out
+
+
+def readAllResponses(filename):
+    """Read every source's responses from a single PETGEM responses file.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the responses HDF5 file written by fm.csem postprocessing.
+
+    Returns
+    -------
+    dict
+        Keys::
+
+          provenance : dict of root-level attributes (see ``readResponses``)
+          num_sources : int (mirrors provenance['num_sources'] for convenience)
+          sources    : dict keyed by 1-based source index; each value has the
+                       same shape as ``readResponses(filename, source=k)``
+                       (Ex..Hz arrays + 'source' attrs + 'provenance').
+
+    Notes
+    -----
+    Source indices are discovered from root attribute ``num_sources``; the
+    underlying groups are named ``/sources/src1`` ... ``/sources/srcN``.
+    """
+    import h5py
+
+    with h5py.File(filename, 'r') as f:
+        provenance = {k: _decodeH5Attr(v) for k, v in f.attrs.items()}
+        num_sources = int(provenance.get('num_sources', 0))
+        if num_sources <= 0 and '/sources' in f:
+            num_sources = len([k for k in f['/sources'].keys() if k.startswith('src')])
+
+    sources = {k: readResponses(filename, source=k)
+               for k in range(1, num_sources + 1)}
+    return {
+        'provenance':  provenance,
+        'num_sources': num_sources,
+        'sources':     sources,
+    }
 
 
 def _decodeH5Attr(v):

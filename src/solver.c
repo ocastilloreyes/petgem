@@ -64,13 +64,44 @@
  * - Ensure B has the correct size and ordering consistent with A.
  * - G must be compatible with the ordering of DOFs in A if MATIS/PCBDDC is used.
  */
+/*
+ * PCBDDC + Nédélec discrete-gradient policy used by BOTH kernels.
+ *
+ * G is the TOPOLOGICAL gradient G_BDDC : Nédélec_k → P_nord H1 from
+ * assembleCsemKandM (lowest-Whitney vertex incidence per mesh edge, higher-
+ * order edge / face / volume rows zero, K·G_BDDC ≠ 0 by design).  BDDC uses
+ * G as a structural hint to identify the curl-kernel coarse space
+ * (∇P_1 ⊂ Nédélec_1 ⊂ Nédélec_k); higher-order H(curl) DOFs are
+ * static-condensed internally.
+ *
+ * (A denser, mathematically exact canonical Π^Ned gradient against P_nord
+ * H1 was historically a separate assembleCsemKandM output for K·G analysis,
+ * but it was never passed to PCBDDC - its face / volume couplings violate
+ * the edge-cluster nnz budget BDDC checks in PCBDDCNedelecSupport
+ * ("SIZE OF EDGE > EXTCOL SECOND PASS" at nord ≥ 3) - and has been removed
+ * as unused.)
+ */
+PetscErrorCode petgemConfigureBDDCFromGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt order)
+{
+  PetscFunctionBeginUser;
+  PetscBool ismatis = PETSC_FALSE;
+  PetscCall(PetscObjectTypeCompare((PetscObject)A, MATIS, &ismatis));
+  if (ismatis && Gbddc) {
+    PC pc;
+    PetscCall(KSPGetPC(ksp, &pc));
+    PetscCall(PCSetType(pc, PCBDDC));
+    PetscCall(PCBDDCSetDiscreteGradient(pc, Gbddc, order, 0,
+                                        PETSC_TRUE, PETSC_TRUE));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat G, Mat* X) {
 
   PetscFunctionBeginUser;
 
   /* Variables declaration */
   KSP ksp;
-  PetscBool ismatis = PETSC_FALSE;
   PetscInt M, N, m, n;
   VecType vtype;
 
@@ -81,45 +112,22 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
   PetscCall(KSPCreate(comm, &ksp));
   PetscCall(KSPSetOperators(ksp, A, A));
 
-  PetscCall(PetscObjectTypeCompare((PetscObject)A, MATIS, &ismatis));
-
-  /* PCBDDC + Nédélec discrete-gradient operator at every supported order.
-   *
-   * G here is the TOPOLOGICAL gradient G_BDDC : Nédélec_k → P_nord H1
-   * from assembleCsemKandM (lowest-Whitney vertex incidence per mesh
-   * edge, higher-order edge / face / volume rows zero, K·G_BDDC ≠ 0
-   * by design). PCBDDCSetDiscreteGradient is called with order = 1:
-   * BDDC uses G as a structural hint to identify the curl-kernel
-   * coarse space (∇P_1 ⊂ Nédélec_1 ⊂ Nédélec_k), and higher-order
-   * H(curl) DOFs are static-condensed internally.
-   *
-   * The mathematically exact, cross-cell-consistent canonical Π^Ned
-   * gradient against P_nord H1 is also produced by assembleCsemKandM
-   * (the separate `G` matrix output) but is NOT passed to PCBDDC
-   * because its denser face/volume couplings violate the edge-cluster
-   * nnz budget BDDC checks during PCBDDCNedelecSupport ("SIZE OF EDGE
-   * > EXTCOL SECOND PASS" at nord ≥ 3). The canonical G is used for
-   * K·G analysis and any consumer that needs the actual algebraic
-   * gradient. */
-  if (ismatis && G) {
-    PC pc;
-    PetscCall(KSPGetPC(ksp, &pc));
-    PetscCall(PCSetType(pc, PCBDDC));
-    PetscCall(PCBDDCSetDiscreteGradient(pc, G, 1, 0,
-                                        PETSC_TRUE, PETSC_TRUE));
-  }
+  /* Forward solver always passes order = 1 to PCBDDCSetDiscreteGradient
+   * (G is the lowest-Whitney topological gradient). */
+  PetscCall(petgemConfigureBDDCFromGradient(ksp, A, G, 1));
   PetscCall(KSPSetFromOptions(ksp));
 
   PetscCall(MatGetSize(B, &M, &N));
   PetscCall(MatGetLocalSize(B, &m, &n));
   PetscCall(MatGetVecType(A, &vtype));
   PetscCall(MatCreateDenseFromVecType(comm, vtype, m, n, M, N, m, NULL, X));
-  PetscCall(PetscPrintf(comm, "\n Solution of %" PetscInt_FMT " linear systems:\n", N));
-  PetscCall(PetscPrintf(comm, "   Solver process    = Initiated\n"));
+  PetscCall(PetscPrintf(comm, "\n Linear solve:\n"));
+  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "Number of systems", N));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",            "Started"));
 
   PetscCall(KSPMatSolve(ksp, B, *X));
 
-  PetscCall(PetscPrintf(comm, "   Solver process    = Finished\n"));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
   PetscCall(KSPDestroy(&ksp));
 
   PetscFunctionReturn(PETSC_SUCCESS);

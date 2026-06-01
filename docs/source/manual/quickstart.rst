@@ -50,7 +50,7 @@ Run the canonical forward example
 
    # 4. Validate against the reference (prints NRMSD)
    python3 ${CSEM_TEST_DIR}/postprocess.py \
-      -responses_filename responses_p${NORD}_src1.h5
+      -responses_filename responses_p${NORD}.h5
 
 Step 4 prints the normalized root-mean-square deviation (NRMSD) of ``|Ex|``
 against the shipped reference; values below the default tolerance (``0.03``)

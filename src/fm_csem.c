@@ -24,7 +24,6 @@ static char fmHelp[] = "PETGEM forward CSEM kernel (runForward / fm.csem).\n\
 #include <petscsys.h>
 #include <petscviewerhdf5.h>
 
-
 /* PETGEM functions */
 #include "assembly.h"
 #include "common.h"
@@ -60,7 +59,6 @@ static char fmHelp[] = "PETGEM forward CSEM kernel (runForward / fm.csem).\n\
  */
 int runForward(int argc, char** argv) {
 
-
   /* ---------------------------------------------------------------- */
   /* Check if the --version option is provided                        */
   /* ---------------------------------------------------------------- */
@@ -76,11 +74,13 @@ int runForward(int argc, char** argv) {
   DM              dm;
   Vec             conductivity, materials_id, receivers;
   Mat             A = NULL, B, X;
-  Mat             G_BDDC = NULL;  /* Topological lowest-Whitney G : Nédélec_k → P_nord H1. */
-  csemParams      params;
+  Mat             G_BDDC = NULL;  /* Topological lowest-Whitney G : Nédélec_k -> P_nord H1 */
+  fmParams        params;
   Grid            grid;
   CsemSourceSet   sources = {0, 0, NULL};
-  PetscLogDouble  timers[7];
+  PetscReal       omega;      
+  PetscScalar     constFactor;
+  PetscLogDouble  timers[6];
   PetscLogDouble  start_timer, end_timer;
 
   /* ---------------------------------------------------------------- */
@@ -94,6 +94,20 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscInitialize(&argc, &argv, (char*)0, fmHelp));
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
+
+  /* Register the six fm.csem phase stages with PETSc's logging system.
+   * The existing PetscTime-based timer table is preserved unchanged; these
+   * stages make `-log_view` produce a per-rank, per-event profile (including
+   * KSP / Mat / Vec sub-events) for free.  Stage names match the printTimers
+   * row labels so the two reports cross-reference cleanly. */
+  PetscLogStage stage_parse, stage_load, stage_grid;
+  PetscLogStage stage_assembly, stage_solve, stage_postproc;
+  PetscCall(PetscLogStageRegister("Read parameters",     &stage_parse));
+  PetscCall(PetscLogStageRegister("Load input bundle",   &stage_load));
+  PetscCall(PetscLogStageRegister("Setup grid",          &stage_grid));
+  PetscCall(PetscLogStageRegister("Assembly",            &stage_assembly));
+  PetscCall(PetscLogStageRegister("Linear solve",        &stage_solve));
+  PetscCall(PetscLogStageRegister("Field interpolation", &stage_postproc));
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -119,9 +133,11 @@ int runForward(int argc, char** argv) {
   Extrae_event(1000, 3);
 #endif
 
+  PetscCall(PetscLogStagePush(stage_parse));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(readCsemParams(size, &params));
+  PetscCall(readfmParams(size, &params));
   PetscCall(PetscTime(&end_timer));
+  PetscCall(PetscLogStagePop());
   timers[0] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
@@ -129,67 +145,60 @@ int runForward(int argc, char** argv) {
 #endif
 
   /* ---------------------------------------------------------------- */
-  /* Load unified PETGEM input: mesh + sigma + materials_id + sources */
-  /* + receivers, all from params.inputFile in a single routine.       */
+  /* Load input data: mesh, sigma, materials_id, sources, receivers   */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 4);
 #endif
 
+  PetscCall(PetscLogStagePush(stage_load));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(loadCsemInputs(&params, &dm, &conductivity, &materials_id,
-                           &sources, &receivers));
+  PetscCall(loadCsemInputs(&params, &dm, &conductivity, &materials_id, &sources, &receivers));
   PetscCall(PetscTime(&end_timer));
+  PetscCall(PetscLogStagePop());
   timers[1] = end_timer - start_timer;
-  timers[2] = 0.0;  /* legacy slot, kept for printTimers compatibility */
+  
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 0);
+#endif
+
+  /* ---------------------------------------------------------------- */
+  /* Setup grid for finite element computations                       */
+  /* ---------------------------------------------------------------- */
+#ifdef USE_EXTRAE
+  Extrae_event(1000, 5);
+#endif
+
+  PetscCall(PetscLogStagePush(stage_grid));
+  PetscCall(PetscTime(&start_timer));
+  PetscCall(setupCsemGrid(params, &dm, &grid));
+  PetscCall(PetscTime(&end_timer));
+  PetscCall(PetscLogStagePop());
+  timers[2] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
 
   /* ---------------------------------------------------------------- */
-  /* Setup grid for FE computations                                   */
+  /* Assembly linear system                                              */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 6);
 #endif
 
-  PetscCall(PetscTime(&start_timer));
-  PetscCall(setupCsemGrid(params, &dm, &grid));
-  PetscCall(PetscTime(&end_timer));
-  timers[3] = end_timer - start_timer;
-
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
-
-  /* ---------------------------------------------------------------- */
-  /* Setup linear system                                              */
-  /* ---------------------------------------------------------------- */
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 7);
-#endif
-
+  /* Compute constants for assembly phase */
+  omega       = sources.freq * 2.0 * PETSC_PI;
+  constFactor = (0.0 + 1.0 * PETSC_i) * (omega * MU);
+  
+  /* Perform assembly */
+  PetscCall(PetscLogStagePush(stage_assembly));
   PetscCall(PetscTime(&start_timer));
   PetscCall(assembleCsemRHS(params, sources, dm, grid, &B));
-
-  /* Single unified assembly in fused mode: A = K − iωμ·Ms is built
-   * directly via element-level fusion (K_e − iωμ·M_e per cell). No
-   * global Ms is allocated, no MatDuplicate, no MatAXPY. The
-   * topological G_BDDC for PCBDDC is built in the same element loop;
-   * the canonical Π^Ned G is skipped (NULL). */
-  {
-    const PetscReal   omega       = sources.freq * 2.0 * PETSC_PI;
-    const PetscScalar constFactor = (0.0 + 1.0 * PETSC_i) * (omega * MU);
-    PetscCall(assembleCsemKandM(params, dm, grid, conductivity,
-                                constFactor,
-                                &A,    /* fused output: A = K − constFactor·Ms */
-                                NULL,  /* Ms == NULL selects fused mode        */
-                                NULL,  /* canonical G - skip                    */
-                                &G_BDDC));
-  }
+  PetscCall(assembleCsemKandM(params, dm, grid, conductivity, constFactor, &A, NULL, &G_BDDC));
   PetscCall(PetscTime(&end_timer));
-  timers[4] = end_timer - start_timer;
+  PetscCall(PetscLogStagePop());
+  timers[3] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -199,18 +208,15 @@ int runForward(int argc, char** argv) {
   /* Solve linear system                                              */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
-  Extrae_event(1000, 8);
+  Extrae_event(1000, 7);
 #endif
 
+  PetscCall(PetscLogStagePush(stage_solve));
   PetscCall(PetscTime(&start_timer));
-  /* G_BDDC is the topological lowest-Whitney gradient mapping
-   * Nédélec_k → P_nord H1 (vertex incidence only). Built against the
-   * same DM as the canonical G (grid.H1dm_Pnord), so the same code
-   * path serves every order: PCBDDC sees a ±1 sparsity structure at
-   * the vertex-DOF tail of the P_nord closure, independent of nord. */
   PetscCall(solveCsemSystem(dm, A, B, G_BDDC, &X));
   PetscCall(PetscTime(&end_timer));
-  timers[5] = end_timer - start_timer;
+  PetscCall(PetscLogStagePop());
+  timers[4] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -220,13 +226,15 @@ int runForward(int argc, char** argv) {
   /* Postprocessing solution                                          */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
-  Extrae_event(1000, 9);
+  Extrae_event(1000, 8);
 #endif
 
+  PetscCall(PetscLogStagePush(stage_postproc));
   PetscCall(PetscTime(&start_timer));
   PetscCall(computeFields(params, sources, dm, grid, receivers, X));
   PetscCall(PetscTime(&end_timer));
-  timers[6] = end_timer - start_timer;
+  PetscCall(PetscLogStagePop());
+  timers[5] = end_timer - start_timer;
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -236,7 +244,7 @@ int runForward(int argc, char** argv) {
   /* Print timers and footer                                          */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
-  Extrae_event(1000, 10);
+  Extrae_event(1000, 9);
 #endif
 
   PetscCall(printTimers(timers));
@@ -249,7 +257,6 @@ int runForward(int argc, char** argv) {
   /* ---------------------------------------------------------------- */
   /* Free memory                                                      */
   /* ---------------------------------------------------------------- */
-  PetscCall(DMDestroy(&grid.H1dm));
   PetscCall(DMDestroy(&grid.H1dm_Pnord));
   PetscCall(DMDestroy(&dm));
   PetscCall(VecDestroy(&conductivity));

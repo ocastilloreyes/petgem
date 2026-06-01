@@ -42,7 +42,7 @@ order (``1`` through ``6``) by modifying the ``NORD`` variable:
    export NORD=1        # any order in 1..6
 
    # Mesh generation
-   gmsh ${CSEM_TEST_DIR}/mesh_p${NORD}.geo -3 -o ${CSEM_TEST_DIR}/mesh_p${NORD}.msh
+   gmsh ${CSEM_TEST_DIR}/mesh_p${NORD}.geo -3
 
    # Generate the input bundle and parameter file (forward mode)
    python3 utils/preprocess.py \
@@ -63,7 +63,7 @@ order (``1`` through ``6``) by modifying the ``NORD`` variable:
 
    # Compare results against the reference
    python3 ${CSEM_TEST_DIR}/postprocess.py \
-      -responses_filename responses_p${NORD}_src1.h5
+      -responses_filename responses_p${NORD}.h5
 
 Step-by-step
 ************
@@ -94,8 +94,8 @@ Step-by-step
 5. **Forward modeling**
 
    ``fm.csem`` runs in parallel (4 MPI tasks in this example) using the
-   generated parameter file to compute the CSEM responses
-   (``responses_p${NORD}_src1.h5``).
+   generated parameter file to compute the CSEM responses, which are written
+   to a single unified HDF5 file ``responses_p${NORD}.h5``.
 
 6. **Results comparison**
 

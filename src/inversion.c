@@ -15,6 +15,20 @@
  * Inversion parameterization: log-conductivity perturbation X = log(rho) - X0
  * Objective: ||W(dObs - Ex)||^2 + lambda*||X||^2/N
  * Gradient:  adjoint method (forward + adjoint solve per frequency)
+ *
+ * MPI reproducibility (important):
+ *   The recovered model is reproducible across MPI task counts and mesh
+ *   partitionings to CONVERGENCE TOLERANCE, not bitwise. Every cross-rank
+ *   reduction in the pipeline - the misfit MPI_Allreduce here, and the
+ *   VecDot/VecNorm reductions inside the L-BFGS driver - sums partial
+ *   results in a rank-count-dependent order, and IEEE addition is non-
+ *   associative, so the last bits of the objective and gradient differ
+ *   between, say, 4 and 336 ranks. This perturbs the optimizer trajectory
+ *   exactly like the already-accepted MUMPS factorization drift. The
+ *   per-cell adjoint gradient and the Nedelec sign/ordering convention are
+ *   partition-INDEPENDENT (topological); only the global scalar reductions
+ *   and the Jacobi smoother carry the FP-order sensitivity. Do NOT read
+ *   "partition-independent results" as "bit-identical across rank counts".
  */
 
 /* C libraries */
@@ -35,132 +49,33 @@
 #include "inputs.h"
 #include "inversion.h"
 #include "inversion_internal.h"
+#include "solver.h"
 #include "transmitter.h"
 
-/* ================================================================== */
-/* computeGradientContribution                                         */
-/*                                                                     */
-/* For each local cell ie:                                             */
-/*   idKdm = -2 * constFactor * Me_e                                  */
-/*   iG    = idKdm * x_e                                              */
-/*   DfDm[ie] += real( iG . nx_e )   (plain transpose, MATLAB iG.'*inx) */
-/*                                                                     */
-/* The 3D quadrature and Me/Ke buffers are provided by the caller     */
-/* (allocated once on the InversionContext, see setupInversionWorkspace).*/
-/* That hoist is purely a lifetime change - the values produced by    */
-/* each cell evaluation are byte-identical to the previous version.   */
-/* ================================================================== */
-PetscErrorCode computeGradientContribution(const DM          dm,
-                                           const Grid       *grid,
-                                           const Vec         conductivity,
-                                           const Vec         xLocal,
-                                           const Vec         nxLocal,
-                                           PetscScalar       constFactor,
-                                           DM                dmInversion,
-                                           Vec               DfDm,
-                                           const Quadrature3D *quadrature_3d,
-                                           PetscReal       **Me,
-                                           PetscReal       **Ke)
-{
-  PetscFunctionBeginUser;
-  /* nord lives in grid->fem.ops via the supplied quadrature */
-
-  /* Get local section and conductivity DM */
-  PetscSection section;
-  DM           dmConductivity;
-  PetscCall(DMGetLocalSection(dm, &section));
-  PetscCall(VecGetDM(conductivity, &dmConductivity));
-
-  /* Loop over local cells */
-  for (PetscInt i = grid->cellStart; i < grid->cellEnd; i++) {
-    Cell cell;
-
-    PetscCall(extractCellCoordinates(dm, i, &cell));
-    PetscCall(computeCellJacobian(&cell));
-    PetscCall(extractCellConductivity(dmConductivity, conductivity, i, &cell));
-    PetscCall(extractCellClousure(dm, i, &cell));
-    PetscCall(computeCellOrientation(&cell));
-
-    /* Zero elemental matrices */
-    PetscCall(PetscArrayzero(Me[0], grid->numDofInCell * grid->numDofInCell));
-    PetscCall(PetscArrayzero(Ke[0], grid->numDofInCell * grid->numDofInCell));
-
-    /* The gradient formula requires the UNSCALED mass matrix:
-     *   dA/d(sigma_e) = -iωμ · Me_unscaled   where   Me_unscaled = ∫ N·N dV
-     * computeElementalMatrices fills Me = ∫ N·(sigma·I)·N dV (= MATLAB Mes).
-     * Setting conductivity to 1 makes it compute Me_unscaled directly.
-     * sigma is still available from c->conductivity for the chain rule later. */
-    cell.conductivity[0] = 1.0;
-    cell.conductivity[1] = 1.0;
-    cell.conductivity[2] = 1.0;
-    PetscCall(computeElementalMatrices(&grid->fem, &cell, quadrature_3d, Me, Ke));
-
-    /* Get DOF closure indices */
-    PetscInt  numDofIdx, *dofIdx;
-    PetscCall(DMPlexGetClosureIndices(dm, section, section, i,
-                                      PETSC_TRUE, &numDofIdx, &dofIdx,
-                                      NULL, NULL));
-
-    /* Extract local solution values for forward (x_e) and adjoint (nx_e) */
-    PetscInt      closureSize = grid->numDofInCell;
-    PetscScalar  *x_e  = NULL;
-    PetscScalar  *nx_e = NULL;
-    PetscCall(DMPlexVecGetClosure(dm, section, xLocal,  i,
-                                  &closureSize, &x_e));
-    PetscCall(DMPlexVecGetClosure(dm, section, nxLocal, i,
-                                  &closureSize, &nx_e));
-
-    /* Compute gradient contribution (plain transpose, matches MATLAB iG.'*inx):
-     *   iG[j] = sum_k (-2*constFactor * Me[j][k]) * x_e[k]
-     *   contrib = real( sum_j iG[j] * nx_e[j] )               */
-    PetscScalar contrib = 0.0 + PETSC_i * 0.0;
-    for (PetscInt j = 0; j < grid->numDofInCell; j++) {
-      PetscScalar iGj = 0.0;
-      for (PetscInt k = 0; k < grid->numDofInCell; k++)
-        iGj += (-2.0 * constFactor * Me[j][k]) * x_e[k];
-      contrib += iGj * nx_e[j];
-    }
-
-    /* Accumulate into DfDm (1 DOF/cell on dmInversion) */
-    PetscReal   gradReal = PetscRealPart(contrib);
-    PetscScalar gradScalar = gradReal;
-    PetscCall(DMPlexVecSetClosure(dmInversion, NULL, DfDm, i,
-                                  &gradScalar, ADD_VALUES));
-
-    PetscCall(DMPlexVecRestoreClosure(dm, section, xLocal,  i,
-                                      &closureSize, &x_e));
-    PetscCall(DMPlexVecRestoreClosure(dm, section, nxLocal, i,
-                                      &closureSize, &nx_e));
-    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, i,
-                                          PETSC_TRUE, &numDofIdx, &dofIdx,
-                                          NULL, NULL));
-  }
-
-  PetscCall(VecAssemblyBegin(DfDm));
-  PetscCall(VecAssemblyEnd(DfDm));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* ================================================================== */
-/* setupInversionWorkspace / destroyInversionWorkspace                 */
-/*                                                                     */
-/* Lifetime hoist of every workspace that does not depend on the       */
-/* L-BFGS iterate X.  Called once before the optimization loop and     */
-/* freed once after, replacing the per-callback allocate/free dance.   */
-/*                                                                     */
-/* What gets precomputed:                                              */
-/*   • 3D quadrature points + weights (depend only on iparams->nord)   */
-/*   • Per-cell Me / Ke elemental-matrix buffers (numDof² each)        */
-/*   • Reusable global Vecs b, x, nB, nx and parallel Ex_recv          */
-/*   • Per-frequency RHS Vec  Bvec_per_freq[ifre]                      */
-/*     (assembleCsemRHS depends only on source + freq, NOT σ)          */
-/*   • Per-frequency observed-Ex row Vec  dObsRow_per_freq[ifre]       */
-/*   • Per-frequency data weights Vec  Wf_per_freq[ifre]               */
-/*                                                                     */
-/* All produced values are byte-identical to what the previous per-    */
-/* iteration code computed; only the allocation lifetime changes.      */
-/* ================================================================== */
+/**
+ * @brief Allocates all iterate-independent inversion workspace.
+ *
+ * Lifetime hoist of every workspace that does not depend on the L-BFGS
+ * iterate X. Called once before the optimization loop; freed by
+ * destroyInversionWorkspace, replacing the per-callback allocate/free dance.
+ *
+ * What gets precomputed:
+ *   - 3D quadrature points + weights (depend only on iparams->fm.nord);
+ *   - Per-cell Me / Ke elemental-matrix buffers (numDof² each);
+ *   - Reusable global Vecs b, x, nB, nx and parallel Ex_recv;
+ *   - Per-frequency RHS Vec Bvec_per_freq[ifre]
+ *     (assembleCsemRHS depends only on source + freq, NOT σ);
+ *   - Per-frequency observed-Ex row Vec dObsRow_per_freq[ifre];
+ *   - Per-frequency data weights Vec Wf_per_freq[ifre].
+ *
+ * All produced values are byte-identical to what the previous per-iteration
+ * code computed; only the allocation lifetime changes.
+ *
+ * @param[in,out] ctx  Inversion context whose workspace is populated.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
 {
   PetscFunctionBeginUser;
@@ -172,7 +87,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   PetscReal errorLevel  = ctx->iparams->errorLevel;
 
   /* ---- 3D quadrature (depends only on nord) ---- */
-  PetscCall(computeNum3DQuadraturePoints(ctx->iparams->nord, &ctx->quad3d));
+  PetscCall(computeNum3DQuadraturePoints(ctx->iparams->fm.nord, &ctx->quad3d));
   PetscCall(PetscCalloc1(ctx->quad3d.numPoints, &ctx->quad3d.points));
   for (PetscInt i = 0; i < ctx->quad3d.numPoints; i++)
     PetscCall(PetscCalloc1(NUM_DIMENSIONS, &ctx->quad3d.points[i]));
@@ -206,11 +121,11 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   PetscCall(PetscCalloc1(numFreqs, &ctx->Wf_per_freq));
   PetscCall(PetscCalloc1(numFreqs, &ctx->dObsRow_per_freq));
 
-  /* Build a quiet csemParams stub for assembleCsemRHS (it only reads
+  /* Build a quiet fmParams stub for assembleCsemRHS (it only reads
    * nord, numMPITasks and quiet - same fields the iter loop used to fill). */
-  csemParams stub;
+  fmParams stub;
   PetscCall(PetscMemzero(&stub, sizeof(stub)));
-  stub.nord = ctx->iparams->nord;
+  stub.nord = ctx->iparams->fm.nord;
   PetscCallMPI(MPI_Comm_size(comm, &stub.numMPITasks));
   stub.quiet = PETSC_TRUE;
 
@@ -287,17 +202,33 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
    * overwritten by the per-iter assembleCsemMsRefill call, so we only
    * actually keep Ms for its sparsity pattern (= K's pattern, attached
    * to the right local-to-global mapping). */
-  csemParams kandmStub;
+  fmParams kandmStub;
   PetscCall(PetscMemzero(&kandmStub, sizeof(kandmStub)));
-  kandmStub.nord        = ctx->iparams->nord;
+  kandmStub.nord        = ctx->iparams->fm.nord;
   kandmStub.numMPITasks = stub.numMPITasks;
   kandmStub.quiet       = PETSC_TRUE;
   PetscCall(assembleCsemKandM(kandmStub, ctx->dm, ctx->grid,
                                ctx->conductivity,
                                0.0,             /* constFactor (unused: K/Ms mode) */
                                &ctx->Kmat, &ctx->Msmat,
-                               NULL /* canonical G - skip */,
                                &ctx->Gmat_BDDC));
+
+  /* ---- Persistent per-frequency A_f and KSP (built once, reused) ----
+   * A_f shares K's nonzero pattern; we allocate it without copying values
+   * (the inversionObjGrad loop refills it via MatCopy(K)+MatAXPY(-Const·Ms)
+   * every evaluation).  The KSP is bound to A_f here so the symbolic
+   * factorization (MUMPS analysis) / PCBDDC topological setup is computed
+   * once on the first solve and reused for every subsequent iteration -
+   * only numeric refactorization is repeated when A_f's values change. */
+  PetscCall(PetscCalloc1(numFreqs, &ctx->Avec_per_freq));
+  PetscCall(PetscCalloc1(numFreqs, &ctx->ksp_per_freq));
+  for (PetscInt ifre = 0; ifre < numFreqs; ifre++) {
+    PetscCall(MatDuplicate(ctx->Kmat, MAT_DO_NOT_COPY_VALUES,
+                           &ctx->Avec_per_freq[ifre]));
+    PetscCall(createInvKSP(ctx->iparams, ctx->dm,
+                           ctx->Avec_per_freq[ifre], ctx->Gmat_BDDC,
+                           &ctx->ksp_per_freq[ifre]));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -307,6 +238,14 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
  * reusable Vecs, per-frequency precomputes, and the cached K / Ms / G_BDDC
  * matrices).  Safe to call on a context that was zero-initialised but
  * never set up (every PetscFree/VecDestroy/MatDestroy handles NULL). */
+/**
+ * @brief Frees the workspace allocated by setupInversionWorkspace.
+ *
+ * @param[in,out] ctx  Inversion context whose workspace buffers are freed.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx)
 {
   PetscFunctionBeginUser;
@@ -338,6 +277,21 @@ static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx)
   PetscCall(PetscFree(ctx->Bvec_per_freq));
   PetscCall(PetscFree(ctx->Wf_per_freq));
   PetscCall(PetscFree(ctx->dObsRow_per_freq));
+
+  /* Per-frequency persistent solvers + system matrices (NULL-safe: the
+   * arrays may be NULL if setup bailed before allocating them). Freed
+   * before numFreqsAlloc is reset since the loop bounds depend on it. */
+  if (ctx->ksp_per_freq) {
+    for (PetscInt ifre = 0; ifre < ctx->numFreqsAlloc; ifre++)
+      PetscCall(KSPDestroy(&ctx->ksp_per_freq[ifre]));
+    PetscCall(PetscFree(ctx->ksp_per_freq));
+  }
+  if (ctx->Avec_per_freq) {
+    for (PetscInt ifre = 0; ifre < ctx->numFreqsAlloc; ifre++)
+      PetscCall(MatDestroy(&ctx->Avec_per_freq[ifre]));
+    PetscCall(PetscFree(ctx->Avec_per_freq));
+  }
+
   ctx->numFreqsAlloc = 0;
 
   PetscCall(MatDestroy(&ctx->Kmat));
@@ -346,18 +300,138 @@ static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx)
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+/**
+ * @brief Accumulates the per-element adjoint gradient into DfDm.
+ *
+ * For each local cell ie:
+ *   idKdm = -2 · constFactor · Me_e,
+ *   iG    = idKdm · x_e,
+ *   DfDm[ie] += real( iG · nx_e )   (plain transpose, MATLAB iG.'*inx).
+ * The 3D quadrature and Me/Ke buffers are provided by the caller (allocated
+ * once on the InversionContext via setupInversionWorkspace); the hoist is a
+ * pure lifetime change - the values produced by each cell evaluation are
+ * byte-identical to the per-callback version.
+ *
+ * @param[in]     dm             H(curl) DM.
+ * @param[in]     grid           Finite-element grid descriptor.
+ * @param[in]     conductivity   Current conductivity Vec.
+ * @param[in]     xLocal         Forward solution (local).
+ * @param[in]     nxLocal        Adjoint solution (local).
+ * @param[in]     constFactor    Frequency factor iωμ.
+ * @param[in]     dmInversion    DM for the inversion field (1 DOF/cell).
+ * @param[in,out] DfDm           Gradient accumulator (local, 1 DOF/cell).
+ * @param[in]     quadrature_3d  3D quadrature workspace.
+ * @param[in,out] Me             Scratch elemental mass buffer.
+ * @param[in,out] Ke             Scratch elemental stiffness buffer.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode computeGradientContribution(const DM          dm,
+                                           const Grid       *grid,
+                                           const Vec         conductivity,
+                                           const Vec         xLocal,
+                                           const Vec         nxLocal,
+                                           PetscScalar       constFactor,
+                                           DM                dmInversion,
+                                           Vec               DfDm,
+                                           const Quadrature3D *quadrature_3d,
+                                           PetscReal       **Me,
+                                           PetscReal       **Ke)
+{
+  PetscFunctionBeginUser;
+  /* nord lives in grid->fem.ops via the supplied quadrature */
 
-/* ================================================================== */
-/* createInversionDM                                                   */
-/*                                                                     */
-/* Creates a DM with 1 DOF per cell for the inversion variables.       */
-/* Clones the DMPlex topology from dmConductivity and installs a new    */
-/* PetscSection with a single scalar DOF on each cell.                 */
-/*                                                                     */
-/* A 1-component PetscFV is registered as field 0 so that cell-centered */
-/* data can be written to VTU (DMPlexVTKWriteAll_VTU traverses          */
-/* registered fields; without one, DMGetField fails).                   */
-/* ================================================================== */
+  /* Get local section and conductivity DM */
+  PetscSection section;
+  DM           dmConductivity;
+  PetscCall(DMGetLocalSection(dm, &section));
+  PetscCall(VecGetDM(conductivity, &dmConductivity));
+
+  /* Loop over local cells */
+  for (PetscInt i = grid->cellStart; i < grid->cellEnd; i++) {
+    Cell cell;
+
+    PetscCall(extractCellCoordinates(dm, i, &cell));
+    PetscCall(computeCellJacobian(&cell));
+    PetscCall(extractCellConductivity(dmConductivity, conductivity, i, &cell));
+    PetscCall(extractCellClousure(dm, i, &cell));
+    PetscCall(computeCellOrientation(&cell));
+
+    /* Zero elemental matrices */
+    PetscCall(PetscArrayzero(Me[0], grid->numDofInCell * grid->numDofInCell));
+    PetscCall(PetscArrayzero(Ke[0], grid->numDofInCell * grid->numDofInCell));
+
+    /* The gradient formula requires the UNSCALED mass matrix:
+     *   dA/d(sigma_e) = -iωμ · Me_unscaled   where   Me_unscaled = ∫ N·N dV
+     * computeElementalMatrices fills Me = ∫ N·(sigma·I)·N dV (= MATLAB Mes).
+     * Setting conductivity to 1 makes it compute Me_unscaled directly.
+     * sigma is still available from c->conductivity for the chain rule later. */
+    cell.conductivity[0] = 1.0;
+    cell.conductivity[1] = 1.0;
+    cell.conductivity[2] = 1.0;
+    PetscCall(computeElementalMatrices(&grid->fem, &cell, quadrature_3d, Me, Ke));
+
+    /* Extract local solution values for forward (x_e) and adjoint (nx_e).
+     * DMPlexVecGetClosure traverses the closure in the SAME order the
+     * forward assembly used to fill Me (and Me already carries the per-DOF
+     * orientation signs from computeElementalMatrices), so the quadratic
+     * form below is sign- and ordering-consistent with fm.csem without any
+     * separate closure-index lookup. */
+    PetscInt      closureSize = grid->numDofInCell;
+    PetscScalar  *x_e  = NULL;
+    PetscScalar  *nx_e = NULL;
+    PetscCall(DMPlexVecGetClosure(dm, section, xLocal,  i,
+                                  &closureSize, &x_e));
+    PetscCall(DMPlexVecGetClosure(dm, section, nxLocal, i,
+                                  &closureSize, &nx_e));
+
+    /* Compute gradient contribution (plain transpose, matches MATLAB iG.'*inx):
+     *   iG[j] = sum_k (-2*constFactor * Me[j][k]) * x_e[k]
+     *   contrib = real( sum_j iG[j] * nx_e[j] )               */
+    PetscScalar contrib = 0.0 + PETSC_i * 0.0;
+    for (PetscInt j = 0; j < grid->numDofInCell; j++) {
+      PetscScalar iGj = 0.0;
+      for (PetscInt k = 0; k < grid->numDofInCell; k++)
+        iGj += (-2.0 * constFactor * Me[j][k]) * x_e[k];
+      contrib += iGj * nx_e[j];
+    }
+
+    /* Accumulate into DfDm (1 DOF/cell on dmInversion) */
+    PetscReal   gradReal = PetscRealPart(contrib);
+    PetscScalar gradScalar = gradReal;
+    PetscCall(DMPlexVecSetClosure(dmInversion, NULL, DfDm, i,
+                                  &gradScalar, ADD_VALUES));
+
+    PetscCall(DMPlexVecRestoreClosure(dm, section, xLocal,  i,
+                                      &closureSize, &x_e));
+    PetscCall(DMPlexVecRestoreClosure(dm, section, nxLocal, i,
+                                      &closureSize, &nx_e));
+  }
+
+  PetscCall(VecAssemblyBegin(DfDm));
+  PetscCall(VecAssemblyEnd(DfDm));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
+ * @brief Creates a DM with 1 DOF per cell for the inversion variables.
+ *
+ * Clones the DMPlex topology from dmConductivity and installs a new
+ * PetscSection with a single scalar DOF on each cell. A 1-component PetscFV
+ * is registered as field 0 so cell-centered data can be written to VTU
+ * (DMPlexVTKWriteAll_VTU traverses registered fields; without one, DMGetField
+ * fails).
+ *
+ * @param[in]  dmConductivity  DM whose topology is cloned.
+ * @param[in]  grid            Finite-element grid descriptor.
+ * @param[out] dmInv           New 1-DOF/cell inversion DM.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode createInversionDM(DM dmConductivity, const Grid *grid, DM *dmInv)
 {
   PetscFunctionBeginUser;
@@ -395,43 +469,55 @@ PetscErrorCode createInversionDM(DM dmConductivity, const Grid *grid, DM *dmInv)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* createInvKSP                                                        */
-/*                                                                     */
-/* Same setup logic as solveCsemSystem but returns without solving.   */
-/* Caller calls solveInvSystem twice (forward + adjoint) then         */
-/* KSPDestroy. MUMPS factorization is triggered on first KSPSolve.   */
-/* ================================================================== */
-PetscErrorCode createInvKSP(const invParams *iparams,
+/**
+ * @brief Creates a KSP for the inversion (same setup as solveCsemSystem, no solve).
+ *
+ * The caller invokes solveInvSystem twice (forward + adjoint) then KSPDestroy.
+ * The MUMPS factorization is triggered on the first KSPSolve.
+ *
+ * @param[in]  iparams  Inversion parameters.
+ * @param[in]  dm       H(curl) DM.
+ * @param[in]  A        System matrix.
+ * @param[in]  Gbddc    Topological discrete-gradient operator for PCBDDC.
+ * @param[out] ksp      Created KSP bound to A.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode createInvKSP(const imParams *iparams,
                              const DM          dm,
                              const Mat         A,
-                             const Mat         G,
+                             const Mat         Gbddc,
                              KSP              *ksp)
 {
   PetscFunctionBeginUser;
 
-  MPI_Comm  comm    = PetscObjectComm((PetscObject)dm);
-  PetscBool ismatis = PETSC_FALSE;
+  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
 
   PetscCall(KSPCreate(comm, ksp));
   PetscCall(KSPSetOperators(*ksp, A, A));
 
-  PetscCall(PetscObjectTypeCompare((PetscObject)A, MATIS, &ismatis));
-  if (ismatis && G) {
-    PC pc;
-    PetscCall(KSPGetPC(*ksp, &pc));
-    PetscCall(PCSetType(pc, PCBDDC));
-    PetscCall(PCBDDCSetDiscreteGradient(pc, G, iparams->nord, 0,
-                                        PETSC_TRUE, PETSC_TRUE));
-  }
+  /* `Gbddc` is the forward-formulation TOPOLOGICAL discrete-gradient operator
+   * (Nédélec→H1 vertex incidence) consumed by PCBDDC. It has nothing to do
+   * with the inversion gradient ∂F/∂X built by the L-BFGS layer — distinct
+   * names so the two never get conflated. The inverse path passes
+   * iparams->fm.nord as the order argument (preserves prior behaviour). */
+  PetscCall(petgemConfigureBDDCFromGradient(*ksp, A, Gbddc, iparams->fm.nord));
   PetscCall(KSPSetFromOptions(*ksp));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* solveInvSystem                                                      */
-/* ================================================================== */
+/**
+ * @brief Solves A·sol = rhs using an already-created (factored) KSP.
+ *
+ * @param[in]  ksp  KSP previously created by createInvKSP.
+ * @param[in]  rhs  Right-hand side vector.
+ * @param[out] sol  Solution vector.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode solveInvSystem(const KSP ksp, const Vec rhs, Vec sol)
 {
   PetscFunctionBeginUser;
@@ -439,16 +525,24 @@ PetscErrorCode solveInvSystem(const KSP ksp, const Vec rhs, Vec sol)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* inversionObjGrad                                                    */
-/*                                                                     */
-/* Objective + gradient callback for the L-BFGS optimizer:            */
-/*  1. Recover sigma from X                                           */
-/*  2. Reassemble LHS (uses updated sigma)                            */
-/*  3. Frequency loop: forward solve → field interpolation →          */
-/*     residual → adjoint RHS → adjoint solve → gradient             */
-/*  4. Chain rule + smoothing + Tikhonov                              */
-/* ================================================================== */
+/**
+ * @brief Objective + gradient callback for the L-BFGS optimizer.
+ *
+ * Per call:
+ *   1. Recover σ from X (applyLogToSigma).
+ *   2. Reassemble the LHS using the updated σ.
+ *   3. Frequency loop: forward solve → field interpolation → residual →
+ *      adjoint RHS → adjoint solve → gradient accumulation.
+ *   4. Chain rule + smoothing + Tikhonov regularization.
+ *
+ * @param[in]  X     Current log-perturbation iterate.
+ * @param[out] F     Objective value at X.
+ * @param[out] Gvec  Gradient at X.
+ * @param[in]  ctx   InversionContext pointer (cast from void*).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
                                 void *ctx)
 {
@@ -464,15 +558,10 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
 
   /* ---- 1. Recover conductivity from smoothed X (1-DOF → 4-DOF) ----
    * applyLogToSigma applies the same GS smoothing MATLAB uses on tempX
-   * before computing sigma.  diagGradientWeight=0 matches diag_gwight=0.
-   * Capture pre/post-smoothing X for VTU diagnostics when enabled. */
-  if (c->XPreSmooth) PetscCall(VecCopy(X, c->XPreSmooth));
-  {
-    PetscReal fwdDiagWeight = c->bypassSmoother ? -1.0 : 0.0;
-    PetscCall(applyLogToSigma(c->dmInversion, c->dmConductivity,
-                              X, c->X0, c->conductivity, &c->grid,
-                              c->graph, fwdDiagWeight, c->XPostSmooth));
-  }
+   * before computing sigma.  diagGradientWeight=0 matches diag_gwight=0. */
+  PetscCall(applyLogToSigma(c->dmInversion, c->dmConductivity,
+                            X, c->X0, c->conductivity, &c->grid,
+                            c->graph, 0.0, NULL));
 
   /* ---- 2. Refill Ms(σ) with the current iterate's σ ----
    * K (curl-curl stiffness, σ-independent) and G_BDDC (topological,
@@ -483,9 +572,9 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
    * assembleCsemMsRefill walks the local cells, shares the per-cell
    * setup helper (prepareCellForAssembly) with assembleCsemKandM, and
    * overwrites Ms in-place using the cached sparsity pattern. */
-  csemParams fwdParams;
+  fmParams fwdParams;
   PetscCall(PetscMemzero(&fwdParams, sizeof(fwdParams)));
-  fwdParams.nord = c->iparams->nord;
+  fwdParams.nord = c->iparams->fm.nord;
   PetscCallMPI(MPI_Comm_size(comm, &fwdParams.numMPITasks));
   fwdParams.quiet = PETSC_TRUE;
 
@@ -500,7 +589,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
 
   Mat Kmat = c->Kmat;
   Mat Msmat = c->Msmat;
-  Mat Gmat  = c->Gmat_BDDC;
 
   /* ---- 3. Zero gradient accumulator ---- */
   PetscCall(VecZeroEntries(c->DfDm));
@@ -520,16 +608,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   Vec Ex_recv = c->ExRecvVec;
   Vec wcdtD_mpi = c->wcdtDvec;
 
-  /* One A matrix for the whole iteration (numFreqs systems share its
-   * sparsity pattern). Allocate with DO_NOT_COPY_VALUES; each freq does
-   * MatCopy(K → A) + MatAXPY(-Const · Ms). Replaces numFreqs× MatDuplicate
-   * (COPY_VALUES) with one allocation + numFreqs× value copy. */
-  Mat A;
-  PetscCall(PetscTime(&tA0));
-  PetscCall(MatDuplicate(Kmat, MAT_DO_NOT_COPY_VALUES, &A));
-  PetscCall(PetscTime(&tA1));
-  c->tAssembly += tA1 - tA0;
-
   /* ---- 5. Frequency loop ---- */
   for (PetscInt ifre = 0; ifre < numFreqs; ifre++) {
     const InvCsemSource *isrc = &c->iparams->invSources[ifre];
@@ -537,7 +615,15 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscReal   omega = isrc->freq * 2.0 * PETSC_PI;
     PetscScalar Const = PETSC_i * omega * MU;
 
-    /* A_f = K - iωμ·Ms.  SAME_NONZERO_PATTERN lets PETSc skip symbolic. */
+    /* Persistent per-frequency system matrix and solver (allocated once in
+     * setupInversionWorkspace). A_f is refilled in place each evaluation:
+     * A_f = K - iωμ·Ms.  SAME_NONZERO_PATTERN guarantees the symbolic
+     * factorization / PCBDDC topological setup attached to ksp is preserved -
+     * KSPSolve detects the matrix-value change and redoes ONLY the numeric
+     * factorization. */
+    Mat A   = c->Avec_per_freq[ifre];
+    KSP ksp = c->ksp_per_freq[ifre];
+
     PetscCall(PetscTime(&tA0));
     PetscCall(MatCopy(Kmat, A, SAME_NONZERO_PATTERN));
     PetscCall(MatAXPY(A, -Const, Msmat, SAME_NONZERO_PATTERN));
@@ -551,10 +637,9 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     Vec dObs_row = c->dObsRow_per_freq[ifre];
     Vec Wf       = c->Wf_per_freq[ifre];
 
-    /* Factorize and solve forward system: A_f * x = b */
-    KSP ksp;
+    /* Solve forward system: A_f * x = b (numeric refactor on the cached
+     * symbolic factorization, triggered by the in-place A_f value update). */
     PetscCall(PetscTime(&tA0));
-    PetscCall(createInvKSP(c->iparams, c->dm, A, Gmat, &ksp));
     PetscCall(solveInvSystem(ksp, b, x));
     PetscCall(PetscTime(&tA1));
     c->tSolver += tA1 - tA0;
@@ -620,15 +705,12 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
                                           c->dmInversion, c->DfDm,
                                           &c->quad3d, c->MeRows, c->KeRows));
 
-    /* Cleanup frequency-level objects (workspace stays alive on ctx). */
+    /* Cleanup frequency-level objects. The per-frequency A_f and ksp live
+     * on the context (reused next evaluation); only the borrowed local
+     * vectors are returned here. */
     PetscCall(DMRestoreLocalVector(c->dm, &xLocal));
     PetscCall(DMRestoreLocalVector(c->dm, &nxLocal));
-    PetscCall(KSPDestroy(&ksp));
   } /* end frequency loop */
-
-  /* Destroy A (per-iter scratch). K, Ms and G_BDDC live on the context
-   * and are released once at runCsemInversion teardown. */
-  PetscCall(MatDestroy(&A));
 
   /* ---- 5. RMS ---- */
   /* RMS = sqrt( sum_freq sum_rec |W*(d_obs - E_x)|^2 / Ndata )
@@ -672,21 +754,13 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
     PetscCall(VecRestoreArray(c->DfDm, &dfArr));
   }
 
-  /* Capture raw gradient (MATLAB dfdm0) before fixed-zero and smoothing. */
-  if (c->DfDmRaw) PetscCall(VecCopy(c->DfDm, c->DfDmRaw));
-
   /* Zero local gradient at fixed elements via the persistent mask. */
   PetscCall(VecPointwiseMult(c->DfDm, c->DfDm, c->notFixedMaskLocal));
 
   /* ---- 8. Gradient smoothing (forward + reverse Gauss-Seidel) ----
-   * DfDm is already 1 value per cell - apply smoothing directly.
-   * bypassSmoother (FD check mode) passes the sentinel -1.0 to skip it. */
-  {
-    PetscReal gradDiagWeight = c->bypassSmoother
-                                 ? -1.0
-                                 : c->iparams->diagGradientWeight;
-    PetscCall(applyGaussSeidelSmoothing(c->graph, gradDiagWeight, c->DfDm));
-  }
+   * DfDm is already 1 value per cell - apply smoothing directly. */
+  PetscCall(applyGaussSeidelSmoothing(c->graph, c->iparams->diagGradientWeight,
+                                      c->DfDm));
 
   /* ---- 9. Scale local gradient by 1/numData ---- */
   PetscCall(VecScale(c->DfDm, 1.0 / (PetscReal)numData));
@@ -703,9 +777,6 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   /* ---- 12. Zero gradient at fixed elements in global Gvec via mask ---- */
   PetscCall(VecPointwiseMult(Gvec, Gvec, c->notFixedMaskGlobal));
 
-  /* Capture final gradient (MATLAB DfDM) for VTU diagnostics. */
-  if (c->DfDmFinal) PetscCall(VecCopy(Gvec, c->DfDmFinal));
-
   /* Publish the most recent RMS so the optimizer loop can use it
    * for early-stopping, matching MATLAB's `rms <= 1.05` exit. */
   c->lastRMS = rms;
@@ -713,219 +784,29 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* ================================================================== */
-/* runFdGradientCheck                                                   */
-/*                                                                     */
-/* Diagnostic: compare the adjoint-based gradient against a centered    */
-/* finite-difference approximation on `ncells` non-fixed cells.        */
-/*                                                                     */
-/* For each selected global cell index i:                              */
-/*   G_adj = G[i] returned by inversionObjGrad at the baseline X       */
-/*   FD    = (F(X + eps*e_i) - F(X - eps*e_i)) / (2*eps)               */
-/* Prints ratio = FD / G_adj per cell. Centered FD has O(eps^2)        */
-/* truncation error; forward FD was O(eps), which dominates the signal */
-/* for cells with small |G| and produced spurious mixed ratios.        */
-/*                                                                     */
-/* Interpretation:                                                     */
-/*   ratio ~ +1 : gradient correct, bug lies in smoother/mask/mapping. */
-/*   ratio ~ -1 : sign flip (commonly in dsigma/dX = -sigma).          */
-/*   ratio O(1) but != 1 : missing scalar factor (mu0, i*omega, W...). */
-/*   ratio random/huge  : indexing bug between X and G.                */
-/*                                                                     */
-/* Side effects: leaves ctx->conductivity in the last perturbed state. */
-/* Callers that continue past this function (currently none) must      */
-/* trigger a fresh objgrad before trusting ctx->conductivity.          */
-/* ================================================================== */
-PetscErrorCode runFdGradientCheck(InversionContext *ctx, Vec X,
-                                          PetscInt ncells, PetscReal eps)
-{
-  PetscFunctionBeginUser;
-
-  MPI_Comm    comm = PetscObjectComm((PetscObject)X);
-  PetscMPIInt rank;
-  PetscCallMPI(MPI_Comm_rank(comm, &rank));
-
-  PetscCheck(ncells > 0 && ncells <= INV_MAX_FD_CHECK_CELLS, comm,
-             PETSC_ERR_ARG_OUTOFRANGE,
-             "-inv_dev_fd_check must be in [1,%d] "
-             "(bump INV_MAX_FD_CHECK_CELLS in include/constants.h to raise)",
-             INV_MAX_FD_CHECK_CELLS);
-
-  /* ---- Gather the not-fixed mask to rank 0 and pick ncells well-spaced
-   *      non-fixed global cell indices.                               */
-  Vec        maskAll;
-  VecScatter sMask;
-  PetscCall(VecScatterCreateToZero(ctx->notFixedMaskGlobal, &sMask, &maskAll));
-  PetscCall(VecScatterBegin(sMask, ctx->notFixedMaskGlobal, maskAll,
-                            INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecScatterEnd  (sMask, ctx->notFixedMaskGlobal, maskAll,
-                            INSERT_VALUES, SCATTER_FORWARD));
-
-  PetscInt chosen[INV_MAX_FD_CHECK_CELLS] = {0};
-  PetscInt numChosen = 0;
-  if (rank == 0) {
-    PetscInt           Ntotal;
-    const PetscScalar *mArr;
-    PetscCall(VecGetSize(maskAll, &Ntotal));
-    PetscCall(VecGetArrayRead(maskAll, &mArr));
-    PetscInt stride = PetscMax((PetscInt)1, Ntotal / (ncells + 1));
-    PetscInt start  = stride / 2;
-    for (PetscInt k = 0; k < ncells && numChosen < ncells; k++) {
-      PetscInt idx   = start + k * stride;
-      PetscInt probe = 0;
-      while (probe < Ntotal &&
-             PetscRealPart(mArr[(idx + probe) % Ntotal]) <= 0.5) probe++;
-      if (probe < Ntotal) {
-        PetscInt pick = (idx + probe) % Ntotal;
-        /* avoid duplicates if stride collapsed */
-        PetscBool dup = PETSC_FALSE;
-        for (PetscInt j = 0; j < numChosen; j++)
-          if (chosen[j] == pick) { dup = PETSC_TRUE; break; }
-        if (!dup) chosen[numChosen++] = pick;
-      }
-    }
-    PetscCall(VecRestoreArrayRead(maskAll, &mArr));
-  }
-  PetscCallMPI(MPI_Bcast(&numChosen, 1, MPIU_INT, 0, comm));
-  if (numChosen > 0)
-    PetscCallMPI(MPI_Bcast(chosen, numChosen, MPIU_INT, 0, comm));
-  PetscCall(VecScatterDestroy(&sMask));
-  PetscCall(VecDestroy(&maskAll));
-
-  PetscCheck(numChosen > 0, comm, PETSC_ERR_PLIB,
-             "FD check: could not select any non-fixed cells");
-
-  PetscCall(PetscPrintf(comm,
-    "\n === Finite-difference gradient check ===\n"
-    "   Non-fixed cells   : %" PetscInt_FMT "\n"
-    "   Epsilon           : %g\n"
-    "   Scheme            : centered difference (O(eps^2))\n"
-    "   Smoother          : BYPASSED (self-consistent F vs G)\n\n",
-    numChosen, (double)eps));
-
-  /* Bypass the forward + gradient smoothers for the duration of the
-   * check. The smoother is non-self-adjoint (forward+reverse GS with
-   * neighbour averaging), so with it active FD(F(X)) != G even when
-   * the adjoint machinery is correct. Bypassing makes F(X) = F(sigma(X,X0))
-   * and G(X) = dF/dX exactly, so ratios ~ 1 iff the gradient is right. */
-  PetscBool savedBypass = ctx->bypassSmoother;
-  ctx->bypassSmoother   = PETSC_TRUE;
-
-  /* ---- Baseline: F0 and G from one adjoint solve ---- */
-  Vec Gbase;
-  PetscCall(VecDuplicate(X, &Gbase));
-  PetscReal F0;
-  PetscCall(inversionObjGrad(X, &F0, Gbase, ctx));
-
-  /* ---- Replicate X and Gbase to all ranks for cell-local lookups ---- */
-  Vec        Xall, Gall;
-  VecScatter sX, sG;
-  PetscCall(VecScatterCreateToAll(X,     &sX, &Xall));
-  PetscCall(VecScatterCreateToAll(Gbase, &sG, &Gall));
-  PetscCall(VecScatterBegin(sX, X,     Xall, INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecScatterEnd  (sX, X,     Xall, INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecScatterBegin(sG, Gbase, Gall, INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecScatterEnd  (sG, Gbase, Gall, INSERT_VALUES, SCATTER_FORWARD));
-
-  PetscCall(PetscPrintf(comm,
-    "   Baseline F0 = %14.6e\n\n", (double)F0));
-  PetscCall(PetscPrintf(comm,
-    "   %8s   %14s   %14s   %14s   %10s   %12s\n",
-    "cell_idx", "G_adjoint", "FD_approx", "|FD-G|",
-    "ratio", "|FD-G|/|G|"));
-  PetscCall(PetscPrintf(comm,
-    "   --------   --------------   --------------   --------------"
-    "   ----------   ------------\n"));
-
-  /* Ownership range for targeted VecSetValue - only the owner sets the
-   * value so INSERT_VALUES stays unambiguous under MPI. */
-  PetscInt lo, hi;
-  PetscCall(VecGetOwnershipRange(X, &lo, &hi));
-
-  PetscReal sumRatio = 0.0, maxAbsErr = 0.0;
-  PetscInt  nValid = 0;
-
-  for (PetscInt k = 0; k < numChosen; k++) {
-    PetscInt idx = chosen[k];
-
-    /* Read xi and Gi from the all-ranks replicas */
-    const PetscScalar *xArr, *gArr;
-    PetscCall(VecGetArrayRead(Xall, &xArr));
-    PetscCall(VecGetArrayRead(Gall, &gArr));
-    PetscScalar xi = xArr[idx];
-    PetscReal   Gi = PetscRealPart(gArr[idx]);
-    PetscCall(VecRestoreArrayRead(Xall, &xArr));
-    PetscCall(VecRestoreArrayRead(Gall, &gArr));
-
-    /* Centered difference: evaluate at X + eps*e_i and X - eps*e_i */
-    if (idx >= lo && idx < hi)
-      PetscCall(VecSetValue(X, idx, xi + eps, INSERT_VALUES));
-    PetscCall(VecAssemblyBegin(X));
-    PetscCall(VecAssemblyEnd(X));
-
-    PetscReal Fplus;
-    PetscCall(inversionObjGrad(X, &Fplus, Gbase, ctx));
-
-    if (idx >= lo && idx < hi)
-      PetscCall(VecSetValue(X, idx, xi - eps, INSERT_VALUES));
-    PetscCall(VecAssemblyBegin(X));
-    PetscCall(VecAssemblyEnd(X));
-
-    PetscReal Fminus;
-    PetscCall(inversionObjGrad(X, &Fminus, Gbase, ctx));
-
-    /* Restore X[idx] */
-    if (idx >= lo && idx < hi)
-      PetscCall(VecSetValue(X, idx, xi, INSERT_VALUES));
-    PetscCall(VecAssemblyBegin(X));
-    PetscCall(VecAssemblyEnd(X));
-
-    PetscReal fd     = (Fplus - Fminus) / (2.0 * eps);
-    PetscReal absErr = PetscAbsReal(fd - Gi);
-    PetscReal ratio  = (PetscAbsReal(Gi) > 1e-30) ? (fd / Gi) : 0.0;
-    PetscReal relErr = (PetscAbsReal(Gi) > 1e-30)
-                         ? absErr / PetscAbsReal(Gi) : absErr;
-
-    PetscCall(PetscPrintf(comm,
-      "   %8" PetscInt_FMT "   %+14.6e   %+14.6e   %14.6e   %+10.4f   %12.4e\n",
-      idx, (double)Gi, (double)fd, (double)absErr,
-      (double)ratio, (double)relErr));
-
-    if (PetscAbsReal(Gi) > 1e-30) {
-      sumRatio += ratio;
-      nValid++;
-    }
-    if (absErr > maxAbsErr) maxAbsErr = absErr;
-  }
-
-  PetscCall(PetscPrintf(comm,
-    "\n   mean ratio = %+.4f   (over %" PetscInt_FMT " cells with |G|>1e-30)\n",
-    (nValid > 0) ? (double)(sumRatio / nValid) : 0.0, nValid));
-  PetscCall(PetscPrintf(comm,
-    "   max |FD-G| = %.4e\n", (double)maxAbsErr));
-
-  PetscCall(PetscPrintf(comm,
-    "\n Interpretation:\n"
-    "   ratio ~ +1     gradient correct; bug is in smoother/mask/mapping\n"
-    "   ratio ~ -1     sign flip (check log-Jacobian dsigma/dX = -sigma)\n"
-    "   ratio O(1)!=1  missing scalar factor (mu0, i*omega, W vs W^2)\n"
-    "   ratio huge/nan indexing bug between X[i] and G[i]\n\n"));
-
-  PetscCall(VecDestroy(&Xall));
-  PetscCall(VecDestroy(&Gall));
-  PetscCall(VecScatterDestroy(&sX));
-  PetscCall(VecScatterDestroy(&sG));
-  PetscCall(VecDestroy(&Gbase));
-
-  ctx->bypassSmoother = savedBypass;
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* ================================================================== */
-/* runCsemInversion                                                    */
-/* ================================================================== */
-PetscErrorCode runCsemInversion(const invParams  *iparams,
+/**
+ * @brief Top-level inversion driver.
+ *
+ * Builds the inversion DM, neighbor smoothing graph, workspace, and KSPs;
+ * runs the custom L-BFGS optimizer over the per-frequency objective/gradient
+ * callback; writes the final HDF5 results; and returns accumulated assembly
+ * and solver wall-clock times for the kernel timer report. `receivers` is
+ * the serial Vec produced by loadCsemInputs; it is consumed by
+ * buildReceiverInterpolationMatrices and the caller retains ownership.
+ *
+ * @param[in]  iparams       Inversion parameters.
+ * @param[in]  dm            H(curl) DM.
+ * @param[in]  grid          Finite-element grid descriptor.
+ * @param[in]  conductivity  Initial per-cell conductivity Vec.
+ * @param[in]  materialsID   Per-cell material-id Vec.
+ * @param[in]  receivers     Serial Vec of 3·N_recv receiver coordinates.
+ * @param[out] tAssemblyOut  Accumulated assembly time (seconds).
+ * @param[out] tSolverOut    Accumulated solver time (seconds).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode runCsemInversion(const imParams  *iparams,
                                 const DM          dm,
                                 const Grid       *grid,
                                 Vec               conductivity,
@@ -956,14 +837,15 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
 
   /* ---- Build receiver Q matrices ---- */
   ReceiverInterpolationMatrices Q;
-  PetscCall(buildReceiverInterpolationMatrices(iparams->nord,
+  PetscCall(buildReceiverInterpolationMatrices(iparams->fm.nord,
                                                 receivers,
                                                 dm, grid, &Q));
 
-  /* ---- Load observed data from the unified bundle (/observed/Ex) ---- */
+  /* ---- Load observed data via the source-agnostic abstraction ----
+   * Backend (external /observed/Ex vs fm-native /sources/src*/fields/Ex) and
+   * file are selected from iparams (-inv_observed_mode / -inv_observed_file). */
   Mat dObs;
-  PetscCall(loadObservedData(iparams->bundleFile, iparams->numFreqs,
-                              Q.numReceivers, &dObs));
+  PetscCall(loadObservedDataset(iparams, Q.numReceivers, &dObs));
 
   /* ---- Get conductivity DM (3 DOF/cell) for scatter operations ---- */
   DM dmConductivity;
@@ -1035,17 +917,6 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
   PetscCall(buildNotFixedMask(&graph, dmInversion, grid,
                                &notFixedMaskGlobal, &notFixedMaskLocal));
 
-  /* Diagnostic snapshot buffers - allocated only when VTU snapshots
-   * are enabled. NULL entries in the context disable the corresponding
-   * capture inside inversionObjGrad / applyLogToSigma. */
-  Vec DfDmRaw = NULL, DfDmFinal = NULL, XPreSmooth = NULL, XPostSmooth = NULL;
-  if (iparams->snapshotInterval > 0) {
-    PetscCall(DMCreateLocalVector (dmInversion, &DfDmRaw));
-    PetscCall(DMCreateGlobalVector(dmInversion, &DfDmFinal));
-    PetscCall(DMCreateGlobalVector(dmInversion, &XPreSmooth));
-    PetscCall(DMCreateLocalVector (dmInversion, &XPostSmooth));
-  }
-
   InversionContext ctx = {
     .iparams            = iparams,
     .dm                 = dm,
@@ -1061,20 +932,12 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
     .graph              = &graph,
     .notFixedMaskGlobal = notFixedMaskGlobal,
     .notFixedMaskLocal  = notFixedMaskLocal,
-    .DfDmRaw            = DfDmRaw,
-    .DfDmFinal          = DfDmFinal,
-    .XPreSmooth         = XPreSmooth,
-    .XPostSmooth        = XPostSmooth,
     .allRMS             = allRMS,
     .lastRMS            = PETSC_INFINITY,
     .lastDataMisfit     = 0.0,
     .lastRegTerm        = 0.0,
     .iterCount          = 0,
     .acceptedIter       = 0,
-    /* -inv_no_smoother disables both smoothers for the whole run (diagnostic
-     * for the nord>=2 / multi-rank boundary-artifact investigation). The FD
-     * check still toggles bypassSmoother around its own evaluations. */
-    .bypassSmoother     = iparams->smootherOff,
     /* Workspace fields (quad3d, MeRows, KeRows, b/x/nB/nx/Ex_recv,
      * Bvec_per_freq, Wf_per_freq, dObsRow_per_freq) are zero-initialized
      * by C designated-init and populated by setupInversionWorkspace next. */
@@ -1083,29 +946,15 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
   /* Precompute everything that doesn't depend on the L-BFGS iterate X. */
   PetscCall(setupInversionWorkspace(&ctx));
 
-  /* ---- Optional: FD gradient check at iter 0, then exit ---- */
-  if (iparams->fdCheckCells > 0) {
-    PetscReal fdEps = 1.0e-3;
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-inv_dev_fd_check_eps",
-                                  &fdEps, NULL));
-    PetscCall(runFdGradientCheck(&ctx, X, iparams->fdCheckCells, fdEps));
-    PetscCall(PetscPrintf(comm,
-      " FD check complete; skipping L-BFGS "
-      "(remove -inv_dev_fd_check to run the inversion).\n"));
-    goto fd_cleanup;
-  }
-
   /* ---- Run L-BFGS optimization ----
    * PETSc TAO is unavailable with --with-scalar-type=complex (all TAO
    * solver registrations are guarded by #if !defined(PETSC_USE_COMPLEX)).
    * We use a custom L-BFGS implementation matching the MATLAB Fortran
    * reference (Nocedal 1980 two-loop recursion).                     */
-  PetscCall(PetscPrintf(comm, "\n L-BFGS inversion started"
-    " (M=%" PetscInt_FMT ", maxIter=%" PetscInt_FMT ")\n",
-    iparams->lbfgsMemory, iparams->maxIter));
-  if (iparams->smootherOff)
-    PetscCall(PetscPrintf(comm,
-      "   [diagnostic] -inv_no_smoother: BOTH smoothers disabled this run\n"));
+  PetscCall(PetscPrintf(comm, "\n L-BFGS optimization:\n"));
+  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "L-BFGS memory (M)", iparams->lbfgsMemory));
+  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "Max iterations",    iparams->maxIter));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",            "Started"));
 
   PetscInt    numIters;
   const char *reasonStr;
@@ -1116,10 +965,11 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
                           &numIters, &reasonStr));
 
   /* Print RMS history (one entry per objgrad call, including line searches) */
-  PetscCall(PetscPrintf(comm, "\n RMS history (all objgrad evaluations):\n"));
+  PetscCall(PetscPrintf(comm, "\n RMS history (per objgrad evaluation):\n"));
+  PetscCall(PetscPrintf(comm, "        eval         RMS\n"));
   for (PetscInt it = 0; it < ctx.iterCount; it++)
     PetscCall(PetscPrintf(comm,
-      "   eval %" PetscInt_FMT " : RMS = %g\n",
+      "   %9" PetscInt_FMT "   %.6g\n",
       it + 1, (double)allRMS[it]));
 
   /* ---- Write results to HDF5 ---- */
@@ -1127,7 +977,6 @@ PetscErrorCode runCsemInversion(const invParams  *iparams,
                                   conductivity, X,
                                   allRMS, ctx.iterCount, reasonStr));
 
-fd_cleanup:
   /* ---- Cleanup ---- */
   PetscCall(destroyInversionWorkspace(&ctx));
   PetscCall(VecDestroy(&X0));
@@ -1135,10 +984,6 @@ fd_cleanup:
   PetscCall(VecDestroy(&DfDm));
   PetscCall(VecDestroy(&notFixedMaskGlobal));
   PetscCall(VecDestroy(&notFixedMaskLocal));
-  if (DfDmRaw)     PetscCall(VecDestroy(&DfDmRaw));
-  if (DfDmFinal)   PetscCall(VecDestroy(&DfDmFinal));
-  if (XPreSmooth)  PetscCall(VecDestroy(&XPreSmooth));
-  if (XPostSmooth) PetscCall(VecDestroy(&XPostSmooth));
   PetscCall(DMDestroy(&dmInversion));
   PetscCall(MatDestroy(&dObs));
   PetscCall(PetscFree(allRMS));

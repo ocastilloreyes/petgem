@@ -190,6 +190,6 @@ def run_pipeline_for_nord(repo_root, fm_csem_binary, case_workspace, nord,
     _run_with_timeout(cmd, cwd=case_workspace, timeout=kernel_timeout,
                       label=f"fm.csem[nord={nord}]")
 
-    responses_path = case_workspace / f"{responses_base}_src1.h5"
+    responses_path = case_workspace / f"{responses_base}.h5"
     assert responses_path.exists(), f"expected responses at {responses_path}"
     return responses_path, case_workspace / bundle_name
