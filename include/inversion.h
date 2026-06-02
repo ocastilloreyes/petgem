@@ -161,7 +161,6 @@ typedef struct {
   Vec                             X0;          /**< Initial log(rho) (global, 1 DOF/cell). */
   Vec                             DfDm;        /**< Gradient workspace (local, 1 DOF/cell). */
   Mat                             dObs;        /**< Observed Ex, Nfreq × Nrec dense. */
-  Vec                             Wweights;    /**< Data weights, Nfreq*Nrec. */
   const ReceiverInterpolationMatrices *Q;      /**< Receiver-interpolation operators. */
   const NeighborGraph            *graph;       /**< Neighbor smoothing graph. */
   Vec                             notFixedMaskGlobal; /**< 0 at fixed cells, 1 elsewhere (global, dmInversion). */

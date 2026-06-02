@@ -842,8 +842,8 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
                                                 dm, grid, &Q));
 
   /* ---- Load observed data via the source-agnostic abstraction ----
-   * Backend (external /observed/Ex vs fm-native /sources/src*/fields/Ex) and
-   * file are selected from iparams (-inv_observed_mode / -inv_observed_file). */
+   * Backend (external /observed/Ex vs fm-native /sources/src{k}/fields/Ex)
+   * and file are selected from iparams (-inv_observed_mode / -inv_observed_file). */
   Mat dObs;
   PetscCall(loadObservedDataset(iparams, Q.numReceivers, &dObs));
 
@@ -927,7 +927,6 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
     .X0                 = X0,
     .DfDm               = DfDm,
     .dObs               = dObs,
-    .Wweights           = NULL,   /* superseded by per-freq Wf_per_freq[] */
     .Q                  = &Q,
     .graph              = &graph,
     .notFixedMaskGlobal = notFixedMaskGlobal,
