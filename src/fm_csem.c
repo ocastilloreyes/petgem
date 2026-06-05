@@ -8,11 +8,44 @@
  * fm.csem binary and the unified petgem dispatcher.
  */
 
-static char fmHelp[] = "PETGEM forward CSEM kernel (runForward / fm.csem).\n\
-  Standalone usage:\n\
-    mpirun -n <np> ./fm.csem -options_file <file.txt>\n\
-  Unified-binary usage:\n\
-    mpirun -n <np> ./petgem modeling -options_file <file.txt>\n";
+static char fmHelp[] =
+"================================================================\n\
+ PETGEM  fm.csem  --  CSEM forward modeling kernel\n\
+================================================================\n\
+\n\
+ Computes the 3-D controlled-source EM response on a tetrahedral\n\
+ mesh using high-order (1..6) Nedelec finite elements on PETSc.\n\
+\n\
+QUICK START\n\
+  mpirun -n <np> ./fm.csem -input_filename model.h5 \\\n\
+         -output_dir out/ -output_filename resp\n\
+\n\
+REQUIRED\n\
+  -input_filename <file.h5>  Unified PETGEM input bundle: mesh,\n\
+                             conductivity, materials, sources and\n\
+                             receivers (built by the preprocessor).\n\
+  -output_dir <dir>          Output directory (created if absent).\n\
+  -output_filename <stem>    Output stem; writes <dir>/<stem>.h5.\n\
+\n\
+OPTIONAL\n\
+  -nord <1..6>               Override bundle basis order.\n\
+  -options_file <file>       Read options (and PETSc flags) from file.\n\
+\n\
+EXAMPLES\n\
+  ./fm.csem -input_filename model.h5 -output_dir out/ -output_filename resp\n\
+  mpirun -n 96 ./fm.csem -options_file params_p2.txt\n\
+  mpirun -n 96 ./fm.csem -options_file params.txt -nord 3\n\
+\n\
+UNIFIED BINARY\n\
+  mpirun -n 96 ./petgem modeling -options_file params_p2.txt\n\
+\n\
+MORE\n\
+  -help        Full option database, incl. advanced PETSc flags.\n\
+  -help intro  This concise usage summary, then exit.\n\
+  --version    Print the PETGEM version and exit.\n\
+\n\
+ Docs: github.com/ocastilloreyes/petgem\n\
+================================================================\n";
 
 /* C libraries */
 #include <stdio.h>
@@ -82,6 +115,9 @@ int runForward(int argc, char** argv) {
   PetscScalar     constFactor;
   PetscLogDouble  timers[6];
   PetscLogDouble  start_timer, end_timer;
+  PetscLogStage stage_parse, stage_load, stage_grid;
+  PetscLogStage stage_assembly, stage_solve, stage_postproc;
+  PetscBool     helpRequested = PETSC_FALSE;
 
   /* ---------------------------------------------------------------- */
   /* PETSC initialization                                             */
@@ -95,13 +131,14 @@ int runForward(int argc, char** argv) {
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
 
-  /* Register the six fm.csem phase stages with PETSc's logging system.
-   * The existing PetscTime-based timer table is preserved unchanged; these
-   * stages make `-log_view` produce a per-rank, per-event profile (including
-   * KSP / Mat / Vec sub-events) for free.  Stage names match the printTimers
-   * row labels so the two reports cross-reference cleanly. */
-  PetscLogStage stage_parse, stage_load, stage_grid;
-  PetscLogStage stage_assembly, stage_solve, stage_postproc;
+  /* ---------------------------------------------------------------- */
+  /* Resolve here the petsc help printing                             */
+  /* ---------------------------------------------------------------- */
+  PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
+
+  /* ---------------------------------------------------------------- */
+  /* Register the fm.csem phase stages with PETSc's logging system    */  
+  /* ---------------------------------------------------------------- */
   PetscCall(PetscLogStageRegister("Read parameters",     &stage_parse));
   PetscCall(PetscLogStageRegister("Load input bundle",   &stage_load));
   PetscCall(PetscLogStageRegister("Setup grid",          &stage_grid));
@@ -120,7 +157,7 @@ int runForward(int argc, char** argv) {
   Extrae_event(1000, 2);
 #endif
 
-  PetscCall(printHeader());
+  if (!helpRequested) PetscCall(printHeader());
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -139,6 +176,14 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[0] = end_timer - start_timer;
+
+  /* Option groups already printed by -help; skip simulation and exit. */
+  if (helpRequested) {
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,
+              "\nTip: 'fm.csem -help intro' shows the concise usage summary.\n"));
+    PetscCall(PetscFinalize());
+    return 0;
+  }
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -181,7 +226,7 @@ int runForward(int argc, char** argv) {
 #endif
 
   /* ---------------------------------------------------------------- */
-  /* Assembly linear system                                              */
+  /* Assembly linear system                                           */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 6);
@@ -190,11 +235,11 @@ int runForward(int argc, char** argv) {
   /* Compute constants for assembly phase */
   omega       = sources.freq * 2.0 * PETSC_PI;
   constFactor = (0.0 + 1.0 * PETSC_i) * (omega * MU);
-  
+
   /* Perform assembly */
   PetscCall(PetscLogStagePush(stage_assembly));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(assembleCsemRHS(params, sources, dm, grid, &B));
+  PetscCall(assembleCsemRHS(params, sources, dm, grid, constFactor, &B));
   PetscCall(assembleCsemKandM(params, dm, grid, conductivity, constFactor, &A, NULL, &G_BDDC));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());

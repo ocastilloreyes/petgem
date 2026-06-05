@@ -8,11 +8,51 @@
  * im.csem binary and the unified petgem dispatcher.
  */
 
-static char imHelp[] = "PETGEM inverse CSEM kernel (runInverse / im.csem).\n\
-  Standalone usage:\n\
-    mpirun -n <np> ./im.csem -options_file <file.txt>\n\
-  Unified-binary usage:\n\
-    mpirun -n <np> ./petgem inverse -options_file <file.txt>\n";
+static char imHelp[] =
+"================================================================\n\
+ PETGEM  im.csem  --  CSEM inversion kernel\n\
+================================================================\n\
+\n\
+ Recovers a 3-D conductivity model from CSEM data by L-BFGS with\n\
+ an adjoint-state gradient (PETSc, Nedelec FEM).\n\
+\n\
+QUICK START\n\
+  mpirun -n <np> ./im.csem -options_file params.txt -output_dir out/\n\
+\n\
+REQUIRED\n\
+  -input_filename <file.h5>  Unified PETGEM bundle (mesh, start\n\
+                             model, sources, receivers, /observed).\n\
+  -output_dir <dir>          Output directory (created if absent).\n\
+  -output_filename <stem>    Output stem; writes <dir>/<stem>.h5.\n\
+\n\
+OPTIONAL  (inversion control; defaults in brackets)\n\
+  -inv_max_iter <n>          Max L-BFGS iterations            [80]\n\
+  -inv_lbfgs_memory <m>      L-BFGS history depth M            [5]\n\
+  -inv_lambda <r>            Tikhonov regularisation weight  [0.1]\n\
+  -inv_gtol <r>              Gradient-norm tolerance        [1e-5]\n\
+  -inv_rms_tol <r>           Absolute RMS early stop (0=off)   [0]\n\
+  -inv_error_level <r>       Relative data-error level      [0.01]\n\
+  -inv_diag_weight <r>       Gradient-smoother self-weight     [0]\n\
+  -inv_fixed_materials <ids> Material IDs frozen in smoothing\n\
+  -inv_snapshot_interval <n> Write VTU every N steps (0=off)   [0]\n\
+  -inv_observed_mode <m>     external | fm_native     [external]\n\
+  -inv_observed_file <f>     Observed-data file (req. fm_native)\n\
+  -nord <1..6>               Override bundle basis order.\n\
+\n\
+EXAMPLES\n\
+  mpirun -n 56 ./im.csem -options_file params_p1.txt -output_dir out/\n\
+  mpirun -n 56 ./im.csem -options_file params.txt -inv_max_iter 120 -inv_lambda 0.05\n\
+\n\
+UNIFIED BINARY\n\
+  mpirun -n 56 ./petgem inverse -options_file params_p1.txt\n\
+\n\
+MORE\n\
+  -help        Full option database, incl. advanced PETSc flags.\n\
+  -help intro  This concise usage summary, then exit.\n\
+  --version    Print the PETGEM version and exit.\n\
+\n\
+ Docs: github.com/ocastilloreyes/petgem\n\
+================================================================\n";
 
 /* C libraries */
 #include <stdio.h>
@@ -76,6 +116,7 @@ int runInverse(int argc, char **argv)
   Grid            grid;
   PetscLogDouble  timers[7];
   PetscLogDouble  start_timer, end_timer;
+  PetscBool       helpRequested = PETSC_FALSE;
 
   /* ---------------------------------------------------------------- */
   /* PETSC initialization                                             */
@@ -89,6 +130,11 @@ int runInverse(int argc, char **argv)
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
 
+  /* Resolved once here so the boxed run header is skipped on a -help run
+   * (it would otherwise interrupt the option listing) and the clean exit
+   * below can reuse it. */
+  PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
+
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
@@ -100,7 +146,7 @@ int runInverse(int argc, char **argv)
   Extrae_event(1000, 2);
 #endif
 
-  PetscCall(printHeader());
+  if (!helpRequested) PetscCall(printHeader());
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -137,6 +183,16 @@ int runInverse(int argc, char **argv)
   /* Parse inversion parameters                                        */
   /* ---------------------------------------------------------------- */
   PetscCall(readInversionParams(&iparams));
+
+  /* A plain -help run has printed the required/optional/inversion option
+   * groups during parsing; exit cleanly here instead of running an
+   * inversion. (-help intro already exited inside PetscInitialize.) */
+  if (helpRequested) {
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,
+              "\nTip: 'im.csem -help intro' shows the concise usage summary.\n"));
+    PetscCall(PetscFinalize());
+    return 0;
+  }
 
   /* Pull case-property defaults out of the bundle (error_level,
    * fixed_materials) - CLI overrides applied by readInversionParams

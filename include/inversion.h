@@ -195,7 +195,7 @@ typedef struct {
   PetscReal                     **KeRows;       /**< Row-of-pointers view of KeBuf. */
   /** @} */
   /** 3D quadrature for elemental mass-matrix integration. Depends only on
-   *  iparams->nord (constant across the run). */
+   *  iparams->fm.nord (constant across the run). */
   Quadrature3D                    quad3d;       /**< 3D quadrature rule. */
   PetscBool                       quad3dInited; /**< PETSC_TRUE once quad3d is filled. */
 

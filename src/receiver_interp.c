@@ -92,10 +92,8 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   PetscInt globalSizeReceivers, numGlobalReceivers;
   PetscCall(VecGetSize(receivers, &globalSizeReceivers));
 
-  PetscCheck(globalSizeReceivers % NUM_DIMENSIONS == 0,
-             comm, PETSC_ERR_ARG_SIZ,
-             "Receiver vector size %" PetscInt_FMT " not divisible by %d",
-             globalSizeReceivers, NUM_DIMENSIONS);
+  PetscCheck(globalSizeReceivers % NUM_DIMENSIONS == 0, comm, PETSC_ERR_ARG_SIZ,
+             "Receiver vector size %" PetscInt_FMT " not divisible by %d", globalSizeReceivers, NUM_DIMENSIONS);
 
   numGlobalReceivers = globalSizeReceivers / NUM_DIMENSIONS;
   Q->numReceivers    = numGlobalReceivers;
@@ -106,10 +104,8 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   const PetscSFNode *recvInCell;
   const PetscInt    *recvFound;
 
-  PetscCall(DMLocatePoints(dm, receivers, DM_POINTLOCATION_REMOVE,
-                           &receiverSF));
-  PetscCall(PetscSFGetGraph(receiverSF, NULL, &numFound,
-                            &recvFound, &recvInCell));
+  PetscCall(DMLocatePoints(dm, receivers, DM_POINTLOCATION_REMOVE, &receiverSF));
+  PetscCall(PetscSFGetGraph(receiverSF, NULL, &numFound, &recvFound, &recvInCell));
 
   /* Global DOF count for matrix column size */
   Vec  tmpVec;
@@ -176,16 +172,14 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
     PetscCall(extractCellCoordinates(dm, cellID, &cell));
     PetscCall(computeCellJacobian(&cell));
 
-    /* If the located cell is degenerate (near-zero volume), search
-       neighboring cells sharing a vertex for a valid alternative.
-       DMLocatePoints may place receivers on partition boundaries
-       or in thin surface cells where |detJ| <= PETSC_SMALL.       */
+    /* If the located cell is degenerate (near-zero volume), search neighboring cells sharing a vertex 
+       for a valid alternative. DMLocatePoints may place receivers on partition boundaries or in thin 
+       surface cells where |detJ| <= PETSC_SMALL.       */
     if (PetscAbsReal(cell.detJacobian) <= PETSC_SMALL) {
       PetscInt        altCell = -1;
       PetscInt        closureSize = 0;
       PetscInt       *closure     = NULL;
-      PetscCall(DMPlexGetTransitiveClosure(dm, cellID, PETSC_TRUE,
-                                           &closureSize, &closure));
+      PetscCall(DMPlexGetTransitiveClosure(dm, cellID, PETSC_TRUE, &closureSize, &closure));
       for (PetscInt ci = 0; ci < closureSize * 2; ci += 2) {
         PetscInt point = closure[ci];
         PetscInt pdepth;
@@ -209,8 +203,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
         }
         if (altCell >= 0) break;
       }
-      PetscCall(DMPlexRestoreTransitiveClosure(dm, cellID, PETSC_TRUE,
-                                               &closureSize, &closure));
+      PetscCall(DMPlexRestoreTransitiveClosure(dm, cellID, PETSC_TRUE, &closureSize, &closure));
       if (altCell >= 0) {
         PetscCall(PetscPrintf(PETSC_COMM_SELF,
           "   WARNING: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
@@ -239,9 +232,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
     /* Nord-agnostic basis + curl evaluation through the per-order ops
      * table (cf. include/hvfem.h). Same routine assembly.c uses, so any
      * basis order with a registered NedelecOps works here uniformly. */
-    PetscCall(evaluateNedelecBasis(&grid->fem, &cell, XiEtaZeta,
-                                   coeffs, Dx_Ni, Dy_Ni, Dz_Ni,
-                                   Ni, NiCurl));
+    PetscCall(evaluateNedelecBasis(&grid->fem, &cell, XiEtaZeta, coeffs, Dx_Ni, Dy_Ni, Dz_Ni, Ni, NiCurl));
 
     /* Per-DOF sign convention - same routine the forward assembly uses,
      * so Q aligns with the physical (signed) field evaluation. */
@@ -266,40 +257,30 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
     PetscCall(DMGetGlobalSection(dm, &globalSection));
 
     PetscInt  numLocal, *localIdx;
-    PetscCall(DMPlexGetClosureIndices(dm, section, section, cellID,
-                                      PETSC_TRUE, &numLocal, &localIdx,
-                                      NULL, NULL));
+    PetscCall(DMPlexGetClosureIndices(dm, section, section, cellID, PETSC_TRUE, &numLocal, &localIdx, NULL, NULL));
     PetscInt  numGlobal, *globalIdxRaw;
-    PetscCall(DMPlexGetClosureIndices(dm, section, globalSection, cellID,
-                                      PETSC_TRUE, &numGlobal, &globalIdxRaw,
-                                      NULL, NULL));
+    PetscCall(DMPlexGetClosureIndices(dm, section, globalSection, cellID, PETSC_TRUE, &numGlobal, &globalIdxRaw, NULL, NULL));
 
     for (PetscInt k = 0; k < grid->numDofInCell; k++) {
-      if (localIdx[k] < 0) continue;                       /* BC-constrained: skip */
+      if (localIdx[k] < 0) {
+        continue;                       /* BC-constrained: skip */
+      }
       PetscInt gidx = decodeGlobalDOF(globalIdxRaw[k]);
-      if (gidx >= Q->numDof) continue;                     /* safety */
+      if (gidx >= Q->numDof) {
+        continue;                     /* safety */
+      }
 
       PetscReal ori = (PetscReal)dofSigns[k];
-      PetscCall(MatSetValue(Q->QEx, ridx, gidx,
-                            Ni[0][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QEy, ridx, gidx,
-                            Ni[1][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QEz, ridx, gidx,
-                            Ni[2][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHx, ridx, gidx,
-                            NiCurl[0][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHy, ridx, gidx,
-                            NiCurl[1][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHz, ridx, gidx,
-                            NiCurl[2][k] * ori, ADD_VALUES));
+      PetscCall(MatSetValue(Q->QEx, ridx, gidx, Ni[0][k] * ori, ADD_VALUES));
+      PetscCall(MatSetValue(Q->QEy, ridx, gidx, Ni[1][k] * ori, ADD_VALUES));
+      PetscCall(MatSetValue(Q->QEz, ridx, gidx, Ni[2][k] * ori, ADD_VALUES));
+      PetscCall(MatSetValue(Q->QHx, ridx, gidx, NiCurl[0][k] * ori, ADD_VALUES));
+      PetscCall(MatSetValue(Q->QHy, ridx, gidx, NiCurl[1][k] * ori, ADD_VALUES));
+      PetscCall(MatSetValue(Q->QHz, ridx, gidx, NiCurl[2][k] * ori, ADD_VALUES));
     }
 
-    PetscCall(DMPlexRestoreClosureIndices(dm, section, globalSection, cellID,
-                                          PETSC_TRUE, &numGlobal,
-                                          &globalIdxRaw, NULL, NULL));
-    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, cellID,
-                                          PETSC_TRUE, &numLocal, &localIdx,
-                                          NULL, NULL));
+    PetscCall(DMPlexRestoreClosureIndices(dm, section, globalSection, cellID, PETSC_TRUE, &numGlobal, &globalIdxRaw, NULL, NULL));
+    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, cellID, PETSC_TRUE, &numLocal, &localIdx, NULL, NULL));
   }
 
   PetscCall(VecRestoreArrayRead(receivers, &coords));

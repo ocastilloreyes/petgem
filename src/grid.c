@@ -89,19 +89,7 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   PetscCall(DMPlexMarkBoundaryFaces(*dm, 100, labelBoundary));
   PetscCall(DMPlexLabelComplete(*dm, labelBoundary));
 
-  /*  Create PetscSection. The PETSc convention in 3
-     dimensions is to number first cells, then vertices,
-     then faces, and then edges. The above statement is not
-     always true and we should not rely on that. It may be
-     true for meshes read from GMSH files, but not for
-     others. We are only guaranteed that points at different
-     depths (or different heights, depending from where we
-     start looking at the DAG) are numbered contiguously,
-     this is why we can get start and end. Also, note that
-     this numbering is purely local, because it is used to
-     perform local mesh traversals   */
-  /* Compute DOFs for PETGEM basis functions at vertex,
-   * edges, faces, and volume */
+  /* Compute DOFs for PETGEM basis functions at vertex, edges, faces, and volume */
   numDofInVertex = 0;
   numDofInEdge = params.nord;
   numDofInFace = params.nord * (params.nord - 1);
@@ -111,6 +99,13 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
 
   /* Get the IS for boundaries */
   PetscCall(DMLabelGetStratumIS(labelBoundary, 100, &boundaryIS));
+
+  /*  Create PetscSection. The PETSc convention in 3 dimensions is to number first cells, then vertices,
+     then faces, and then edges. The above statement is not always true and we should not rely on that. 
+     It may be true for meshes read from GMSH files, but not for others. We are only guaranteed that 
+     points at different depths (or different heights, depending from where we start looking at the 
+     DAG) are numbered contiguously, this is why we can get start and end. Also, note that this 
+     numbering is purely local, because it is used to perform local mesh traversals */
   PetscCall(DMPlexCreateSection(*dm, NULL, numComp, numDof, numBC, bcField, NULL, &boundaryIS, NULL, &section));
   PetscCall(DMSetLocalSection(*dm, section));
   PetscCall(PetscSectionDestroy(&section));
@@ -144,8 +139,7 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   PetscCall(DMPlexCreatePointNumbering(*dm, &globalPointNumbering));
   PetscCall(ISGetIndices(globalPointNumbering, &gidxs));
 
-  /* pStart is almost always 0, but we support nonzero too
-   */
+  /* pStart is almost always 0, but we support nonzero too */
   PetscCall(DMPlexGetChart(*dm, &pStart, NULL));
 
   /* Get numbering for cells (height 0) */
@@ -170,8 +164,7 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
     if (gidxs[i - pStart] >= 0) numVerticesLocal += 1;
   }
 
-  /* One fused MPI_Allreduce instead of four. MPIU_INT tracks the PetscInt
-   * size so the reduction stays correct under --with-64-bit-indices. */
+  /* MPI_Allreduce for mesh statististics */
   {
     PetscInt localCounts[4]  = {numCellsLocal, numFacesLocal, numEdgesLocal, numVerticesLocal};
     PetscInt globalCounts[4] = {0, 0, 0, 0};
@@ -349,8 +342,8 @@ PetscErrorCode locatePoint(const DM dm, const PetscReal* position, PetscInt* poi
     *pointInCell = pointCell[i].index;
   }
 
-  /* Perform validation (at least one MPI task must found
-     the point). Each process sets its local flag */
+  /* Perform validation (at least one MPI task must found the point). 
+     Each process sets its local flag */
   pointFoundLocal = (*pointInCell < 0) ? PETSC_FALSE : PETSC_TRUE;
 
   /* Gather all local flags to the master process */

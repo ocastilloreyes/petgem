@@ -25,12 +25,18 @@
  * @param[in]  sources  Transmitter set (one column of B per source).
  * @param[in]  dm       DMPlex mesh and H(curl) discretization.
  * @param[in]  grid     Finite-element grid descriptor.
+ * @param[in]  constFactor  Fused-mode factor iωμ; ignored when Ms != NULL.
  * @param[out] B        Assembled right-hand side matrix.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemRHS(const fmParams params, const CsemSourceSet sources, const DM dm, const Grid grid, Mat* B);
+PetscErrorCode assembleCsemRHS(const fmParams params, 
+                               const CsemSourceSet sources, 
+                               const DM dm, 
+                               const Grid grid,
+                               const PetscScalar constFactor, 
+                               Mat* B);
 
 /**
  * @brief Assembles the CSEM left-hand side operator (unified K/Ms or fused).

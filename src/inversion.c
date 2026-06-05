@@ -150,7 +150,11 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
     setOne.sourceArray = &one;
 
     Mat Bmat;
-    PetscCall(assembleCsemRHS(stub, setOne, ctx->dm, ctx->grid, &Bmat));
+    PetscReal       omega;      
+    PetscScalar     constFactor;
+    omega       = setOne.freq * 2.0 * PETSC_PI;
+    constFactor = (0.0 + 1.0 * PETSC_i) * (omega * MU);
+    PetscCall(assembleCsemRHS(stub, setOne, ctx->dm, ctx->grid, constFactor, &Bmat));
 
     PetscCall(DMCreateGlobalVector(ctx->dm, &ctx->Bvec_per_freq[ifre]));
     {
@@ -475,7 +479,8 @@ PetscErrorCode createInversionDM(DM dmConductivity, const Grid *grid, DM *dmInv)
  * The caller invokes solveInvSystem twice (forward + adjoint) then KSPDestroy.
  * The MUMPS factorization is triggered on the first KSPSolve.
  *
- * @param[in]  iparams  Inversion parameters.
+ * @param[in]  iparams  Inversion parameters. Reserved; currently unused
+ *                      (solver options come from KSPSetFromOptions).
  * @param[in]  dm       H(curl) DM.
  * @param[in]  A        System matrix.
  * @param[in]  Gbddc    Topological discrete-gradient operator for PCBDDC.
@@ -491,6 +496,7 @@ PetscErrorCode createInvKSP(const imParams *iparams,
                              KSP              *ksp)
 {
   PetscFunctionBeginUser;
+  (void)iparams; /* reserved; currently unused - see header */
 
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);
 
@@ -500,9 +506,15 @@ PetscErrorCode createInvKSP(const imParams *iparams,
   /* `Gbddc` is the forward-formulation TOPOLOGICAL discrete-gradient operator
    * (Nédélec→H1 vertex incidence) consumed by PCBDDC. It has nothing to do
    * with the inversion gradient ∂F/∂X built by the L-BFGS layer — distinct
-   * names so the two never get conflated. The inverse path passes
-   * iparams->fm.nord as the order argument (preserves prior behaviour). */
-  PetscCall(petgemConfigureBDDCFromGradient(*ksp, A, Gbddc, iparams->fm.nord));
+   * names so the two never get conflated.
+   *
+   * The order argument MUST be 1: Gbddc only ever fills the lowest-Whitney
+   * slot per mesh edge (the ±1 vertex incidence G_h of Kolev-Vassilevski
+   * §4), so it is structurally an order-1 discrete gradient regardless of
+   * fm.nord. Declaring order=nord>1 would tell PCBDDC's Nédélec support to
+   * expect nord DOFs/edge in G's rows that are in fact zero, feeding it a
+   * mismatched descriptor. This matches the forward solver (solver.c). */
+  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, Gbddc, 1));
   PetscCall(KSPSetFromOptions(*ksp));
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -63,7 +63,8 @@
  * @note Assumes 3D H(curl) Nédélec elements. Receivers outside the
  *       computational domain trigger a warning and are skipped.
  */
-PetscErrorCode computeFields(const fmParams params, const CsemSourceSet sources,
+PetscErrorCode computeFields(const fmParams params, 
+                             const CsemSourceSet sources,
                              const DM dm, const Grid grid,
                              Vec receivers, const Mat X) {
   PetscFunctionBeginUser;
@@ -93,9 +94,7 @@ PetscErrorCode computeFields(const fmParams params, const CsemSourceSet sources,
    * frequency.  Per-receiver Ex = QEx * x, etc. - MPI-invariant by
    * construction because each Q row is decided once with global column
    * indexing, irrespective of partition. */
-  PetscCall(buildReceiverInterpolationMatrices(params.nord,
-                                                receivers,
-                                                dm, &grid, &Q));
+  PetscCall(buildReceiverInterpolationMatrices(params.nord, receivers, dm, &grid, &Q));
 
   /* Allocate output Vecs sized to match Q's row layout (left vector).
    * These are parallel Vecs on the kernel communicator, so VecView through
@@ -164,8 +163,7 @@ PetscErrorCode computeFields(const fmParams params, const CsemSourceSet sources,
     /* Get the solution column for this source */
     PetscCall(MatDenseGetColumnVecRead(X, i, &x));
 
-    PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " of %" PetscInt_FMT "\n",
-                          "Processing source", i + 1, sources.numSources));
+    PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " of %" PetscInt_FMT "\n", "Processing source", i + 1, sources.numSources));
 
     /* Apply Q to the H(curl) solution: Ex = QEx*x, Ey = QEy*x, ... */
     PetscCall(MatMult(Q.QEx, x, Ex));
@@ -185,8 +183,7 @@ PetscErrorCode computeFields(const fmParams params, const CsemSourceSet sources,
     /* Per-source group path. Field components land under
      * /sources/src{k}/fields/, and the per-source metadata attributes
      * attach to the /sources/src{k} group itself. */
-    snprintf(groupPath, sizeof(groupPath),
-             "/sources/src%" PetscInt_FMT "/fields", i + 1);
+    snprintf(groupPath, sizeof(groupPath), "/sources/src%" PetscInt_FMT "/fields", i + 1);
     PetscCall(PetscObjectSetName((PetscObject)Ex, "Ex"));
     PetscCall(PetscObjectSetName((PetscObject)Ey, "Ey"));
     PetscCall(PetscObjectSetName((PetscObject)Ez, "Ez"));
@@ -205,8 +202,7 @@ PetscErrorCode computeFields(const fmParams params, const CsemSourceSet sources,
     /* Per-source metadata at /sources/src{k}. */
     {
       const CsemSource *s = &sources.sourceArray[i];
-      snprintf(groupPath, sizeof(groupPath),
-               "/sources/src%" PetscInt_FMT, i + 1);
+      snprintf(groupPath, sizeof(groupPath), "/sources/src%" PetscInt_FMT, i + 1);
       PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "frequency",     PETSC_REAL, &sources.freq));
       PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "x_pos",         PETSC_REAL, &s->position[0]));
       PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, groupPath, "y_pos",         PETSC_REAL, &s->position[1]));

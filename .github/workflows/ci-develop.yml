@@ -305,6 +305,29 @@ jobs:
             ${{ env.DOCKER_IMAGE }} \
             bash -c "make docs"
 
+  # =========================
+  # Documentation drift guard
+  # =========================
+  # Fast comment/docstring synchronization check
+  # (scripts/auto_doc/check_doc_drift.sh): a removed-symbol guard plus a
+  # Doxygen @param-vs-signature check. Runs in the CI image, which already
+  # has doxygen (it builds the docs in compile-docs).
+  doc-drift:
+    runs-on: ubuntu-latest
+    needs: [docker-build, changes]
+    if: needs.changes.outputs.docs == 'true'
+    steps:
+      - uses: actions/checkout@v5
+      - name: Pull Docker image
+        run: docker pull ${{ env.DOCKER_IMAGE }}
+      - name: Check documentation drift
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}":/app \
+            -w /app \
+            ${{ env.DOCKER_IMAGE }} \
+            bash -c "bash scripts/auto_doc/check_doc_drift.sh"
+
   # ========================
   # Publish CI report
   # ========================

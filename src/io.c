@@ -192,40 +192,59 @@ PetscErrorCode readfmParams(const PetscMPIInt size, fmParams* fm_Params) {
   PetscBool outputDirIsPresent       = PETSC_FALSE;
   PetscBool outputFilenameIsPresent  = PETSC_FALSE;
   PetscBool nordIsPresent            = PETSC_FALSE;
+  PetscBool helpRequested            = PETSC_FALSE;
   PetscInt  nord                     = 0;
 
-  /* Group every fm.csem option under one PetscOptionsBegin/End block so
-   * `-help` produces a structured "Forward modeling (fm.csem) options"
-   * section instead of scattering them across PETSc's default surface. */
+  /* When the user runs with -help / -help intro, the option blocks below are
+   * registered (so PETSc documents them), but the mandatory-argument checks
+   * are skipped so a help run prints usage cleanly instead of aborting on a
+   * missing -input_filename. The caller exits after parsing in that case. */
+  PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
+
+  /* Two PetscOptionsBegin/End groups so `-help` renders a clean "required"
+   * vs "optional" split for the fm.csem application options (PETSc prints
+   * groups in registration order). */
   PetscOptionsBegin(PETSC_COMM_WORLD, NULL,
-                    "Forward modeling (fm.csem) options", "PETGEM");
+                    "fm.csem: required options", "PETGEM");
   PetscCall(PetscOptionsString("-input_filename",
-                               "Unified PETGEM input bundle (mesh, sigma, "
-                               "materials_id, receivers, sources)", "fm.csem",
-                               inputFilename, inputFilename,
+                               "[REQUIRED] Unified PETGEM input bundle (mesh, "
+                               "sigma, materials_id, receivers, sources)",
+                               "fm.csem", inputFilename, inputFilename,
                                sizeof(inputFilename), &inputIsPresent));
   PetscCall(PetscOptionsString("-output_dir",
-                               "Output directory for responses", "fm.csem",
-                               outputDir, outputDir,
+                               "[REQUIRED] Output directory for responses",
+                               "fm.csem", outputDir, outputDir,
                                sizeof(outputDir), &outputDirIsPresent));
   PetscCall(PetscOptionsString("-output_filename",
-                               "Output filename stem for responses "
+                               "[REQUIRED] Output filename stem for responses "
                                "(<stem>.h5)", "fm.csem",
                                outputFilename, outputFilename,
                                sizeof(outputFilename),
                                &outputFilenameIsPresent));
+  PetscOptionsEnd();
+
+  PetscOptionsBegin(PETSC_COMM_WORLD, NULL,
+                    "fm.csem: optional options", "PETGEM");
   PetscCall(PetscOptionsInt   ("-nord",
                                "Basis order override (1..6); default = take "
                                "from bundle /nord", "fm.csem",
                                nord, &nord, &nordIsPresent));
   PetscOptionsEnd();
 
+  /* Both option groups have now been printed under -help; skip argument
+   * enforcement and model/directory setup so usage prints cleanly. The
+   * caller (runForward / runInverse) exits right after parsing. */
+  if (helpRequested) PetscFunctionReturn(PETSC_SUCCESS);
+
   PetscCheck(inputIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL,
-             "Exiting: -input_filename missing. Mandatory parameter required for simulation.");
+             "Missing required -input_filename.\n"
+             "  Run  ./fm.csem -help intro  for usage.");
   PetscCheck(outputDirIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL,
-             "Exiting: -output_dir missing. Mandatory parameter required for simulation.");
+             "Missing required -output_dir.\n"
+             "  Run  ./fm.csem -help intro  for usage.");
   PetscCheck(outputFilenameIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL,
-             "Exiting: -output_filename missing. Mandatory parameter required for simulation.");
+             "Missing required -output_filename.\n"
+             "  Run  ./fm.csem -help intro  for usage.");
 
   PetscCall(PetscStrncpy(fm_Params->inputFile,        inputFilename,  sizeof(fm_Params->inputFile)));
   PetscCall(PetscStrncpy(fm_Params->outputDirectory,  outputDir,      sizeof(fm_Params->outputDirectory)));
@@ -290,9 +309,9 @@ PetscErrorCode loadCsemInputs(fmParams      *fm_Params,
   PetscCheck(fm_Params->inputFile[0] != '\0', PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL,
              "loadCsemInputs: fm_Params->inputFile is empty (set -input_filename).");
 
-  /* Phase 1: read mesh + sections + combined model vector (parallel I/O). */
-  /* Replicates the legacy importGrid behavior so downstream code     */
-  /* sees the same DMPlex / sub-DM / local-Vec configuration.         */
+  /* Phase 1: read mesh + sections + combined model vector (parallel I/O)
+   * Replicates the legacy importGrid behavior so downstream code          
+   * sees the same DMPlex / sub-DM / local-Vec configuration. */
   {
     PetscViewer  viewer;
     DM           dm, dmDist, subDMSigma, subDMMat;
@@ -429,10 +448,10 @@ PetscErrorCode loadCsemInputs(fmParams      *fm_Params,
     }
   }
 
-  /* Phase 2: /nord, receivers, and sources (rank-local serial I/O)  */
-  /* /nord is always read so the caller does not need -nord in the   */
-  /* fm_Params file. CLI -nord (if set) overrides the bundle value, but */
-  /* normally readfmParams leaves it at zero and the bundle wins   */
+  /* Phase 2: /nord, receivers, and sources (rank-local serial I/O)  
+   * /nord is always read so the caller does not need -nord in the   
+   * fm_Params file. CLI -nord (if set) overrides the bundle value, but 
+   * normally readfmParams leaves it at zero and the bundle wins */
   {
     PetscViewer viewer;
     PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, fm_Params->inputFile,
@@ -549,8 +568,8 @@ PetscErrorCode loadCsemInputs(fmParams      *fm_Params,
  * overrides the bundled value. A value of 0 means "not overridden".
  *
  * The routine also initializes defaults for L-BFGS settings, Tikhonov
- * regularization, RMS stopping criteria, snapshot generation, gradient
- * checks, and optional smoothing controls.
+ * regularization, RMS stopping criteria, snapshot generation, and
+ * optional smoothing controls.
  *
  * Transmiter/frequency metadata is not loaded here; it is populated later
  * from the unified input bundle.
@@ -580,12 +599,13 @@ PetscErrorCode readInversionParams(imParams *im_Params)
   im_Params->observedFile[0]        = '\0';
 
   /* Group every im.csem option under one PetscOptionsBegin/End block so
-   * `-help` produces a structured "Inverse modeling (im.csem) options"
-   * section. Note: -nord is parsed (and range-validated) once by
-   * readfmParams() into im_Params->fm.nord - the shared base both kernels
-   * use - so it is intentionally NOT re-registered here. */
+   * `-help` renders a structured "im.csem: inversion options" section,
+   * printed after the shared "fm.csem: required/optional" groups that
+   * readfmParams() registers. Note: -nord is parsed (and range-validated)
+   * once by readfmParams() into im_Params->fm.nord - the shared base both
+   * kernels use - so it is intentionally NOT re-registered here. */
   PetscOptionsBegin(PETSC_COMM_WORLD, NULL,
-                    "Inverse modeling (im.csem) options", "PETGEM");
+                    "im.csem: inversion options (optional)", "PETGEM");
   PetscCall(PetscOptionsInt   ("-inv_max_iter",
                                "Maximum L-BFGS iterations", "im.csem",
                                im_Params->maxIter, &im_Params->maxIter, NULL));
@@ -645,6 +665,15 @@ PetscErrorCode readInversionParams(imParams *im_Params)
                                  sizeof(im_Params->observedFile), NULL));
   }
   PetscOptionsEnd();
+
+  /* A -help run has now printed the inversion option group; skip validation
+   * and the parameter summary so usage prints cleanly. The caller
+   * (runInverse) exits right after parsing. */
+  {
+    PetscBool helpRequested = PETSC_FALSE;
+    PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
+    if (helpRequested) PetscFunctionReturn(PETSC_SUCCESS);
+  }
 
   /* -nord is validated by readfmParams() (im_Params->fm.nord); no re-check here. */
   if (!im_Params->fixedMaterialsFromCLI) im_Params->numFixedMaterials = 0;
@@ -892,7 +921,7 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
       int *buf;
       PetscCall(PetscMalloc1(n, &buf));
       H5Dread(dset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
-      for (PetscInt k = 0; k < n; k++) im_Params->fixedMaterials[k] = (PetscInt)buf[k];
+      for (PetscInt i = 0; i < n; i++) im_Params->fixedMaterials[i] = (PetscInt)buf[i];
       im_Params->numFixedMaterials = n;
       PetscCall(PetscFree(buf));
       H5Sclose(sp);
@@ -908,9 +937,9 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
                         "Error level", (double)im_Params->errorLevel, errLevelOrigin));
   PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " IDs (%s):",
                         "Fixed materials", im_Params->numFixedMaterials, fixedMatsOrigin));
-  for (PetscInt k = 0; k < im_Params->numFixedMaterials; k++)
+  for (PetscInt i = 0; i < im_Params->numFixedMaterials; i++)
     PetscCall(PetscPrintf(comm, " %" PetscInt_FMT,
-                          im_Params->fixedMaterials[k]));
+                          im_Params->fixedMaterials[i]));
   PetscCall(PetscPrintf(comm, "\n"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1024,7 +1053,7 @@ PetscErrorCode loadObservedData(const char *bundleFile,
   if (rank == 0) {
     const PetscScalar *arr;
     PetscCall(MatDenseGetArrayRead(*dObs, &arr));
-    for (PetscInt k = 0; k < totalElems; k++) bcast[k] = arr[k];
+    for (PetscInt i = 0; i < totalElems; i++) bcast[i] = arr[i];
     PetscCall(MatDenseRestoreArrayRead(*dObs, &arr));
   }
   PetscCallMPI(MPI_Bcast(bcast, totalElems, MPIU_SCALAR, 0, comm));
@@ -1032,7 +1061,7 @@ PetscErrorCode loadObservedData(const char *bundleFile,
   if (rank != 0) {
     PetscScalar *arr;
     PetscCall(MatDenseGetArray(*dObs, &arr));
-    for (PetscInt k = 0; k < totalElems; k++) arr[k] = bcast[k];
+    for (PetscInt i = 0; i < totalElems; i++) arr[i] = bcast[i];
     PetscCall(MatDenseRestoreArray(*dObs, &arr));
     PetscCall(MatAssemblyBegin(*dObs, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(*dObs, MAT_FINAL_ASSEMBLY));
@@ -1299,12 +1328,8 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
  * Cell data is written in exploded tetrahedral form to avoid global
  * point renumbering.
  *
- * The snapshot includes five cell-centered scalar fields:
+ * The snapshot carries a single cell-centered scalar field:
  *   - rho_ohm_m      : 1 / sigma_x (conductivity-derived resistivity)
- *   - X_pre_smooth   : model before smoothing
- *   - X_post_smooth  : model after smoothing
- *   - DfDm_raw       : raw gradient before filtering
- *   - DfDm_final     : processed gradient after regularization
  *
  * Output structure:
  *   - inv_model_iterXXXXX.pvtu              (master file, rank 0)
@@ -1380,7 +1405,7 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx, PetscInt a
     PetscInt li = i - ctx->grid.cellStart;
     Cell cell;
     PetscCall(extractCellCoordinates(ctx->dm, i, &cell));
-    for (PetscInt k = 0; k < 12; k++) coords[12 * li + k] = cell.coordinates[k];
+    for (PetscInt j = 0; j < 12; j++) coords[12 * li + j] = cell.coordinates[j];
   }
 
   /* Each rank writes its own .vtu piece */

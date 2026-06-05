@@ -22,8 +22,10 @@
  * PCBDDC and G is registered via PCBDDCSetDiscreteGradient at order = 1 to
  * capture the curl kernel for H(curl) problems. G is the topological
  * lowest-Whitney gradient G_BDDC : Nédélec_k → P_nord H1 from
- * assembleCsemKandM (the canonical P_nord gradient is too dense for
- * PCBDDC's nnz budget at nord ≥ 3).
+ * assembleCsemKandM. (A denser, exact P_nord gradient was removed: its
+ * face/volume couplings violate PCBDDC's coarse-edge model — every coarse
+ * edge must resolve to exactly two corner nodes — and abort
+ * PCBDDCNedelecSupport at nord ≥ 3. See solver.c.)
  *
  * @param[in]  dm  DMPlex mesh; its communicator drives the parallel solve.
  * @param[in]  A   System matrix (H(curl) FEM operator).
@@ -56,6 +58,6 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode petgemConfigureBDDCFromGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt order);
+PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt order);
 
 #endif

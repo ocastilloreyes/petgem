@@ -153,8 +153,8 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     PetscCall(VecCopy(G, d));     /* q = G */
 
     /* First loop (backward over stored pairs) */
-    for (PetscInt ii = 0; ii < bound; ii++) {
-      PetscInt idx = (ptr - 1 - ii + M) % M;
+    for (PetscInt j = 0; j < bound; j++) {
+      PetscInt idx = (ptr - 1 - j + M) % M;
       PetscScalar dotval;
       PetscCall(VecDot(S[idx], d, &dotval));
       alpha[idx] = rho[idx] * PetscRealPart(dotval);
@@ -172,8 +172,8 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     }
 
     /* Second loop (forward over stored pairs) */
-    for (PetscInt ii = bound - 1; ii >= 0; ii--) {
-      PetscInt idx = (ptr - 1 - ii + M) % M;
+    for (PetscInt j = bound - 1; j >= 0; j--) {
+      PetscInt idx = (ptr - 1 - j + M) % M;
       PetscScalar dotval;
       PetscCall(VecDot(Y[idx], d, &dotval));
       PetscReal beta = rho[idx] * PetscRealPart(dotval);
