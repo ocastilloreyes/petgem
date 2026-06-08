@@ -16,6 +16,11 @@ tests/cases/csem_model/responses_p*
 tests/cases/csem_model/*.vtu
 tests/cases/csem_model/*.png
 tests/cases/csem_model/params.txt
+tests/cases/unit_cube/input*
+tests/cases/unit_cube/model.vtu
+tests/cases/unit_cube/params*
+tests/cases/unit_cube/responses_p1.h5
+wham/
 
 logo_proposals/*
 petgem-logo-BIG-430x480.png
@@ -45,7 +50,8 @@ petgem*.out
 job_fm_forward.sh
 job_im_invert.sh
 stuff/
-
+petsc
+petsc_manual.pdf
 
 
 

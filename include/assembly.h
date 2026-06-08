@@ -60,11 +60,11 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  * Matrices:
  *   - K      : curl-curl stiffness, ∫_K (μ⁻¹ curl Ni)·curl Nj.
  *   - Ms     : mass × σ,            ∫_K (ε_r ⊙ Ni)·Nj.
- *   - G_BDDC : lowest-Whitney topological gradient consumed by
- *              PCBDDCSetDiscreteGradient at order = 1. Each H(curl) edge DOF
- *              couples to its two endpoint vertex H1 DOFs (±1); higher-order
- *              rows and inter-bubble columns are zero. Built against
- *              grid.H1dm_Pnord so a single solver code path serves every order.
+ *   - G_BDDC : EXACT order-p discrete gradient (buildExactDiscreteGradient)
+ *              consumed by PCBDDCSetDiscreteGradient. Each H(curl) DOF's
+ *              gradient is resolved against the full P_nord H1 closure, so
+ *              grad(phi_k) = sum_i G_ik N_i exactly (K·G = 0). Built against
+ *              grid.H1dm_Pnord; one solver code path serves every order.
  *
  * @param[in]  params       Forward-modeling parameters (nord, MPI tasks).
  * @param[in]  dm           DMPlex mesh and H(curl) discretization.
@@ -73,7 +73,7 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  * @param[in]  constFactor  Fused-mode factor iωμ; ignored when Ms != NULL.
  * @param[out] KorA         Stiffness K (K/Ms mode) or fused operator A.
  * @param[out] Ms           Mass-σ matrix in K/Ms mode; pass NULL for fused mode.
- * @param[out] G_BDDC       Topological discrete gradient; pass NULL to skip.
+ * @param[out] G_BDDC       Exact order-p discrete gradient; pass NULL to skip.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.

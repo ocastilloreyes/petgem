@@ -25,35 +25,27 @@
  * policy used by BOTH kernels: the forward solver (solveCsemSystem) and the
  * inverse solver (createInvKSP). When @p A is of type MATIS and @p Gbddc is
  * non-NULL, the preconditioner is set to PCBDDC and @p Gbddc is registered via
- * PCBDDCSetDiscreteGradient(pc, Gbddc, order, 0, PETSC_TRUE, PETSC_TRUE). When
- * those conditions are not met the call is a no-op, so the caller's default PC
- * stays in place.
+ * PCBDDCSetDiscreteGradient(pc, Gbddc, 1, 0, PETSC_TRUE, PETSC_TRUE). When those
+ * conditions are not met the call is a no-op, so the caller's default PC stays.
  *
- * @p Gbddc is the TOPOLOGICAL gradient G_BDDC : Nédélec_k → P_nord H1 produced
- * by assembleCsemKandM (lowest-Whitney vertex incidence per mesh edge; the
- * higher-order edge / face / volume rows are zero, so K·G_BDDC ≠ 0 by design).
- * BDDC uses it only as a structural hint to identify the curl-kernel coarse
- * space (∇P_1 ⊂ Nédélec_1 ⊂ Nédélec_k); the higher-order H(curl) DOFs are
- * static-condensed internally. Because G_BDDC only ever fills the lowest
- * Whitney slot per edge, @p order must be 1 regardless of the basis order
- * fm.nord — both kernels pass order = 1.
+ * @p Gbddc is the EXACT order-p discrete gradient G_BDDC : Nédélec_nord →
+ * P_nord H1 produced by assembleCsemKandM (buildExactDiscreteGradient: each
+ * H(curl) DOF's gradient is resolved against the full P_nord H1 closure, so
+ * grad(phi_k) = sum_i G_ik N_i exactly and K·G_BDDC = 0). PCBDDC reads its
+ * sparsity (GᵀG) to build the curl-kernel coarse space.
  *
- * A denser, mathematically exact canonical Π^Ned gradient against P_nord H1 was
- * historically a separate assembleCsemKandM output for K·G analysis, but it was
- * never passed to PCBDDC: its face / volume couplings violate the edge-cluster
- * nnz budget BDDC checks in PCBDDCNedelecSupport (every coarse edge must resolve
- * to exactly two corner nodes, else "SIZE OF EDGE > EXTCOL SECOND PASS" at
- * nord ≥ 3), and has been removed as unused.
+ * The operator is registered at order 1: the coarse-space collapse is driven by
+ * G's sparsity/values, NOT the order argument (validated — wham nord=2: 6,023
+ * coarse DOFs, 15 KSP iters, rank-robust to 560 ranks). Registering at order =
+ * nord is an untested alternative and is deliberately not done here.
  *
  * @param[in,out] ksp    KSP whose preconditioner is configured.
  * @param[in]     A      System matrix (probed for the MATIS type).
  * @param[in]     Gbddc  Discrete-gradient hint; may be NULL.
- * @param[in]     order  Polynomial order forwarded to PCBDDCSetDiscreteGradient
- *                       (always 1 here; see above).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
-PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt order)
+PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc)
 {
   PetscFunctionBeginUser;
   PetscBool ismatis = PETSC_FALSE;
@@ -62,7 +54,7 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt o
     PC pc;
     PetscCall(KSPGetPC(ksp, &pc));
     PetscCall(PCSetType(pc, PCBDDC));
-    PetscCall(PCBDDCSetDiscreteGradient(pc, Gbddc, order, 0, PETSC_TRUE, PETSC_TRUE));
+    PetscCall(PCBDDCSetDiscreteGradient(pc, Gbddc, 1, 0, PETSC_TRUE, PETSC_TRUE));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -74,8 +66,8 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt o
  * Drives a single KSP over every column of @p B via KSPMatSolve, which is how
  * the forward kernel solves for all CSEM sources simultaneously. The
  * preconditioner is set up through setupBDDCFromPetgemGradient: when @p A is
- * of type MATIS and @p G is supplied, PCBDDC is configured with the topological
- * discrete gradient at order 1 to capture the curl kernel of the H(curl)
+ * of type MATIS and @p G is supplied, PCBDDC is configured with the exact
+ * order-p discrete gradient to capture the curl kernel of the H(curl)
  * operator; otherwise PETSc's default PC is used. The KSP type, tolerances and
  * PC settings stay overridable through the PETSc options database
  * (KSPSetFromOptions).
@@ -93,7 +85,7 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt o
  * @param[in]  dm  DMPlex mesh; its communicator drives the parallel solve.
  * @param[in]  A   System matrix (H(curl) FEM operator).
  * @param[in]  B   Right-hand side matrix, one column per source.
- * @param[in]  G   Topological discrete-gradient hint for PCBDDC; may be NULL
+ * @param[in]  G   Exact order-p discrete-gradient hint for PCBDDC; may be NULL
  *                 when @p A is not of type MATIS.
  * @param[out] X   Solution matrix, created internally (the caller destroys it).
  *
@@ -118,9 +110,9 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
   PetscCall(KSPCreate(comm, &ksp));
   PetscCall(KSPSetOperators(ksp, A, A));
 
-  /* Forward solver always passes order = 1 to PCBDDCSetDiscreteGradient
-   * (G is the lowest-Whitney topological gradient). */
-  PetscCall(setupBDDCFromPetgemGradient(ksp, A, G, 1));
+  /* G is the exact order-p discrete gradient (assembleCsemKandM); BDDC reads
+   * its sparsity to build the curl-kernel coarse space. */
+  PetscCall(setupBDDCFromPetgemGradient(ksp, A, G));
   PetscCall(KSPSetFromOptions(ksp));
 
   PetscCall(MatGetSize(B, &M, &N));

@@ -283,12 +283,12 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  *
  *   K       - stiffness (curl–curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
  *   Ms      - mass × σ matrix, ∫ (ε_r ⊙ N_i)·N_j where ε_r encodes σ.
- *   G_BDDC  - topological lowest-Whitney gradient against the P_nord H¹
- *             DM (grid.H1dm_Pnord) with vertex incidence only. Inter-bubble
- *             columns never enter the sparsity pattern: G_BDDC is built with
- *             MAT_IGNORE_ZERO_ENTRIES and a 4-nnz/row preallocation, so no
- *             MatFilter pass is required. Consumed by
- *             PCBDDCSetDiscreteGradient at order = 1.
+ *   G_BDDC  - EXACT order-p discrete gradient (buildExactDiscreteGradient)
+ *             against the P_nord H¹ DM (grid.H1dm_Pnord): grad(phi_k) =
+ *             sum_i G_ik N_i over the full closure, so K·G = 0. Built with
+ *             MAT_IGNORE_ZERO_ENTRIES (thresholded zeros stay out of the
+ *             pattern), so no MatFilter pass is required. Consumed by
+ *             PCBDDCSetDiscreteGradient.
  *
  * The caller forms A_f = K − iωμ·Ms per frequency via
  *     MatDuplicate(K, MAT_COPY_VALUES, &A);
@@ -311,7 +311,6 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   /* Variables declaration */
   Cell cell;
   Quadrature3D quadrature_3d;
-  Quadrature1D quadrature_1d;
   PetscInt m, n, M, N, numDofIndices, numH1DofIndices;
   PetscInt *dofIndices, *H1dofIndices;
   PetscReal **Me, **Ke, **gradientMatrixBDDC;
@@ -367,25 +366,25 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   PetscCall(VecDestroy(&h1v));
   PetscCall(VecDestroy(&b));
 
-  /* Topological gradient G_BDDC : Nédélec -> P_nord H1, lowest-Whitney
-   * vertex incidence only (face/edge-bubble/volume H1 columns are all
-   * zero). PCBDDC's coarse-space algorithm operates on this structural
-   * hint at order = 1.
+  /* Exact order-p discrete gradient G_BDDC : Nédélec_nord -> P_nord H1
+   * (buildExactDiscreteGradient): grad(phi_k) = sum_i G_ik N_i over the full
+   * P_nord closure, so K·G = 0 and PCBDDC's coarse-space algorithm reads the
+   * true curl-kernel structure.
    *
-   * Built against grid.H1dm_Pnord with vertex entries placed at the
-   * LAST 4 closure positions per row (PETSc closure for P_nord H1 is
-   * volume -> face -> edge -> vertex). Each row has at most 4 nonzeros
-   * regardless of nord, so we preallocate d_nnz = o_nnz = 4 and turn
-   * on MAT_IGNORE_ZERO_ENTRIES - that way the insertion's full
-   * P_nord-wide closure buffer doesn't trigger storage for the
-   * inter-bubble columns, and no MatFilter pass is needed. */
+   * Built against grid.H1dm_Pnord (PETSc closure for P_nord H1 is
+   * volume -> face -> edge -> vertex). Rows can touch up to a full P_nord
+   * closure, so we preallocate d_nnz = o_nnz = numH1DofInCell_Pnord and turn
+   * on MAT_IGNORE_ZERO_ENTRIES - thresholded-zero entries in the insertion
+   * buffer stay out of the sparsity pattern, so no MatFilter pass is needed. */
   if (G_BDDC) {
     PetscCall(MatCreate(comm, G_BDDC));
     PetscCall(MatSetSizes(*G_BDDC, m, n, M, N));
     PetscCall(MatSetType(*G_BDDC, MATAIJ));
     PetscCall(MatSetLocalToGlobalMapping(*G_BDDC, mapping, H1mapping));
-    PetscCall(MatSeqAIJSetPreallocation(*G_BDDC, 4, NULL));
-    PetscCall(MatMPIAIJSetPreallocation(*G_BDDC, 4, NULL, 4, NULL));
+    /* The exact order-p gradient can touch up to a full P_nord cell closure
+     * per row; preallocate that width. */
+    PetscCall(MatSeqAIJSetPreallocation(*G_BDDC, grid.numH1DofInCell_Pnord, NULL));
+    PetscCall(MatMPIAIJSetPreallocation(*G_BDDC, grid.numH1DofInCell_Pnord, NULL, grid.numH1DofInCell_Pnord, NULL));
     PetscCall(MatSetOption(*G_BDDC, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
     PetscCall(MatSetOption(*G_BDDC, MAT_NEW_NONZERO_ALLOCATION_ERR,
                            PETSC_TRUE));
@@ -398,19 +397,16 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   /* Get the local values of the conductivity components */
   PetscCall(VecGetDM(conductivity, &dmConductivity));
 
-  /* Compute quadrature points (1D and 3D cases) */
+  /* Compute 3D quadrature points (element mass/stiffness; the exact gradient
+   * builds its own reference quadrature internally). */
   PetscCall(computeNum3DQuadraturePoints(params.nord, &quadrature_3d));
-  PetscCall(computeNum1DQuadraturePoints(params.nord, &quadrature_1d));
 
   PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.points));
-  PetscCall(PetscCalloc1(quadrature_1d.numPoints, &quadrature_1d.points));
   for (PetscInt i = 0; i < quadrature_3d.numPoints; i++) {
     PetscCall(PetscCalloc1(NUM_DIMENSIONS, &quadrature_3d.points[i]));
   }
   PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.weights));
-  PetscCall(PetscCalloc1(quadrature_1d.numPoints, &quadrature_1d.weights));
   PetscCall(compute3DQuadraturePoints(&quadrature_3d));
-  PetscCall(compute1DQuadraturePoints(&quadrature_1d));
 
   /* Allocate memory. closureK is a square scratch buffer sized
    * numDofInCell × numDofInCell; in fused mode it carries the fused
@@ -430,29 +426,22 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   if (!fused) {
     PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureM));
   }
-  /* Topological gradient scratch.
+  /* Exact discrete-gradient scratch.
    *
-   * gradientMatrixBDDC is the OUTPUT of the topological builder
-   * (hierarchicalBuildGradientMatrixTopological), sized
-   * numDofInCell × numH1DofInCell (= 4 vertex columns in PETGEM
-   * cell-local order).
-   *
-   * closureGBDDC is the INSERTION buffer for G_BDDC. We pass only the
-   * 4 vertex-tail column indices of the P_nord H1 closure to
-   * MatSetValuesLocal, so the buffer is sized to match:
-   *   numDofInCell × numH1DofInCell  (= 4 cols).
-   * The per-cell SetValues walk is 4·numDofInCell instead of
-   * numH1DofInCell_Pnord·numDofInCell. */
+   * gradientMatrixBDDC is the OUTPUT of buildExactDiscreteGradient, sized
+   * numDofInCell × numH1DofInCell_Pnord (all P_nord H1 columns, in DMPlex
+   * closure order). closureGBDDC is the row-major INSERTION buffer of the
+   * same shape passed to MatSetValuesLocal. */
   gradientMatrixBDDC = NULL;
   closureGBDDC       = NULL;
   if (G_BDDC) {
     PetscCall(PetscCalloc1(grid.numDofInCell, &gradientMatrixBDDC));
-    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell,
+    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell_Pnord,
                            &gradientMatrixBDDC[0]));
     for (PetscInt i = 1; i < grid.numDofInCell; i++) {
-      gradientMatrixBDDC[i] = gradientMatrixBDDC[i - 1] + grid.numH1DofInCell;
+      gradientMatrixBDDC[i] = gradientMatrixBDDC[i - 1] + grid.numH1DofInCell_Pnord;
     }
-    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell,
+    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell_Pnord,
                            &closureGBDDC));
   }
 
@@ -501,28 +490,18 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
       PetscCall(MatSetValuesLocal(*Ms,   numDofIndices, dofIndices, numDofIndices, dofIndices, closureM, ADD_VALUES));
     }
 
-    /* Build & insert the topological G_BDDC for PCBDDC.
-     *
-     * The topological builder fills gradientMatrixBDDC[*][0..3] with
-     * the ±1 vertex incidence in PETGEM cell-local vertex order. In
-     * the P_nord H1 closure (volume -> face -> edge -> vertex) those 4
-     * vertex DOFs sit at the END of H1dofIndices - at positions
-     *   [numH1DofIndices − 4 .. numH1DofIndices − 1].
-     * We only pass that 4-column slice to MatSetValuesLocal (instead
-     * of the full P_nord row width), so PETSc walks 4·numDofInCell
-     * entries per cell instead of numH1DofInCell_Pnord·numDofInCell.
-     * Combined with MAT_IGNORE_ZERO_ENTRIES, the higher-order H(curl)
-     * rows (whose topological gradient is zero) contribute nothing to
-     * the sparsity pattern. */
+    /* Build & insert the EXACT order-p discrete gradient for PCBDDC:
+     * grad(phi_k) = sum_i G_ik N_i, all P_nord H1 columns in DMPlex closure
+     * order (= H1dofIndices). Insert the full row width; thresholded zeros are
+     * dropped by MAT_IGNORE_ZERO_ENTRIES. */
     if (G_BDDC) {
-      PetscCall(grid.fem.ops->buildGradientMatrix(&grid.fem, &cell, &quadrature_1d, gradientMatrixBDDC));
+      PetscCall(buildExactDiscreteGradient(&grid.fem, &cell, gradientMatrixBDDC, NULL, NULL));
       for (PetscInt j = 0; j < grid.numDofInCell; j++) {
-        for (PetscInt k = 0; k < grid.numH1DofInCell; k++) {
-          closureGBDDC[j * grid.numH1DofInCell + k] = gradientMatrixBDDC[j][k];
+        for (PetscInt k = 0; k < grid.numH1DofInCell_Pnord; k++) {
+          closureGBDDC[j * grid.numH1DofInCell_Pnord + k] = gradientMatrixBDDC[j][k];
         }
       }
-      const PetscInt vertex_offset = numH1DofIndices - grid.numH1DofInCell;
-      PetscCall(MatSetValuesLocal(*G_BDDC, numDofIndices, dofIndices, grid.numH1DofInCell, H1dofIndices + vertex_offset,
+      PetscCall(MatSetValuesLocal(*G_BDDC, numDofIndices, dofIndices, numH1DofIndices, H1dofIndices,
                                   closureGBDDC, INSERT_VALUES));
     }
 
@@ -556,12 +535,10 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
 
   /* Free memory */
   PetscCall(PetscFree(quadrature_3d.weights));
-  PetscCall(PetscFree(quadrature_1d.weights));
   for (PetscInt i = 0; i < quadrature_3d.numPoints; i++) {
     PetscCall(PetscFree(quadrature_3d.points[i]));
   }
   PetscCall(PetscFree(quadrature_3d.points));
-  PetscCall(PetscFree(quadrature_1d.points));
 
   PetscCall(PetscFree(Me[0]));
   PetscCall(PetscFree(Ke[0]));

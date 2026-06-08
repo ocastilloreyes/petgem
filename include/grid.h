@@ -44,10 +44,8 @@ struct NedelecOps;
 typedef struct {
   PetscInt nord;                  /**< Basis order (1, 2, 3, ...). */
   PetscInt numDofInCell;          /**< Total H(curl) DOFs per cell. */
-  PetscInt numH1DofInCell;        /**< P1 H1 DOFs per cell (= 4); vertex-column
-                                   *   count for the topological G_BDDC builder. */
   PetscInt numH1DofInCell_Pnord;  /**< P_nord H1 DOFs per cell; column count of
-                                   *   the topological G_BDDC discrete gradient. */
+                                   *   the exact G_BDDC discrete gradient. */
 
   /* Per-entity DOF counts */
   PetscInt numDofPerEdge;    /**< H(curl) DOFs per edge. */
@@ -110,20 +108,15 @@ typedef struct {
   PetscInt vertexEnd;         /**< Index of global vertex end. */
   PetscInt dim;               /**< Number of spatial dimensions. */
 
-  PetscInt numH1DofInCell;       /**< P1 H1 DOFs per cell (= 4 always);
-                                  *   held by the topological gradient builder
-                                  *   which writes ±1 vertex incidences into a
-                                  *   4-column scratch buffer before tail-padding
-                                  *   into the P_nord H1 closure. */
   PetscInt numH1DofInCell_Pnord; /**< P_nord H1 DOFs per cell
                                   *   (= (nord+1)(nord+2)(nord+3)/6); the column
                                   *   count of the G_BDDC discrete gradient
                                   *   produced by assembleCsemKandM. */
-  DM H1dm_Pnord;                 /**< P_nord H1 DM: column space of the
-                                  *   topological G_BDDC discrete gradient. For
-                                  *   nord = 1 it is the P1 vertex space; for
-                                  *   nord >= 2 it adds edge/face/volume bubble
-                                  *   DOFs per the De Rham complex. */
+  DM H1dm_Pnord;                 /**< P_nord H1 DM: column space of the exact
+                                  *   G_BDDC discrete gradient. For nord = 1 it
+                                  *   is the P1 vertex space; for nord >= 2 it
+                                  *   adds edge/face/volume bubble DOFs per the
+                                  *   De Rham complex. */
 
   FEMSpace fem; /**< Finite-element space descriptor (mirrors nord + DOF counts). */
 } Grid;

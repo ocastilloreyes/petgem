@@ -34,7 +34,7 @@
  *   - Creates and attaches a PetscSection for H(curl) elements,
  *     applying boundary conditions on the marked faces.
  *   - Clones the DM to create the P_nord H1 DM (`grid->H1dm_Pnord`) used
- *     for the topological discrete-gradient (G_BDDC) column space.
+ *     for the exact discrete-gradient (G_BDDC) column space.
  *   - Computes local and global counts of vertices, edges, faces, and cells.
  *   - Stores DOF counts, element start/end indices, and dimension in the `grid` struct.
  *   - Prints mesh and HEFEM statistics for verification.
@@ -110,15 +110,11 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   PetscCall(DMSetLocalSection(*dm, section));
   PetscCall(PetscSectionDestroy(&section));
 
-  /* P1 vertex H1 DOF count (= 4), used by the topological discrete-gradient
-   * (G_BDDC) builder for its vertex columns. */
-  const PetscInt numH1DofInCell = NUM_H1_DOF_PER_CELL;
-
   /* DM for the order-k S_h^k space - P_nord nodal + edge/face/volume
    * bubbles, sized so ∇P_nord = curl-kernel of Nédélec_nord (the De Rham
-   * complex). Paired with the topological G_BDDC consumed by PCBDDC; for
-   * nord = 1 the counts collapse to {1,0,0,0}, for nord >= 2 it adds
-   * bubble DOFs. */
+   * complex). This is the column space of the exact G_BDDC consumed by
+   * PCBDDC; for nord = 1 the counts collapse to {1,0,0,0}, for nord >= 2 it
+   * adds bubble DOFs. */
   PetscInt numH1Dof_Pnord[NUM_H1_DOF_PER_CELL];
   numH1Dof_Pnord[0] = 1;
   numH1Dof_Pnord[1] = params.nord - 1;
@@ -202,7 +198,6 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   grid->vertexStart = vertexStart;
   grid->vertexEnd = vertexEnd;
   grid->dim = dim;
-  grid->numH1DofInCell       = numH1DofInCell;
   grid->numH1DofInCell_Pnord = numH1DofInCell_Pnord;
   grid->H1dm_Pnord           = H1dm_Pnord;
 
@@ -229,7 +224,6 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
 
     grid->fem.nord            = params.nord;
     grid->fem.numDofInCell    = numDofInCell;
-    grid->fem.numH1DofInCell        = numH1DofInCell;
     grid->fem.numH1DofInCell_Pnord  = numH1DofInCell_Pnord;
 
     grid->fem.numDofPerEdge   = numDofInEdge;

@@ -20,11 +20,10 @@
  *     HIERARCHICAL_ORDER_OPS macro near the bottom of this file.
  *
  * Discrete-gradient builder (all orders):
- *   - TOPOLOGICAL (hierarchicalBuildGradientMatrixTopological): vertex-
- *     edge incidence. Lowest-order Whitney slot per mesh edge maps to
- *     that edge's 2 endpoint vertex H1 DOFs; face/volume / higher-order
- *     edge DOF rows are zero. Consumed by PCBDDCSetDiscreteGradient as
- *     the curl-kernel hint at every order.
+ *   - buildExactDiscreteGradient: the EXACT order-p discrete gradient against
+ *     the full P_nord H1 closure (grad(phi_k) = sum_i G_ik N_i, so K·G = 0).
+ *     Consumed by PCBDDCSetDiscreteGradient as the curl-kernel coarse-space
+ *     operator. verifyExactDiscreteGradientCell unit-checks it (-fm_check_gradient).
  */
 
 #include <petsc.h>
@@ -682,77 +681,392 @@ static PetscErrorCode hierarchicalComputeCurlsOrder(PetscInt nord, const Cell *c
 }
 
 /**
- * @brief Builds the topological discrete-gradient matrix (lowest-Whitney slot).
+ * @brief Solves the SPD system A X = B by Cholesky + iterative refinement.
  *
- * Maps each mesh edge's lowest-Whitney slot to its two endpoint vertex H1
- * DOFs; consumed by PCBDDCSetDiscreteGradient as the curl-kernel hint at
- * every order. Only the LOWEST-ORDER Whitney DOF per mesh edge carries the
- * ±1 vertex incidence; higher-order edge DOFs (n > 0) and all face/volume
- * DOF rows are zero.
+ * Replaces the earlier explicit Gauss-Jordan inverse (invertMatrixDense): forming
+ * M^{-1} and multiplying squares the conditioning damage, which is what made the
+ * nord=5 reference Nédélec mass solve collapse to a 1e-3 residual on the wham
+ * case. A here is the reference Nédélec mass matrix M, symmetric positive
+ * definite, so a Cholesky factor A = L L^T plus a few refinement sweeps is both
+ * faster (O(N^3/3) vs the inverse) and markedly more accurate.
  *
- * Sign convention: edges in canonical orientation (NoriE=0, edgeSigns ≥ 0)
- * get -1 at the start vertex and +1 at the end vertex of EDGE_VERTICES[e].
- * Reversed edges get the opposite - the standard Whitney tangential
- * direction.
+ * Two diagnostics are returned to separate the failure modes:
+ *   - relResidual = ||B - A X||_F / ||B||_F. Refinement drives the BACKWARD error
+ *     (this residual) toward machine eps even when A is ill-conditioned, so a
+ *     small value only confirms the solve converged; it does NOT prove X is
+ *     accurate.
+ *   - condEst = max/min Cholesky pivot d_j (an SPD lower bound on kappa_2(A)).
+ *     The FORWARD error of X is ~ condEst * eps, so this is the metric that
+ *     decides whether a large downstream gradient residual is a conditioning
+ *     artifact (condEst huge) or a genuine basis fault (condEst modest).
  *
- * @param[in]  fem             Finite-element space descriptor.
- * @param[in]  cell            Cell with computed orientation.
- * @param[in]  quadrature1d    1D quadrature (unused; signature compatibility).
- * @param[out] gradientMatrix  Per-cell gradient block
- *                             (numDofInCell × numH1DofInCell).
+ * Not capped at N <= 6 (unlike invertMatrix in hvfem.c): N = numDofInCell, up to
+ * 216 at nord=6.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success,
- *         or a PETSc error code otherwise.
+ * @param[in]  N            System dimension.
+ * @param[in]  A            Row-major N x N SPD matrix (preserved).
+ * @param[in]  nrhs         Number of right-hand sides (columns of B/X).
+ * @param[in]  Bmat         Row-major N x nrhs right-hand sides.
+ * @param[out] Xmat         Row-major N x nrhs solution.
+ * @param[out] relResidual  ||B - A X||_F / ||B||_F (may be NULL).
+ * @param[out] condEst      max/min Cholesky pivot ratio (may be NULL).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS, or PETSC_ERR_MAT_CH_ZRPVT if A is not
+ *         numerically SPD (a Cholesky breakdown is itself a strong diagnostic:
+ *         basis degeneracy or extreme ill-conditioning).
  */
-static PetscErrorCode hierarchicalBuildGradientMatrixTopological(const FEMSpace *fem, const Cell *cell,
-                                                                  const Quadrature1D *quadrature1d,
-                                                                  PetscReal **gradientMatrix) {
+static PetscErrorCode choleskySolveSPDRefined(PetscInt N, const PetscReal *A, PetscInt nrhs,
+                                              const PetscReal *Bmat, PetscReal *Xmat,
+                                              PetscReal *relResidual, PetscReal *condEst) {
   PetscFunctionBeginUser;
-  (void)quadrature1d;
+  const PetscInt nRefine = 2;          /* refinement sweeps after the initial solve */
+  PetscReal *L, *b, *x, *y;
+  PetscReal  dMin = PETSC_MAX_REAL, dMax = 0.0;
+  PetscCall(PetscCalloc1(N * N, &L));
+  PetscCall(PetscCalloc1(N, &b));
+  PetscCall(PetscCalloc1(N, &x));
+  PetscCall(PetscCalloc1(N, &y));
 
-  const PetscInt numDofInCell    = fem->numDofInCell;
-  const PetscInt numH1DofInCell  = fem->numH1DofInCell;
-  const PetscInt numDofPerEdge   = fem->numDofPerEdge;
-  const PetscInt edgeDofOffset   = fem->edgeDofOffset;
+  /* Cholesky factor A = L L^T (lower triangle). */
+  for (PetscInt j = 0; j < N; j++) {
+    PetscReal d = A[j * N + j];
+    for (PetscInt k = 0; k < j; k++) d -= L[j * N + k] * L[j * N + k];
+    if (d <= 0.0) {
+      PetscCall(PetscFree(L));
+      PetscCall(PetscFree(b));
+      PetscCall(PetscFree(x));
+      PetscCall(PetscFree(y));
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_MAT_CH_ZRPVT,
+              "Cholesky breakdown at pivot %" PetscInt_FMT " (d=%g): reference Nédélec mass "
+              "matrix is not numerically SPD (basis degeneracy or extreme ill-conditioning, N=%" PetscInt_FMT ")",
+              j, (double)d, N);
+    }
+    dMin = PetscMin(dMin, d);
+    dMax = PetscMax(dMax, d);
+    L[j * N + j] = PetscSqrtReal(d);
+    for (PetscInt i = j + 1; i < N; i++) {
+      PetscReal s = A[i * N + j];
+      for (PetscInt k = 0; k < j; k++) s -= L[i * N + k] * L[j * N + k];
+      L[i * N + j] = s / L[j * N + j];
+    }
+  }
+  if (condEst) *condEst = (dMin > 0.0) ? dMax / dMin : PETSC_MAX_REAL;
 
-  /* Reset the matrix; face/volume and higher-order edge rows stay zero. */
-  for (PetscInt i = 0; i < numDofInCell; i++)
-    for (PetscInt j = 0; j < numH1DofInCell; j++) gradientMatrix[i][j] = 0.0;
+  PetscReal resNum = 0.0, resDen = 0.0;
+  for (PetscInt c = 0; c < nrhs; c++) {
+    for (PetscInt i = 0; i < N; i++) { b[i] = Bmat[i * nrhs + c]; x[i] = 0.0; }
 
-  /* Edge -> endpoint vertex pairs in PETGEM canonical order
-   * (matches EDGE_VERTICES in constants.c). */
-  static const PetscInt EDGE_ENDS[NUM_EDGES_PER_CELL][2] = {
-      {0, 1}, {1, 2}, {2, 0}, {0, 3}, {3, 1}, {2, 3}};
+    /* Initial solve (x = 0 -> first residual is b) followed by nRefine sweeps.
+     * Each sweep: r = b - A x; solve A dx = r via L; x += dx. */
+    for (PetscInt it = 0; it <= nRefine; it++) {
+      for (PetscInt i = 0; i < N; i++) {       /* y <- r = b - A x */
+        PetscReal s = b[i];
+        for (PetscInt k = 0; k < N; k++) s -= A[i * N + k] * x[k];
+        y[i] = s;
+      }
+      for (PetscInt i = 0; i < N; i++) {       /* forward: L z = r, z over y */
+        PetscReal s = y[i];
+        for (PetscInt k = 0; k < i; k++) s -= L[i * N + k] * y[k];
+        y[i] = s / L[i * N + i];
+      }
+      for (PetscInt i = N - 1; i >= 0; i--) {  /* back: L^T dx = z, dx over y */
+        PetscReal s = y[i];
+        for (PetscInt k = i + 1; k < N; k++) s -= L[k * N + i] * y[k];
+        y[i] = s / L[i * N + i];
+      }
+      for (PetscInt i = 0; i < N; i++) x[i] += y[i];
+    }
 
-  /* For each mesh edge, fill ONLY the lowest-order Whitney slot
-   * (n = 0 within the edge's DOF block) with the ±1 vertex incidence. */
-  for (PetscInt e = 0; e < NUM_EDGES_PER_CELL; e++) {
-    const PetscBool reversed = (PetscBool)(cell->orientation.edgeSigns[e] < 0);
-    const PetscInt  va = EDGE_ENDS[e][0];
-    const PetscInt  vb = EDGE_ENDS[e][1];
-    const PetscReal valA = reversed ?  1.0 : -1.0;
-    const PetscReal valB = reversed ? -1.0 :  1.0;
+    for (PetscInt i = 0; i < N; i++) Xmat[i * nrhs + c] = x[i];
 
-    /* Lowest Whitney slot for edge e: edgeDofOffset + e*numDofPerEdge + 0.
-     * Slots e*numDofPerEdge + 1..numDofPerEdge-1 (higher-order Whitneys
-     * on the same edge) intentionally remain zero. */
-    const PetscInt slot = edgeDofOffset + e * numDofPerEdge;
-    gradientMatrix[slot][va] = valA;
-    gradientMatrix[slot][vb] = valB;
+    for (PetscInt i = 0; i < N; i++) {         /* accumulate ||b - A x||, ||b|| */
+      PetscReal s = b[i];
+      for (PetscInt k = 0; k < N; k++) s -= A[i * N + k] * x[k];
+      resNum += s * s;
+      resDen += b[i] * b[i];
+    }
+  }
+  if (relResidual) *relResidual = (resDen > 0.0) ? PetscSqrtReal(resNum / resDen) : 0.0;
+
+  PetscCall(PetscFree(L));
+  PetscCall(PetscFree(b));
+  PetscCall(PetscFree(x));
+  PetscCall(PetscFree(y));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Builds the EXACT high-order discrete gradient block for one cell.
+ *
+ * Replaces the topological order-1 incidence with the full discrete de Rham
+ * gradient PCBDDC requires for high-order Nédélec: for each P_nord H1 basis
+ * function phi_k it expresses grad(phi_k) in the Nédélec basis,
+ *     grad(phi_k) = sum_i C_ik N_i,     gradientMatrix[i][k] = C_ik,
+ * i.e. the matrix G : S_h^p -> V_h^p that PCBDDCSetDiscreteGradient() expects.
+ * It is sparse; BDDC reads the sparsity of G^T G to recover the vertex/edge/
+ * face equivalence classes (per S. Zampini). The order-1 topological builder
+ * leaves higher-order rows zero, which collapses the coarse space onto the
+ * whole interface; the previous dense moment-gradient had the opposite fault
+ * (spurious fill -> "more than two corners" / "SIZE OF EDGE > EXTCOL").
+ *
+ * Construction (geometry-independent): grad_ref(phi_k) lies exactly in
+ * span{N_i^ref} (FEEC exact sequence), so the reference-frame L2 projection
+ *     M C = B,  M_ij = <N_i^ref,N_j^ref>,  B_ik = <N_i^ref, grad_ref phi_k>
+ * gives the exact coefficients (the Jacobian J^{-T} cancels between N and
+ * grad). The SPD system M C = B is solved by Cholesky + iterative refinement
+ * (choleskySolveSPDRefined) rather than an explicit inverse - the inverse
+ * squared the conditioning damage and made the nord=5 solve diverge. A relative
+ * threshold then restores the true sparse pattern - WITHOUT it, floating-point
+ * fill makes G dense and corrupts BDDC's analysis (this threshold is the fix the
+ * earlier implementation lacked).
+ *
+ * Row  i: Nédélec DOF (edge/face/volume), DMPlex closure order (= dofIndices).
+ * Col  k: P_nord H1 DOF (vertex/edge/face/volume), DMPlex closure order
+ *         (= shape3DHTet output order = grid.H1dm_Pnord closure).
+ *
+ * Orientation is baked into both bases (shape3DETet / shape3DHTet take
+ * cell->orientation), so the +/- signs are correct per cell. Cost is
+ * O(numDofInCell^3) per cell (a dense Cholesky factor); for high order it
+ * should be cached/reused across equal-orientation cells (TODO - fine for the
+ * validation target).
+ *
+ * @param[in]  fem             FE space (nord, numDofInCell, numH1DofInCell_Pnord).
+ * @param[in]  cell            Cell with computed orientation.
+ * @param[out] gradientMatrix  Per-cell block (numDofInCell x numH1DofInCell_Pnord).
+ * @param[out] laResidual      ||M C - B||_F / ||B||_F of the solve (may be NULL).
+ * @param[out] condEst         max/min Cholesky pivot of M (may be NULL).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode buildExactDiscreteGradient(const FEMSpace *fem, const Cell *cell,
+                                          PetscReal **gradientMatrix,
+                                          PetscReal *laResidual, PetscReal *condEst) {
+  PetscFunctionBeginUser;
+  const PetscInt nord = fem->nord;
+  const PetscInt nNed = fem->numDofInCell;           /* rows: Nédélec        */
+  const PetscInt nH1  = fem->numH1DofInCell_Pnord;   /* cols: P_nord H1      */
+
+  for (PetscInt i = 0; i < nNed; i++)
+    for (PetscInt k = 0; k < nH1; k++) gradientMatrix[i][k] = 0.0;
+
+  /* Reference quadrature. computeNum3DQuadraturePoints(nord) already returns a
+   * rule exact for the degree-(2*nord) mass integrand (same one the assembly
+   * uses for Me), which also covers B (degree 2*nord-1). */
+  Quadrature3D q;
+  PetscCall(computeNum3DQuadraturePoints(nord, &q));
+  PetscCall(PetscCalloc1(q.numPoints, &q.points));
+  for (PetscInt qp = 0; qp < q.numPoints; qp++)
+    PetscCall(PetscCalloc1(NUM_DIMENSIONS, &q.points[qp]));
+  PetscCall(PetscCalloc1(q.numPoints, &q.weights));
+  PetscCall(compute3DQuadraturePoints(&q));
+
+  /* Per-point scratch: reference Nédélec values/curls, H1 values/gradients. */
+  PetscReal **Eref, **Cref, *Hval, **Hgrad;
+  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Eref));
+  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Cref));
+  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Hgrad));
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+    PetscCall(PetscCalloc1(nNed, &Eref[d]));
+    PetscCall(PetscCalloc1(nNed, &Cref[d]));   /* curls: unused, but shape3DETet fills them */
+    PetscCall(PetscCalloc1(nH1,  &Hgrad[d]));
+  }
+  PetscCall(PetscCalloc1(nH1, &Hval));
+
+  /* Reference Nédélec mass matrix M (nNed x nNed), projection RHS B and the
+   * coefficient block C (both nNed x nH1, row-major). */
+  PetscReal *M, *B, *C;
+  PetscCall(PetscCalloc1(nNed * nNed, &M));
+  PetscCall(PetscCalloc1(nNed * nH1,  &B));
+  PetscCall(PetscCalloc1(nNed * nH1,  &C));
+
+  for (PetscInt qp = 0; qp < q.numPoints; qp++) {
+    PetscCall(shape3DETet(q.points[qp], nord, &cell->orientation, Eref, Cref));
+    PetscCall(shape3DHTet(q.points[qp], nord, &cell->orientation, Hval, Hgrad));
+    const PetscReal w = q.weights[qp];
+    for (PetscInt i = 0; i < nNed; i++) {
+      for (PetscInt j = 0; j < nNed; j++)
+        M[i * nNed + j] += w * (Eref[0][i] * Eref[0][j] + Eref[1][i] * Eref[1][j] + Eref[2][i] * Eref[2][j]);
+      for (PetscInt k = 0; k < nH1; k++)
+        B[i * nH1 + k] += w * (Eref[0][i] * Hgrad[0][k] + Eref[1][i] * Hgrad[1][k] + Eref[2][i] * Hgrad[2][k]);
+    }
   }
 
+  /* Exact coefficients solve M C = B (projection is exact since grad(phi_k) in
+   * span{N_i}). SPD Cholesky + refinement, not an explicit inverse; the residual
+   * and conditioning of M flow back to the diagnostic. */
+  PetscCall(choleskySolveSPDRefined(nNed, M, nH1, B, C, laResidual, condEst));
+  PetscReal maxabs = 0.0;
+  for (PetscInt i = 0; i < nNed; i++)
+    for (PetscInt k = 0; k < nH1; k++) {
+      gradientMatrix[i][k] = C[i * nH1 + k];
+      maxabs = PetscMax(maxabs, PetscAbsReal(C[i * nH1 + k]));
+    }
+
+  /* Restore the exact sparse pattern: drop floating-point fill. */
+  const PetscReal tol = 1.0e-8 * maxabs;
+  for (PetscInt i = 0; i < nNed; i++)
+    for (PetscInt k = 0; k < nH1; k++)
+      if (PetscAbsReal(gradientMatrix[i][k]) < tol) gradientMatrix[i][k] = 0.0;
+
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+    PetscCall(PetscFree(Eref[d]));
+    PetscCall(PetscFree(Cref[d]));
+    PetscCall(PetscFree(Hgrad[d]));
+  }
+  PetscCall(PetscFree(Eref));
+  PetscCall(PetscFree(Cref));
+  PetscCall(PetscFree(Hgrad));
+  PetscCall(PetscFree(Hval));
+  PetscCall(PetscFree(M));
+  PetscCall(PetscFree(B));
+  PetscCall(PetscFree(C));
+  for (PetscInt qp = 0; qp < q.numPoints; qp++) PetscCall(PetscFree(q.points[qp]));
+  PetscCall(PetscFree(q.points));
+  PetscCall(PetscFree(q.weights));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Unit check for buildExactDiscreteGradient on one cell (no BDDC).
+ *
+ * Verifies the defining identity grad(phi_k) = sum_i G_ik N_i at several interior
+ * reference points (max abs error), and reports - via @p result - the solve
+ * health and the entity-local sparsity PCBDDC requires. Three things are
+ * separated so the wham nord=5 cliff can be diagnosed without guessing:
+ *   - condEst (max/min Cholesky pivot of M): a HUGE value with a large pointwise
+ *     residual means the failure is conditioning of the dense projection, not the
+ *     basis; a MODEST value with a large residual means a genuine basis fault.
+ *   - crossEntityRatio: the Frobenius energy fraction of G living in FORBIDDEN
+ *     entity blocks (edge-row coupling into face/volume H1, or face-row into
+ *     volume H1). ~0 means the gradient is entity-local and the planned
+ *     per-entity construction will keep it exact (gate 1b PASS).
+ *   - maxEdgeRowNnz: must equal nord+1 (2 endpoint vertices + nord-1 edge
+ *     bubbles); the exact per-row budget PCBDDC checks (bddcprivate.c:531).
+ *
+ * @param[in]  fem     FE space descriptor.
+ * @param[in]  cell    Cell with computed orientation.
+ * @param[out] result  Filled diagnostic metrics (must be non-NULL).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode verifyExactDiscreteGradientCell(const FEMSpace *fem, const Cell *cell,
+                                               GradientCheckResult *result) {
+  PetscFunctionBeginUser;
+  const PetscInt nord = fem->nord;
+  const PetscInt nNed = fem->numDofInCell;
+  const PetscInt nH1  = fem->numH1DofInCell_Pnord;
+
+  /* Fixed interior reference points (x,y,z >= 0, x+y+z <= 1). */
+  const PetscReal pts[5][NUM_DIMENSIONS] = {
+      {0.25, 0.25, 0.25}, {0.10, 0.20, 0.30}, {0.40, 0.10, 0.20},
+      {0.20, 0.40, 0.10}, {0.15, 0.15, 0.50}};
+
+  /* Exact gradient block (contiguous row-of-pointers, like the assembler). */
+  PetscReal **G;
+  PetscReal   laResidual = 0.0, condEst = 0.0;
+  PetscCall(PetscCalloc1(nNed, &G));
+  PetscCall(PetscCalloc1(nNed * nH1, &G[0]));
+  for (PetscInt i = 1; i < nNed; i++) G[i] = G[i - 1] + nH1;
+  PetscCall(buildExactDiscreteGradient(fem, cell, G, &laResidual, &condEst));
+
+  /* H1 P_nord column entity classes, in DMPlex closure order volume->face->edge
+   * ->vertex (= grid.H1dm_Pnord / shape3DHTet output). Counts from nord; empty
+   * classes collapse to zero-width ranges. */
+  const PetscInt nH1vol  = (nord - 1) * (nord - 2) * (nord - 3) / 6;
+  const PetscInt nH1face = NUM_FACES_PER_CELL * (nord - 1) * (nord - 2) / 2;
+  const PetscInt nH1edge = NUM_EDGES_PER_CELL * (nord - 1);
+  const PetscInt volColEnd  = nH1vol;               /* [0, volColEnd) volume    */
+  const PetscInt faceColEnd = nH1vol + nH1face;     /* [.., faceColEnd) face     */
+  const PetscInt edgeColEnd = faceColEnd + nH1edge; /* [.., edgeColEnd) edge     */
+  (void)edgeColEnd;                                 /* [edgeColEnd, nH1) vertex  */
+
+  /* Nédélec row entity classes from fem offsets (empty classes have count 0). */
+  const PetscInt edgeRow0 = fem->edgeDofOffset,   edgeRow1 = edgeRow0 + fem->numEdgeDof;
+  const PetscInt faceRow0 = fem->faceDofOffset,   faceRow1 = faceRow0 + fem->numFaceDof;
+  const PetscInt volRow0  = fem->volumeDofOffset, volRow1  = volRow0 + fem->numVolumeDof;
+
+  /* Sparsity, per-entity row nnz, and forbidden (off-diagonal entity-block)
+   * energy. Allowed de Rham couplings: edge-row -> {vertex,edge} H1; face-row ->
+   * {vertex,edge,face} H1; volume-row -> any. The rest is "forbidden" and its
+   * energy fraction is the entity-locality gate (gate 1b). */
+  PetscInt  nnz = 0, maxEdge = 0, maxFace = 0, maxVol = 0;
+  PetscReal forbidden2 = 0.0, total2 = 0.0;
+  for (PetscInt i = 0; i < nNed; i++) {
+    const PetscBool isEdge = (PetscBool)(i >= edgeRow0 && i < edgeRow1);
+    const PetscBool isFace = (PetscBool)(i >= faceRow0 && i < faceRow1);
+    const PetscBool isVol  = (PetscBool)(i >= volRow0  && i < volRow1);
+    PetscInt rownz = 0;
+    for (PetscInt k = 0; k < nH1; k++) {
+      const PetscReal g = G[i][k];
+      if (g == 0.0) continue;
+      nnz++; rownz++;
+      total2 += g * g;
+      const PetscBool colVol  = (PetscBool)(k < volColEnd);
+      const PetscBool colFace = (PetscBool)(k >= volColEnd && k < faceColEnd);
+      if (isEdge && (colVol || colFace)) forbidden2 += g * g; /* edge-row off its edge */
+      else if (isFace && colVol)         forbidden2 += g * g; /* face-row into volume  */
+    }
+    if (isEdge) maxEdge = PetscMax(maxEdge, rownz);
+    if (isFace) maxFace = PetscMax(maxFace, rownz);
+    if (isVol)  maxVol  = PetscMax(maxVol,  rownz);
+  }
+
+  /* Scratch and residual check. */
+  PetscReal **Eref, **Cref, *Hval, **Hgrad;
+  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Eref));
+  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Cref));
+  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Hgrad));
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+    PetscCall(PetscCalloc1(nNed, &Eref[d]));
+    PetscCall(PetscCalloc1(nNed, &Cref[d]));
+    PetscCall(PetscCalloc1(nH1,  &Hgrad[d]));
+  }
+  PetscCall(PetscCalloc1(nH1, &Hval));
+
+  PetscReal res = 0.0;
+  for (PetscInt p = 0; p < 5; p++) {
+    PetscReal x[NUM_DIMENSIONS] = {pts[p][0], pts[p][1], pts[p][2]};
+    PetscCall(shape3DETet(x, nord, &cell->orientation, Eref, Cref));
+    PetscCall(shape3DHTet(x, nord, &cell->orientation, Hval, Hgrad));
+    for (PetscInt k = 0; k < nH1; k++)
+      for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+        PetscReal recon = 0.0;
+        for (PetscInt i = 0; i < nNed; i++) recon += G[i][k] * Eref[d][i];
+        res = PetscMax(res, PetscAbsReal(recon - Hgrad[d][k]));
+      }
+  }
+
+  result->pointwiseResidual = res;
+  result->laResidual        = laResidual;
+  result->condEst           = condEst;
+  result->crossEntityRatio  = (total2 > 0.0) ? PetscSqrtReal(forbidden2 / total2) : 0.0;
+  result->nnzTotal          = nnz;
+  result->maxEdgeRowNnz     = maxEdge;
+  result->maxFaceRowNnz     = maxFace;
+  result->maxVolRowNnz      = maxVol;
+
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+    PetscCall(PetscFree(Eref[d]));
+    PetscCall(PetscFree(Cref[d]));
+    PetscCall(PetscFree(Hgrad[d]));
+  }
+  PetscCall(PetscFree(Eref));
+  PetscCall(PetscFree(Cref));
+  PetscCall(PetscFree(Hgrad));
+  PetscCall(PetscFree(Hval));
+  PetscCall(PetscFree(G[0]));
+  PetscCall(PetscFree(G));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /* ---- Per-order thin wrappers + dispatch tables -----------------------
  *
- * One ops table per supported order. All orders share:
- *   - hierarchicalComputeBasisOrder / hierarchicalComputeCurlsOrder
- *     (Piola-pullback wrappers around shape3DETet, parameterized by nord).
- *   - hierarchicalBuildGradientMatrixTopological for the lowest-Whitney
- *     vertex-incidence G used as the PCBDDC discrete-gradient hint.
- */
-#define HIERARCHICAL_ORDER_OPS(N, GRADIENT_BUILDER)                                      \
+ * One ops table per supported order. All orders share
+ * hierarchicalComputeBasisOrder / hierarchicalComputeCurlsOrder (Piola-pullback
+ * wrappers around shape3DETet, parameterized by nord). The discrete gradient
+ * for PCBDDC is the exact order-p operator built directly by
+ * buildExactDiscreteGradient (no per-order dispatch). */
+#define HIERARCHICAL_ORDER_OPS(N)                                                        \
   static PetscErrorCode order##N##ComputeBasis(const Cell *cell,                         \
                                                const PetscReal point[NUM_DIMENSIONS],    \
                                                const PetscReal *const *coeffs,           \
@@ -774,17 +1088,13 @@ static PetscErrorCode hierarchicalBuildGradientMatrixTopological(const FEMSpace 
       .computeCoefficients      = hierarchicalComputeCoefficients,                       \
       .computeBasis             = order##N##ComputeBasis,                                \
       .computeCurls             = order##N##ComputeCurls,                                \
-      .buildGradientMatrix      = (GRADIENT_BUILDER),                                    \
   }
 
-/* All orders use the same topological builder. nord=1 reduces to the
- * vertex-edge incidence with 1 DOF per edge (matching the previous
- * order1HierarchicalBuildGradientMatrix exactly). */
-HIERARCHICAL_ORDER_OPS(1, hierarchicalBuildGradientMatrixTopological);
-HIERARCHICAL_ORDER_OPS(2, hierarchicalBuildGradientMatrixTopological);
-HIERARCHICAL_ORDER_OPS(3, hierarchicalBuildGradientMatrixTopological);
-HIERARCHICAL_ORDER_OPS(4, hierarchicalBuildGradientMatrixTopological);
-HIERARCHICAL_ORDER_OPS(5, hierarchicalBuildGradientMatrixTopological);
-HIERARCHICAL_ORDER_OPS(6, hierarchicalBuildGradientMatrixTopological);
+HIERARCHICAL_ORDER_OPS(1);
+HIERARCHICAL_ORDER_OPS(2);
+HIERARCHICAL_ORDER_OPS(3);
+HIERARCHICAL_ORDER_OPS(4);
+HIERARCHICAL_ORDER_OPS(5);
+HIERARCHICAL_ORDER_OPS(6);
 
 #undef HIERARCHICAL_ORDER_OPS

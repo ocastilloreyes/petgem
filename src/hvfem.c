@@ -1501,12 +1501,25 @@ PetscErrorCode shape3DHTet(const PetscReal X[NUM_DIMENSIONS], const PetscInt nor
 
     PetscCall(HomIJacobi(tmp1, (const PetscReal(*)[2])tmp2, maxK, minbeta, IdecB[1], homLbetV, DhomLbetV));
 
-    for (PetscInt i = minIJK + 3; i < maxIJK + 1; i++) {
-      for (PetscInt j = minIJ; j < i - minK - 2; j++) {
-        for (PetscInt k = minI; k < j - minJ + 1; k++) {
-          ShapH[m] = PhiTriV[k - 1][j] * homLbetV[j - 1][k];
+    /* Volume bubbles, faithfully ported from the reference shape3DHTet.m
+     * (VFEM, MATLAB mins minI=2,minJ=1,minK=1 ⇒ minIJ=3,minIJK=4; the C mins
+     * here are shifted to 1,0,0, so minIJK+3=4, minIJ+2=3, minI+1=2 recover the
+     * reference loop). The earlier port mis-indexed the COLUMNS of
+     * PhiTriV/homLbetV (read [.][j]/[.][k] instead of [.][nij-ii-1]/[.][nijk-nij-1]),
+     * which only collapses to the right cell for the single nord=4 bubble and
+     * goes out of bounds / wrong for nord>=5. 0-based map: A(a,b) -> A[a-1][b-1]:
+     *   PhiTri(ii-1,jj)   -> PhiTriV[ii-2][jj-1]
+     *   homLbet(nij-2,kk) -> homLbetV[nij-3][kk-1] */
+    for (PetscInt nijk = minIJK + 3; nijk <= maxIJK; nijk++) {
+      for (PetscInt nij = minIJ + 2; nij <= nijk - minK - 1; nij++) {
+        for (PetscInt ii = minI + 1; ii <= nij - minJ - 1; ii++) {
+          const PetscInt  jj  = nij - ii;
+          const PetscInt  kk  = nijk - nij;
+          const PetscReal phi = PhiTriV[ii - 2][jj - 1];
+          const PetscReal hom = homLbetV[nij - 3][kk - 1];
+          ShapH[m] = phi * hom;
           for (PetscInt n = 0; n < NUM_DIMENSIONS; n++) {
-            GradH[n][m] = homLbetV[j - 1][k] * DPhiTriV[n][k - 1][j] + PhiTriV[k - 1][j] * DhomLbetV[n][j - 1][k];
+            GradH[n][m] = hom * DPhiTriV[n][ii - 2][jj - 1] + phi * DhomLbetV[n][nij - 3][kk - 1];
           }
           m += 1;
         }

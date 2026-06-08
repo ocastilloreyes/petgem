@@ -107,7 +107,7 @@ int runForward(int argc, char** argv) {
   DM              dm;
   Vec             conductivity, materials_id, receivers;
   Mat             A = NULL, B, X;
-  Mat             G_BDDC = NULL;  /* Topological lowest-Whitney G : Nédélec_k -> P_nord H1 */
+  Mat             G_BDDC = NULL;  /* Exact order-p discrete gradient : Nédélec_nord -> P_nord H1 */
   fmParams        params;
   Grid            grid;
   CsemSourceSet   sources = {0, 0, NULL};
@@ -220,6 +220,75 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[2] = end_timer - start_timer;
+
+  /* Optional discrete-gradient verification (diagnostic; does NOT affect the
+   * solve). Validates buildExactDiscreteGradient on the first local cells:
+   * grad(phi_k) = sum_i G_ik N_i, and reports the block sparsity. Enabled with
+   * -fm_check_gradient; off by default. */
+  {
+    PetscBool checkGrad = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-fm_check_gradient", &checkGrad, NULL));
+    if (checkGrad) {
+      const PetscInt ncells       = PetscMin((PetscInt)8, grid.cellEnd - grid.cellStart);
+      const PetscInt expectedEdge = params.nord + 1;
+      PetscReal      lr[4] = {0.0, 0.0, 0.0, 0.0};  /* pointwise, laRes, condEst, crossEntity (max) */
+      PetscInt       li[4] = {0, 0, 0, 0};          /* nnz(cell0), maxEdge, maxFace, maxVol */
+      for (PetscInt c = grid.cellStart; c < grid.cellStart + ncells; c++) {
+        Cell                cell;
+        GradientCheckResult r;
+        PetscCall(extractCellCoordinates(dm, c, &cell));
+        PetscCall(computeCellJacobian(&cell));
+        PetscCall(extractCellClousure(dm, c, &cell));
+        PetscCall(computeCellOrientation(&cell));
+        PetscCall(verifyExactDiscreteGradientCell(&grid.fem, &cell, &r));
+        lr[0] = PetscMax(lr[0], r.pointwiseResidual);
+        lr[1] = PetscMax(lr[1], r.laResidual);
+        lr[2] = PetscMax(lr[2], r.condEst);
+        lr[3] = PetscMax(lr[3], r.crossEntityRatio);
+        li[1] = PetscMax(li[1], r.maxEdgeRowNnz);
+        li[2] = PetscMax(li[2], r.maxFaceRowNnz);
+        li[3] = PetscMax(li[3], r.maxVolRowNnz);
+        if (c == grid.cellStart) li[0] = r.nnzTotal;
+      }
+      PetscReal gr[4];
+      PetscInt  gi[4];
+      PetscCallMPI(MPI_Allreduce(lr, gr, 4, MPIU_REAL, MPI_MAX, PETSC_COMM_WORLD));
+      PetscCallMPI(MPI_Allreduce(li, gi, 4, MPIU_INT,  MPI_MAX, PETSC_COMM_WORLD));
+
+      const PetscBool idPass  = (PetscBool)(gr[0] < 1.0e-7);
+      const PetscBool illCond = (PetscBool)(gr[2] > 1.0e10);
+      /* gate 1b is the entity-locality test ALONE: zero Frobenius energy in
+       * forbidden cross-entity blocks (edge-row -> face/volume H1, face-row ->
+       * volume H1). This is the property PCBDDC needs. The per-edge-row nnz is
+       * reported below as INFORMATIONAL only - the exact gradient legitimately
+       * routes higher-order energy onto face/volume rows, so the naive
+       * "nord+1 per edge row" budget does NOT hold for this basis and must not
+       * gate acceptance (PCBDDC itself is the authoritative validator). */
+      const char *locVerdict = !idPass ? "n/a (G unreliable)"
+                             : (gr[3] < 1.0e-6) ? "PASS" : "FAIL";
+
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Discrete-gradient check (nord=%" PetscInt_FMT "):\n", params.nord));
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %.3e  (%s)\n", "max |grad(phi) - G.N|",
+                            (double)gr[0], idPass ? "PASS" : "FAIL"));
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %.3e\n", "solve resid ||MG-B||/||B||", (double)gr[1]));
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %.3e  (%s)\n", "cond est kappa2(M) >=",
+                            (double)gr[2], illCond ? "ILL-CONDITIONED" : "ok"));
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %.3e  (gate 1b: %s)\n", "cross-entity energy ratio",
+                            (double)gr[3], locVerdict));
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %" PetscInt_FMT "  (ref nord+1 = %" PetscInt_FMT "; informational)\n",
+                            "edge-row nnz (max)", gi[1], expectedEdge));
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %" PetscInt_FMT " / %" PetscInt_FMT "\n",
+                            "face-row / vol-row nnz (max)", gi[2], gi[3]));
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %" PetscInt_FMT " (cell 0)\n",
+                            "structural nonzeros", li[0]));
+      if (!idPass && illCond)
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD,
+                              "   -> residual is conditioning-bound (kappa2 huge), NOT a basis fault.\n"));
+      else if (!idPass)
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD,
+                              "   -> residual large with modest kappa2: genuine basis-exactness fault.\n"));
+    }
+  }
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
