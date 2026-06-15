@@ -20,7 +20,15 @@ tests/cases/unit_cube/input*
 tests/cases/unit_cube/model.vtu
 tests/cases/unit_cube/params*
 tests/cases/unit_cube/responses_p1.h5
-wham/
+wham/mesh_p1.geo
+wham/mesh_p1.msh
+wham/model.vtu
+wham/postprocess.py
+wham/receivers.txt
+wham/Reference2Hz_modeling.mat
+wham/sigmas.txt
+wham/sources.txt
+
 
 logo_proposals/*
 petgem-logo-BIG-430x480.png

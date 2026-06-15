@@ -1,0 +1,8 @@
+-input_filename wham/input.h5
+-dm_mat_type is
+-ksp_type fgmres
+-pc_type bddc
+-pc_bddc_use_deluxe_scaling 1
+-pc_bddc_coarse_pc_type lu
+-output_dir wham/
+-output_filename responses_p1
