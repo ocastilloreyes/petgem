@@ -34,7 +34,7 @@
  *   - Creates and attaches a PetscSection for H(curl) elements,
  *     applying boundary conditions on the marked faces.
  *   - Clones the DM to create the P_nord H1 DM (`grid->H1dm_Pnord`) used
- *     for the exact discrete-gradient (G_BDDC) column space.
+ *     for the high-order discrete-gradient (G_BDDC) column space.
  *   - Computes local and global counts of vertices, edges, faces, and cells.
  *   - Stores DOF counts, element start/end indices, and dimension in the `grid` struct.
  *   - Prints mesh and HEFEM statistics for verification.
@@ -112,7 +112,7 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
 
   /* DM for the order-k S_h^k space - P_nord nodal + edge/face/volume
    * bubbles, sized so ∇P_nord = curl-kernel of Nédélec_nord (the De Rham
-   * complex). This is the column space of the exact G_BDDC consumed by
+   * complex). This is the column space of the G_BDDC consumed by
    * PCBDDC; for nord = 1 the counts collapse to {1,0,0,0}, for nord >= 2 it
    * adds bubble DOFs. */
   PetscInt numH1Dof_Pnord[NUM_H1_DOF_PER_CELL];

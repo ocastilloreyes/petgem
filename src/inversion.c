@@ -198,7 +198,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
 
   /* ---- K, Ms (template), G_BDDC built once ----
    * K is σ-independent (μ_r = I, no σ enters the curl-curl integrand).
-   * G_BDDC is the exact order-p discrete gradient (σ-independent geometry).
+   * G_BDDC is the high-order discrete gradient (σ-independent geometry).
    * Both can be reused for every L-BFGS iteration.
    *
    * Ms's values produced here come from whatever σ is in `conductivity`
@@ -483,7 +483,7 @@ PetscErrorCode createInversionDM(DM dmConductivity, const Grid *grid, DM *dmInv)
  *                      (solver options come from KSPSetFromOptions).
  * @param[in]  dm       H(curl) DM.
  * @param[in]  A        System matrix.
- * @param[in]  Gbddc    Exact order-p discrete-gradient operator for PCBDDC.
+ * @param[in]  Gbddc    High-order discrete-gradient operator for PCBDDC.
  * @param[out] ksp      Created KSP bound to A.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
@@ -503,7 +503,7 @@ PetscErrorCode createInvKSP(const imParams *iparams,
   PetscCall(KSPCreate(comm, ksp));
   PetscCall(KSPSetOperators(*ksp, A, A));
 
-  /* `Gbddc` is the EXACT order-p discrete-gradient operator (Nédélec_nord →
+  /* `Gbddc` is the high-order discrete-gradient operator (Nédélec_nord →
    * P_nord H1) consumed by PCBDDC. It has nothing to do with the inversion
    * gradient ∂F/∂X built by the L-BFGS layer — distinct names so the two never
    * get conflated. setupBDDCFromPetgemGradient registers it at order 1 (the
@@ -571,7 +571,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
                             c->graph, 0.0, NULL));
 
   /* ---- 2. Refill Ms(σ) with the current iterate's σ ----
-   * K (curl-curl stiffness, σ-independent) and G_BDDC (exact discrete
+   * K (curl-curl stiffness, σ-independent) and G_BDDC (high-order discrete
    * gradient, σ-independent) were built once in setupInversionWorkspace and live
    * on the context - they are reused for every L-BFGS iteration.
    * Only Ms needs to be recomputed when σ changes.

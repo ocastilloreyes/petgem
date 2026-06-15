@@ -45,7 +45,7 @@ typedef struct {
   PetscInt nord;                  /**< Basis order (1, 2, 3, ...). */
   PetscInt numDofInCell;          /**< Total H(curl) DOFs per cell. */
   PetscInt numH1DofInCell_Pnord;  /**< P_nord H1 DOFs per cell; column count of
-                                   *   the exact G_BDDC discrete gradient. */
+                                   *   the G_BDDC discrete gradient. */
 
   /* Per-entity DOF counts */
   PetscInt numDofPerEdge;    /**< H(curl) DOFs per edge. */

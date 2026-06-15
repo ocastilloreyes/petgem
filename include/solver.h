@@ -20,12 +20,8 @@
  *
  * When A is a MATIS matrix and G is provided, the preconditioner is set to
  * PCBDDC and G is registered via PCBDDCSetDiscreteGradient at order = 1 to
- * capture the curl kernel for H(curl) problems. G is the topological
- * lowest-Whitney gradient G_BDDC : Nédélec_k → P_nord H1 from
- * assembleCsemKandM. (A denser, exact P_nord gradient was removed: its
- * face/volume couplings violate PCBDDC's coarse-edge model — every coarse
- * edge must resolve to exactly two corner nodes — and abort
- * PCBDDCNedelecSupport at nord ≥ 3. See solver.c.)
+ * capture the curl kernel for H(curl) problems. G is the high-order discrete
+ * gradient G_BDDC : Nédélec_nord → P_nord H1 from assembleCsemKandM.
  *
  * @param[in]  dm  DMPlex mesh; its communicator drives the parallel solve.
  * @param[in]  A   System matrix (H(curl) FEM operator).
@@ -46,7 +42,7 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
  * Shared helper that captures the single BDDC policy used by both the
  * forward solver (solveCsemSystem) and the inverse solver (createInvKSP):
  * when A is of type MATIS and Gbddc is non-NULL, set PC to PCBDDC and
- * register Gbddc (the exact order-p discrete gradient) via
+ * register Gbddc (the high-order discrete gradient) via
  * PCBDDCSetDiscreteGradient(..., 1, 0, PETSC_TRUE, PETSC_TRUE). When the
  * conditions are not met the function is a no-op so the caller's existing
  * default PC stays in place.

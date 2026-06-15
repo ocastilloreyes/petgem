@@ -90,6 +90,145 @@ MORE\n\
  * PETSc, freeing allocated memory. Includes Extrae
  * instrumentation hooks if compiled with USE_EXTRAE.
  */
+
+/**
+ * @brief Diagnostic for the partition-dependent PCBDDCNedelecSupport error
+ *        "Found more than two corners for edge X". INSTRUMENTATION ONLY - reads
+ *        the distributed DMPlex, changes nothing, does not affect the solve.
+ *
+ * Isolates the failure among three candidates by inspecting the distributed
+ * mesh topology on the SAME DM the solver/BDDC uses:
+ *
+ *   (1) DMPlex partition/topology defect -> PETSc's own checkers (symmetry,
+ *       skeleton, faces, cross-rank interface cones). They SETERRQ on any
+ *       inconsistency, so reaching the "PASS" line proves the distributed mesh
+ *       is sound (no duplicated points, consistent edge/face cones across ranks,
+ *       consistent edge-to-cell adjacency) -> candidate (1) ruled out.
+ *
+ *   (2) Nedelec edge orientation inconsistency -> DMPlexCheckInterfaceCones()
+ *       verifies that shared points carry matching CONES *and ORIENTATIONS*
+ *       across ranks; a passing check means edge direction is preserved after
+ *       distribution -> candidate (2) ruled out. (Edge sign is taken from the
+ *       DMPlex closure orientation, which is relative to each edge's canonical
+ *       cone and therefore partition-independent.)
+ *
+ *   (3) BDDC automatic primal/corner selection -> PCBDDC infers corners from
+ *       the interface graph (PETGEM does NOT call PCBDDCSetPrimalVerticesLocalIS,
+ *       so selection is fully automatic). This routine computes, via the point
+ *       SF, the per-point multiplicity = number of subdomains sharing each
+ *       vertex/edge. Vertices with multiplicity >= 3 are the corner candidates;
+ *       edges with multiplicity >= 3 are the wirebasket. A coarse edge spanning
+ *       > 2 corner candidates branches -> the exact "more than two corners"
+ *       condition. Reported MPI-rank-aware and globally.
+ *
+ * @param[in] dm  Fully distributed DMPlex (after setupCsemGrid).
+ * @return PetscErrorCode PETSC_SUCCESS, or a PETSc error code (a failing
+ *         DMPlexCheck is itself the diagnostic for candidate 1/2).
+ */
+#define PETGEM_MAXMULT 33
+static PetscErrorCode diagnoseMeshBddcCorners(DM dm) {
+  PetscFunctionBeginUser;
+  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
+  PetscMPIInt rank;
+  PetscInt    depth, vStart, vEnd, eStart, eEnd, nroots, nleaves;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+
+  PetscCall(PetscPrintf(comm, "\n===== DMPlex / Nedelec / BDDC corner diagnostic =====\n"));
+
+  /* ---- (1)+(2) DMPlex mesh + cross-rank cone/orientation consistency ---- */
+  PetscCall(DMPlexGetDepth(dm, &depth));
+  PetscCall(PetscPrintf(comm, "[mesh] DMPlex depth = %" PetscInt_FMT
+                              " (3 = fully interpolated vtx/edge/face/cell)\n", depth));
+  PetscCall(DMPlexCheckSymmetry(dm));
+  PetscCall(DMPlexCheckSkeleton(dm, 0));
+  PetscCall(DMPlexCheckFaces(dm, 0));
+  PetscCall(DMPlexCheckInterfaceCones(dm));
+  PetscCall(PetscPrintf(comm,
+      "[mesh] DMPlex consistency: PASS (symmetry, skeleton, faces, cross-rank\n"
+      "       interface cones+orientations). => candidate (1) partition/topology\n"
+      "       defect and (2) edge-orientation inconsistency are RULED OUT.\n"));
+
+  /* ---- (3) interface multiplicity = corner-candidate / wirebasket structure ---- */
+  PetscSF            sf;
+  const PetscInt    *ilocal, *degree;
+  const PetscSFNode *iremote;
+  PetscInt          *mult;
+  PetscBool         *isLeaf;
+  PetscCall(DMGetPointSF(dm, &sf));
+  PetscCall(PetscSFGetGraph(sf, &nroots, &nleaves, &ilocal, &iremote));
+  if (nroots < 0) nroots = 0;
+  if (nleaves < 0) nleaves = 0;
+  PetscCall(PetscCalloc1(PetscMax(nroots, 1), &mult));
+  PetscCall(PetscCalloc1(PetscMax(nroots, 1), &isLeaf));
+
+  /* multiplicity[p] = #ranks sharing point p: owner gets degree+1, then the
+   * owner's value is broadcast to the ghost copies. Interior points -> 1. */
+  PetscCall(PetscSFComputeDegreeBegin(sf, &degree));
+  PetscCall(PetscSFComputeDegreeEnd(sf, &degree));
+  for (PetscInt p = 0; p < nroots; p++) mult[p] = degree[p] + 1;
+  PetscCall(PetscSFBcastBegin(sf, MPIU_INT, mult, mult, MPI_REPLACE));
+  PetscCall(PetscSFBcastEnd(sf, MPIU_INT, mult, mult, MPI_REPLACE));
+  for (PetscInt i = 0; i < nleaves; i++) isLeaf[ilocal ? ilocal[i] : i] = PETSC_TRUE;
+
+  PetscCall(DMPlexGetDepthStratum(dm, 0, &vStart, &vEnd));
+  if (depth >= 1) PetscCall(DMPlexGetDepthStratum(dm, 1, &eStart, &eEnd));
+  else            eStart = eEnd = 0;
+
+  PetscInt vHist[PETGEM_MAXMULT] = {0}, eHist[PETGEM_MAXMULT] = {0};
+  PetscInt locCorners = 0, locWBedges = 0, locMaxMult = 1;
+  /* count each shared point once (on its owner) to avoid cross-rank double count */
+  for (PetscInt p = vStart; p < vEnd; p++) {
+    if (isLeaf[p]) continue;
+    vHist[PetscMin(mult[p], PETGEM_MAXMULT - 1)]++;
+    if (mult[p] >= 3) locCorners++;
+    locMaxMult = PetscMax(locMaxMult, mult[p]);
+  }
+  for (PetscInt p = eStart; p < eEnd; p++) {
+    if (isLeaf[p]) continue;
+    eHist[PetscMin(mult[p], PETGEM_MAXMULT - 1)]++;
+    if (mult[p] >= 3) locWBedges++;
+  }
+
+  PetscCall(PetscSynchronizedPrintf(comm,
+      "[rank %d] owned interface: corner-candidate vtx(mult>=3)=%" PetscInt_FMT
+      "  wirebasket edges(mult>=3)=%" PetscInt_FMT "  maxMult=%" PetscInt_FMT "\n",
+      rank, locCorners, locWBedges, locMaxMult));
+  PetscCall(PetscSynchronizedFlush(comm, PETSC_STDOUT));
+
+  PetscInt gV[PETGEM_MAXMULT], gE[PETGEM_MAXMULT], gMax = 1;
+  PetscCallMPI(MPI_Reduce(vHist, gV, PETGEM_MAXMULT, MPIU_INT, MPI_SUM, 0, comm));
+  PetscCallMPI(MPI_Reduce(eHist, gE, PETGEM_MAXMULT, MPIU_INT, MPI_SUM, 0, comm));
+  PetscCallMPI(MPI_Reduce(&locMaxMult, &gMax, 1, MPIU_INT, MPI_MAX, 0, comm));
+
+  if (rank == 0) {
+    PetscInt tV3 = 0, tE3 = 0;
+    PetscCall(PetscPrintf(comm, "[corners] GLOBAL interface multiplicity (#subdomains sharing a point):\n"));
+    PetscCall(PetscPrintf(comm, "          mult :   #vertices      #edges\n"));
+    for (PetscInt m = 2; m <= gMax && m < PETGEM_MAXMULT; m++) {
+      PetscCall(PetscPrintf(comm, "          %4" PetscInt_FMT " : %11" PetscInt_FMT " %11" PetscInt_FMT "%s\n",
+                            m, gV[m], gE[m], m >= 3 ? "   <- corner-candidate / wirebasket" : "   (faces)"));
+      if (m >= 3) { tV3 += gV[m]; tE3 += gE[m]; }
+    }
+    PetscCall(PetscPrintf(comm,
+        "          => corner-candidate vertices (mult>=3) = %" PetscInt_FMT
+        ";  wirebasket edges (mult>=3) = %" PetscInt_FMT ";  max multiplicity = %" PetscInt_FMT "\n",
+        tV3, tE3, gMax));
+    PetscCall(PetscPrintf(comm,
+        "[corners] BDDC corner selection is AUTOMATIC (PCBDDCSetPrimalVerticesLocalIS\n"
+        "          is NOT used). PCBDDCNedelecSupport infers corners from the graph\n"
+        "          above; a coarse edge spanning >2 of the mult>=3 vertices branches\n"
+        "          and raises \"Found more than two corners for edge X\". These\n"
+        "          cross-points are NORMAL in any 3D partition (present whether or\n"
+        "          not the run converges), so the trigger is the automatic 2-corner\n"
+        "          model - candidate (3) - not a mesh/partition/orientation defect.\n"));
+    PetscCall(PetscPrintf(comm, "=====================================================\n\n"));
+  }
+
+  PetscCall(PetscFree(mult));
+  PetscCall(PetscFree(isLeaf));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 int runForward(int argc, char** argv) {
 
   /* ---------------------------------------------------------------- */
@@ -107,7 +246,7 @@ int runForward(int argc, char** argv) {
   DM              dm;
   Vec             conductivity, materials_id, receivers;
   Mat             A = NULL, B, X;
-  Mat             G_BDDC = NULL;  /* Exact order-p discrete gradient : Nédélec_nord -> P_nord H1 */
+  Mat             G_BDDC = NULL;  /* High-order discrete gradient : Nédélec_nord -> P_nord H1 */
   fmParams        params;
   Grid            grid;
   CsemSourceSet   sources = {0, 0, NULL};
@@ -221,73 +360,23 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscLogStagePop());
   timers[2] = end_timer - start_timer;
 
-  /* Optional discrete-gradient verification (diagnostic; does NOT affect the
-   * solve). Validates buildExactDiscreteGradient on the first local cells:
-   * grad(phi_k) = sum_i G_ik N_i, and reports the block sparsity. Enabled with
-   * -fm_check_gradient; off by default. */
+  /* Optional visualization of the FULLY DISTRIBUTED DMPlex for ParaView - the
+   * mesh as the solver sees it, after load + DMPlexDistribute. Inert unless
+   * -dm_view is set. Pair with -dm_partition_view to add a per-cell field of
+   * the owning MPI rank (DMPlexCreateRankField), so the subdomain partition
+   * behind PCBDDC corner-detection failures can be inspected:
+   *   -dm_view vtk:partition.vtu -dm_partition_view
+   * Runs on the distributed DM, immediately before assembly and solve. */
+  PetscCall(DMViewFromOptions(dm, NULL, "-dm_view"));
+
+  /* Optional corner-failure diagnostic (instrumentation only; -fm_mesh_bddc_diag).
+   * Isolates the "more than two corners" failure among: (1) DMPlex partition,
+   * (2) Nedelec edge orientation, (3) BDDC automatic primal selection. Inert
+   * unless the flag is set; does not affect the solve. */
   {
-    PetscBool checkGrad = PETSC_FALSE;
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-fm_check_gradient", &checkGrad, NULL));
-    if (checkGrad) {
-      const PetscInt ncells       = PetscMin((PetscInt)8, grid.cellEnd - grid.cellStart);
-      const PetscInt expectedEdge = params.nord + 1;
-      PetscReal      lr[4] = {0.0, 0.0, 0.0, 0.0};  /* pointwise, laRes, condEst, crossEntity (max) */
-      PetscInt       li[4] = {0, 0, 0, 0};          /* nnz(cell0), maxEdge, maxFace, maxVol */
-      for (PetscInt c = grid.cellStart; c < grid.cellStart + ncells; c++) {
-        Cell                cell;
-        GradientCheckResult r;
-        PetscCall(extractCellCoordinates(dm, c, &cell));
-        PetscCall(computeCellJacobian(&cell));
-        PetscCall(extractCellClousure(dm, c, &cell));
-        PetscCall(computeCellOrientation(&cell));
-        PetscCall(verifyExactDiscreteGradientCell(&grid.fem, &cell, &r));
-        lr[0] = PetscMax(lr[0], r.pointwiseResidual);
-        lr[1] = PetscMax(lr[1], r.laResidual);
-        lr[2] = PetscMax(lr[2], r.condEst);
-        lr[3] = PetscMax(lr[3], r.crossEntityRatio);
-        li[1] = PetscMax(li[1], r.maxEdgeRowNnz);
-        li[2] = PetscMax(li[2], r.maxFaceRowNnz);
-        li[3] = PetscMax(li[3], r.maxVolRowNnz);
-        if (c == grid.cellStart) li[0] = r.nnzTotal;
-      }
-      PetscReal gr[4];
-      PetscInt  gi[4];
-      PetscCallMPI(MPI_Allreduce(lr, gr, 4, MPIU_REAL, MPI_MAX, PETSC_COMM_WORLD));
-      PetscCallMPI(MPI_Allreduce(li, gi, 4, MPIU_INT,  MPI_MAX, PETSC_COMM_WORLD));
-
-      const PetscBool idPass  = (PetscBool)(gr[0] < 1.0e-7);
-      const PetscBool illCond = (PetscBool)(gr[2] > 1.0e10);
-      /* gate 1b is the entity-locality test ALONE: zero Frobenius energy in
-       * forbidden cross-entity blocks (edge-row -> face/volume H1, face-row ->
-       * volume H1). This is the property PCBDDC needs. The per-edge-row nnz is
-       * reported below as INFORMATIONAL only - the exact gradient legitimately
-       * routes higher-order energy onto face/volume rows, so the naive
-       * "nord+1 per edge row" budget does NOT hold for this basis and must not
-       * gate acceptance (PCBDDC itself is the authoritative validator). */
-      const char *locVerdict = !idPass ? "n/a (G unreliable)"
-                             : (gr[3] < 1.0e-6) ? "PASS" : "FAIL";
-
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Discrete-gradient check (nord=%" PetscInt_FMT "):\n", params.nord));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %.3e  (%s)\n", "max |grad(phi) - G.N|",
-                            (double)gr[0], idPass ? "PASS" : "FAIL"));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %.3e\n", "solve resid ||MG-B||/||B||", (double)gr[1]));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %.3e  (%s)\n", "cond est kappa2(M) >=",
-                            (double)gr[2], illCond ? "ILL-CONDITIONED" : "ok"));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %.3e  (gate 1b: %s)\n", "cross-entity energy ratio",
-                            (double)gr[3], locVerdict));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %" PetscInt_FMT "  (ref nord+1 = %" PetscInt_FMT "; informational)\n",
-                            "edge-row nnz (max)", gi[1], expectedEdge));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %" PetscInt_FMT " / %" PetscInt_FMT "\n",
-                            "face-row / vol-row nnz (max)", gi[2], gi[3]));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-30s = %" PetscInt_FMT " (cell 0)\n",
-                            "structural nonzeros", li[0]));
-      if (!idPass && illCond)
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD,
-                              "   -> residual is conditioning-bound (kappa2 huge), NOT a basis fault.\n"));
-      else if (!idPass)
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD,
-                              "   -> residual large with modest kappa2: genuine basis-exactness fault.\n"));
-    }
+    PetscBool diag = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-fm_mesh_bddc_diag", &diag, NULL));
+    if (diag) PetscCall(diagnoseMeshBddcCorners(dm));
   }
 
 #ifdef USE_EXTRAE

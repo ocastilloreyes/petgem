@@ -28,8 +28,8 @@
  * PCBDDCSetDiscreteGradient(pc, Gbddc, 1, 0, PETSC_TRUE, PETSC_TRUE). When those
  * conditions are not met the call is a no-op, so the caller's default PC stays.
  *
- * @p Gbddc is the EXACT order-p discrete gradient G_BDDC : Nédélec_nord →
- * P_nord H1 produced by assembleCsemKandM (buildExactDiscreteGradient: each
+ * @p Gbddc is the high-order discrete gradient G_BDDC : Nédélec_nord →
+ * P_nord H1 produced by assembleCsemKandM (buildDiscreteGradientMatrix: each
  * H(curl) DOF's gradient is resolved against the full P_nord H1 closure, so
  * grad(phi_k) = sum_i G_ik N_i exactly and K·G_BDDC = 0). PCBDDC reads its
  * sparsity (GᵀG) to build the curl-kernel coarse space.
@@ -85,7 +85,7 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc)
  * @param[in]  dm  DMPlex mesh; its communicator drives the parallel solve.
  * @param[in]  A   System matrix (H(curl) FEM operator).
  * @param[in]  B   Right-hand side matrix, one column per source.
- * @param[in]  G   Exact order-p discrete-gradient hint for PCBDDC; may be NULL
+ * @param[in]  G   High-order discrete-gradient hint for PCBDDC; may be NULL
  *                 when @p A is not of type MATIS.
  * @param[out] X   Solution matrix, created internally (the caller destroys it).
  *
@@ -110,7 +110,7 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
   PetscCall(KSPCreate(comm, &ksp));
   PetscCall(KSPSetOperators(ksp, A, A));
 
-  /* G is the exact order-p discrete gradient (assembleCsemKandM); BDDC reads
+  /* G is the high-order discrete gradient (assembleCsemKandM); BDDC reads
    * its sparsity to build the curl-kernel coarse space. */
   PetscCall(setupBDDCFromPetgemGradient(ksp, A, G));
   PetscCall(KSPSetFromOptions(ksp));

@@ -221,13 +221,13 @@ typedef struct {
   /** @} */
 
   /** @{ Cached LHS matrices. K (stiffness, σ-independent) and G_BDDC
-   *  (exact order-p discrete gradient, σ-independent) are built ONCE at setup
+   *  (high-order discrete gradient, σ-independent) are built ONCE at setup
    *  via assembleCsemKandM and reused across all L-BFGS iters. Ms keeps the
    *  sparsity from that build but its values are refilled every callback via
    *  assembleCsemMsRefill against the current σ. */
   Mat                             Kmat;        /**< Curl-curl stiffness (σ-independent). */
   Mat                             Msmat;       /**< Mass-σ matrix (refilled per callback). */
-  Mat                             Gmat_BDDC;   /**< Exact order-p discrete gradient (BDDC hint). */
+  Mat                             Gmat_BDDC;   /**< High-order discrete gradient (BDDC hint). */
   /** @} */
 
   /** @{ Persistent per-frequency system matrices and solvers. The sparsity
@@ -466,14 +466,14 @@ PetscErrorCode createInversionDM(DM dmConductivity, const Grid *grid,
 /**
  * @brief Creates a KSP for inversion (same setup as solveCsemSystem, no solve).
  *
- * `Gbddc` is the forward-formulation exact order-p discrete-gradient operator
+ * `Gbddc` is the forward-formulation high-order discrete-gradient operator
  * passed to PCBDDC (distinct from the inversion gradient ∂F/∂X). The caller
  * must KSPDestroy it after the forward + adjoint solves.
  *
  * @param[in]  iparams  Inversion parameters.
  * @param[in]  dm       H(curl) DM.
  * @param[in]  A        System matrix.
- * @param[in]  Gbddc    Exact order-p discrete-gradient operator for PCBDDC.
+ * @param[in]  Gbddc    High-order discrete-gradient operator for PCBDDC.
  * @param[out] ksp      Created KSP bound to A.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.

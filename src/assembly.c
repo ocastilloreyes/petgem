@@ -283,7 +283,7 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  *
  *   K       - stiffness (curl–curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
  *   Ms      - mass × σ matrix, ∫ (ε_r ⊙ N_i)·N_j where ε_r encodes σ.
- *   G_BDDC  - EXACT order-p discrete gradient (buildExactDiscreteGradient)
+ *   G_BDDC  - high-order discrete gradient (buildDiscreteGradientMatrix)
  *             against the P_nord H¹ DM (grid.H1dm_Pnord): grad(phi_k) =
  *             sum_i G_ik N_i over the full closure, so K·G = 0. Built with
  *             MAT_IGNORE_ZERO_ENTRIES (thresholded zeros stay out of the
@@ -366,8 +366,8 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   PetscCall(VecDestroy(&h1v));
   PetscCall(VecDestroy(&b));
 
-  /* Exact order-p discrete gradient G_BDDC : Nédélec_nord -> P_nord H1
-   * (buildExactDiscreteGradient): grad(phi_k) = sum_i G_ik N_i over the full
+  /* High-order discrete gradient G_BDDC : Nédélec_nord -> P_nord H1
+   * (buildDiscreteGradientMatrix): grad(phi_k) = sum_i G_ik N_i over the full
    * P_nord closure, so K·G = 0 and PCBDDC's coarse-space algorithm reads the
    * true curl-kernel structure.
    *
@@ -381,7 +381,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
     PetscCall(MatSetSizes(*G_BDDC, m, n, M, N));
     PetscCall(MatSetType(*G_BDDC, MATAIJ));
     PetscCall(MatSetLocalToGlobalMapping(*G_BDDC, mapping, H1mapping));
-    /* The exact order-p gradient can touch up to a full P_nord cell closure
+    /* The high-order gradient can touch up to a full P_nord cell closure
      * per row; preallocate that width. */
     PetscCall(MatSeqAIJSetPreallocation(*G_BDDC, grid.numH1DofInCell_Pnord, NULL));
     PetscCall(MatMPIAIJSetPreallocation(*G_BDDC, grid.numH1DofInCell_Pnord, NULL, grid.numH1DofInCell_Pnord, NULL));
@@ -397,7 +397,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   /* Get the local values of the conductivity components */
   PetscCall(VecGetDM(conductivity, &dmConductivity));
 
-  /* Compute 3D quadrature points (element mass/stiffness; the exact gradient
+  /* Compute 3D quadrature points (element mass/stiffness; the discrete gradient
    * builds its own reference quadrature internally). */
   PetscCall(computeNum3DQuadraturePoints(params.nord, &quadrature_3d));
 
@@ -426,9 +426,9 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   if (!fused) {
     PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureM));
   }
-  /* Exact discrete-gradient scratch.
+  /* Discrete-gradient scratch.
    *
-   * gradientMatrixBDDC is the OUTPUT of buildExactDiscreteGradient, sized
+   * gradientMatrixBDDC is the OUTPUT of buildDiscreteGradientMatrix, sized
    * numDofInCell × numH1DofInCell_Pnord (all P_nord H1 columns, in DMPlex
    * closure order). closureGBDDC is the row-major INSERTION buffer of the
    * same shape passed to MatSetValuesLocal. */
@@ -490,12 +490,12 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
       PetscCall(MatSetValuesLocal(*Ms,   numDofIndices, dofIndices, numDofIndices, dofIndices, closureM, ADD_VALUES));
     }
 
-    /* Build & insert the EXACT order-p discrete gradient for PCBDDC:
+    /* Build & insert the high-order discrete gradient for PCBDDC:
      * grad(phi_k) = sum_i G_ik N_i, all P_nord H1 columns in DMPlex closure
      * order (= H1dofIndices). Insert the full row width; thresholded zeros are
      * dropped by MAT_IGNORE_ZERO_ENTRIES. */
     if (G_BDDC) {
-      PetscCall(buildExactDiscreteGradient(&grid.fem, &cell, gradientMatrixBDDC, NULL, NULL));
+      PetscCall(buildDiscreteGradientMatrix(&grid.fem, &cell, gradientMatrixBDDC));
       for (PetscInt j = 0; j < grid.numDofInCell; j++) {
         for (PetscInt k = 0; k < grid.numH1DofInCell_Pnord; k++) {
           closureGBDDC[j * grid.numH1DofInCell_Pnord + k] = gradientMatrixBDDC[j][k];

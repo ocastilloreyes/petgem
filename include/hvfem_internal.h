@@ -57,8 +57,8 @@ PetscErrorCode invertMatrix(const PetscInt N, const PetscReal A[], PetscReal inv
  * @brief Evaluates H1 hierarchical shape functions and gradients on the
  *        reference tetrahedron.
  *
- * Used by the order-1 gradient-matrix builder and higher orders that need
- * P_k nodal values and gradients at quadrature points.
+ * Used by the discrete-gradient builder (buildDiscreteGradientMatrix) for the
+ * P_nord nodal values and gradients at quadrature points.
  *
  * @param[in]  X                Reference coordinates in the tetrahedron.
  * @param[in]  nord             Polynomial order.

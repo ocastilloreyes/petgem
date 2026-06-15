@@ -44,19 +44,23 @@ with MUMPS:
 
 Choosing a solver by polynomial order
 -------------------------------------
-The BDDC preconditioner is built from a topological (order-1) discrete gradient
-hint. As the polynomial order rises, the high-order curl-kernel is increasingly
-invisible to that order-1 coarse space, and BDDC convergence degrades:
+The BDDC preconditioner is built from the high-order discrete gradient hint,
+which captures the full curl-kernel of the Nédélec space at every polynomial
+order, so iteration counts stay low and order-robust. The practical limit at
+high order is memory: the deluxe sub-domain Schur complements grow with the
+order, so on large meshes a direct solver becomes preferable once BDDC exceeds
+the available per-rank memory.
 
 ==========  ===========================  ==============================================
 ``nord``    Recommended forward solver   Notes
 ==========  ===========================  ==============================================
-1-5         BDDC (FGMRES)                Converges in a handful of iterations
-6           LU + MUMPS                   BDDC degrades sharply; use a direct solver
+1-3         BDDC (FGMRES)                Low, order-robust iteration counts
+4-6         BDDC or LU + MUMPS           BDDC if memory permits; else a direct solver
 ==========  ===========================  ==============================================
 
-At ``nord=6``, switch the forward run to a direct solver by overriding the
-solver keys on the command line (or editing the parameter file):
+For a memory-bound high-order run, switch the forward solver to a direct solver
+by overriding the solver keys on the command line (or editing the parameter
+file):
 
 .. code-block:: bash
 

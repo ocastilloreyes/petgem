@@ -182,67 +182,21 @@ PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, c
 PetscErrorCode buildDofSigns(const Cell* cell, const FEMSpace* fem, PetscInt signs[]);
 
 /**
- * @brief Builds the EXACT high-order discrete gradient block G_e for one cell
- *        (the curl-kernel operator PCBDDCSetDiscreteGradient expects at nord>=2).
+ * @brief Builds the high-order discrete gradient block G_e for one cell (the
+ *        curl-kernel operator consumed by PCBDDCSetDiscreteGradient).
  *
  * grad(phi_k) = sum_i G_ik N_i, with rows = Nédélec DOFs and columns = P_nord H1
- * DOFs, both in DMPlex closure order. Sparse after thresholding. See the
- * definition in hvfem_hierarchical.c for the construction and caveats.
+ * DOFs, both in DMPlex closure order; sparse after thresholding. See the
+ * definition in hvfem_hierarchical.c for the construction.
  *
  * @param[in]  fem             FE space descriptor.
  * @param[in]  cell            Cell with computed orientation.
  * @param[out] gradientMatrix  Block sized numDofInCell x numH1DofInCell_Pnord.
- * @param[out] laResidual      Relative linear-algebra residual ||M G - B||_F /
- *                             ||B||_F of the SPD projection solve (may be NULL).
- * @param[out] condEst         Conditioning estimate of the reference Nédélec mass
- *                             matrix (max/min Cholesky pivot, an SPD lower bound
- *                             on kappa_2(M)); may be NULL.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode buildExactDiscreteGradient(const FEMSpace* fem, const Cell* cell,
-                                          PetscReal** gradientMatrix,
-                                          PetscReal* laResidual, PetscReal* condEst);
-
-/**
- * @brief Per-cell diagnostic metrics for the high-order discrete gradient.
- *
- * Populated by verifyExactDiscreteGradientCell and printed by the
- * -fm_check_gradient diagnostic. Separates the two failure modes the wham run
- * exposed: a large pointwiseResidual with a small laResidual but a HUGE condEst
- * is a conditioning-bound solve (not a basis fault); a large pointwiseResidual
- * with a MODEST condEst is a genuine basis-exactness fault. crossEntityRatio and
- * the per-entity row-nnz counts answer the PCBDDC entity-locality gate
- * (edge-rows must carry exactly nord+1 nonzeros; no edge->face/volume coupling).
- */
-typedef struct {
-  PetscReal pointwiseResidual; /**< max |grad(phi_k) - sum_i G_ik N_i| at sample pts. */
-  PetscReal laResidual;        /**< ||M G - B||_F / ||B||_F of the projection solve. */
-  PetscReal condEst;           /**< max/min Cholesky pivot of M (kappa_2 lower bound). */
-  PetscReal crossEntityRatio;  /**< ||G in forbidden entity blocks||_F / ||G||_F (gate 1b). */
-  PetscInt  nnzTotal;          /**< structural nonzeros in the block. */
-  PetscInt  maxEdgeRowNnz;     /**< max nnz over Nédélec edge rows (== nord+1 if entity-local). */
-  PetscInt  maxFaceRowNnz;     /**< max nnz over Nédélec face rows. */
-  PetscInt  maxVolRowNnz;      /**< max nnz over Nédélec volume rows. */
-} GradientCheckResult;
-
-/**
- * @brief Unit check for buildExactDiscreteGradient on one cell (diagnostic).
- *
- * Verifies grad(phi_k) = sum_i G_ik N_i at interior reference points and reports,
- * via @p result, the projection-solve health (residual + conditioning) and the
- * entity-local sparsity structure PCBDDC requires. Used by the -fm_check_gradient
- * diagnostic to validate the discrete gradient in isolation before it is wired
- * into PCBDDC.
- *
- * @param[in]  fem     FE space descriptor.
- * @param[in]  cell    Cell with computed orientation.
- * @param[out] result  Filled diagnostic metrics (must be non-NULL).
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
- */
-PetscErrorCode verifyExactDiscreteGradientCell(const FEMSpace* fem, const Cell* cell,
-                                               GradientCheckResult* result);
+PetscErrorCode buildDiscreteGradientMatrix(const FEMSpace* fem, const Cell* cell,
+                                           PetscReal** gradientMatrix);
 
 /**
  * @brief Evaluates the Nédélec basis (and optionally curls) at a reference point.
@@ -283,8 +237,8 @@ PetscErrorCode evaluateNedelecBasis(const FEMSpace* fem, const Cell* cell,
  *   - computeCurls       : evaluates NiCurl at a reference-cell point. nord=1
  *     uses Dx/Dy/Dz; nord>=2 uses coeffs+point.
  *
- * The discrete gradient for PCBDDC is NOT in this table: it is the exact
- * order-p operator built directly by buildExactDiscreteGradient.
+ * The discrete gradient for PCBDDC is NOT in this table: it is built directly
+ * by buildDiscreteGradientMatrix.
  */
 typedef struct NedelecOps {
   /** Computes basis coefficients (and, at nord=1, derivative tables). */

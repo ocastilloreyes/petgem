@@ -60,7 +60,7 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  * Matrices:
  *   - K      : curl-curl stiffness, ∫_K (μ⁻¹ curl Ni)·curl Nj.
  *   - Ms     : mass × σ,            ∫_K (ε_r ⊙ Ni)·Nj.
- *   - G_BDDC : EXACT order-p discrete gradient (buildExactDiscreteGradient)
+ *   - G_BDDC : high-order discrete gradient (buildDiscreteGradientMatrix)
  *              consumed by PCBDDCSetDiscreteGradient. Each H(curl) DOF's
  *              gradient is resolved against the full P_nord H1 closure, so
  *              grad(phi_k) = sum_i G_ik N_i exactly (K·G = 0). Built against
@@ -73,7 +73,7 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  * @param[in]  constFactor  Fused-mode factor iωμ; ignored when Ms != NULL.
  * @param[out] KorA         Stiffness K (K/Ms mode) or fused operator A.
  * @param[out] Ms           Mass-σ matrix in K/Ms mode; pass NULL for fused mode.
- * @param[out] G_BDDC       Exact order-p discrete gradient; pass NULL to skip.
+ * @param[out] G_BDDC       High-order discrete gradient; pass NULL to skip.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
