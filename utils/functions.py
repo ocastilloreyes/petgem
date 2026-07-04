@@ -24,7 +24,7 @@ def parsePreprocessingArgs():
     parser.add_argument("-mode",              choices=["forward", "inverse"],
                         default="forward",
                         help="Selects the params-file template (default: forward)")
-    parser.add_argument("-nord",              type=int, required=True,
+    parser.add_argument("-order",              type=int, required=True, dest="order",
                         help="Polynomial order (1..6) - written into the params file only")
     parser.add_argument("-case_dir",          type=str, required=True,
                         help="Directory containing case data (also output directory)")
@@ -367,7 +367,7 @@ def _writeVTKFields(cells, coords, conductivity, materials_id, output_vtk):
 
 
 def writePetgemInputFile(plex, conductivity, materials_id,
-                         receivers_arr, sources8, nord,
+                         receivers_arr, sources8, order,
                          output_filename, cells=None, coords=None,
                          output_vtk=None):
     """Write the unified PETGEM input file.
@@ -376,7 +376,7 @@ def writePetgemInputFile(plex, conductivity, materials_id,
       /petgem_mesh/...     mesh topology, labels, coordinates, sections, fields
                             (HDF5_PETSC format, written via DMPlex *View routines)
       /receivers           Vec, length 3*N_recv, layout [x0 y0 z0 x1 y1 z1 ...]
-      /nord                Vec, length 1 - polynomial order used to size the case
+      /order                Vec, length 1 - polynomial order used to size the case
       /sources/...         transmitters, one entry per row of `sources8`
                             (per-entry frequency). Same group for forward and
                             inverse; inverse adds /observed and /inv_meta later
@@ -433,7 +433,7 @@ def writePetgemInputFile(plex, conductivity, materials_id,
 
     # Polynomial order (top-level scalar, 1-element Vec) - postprocess
     # reads it from here to annotate figures and pick the right responses.
-    _writeArrayAsVec(viewer, np.array([nord], dtype=float), "nord")
+    _writeArrayAsVec(viewer, np.array([order], dtype=float), "order")
 
     # Sources (under /sources group) - unified per-entry layout for both
     # forward and inverse. Each row of sources8 is one transmitter; the
@@ -457,17 +457,17 @@ def writePetgemInputFile(plex, conductivity, materials_id,
     v_model.destroy()
 
 
-def writeForwardModelingParamsFile(nord, output_dir, output_filename,
+def writeForwardModelingParamsFile(order, output_dir, output_filename,
                                    input_filename, params_filename):
     """Emit the fm.csem params file.
 
     `input_filename` is the bundle written by writePetgemInputFile; the
     same name is fed back to the kernel via -input_filename. The basis
     order is no longer written here - the C kernel reads it from the
-    bundle's /nord dataset (loadCsemInputs). `nord` is still accepted as
+    bundle's /order dataset (loadCsemInputs). `order` is still accepted as
     an argument because the caller uses it to compose other defaults,
     but it is not emitted into the params file."""
-    del nord  # bundle is authoritative; CLI -nord remains as override
+    del order  # bundle is authoritative; CLI -order remains as override
     content = textwrap.dedent(f"""\
         -input_filename {output_dir}/{input_filename}
         -dm_mat_type is
@@ -483,7 +483,7 @@ def writeForwardModelingParamsFile(nord, output_dir, output_filename,
         f.write(content)
 
 
-def writeInverseModelingParamsFile(nord, output_dir, output_filename,
+def writeInverseModelingParamsFile(order, output_dir, output_filename,
                                    input_filename, params_filename):
     """Emit the im.csem params file. The inverse kernel now reads EVERYTHING
     case-specific from `input_filename` - multi-frequency sources
@@ -492,8 +492,8 @@ def writeInverseModelingParamsFile(nord, output_dir, output_filename,
     (/inv_meta/fixed_materials).  The emitted params.txt only carries
     runtime/tuning knobs; -inv_error_level and -inv_fixed_materials are
     accepted as CLI overrides but no longer present in the default
-    template.  -nord is sourced from the bundle's /nord."""
-    del nord  # bundle is authoritative; CLI -nord remains as override
+    template.  -order is sourced from the bundle's /order."""
+    del order  # bundle is authoritative; CLI -order remains as override
     content = textwrap.dedent(f"""\
         -input_filename {output_dir}/{input_filename}
         -ksp_type preonly
@@ -570,7 +570,7 @@ def _extractTetraMaterial(mesh, tetra_idx, path):
     return mat.astype(int), codes
 
 
-def runPreprocessing(*, mode, nord, case_dir,
+def runPreprocessing(*, mode, order, case_dir,
                      mesh_filename, receiver_filename, source_filename=None,
                      sigma_x, sigma_y, sigma_z,
                      fixed_materials=(),
@@ -592,7 +592,7 @@ def runPreprocessing(*, mode, nord, case_dir,
     ----------
     mode : {'forward', 'inverse'}
         Selects which params-file template to emit.
-    nord : int
+    order : int
         Polynomial order, written into the params file.
     case_dir : str
         Directory containing the input data and where the bundle is written.
@@ -649,7 +649,7 @@ def runPreprocessing(*, mode, nord, case_dir,
     input_sources_filename   = (os.path.join(case_dir, source_filename)
                                 if source_filename is not None else None)
     output_filename          = os.path.join(case_dir, input_filename)
-    output_petgem_filename   = f"responses_p{nord}"
+    output_petgem_filename   = f"responses_p{order}"
     output_vtk_filename      = (os.path.join(case_dir, output_vtk)
                                 if output_vtk is not None else None)
     input_inv_sources_filename = (os.path.join(case_dir, inv_source_filename)
@@ -660,7 +660,7 @@ def runPreprocessing(*, mode, nord, case_dir,
     print("====================================================")
     print(f" PETGEM INPUT PREPROCESSING ({mode})")
     print("====================================================")
-    print(f"  Polynomial order (nord): {nord}")
+    print(f"  Polynomial order (order): {order}")
     print(f"  Case directory         : {case_dir}")
     print(f"  Mesh file              : {input_mesh_filename}")
     print(f"  Receivers file         : {input_receivers_filename}")
@@ -744,7 +744,7 @@ def runPreprocessing(*, mode, nord, case_dir,
     # 6. Write the unified bundle (mesh + model + receivers + /sources)
     print("\nWriting unified PETGEM input HDF5")
     writePetgemInputFile(plex, conductivity, materials_id,
-                         receivers_arr, sources8, nord,
+                         receivers_arr, sources8, order,
                          output_filename,
                          cells=cells, coords=coords,
                          output_vtk=output_vtk_filename)
@@ -798,10 +798,10 @@ def runPreprocessing(*, mode, nord, case_dir,
     # 7. Params file
     print("\nGenerating PETGEM parameter file")
     if mode == "forward":
-        writeForwardModelingParamsFile(nord, case_dir, output_petgem_filename,
+        writeForwardModelingParamsFile(order, case_dir, output_petgem_filename,
                                        input_filename, params_filename)
     else:
-        writeInverseModelingParamsFile(nord, case_dir, output_petgem_filename,
+        writeInverseModelingParamsFile(order, case_dir, output_petgem_filename,
                                        input_filename, params_filename)
     print(f"  Params file: {os.path.join(case_dir, params_filename)}")
 
@@ -816,7 +816,7 @@ def readBundle(filename):
     Returns a dict with keys::
 
       receivers : (N_recv, 3) ndarray of receiver positions (real-valued)
-      nord      : int polynomial order
+      order      : int polynomial order
       frequency : float - first transmitter frequency (Hz); for a single-
                   frequency forward case this is the operating frequency
       sources   : (N_src, 8) ndarray, columns =
@@ -829,8 +829,8 @@ def readBundle(filename):
     """
     receivers = np.real(np.array(readVectorH5(filename, 'receivers'))).reshape(-1, 3)
 
-    nord_arr = readVectorH5(filename, 'nord')
-    nord = int(round(float(np.real(np.array(nord_arr)).flatten()[0])))
+    order_arr = readVectorH5(filename, 'order')
+    order = int(round(float(np.real(np.array(order_arr)).flatten()[0])))
 
     # Unified /sources group: per-entry frequency.
     freq    = np.real(np.array(readVectorH5(filename, 'freq',         group='/sources'))).reshape(-1)
@@ -843,7 +843,7 @@ def readBundle(filename):
 
     return {
         'receivers': receivers,
-        'nord':      nord,
+        'order':      order,
         'frequency': float(freq[0]),
         'sources':   sources,
     }
@@ -874,7 +874,7 @@ def readResponses(filename, source=1):
                         (frequency, x_pos, y_pos, z_pos, current, length,
                          dip_angle, azimuth_angle)
           provenance  : dict of root-level attributes
-                        (petgem_version, input_filename, date, nord,
+                        (petgem_version, input_filename, date, order,
                          mpi_tasks, num_sources, frequency)
 
     Notes

@@ -61,7 +61,7 @@ typedef struct {
  * MPI-invariant. The routine opens no file; the caller supplies the
  * receiver coordinates.
  *
- * @param[in]  nord       Nédélec basis order (dispatched via fem->ops, 1..6).
+ * @param[in]  order       Nédélec basis order (dispatched via fem->ops, 1..6).
  * @param[in]  receivers  Serial Vec (PETSC_COMM_SELF) of 3·N_recv reals,
  *                        laid out [x0 y0 z0 x1 y1 z1 ...]; produced by
  *                        loadCsemInputs from /receivers in the input bundle.
@@ -73,7 +73,7 @@ typedef struct {
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
+PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
                                                   Vec         receivers,
                                                   const DM    dm,
                                                   const Grid *grid,

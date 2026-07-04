@@ -21,8 +21,6 @@ env:
   PETSC_ARCH: arch-linux-c-opt
   GMSH_DIR: /usr/local/gmsh/bin
   EXTRAE_HOME: /usr/local/extrae
-  CSEM_CASE_DIR: tests/cases/csem_model
-  EXTRAE_CASE_DIR: tests/cases/csem_model/extrae
   DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
   # Forces JavaScript actions still declaring Node 20 (e.g.
   # dorny/paths-filter@v3, which has no Node 24 release yet) to run on
@@ -64,8 +62,11 @@ jobs:
               - 'src/**'
             pytest:
               - 'tests/unit/**'
-              - 'tests/integration/**'
+              - 'tests/e2e/**'
+              - 'tests/csrc/**'
               - 'tests/conftest.py'
+              - 'tests/fmcsem_testlib.py'
+              - '.github/workflows/tests-fm-csem.yml'
               - 'pytest.ini'
             cases:
               - 'tests/cases/**'
@@ -108,7 +109,10 @@ jobs:
   compile-petgem:
     runs-on: ubuntu-latest
     needs: [docker-build, changes]
-    if: needs.changes.outputs.src == 'true'
+    if: |
+      needs.changes.outputs.src == 'true' ||
+      needs.changes.outputs.pytest == 'true' ||
+      needs.changes.outputs.cases == 'true'
     strategy:
       matrix:
         extrae: [0, 1]
@@ -142,149 +146,25 @@ jobs:
             ${{ matrix.extrae == 0 && 'build/fm.csem' || 'build/fm.csem.extrae' }}
             ${{ matrix.extrae == 0 && 'build/petgem' || 'build/petgem.extrae' }}
 
-  # ==========================
-  # Python unit tests (pytest)
-  # ==========================
-  # No compiled kernel needed - exercises the utils/ python layer
-  # (readBundle, readSigmaTable, readSourcesText, …).
-  test-unit:
-    runs-on: ubuntu-latest
-    needs: [docker-build, changes]
-    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.pytest == 'true'
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Pull Docker image
-        run: docker pull ${{ env.DOCKER_IMAGE }}
-
-      - name: Run pytest unit suite
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ${{ env.DOCKER_IMAGE }} \
-            bash -c "pytest tests/unit -ra"
-
-  # ============
-  # PETGEM tests
-  # ============
-  # `normal` runs two things in sequence: the pytest integration suite
-  # (primary - parametrized over nord, owns timeouts and reference
-  # comparison) and a minimal inline shell pipeline (smoke - proves the
-  # raw preprocess → mpirun → postprocess invocation still works without
-  # the pytest harness in the middle).
-  # `extrae` keeps the inline shell pipeline only; the pytest suite
-  # doesn't model Extrae yet.
-  test-petgem:
-    runs-on: ubuntu-latest
-    needs: [compile-petgem, changes]
+  # ==============================
+  # FM-CSEM test suite (reusable)
+  # ==============================
+  # Levels 1-3 (basis / DOF ordering / element matrices, ALL orders 1..6) +
+  # levels 4-5 (global assembly + basic physics on the unit cube, orders 1..3,
+  # up to 4 MPI tasks) + an Extrae build smoke. Delegated to the reusable
+  # tests-fm-csem.yml, which reuses this run's CI image and compiled binaries.
+  tests-fm-csem:
+    needs: [docker-build, compile-petgem, changes]
     if: |
       needs.changes.outputs.src == 'true' ||
       needs.changes.outputs.pytest == 'true' ||
       needs.changes.outputs.cases == 'true'
-    strategy:
-      matrix:
-        include:
-          - type: normal
-            nord: 1
-            binary: petgem-binaries-no-extrae
-            exe: fm.csem
-          - type: extrae
-            nord: 1
-            binary: petgem-binaries-extrae
-            exe: fm.csem.extrae
-      max-parallel: 2
-      fail-fast: true
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Download PETGEM binary
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ matrix.binary }}
-          path: build
-
-      - name: Make PETGEM binaries executable
-        run: chmod +x build/*
-
-      - name: Pull Docker image
-        run: docker pull ${{ env.DOCKER_IMAGE }}
-
-      - name: Pytest integration suite (fm.csem)
-        if: matrix.type == 'normal'
-        run: |
-          docker run --rm \
-            -e PETGEM_FM_CSEM=/workspace/build/${{ matrix.exe }} \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ${{ env.DOCKER_IMAGE }} \
-            bash -c "pytest tests/integration -m integration -ra -s"
-
-      - name: Inline shell smoke (forward)
-        if: matrix.type == 'normal'
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ${{ env.DOCKER_IMAGE }} \
-            bash -c "
-              export CASE_DIR=${{ env.CSEM_CASE_DIR }} && \
-              export NORD=${{ matrix.nord }} && \
-              gmsh \${CASE_DIR}/mesh_p\${NORD}.geo -3 \
-                   -o \${CASE_DIR}/mesh_p\${NORD}.msh && \
-              python3 utils/preprocess.py \
-                -mode forward \
-                -nord \${NORD} \
-                -case_dir \${CASE_DIR} \
-                -mesh_filename mesh_p\${NORD}.msh \
-                -source_filename sources.txt \
-                -receiver_filename receivers.txt \
-                -sigma_file sigmas.txt \
-                -input_filename input_p\${NORD}.h5 \
-                -params_filename params_p\${NORD}.txt && \
-              mpirun -n 4 build/${{ matrix.exe }} \
-                -options_file \${CASE_DIR}/params_p\${NORD}.txt && \
-              python3 \${CASE_DIR}/postprocess.py \
-                -case_dir \${CASE_DIR} \
-                -input_filename input_p\${NORD}.h5 \
-                -responses_filename responses_p\${NORD}_src1.h5
-            "
-
-      - name: Inline shell pipeline (extrae)
-        if: matrix.type == 'extrae'
-        run: |
-          docker run --rm \
-            -e EXTRAE_HOME \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ${{ env.DOCKER_IMAGE }} \
-            bash -c "
-              export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH && \
-              export CASE_DIR=${{ env.CSEM_CASE_DIR }} && \
-              export EXTRAE_DIR=${{ env.EXTRAE_CASE_DIR }} && \
-              export EXTRAE_CONFIG_FILE=\${EXTRAE_DIR}/extrae.xml && \
-              export TRACE_NAME=petgem.prv && \
-              export EXTRAE_LABELS=\${EXTRAE_DIR}/petgem_labels.txt && \
-              export NORD=${{ matrix.nord }} && \
-              gmsh \${CASE_DIR}/mesh_p\${NORD}.geo -3 \
-                   -o \${CASE_DIR}/mesh_p\${NORD}.msh && \
-              python3 utils/preprocess.py \
-                -mode forward \
-                -nord \${NORD} \
-                -case_dir \${CASE_DIR} \
-                -mesh_filename mesh_p\${NORD}.msh \
-                -source_filename sources.txt \
-                -receiver_filename receivers.txt \
-                -sigma_file sigmas.txt \
-                -input_filename input_p\${NORD}.h5 \
-                -params_filename params_p\${NORD}.txt && \
-              mpirun -n 4 build/${{ matrix.exe }} \
-                -options_file \${CASE_DIR}/params_p\${NORD}.txt && \
-              \${EXTRAE_HOME}/bin/mpi2prv \
-                -f \${CASE_DIR}/TRACE.mpits \
-                -o \${CASE_DIR}/\${TRACE_NAME}
-            "
+    uses: ./.github/workflows/tests-fm-csem.yml
+    with:
+      docker_image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+      binary_artifact: petgem-binaries-no-extrae
+      extrae_artifact: petgem-binaries-extrae
+    secrets: inherit
 
   # =====================
   # Compile documentation
@@ -333,7 +213,7 @@ jobs:
   # ========================
   publish-report:
     runs-on: ubuntu-latest
-    needs: [docker-build, compile-docs, compile-petgem, test-unit, test-petgem]
+    needs: [docker-build, compile-docs, compile-petgem, tests-fm-csem]
     steps:
       - uses: actions/checkout@v5
 
@@ -394,9 +274,9 @@ jobs:
             <ul>
               <li><b>compile-petgem (0)</b> → builds <i>fm.csem</i> + <i>petgem</i> (no Extrae)</li>
               <li><b>compile-petgem (1)</b> → builds <i>fm.csem.extrae</i> + <i>petgem.extrae</i> (with Extrae)</li>
-              <li><b>test-unit</b> → pytest tests/unit (no kernel required)</li>
-              <li><b>test-petgem normal</b> → pytest integration suite (fm.csem, nord ∈ {1,2,3}) + inline shell smoke</li>
-              <li><b>test-petgem extrae</b> → inline shell pipeline with Extrae profiling</li>
+              <li><b>tests-fm-csem / fe-core-tests</b> → levels 1-3 (basis, DOFs, elements), all orders 1..6</li>
+              <li><b>tests-fm-csem / e2e-tests</b> → levels 4-5 (assembly + physics), unit cube, orders 1..3, 4 MPI tasks</li>
+              <li><b>tests-fm-csem / extrae-smoke</b> → Extrae-instrumented fm.csem trace smoke</li>
               <li><b>im.csem</b> → not built/tested in CI yet (follow-up)</li>
             </ul>
           </div>

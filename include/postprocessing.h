@@ -11,7 +11,7 @@
 #define POSTPROCESSING_H
 
 #include "grid.h"
-#include "inputs.h"
+#include "io.h"
 #include "transmitter.h"
 #include <petsc.h>
 #include <petscdmplex.h>
@@ -24,7 +24,7 @@
  * SINGLE HDF5 response file containing every source. The file layout is:
  *
  *   /                              root attrs: petgem_version, input_filename,
- *                                              date, nord, mpi_tasks,
+ *                                              date, order, mpi_tasks,
  *                                              num_sources, frequency
  *   /sources/src{k}/               attrs: frequency, x_pos, y_pos, z_pos,
  *                                         current, length, dip_angle,
@@ -38,7 +38,7 @@
  * (PETSC_COMM_SELF, length 3·N_recv) returned by loadCsemInputs - passed
  * through so postprocessing does not re-open the input HDF5.
  *
- * @param[in] params     Forward-modeling parameters (nord, output paths).
+ * @param[in] params     Forward-modeling parameters (order, output paths).
  * @param[in] sources    Transmitter set (one solution column per source).
  * @param[in] dm         DMPlex mesh and H(curl) discretization.
  * @param[in] grid       Finite-element grid descriptor.

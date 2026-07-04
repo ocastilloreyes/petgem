@@ -140,12 +140,12 @@ endif
 # -----------------------------------------------------------------------------
 SHARED_SRCS := src/common.c \
                src/io.c \
-               src/transmitter.c \
                src/grid.c \
                src/assembly.c \
                src/constants.c \
-               src/hvfem.c \
-               src/hvfem_hierarchical.c \
+               src/fem.c \
+               src/fe_nedelec.c \
+               src/fe_nodal.c \
                src/solver.c \
                src/receiver_interp.c \
                src/postprocessing.c

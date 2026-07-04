@@ -11,6 +11,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <petsc.h>
+
 /**
  * @brief Prints the formatted PETGEM header banner.
  *
@@ -74,5 +76,18 @@ PetscErrorCode parseModeArg(const char *s, PetscInt *mode);
  *         or a PETSc error code otherwise.
  */
 PetscErrorCode printUsage(const char *progname);
+
+/**
+ * @brief Formats an integer with space-grouped thousands for readable logs.
+ *
+ * Renders `value` with a space every three digits (e.g. 3738963 -> "3 738 963")
+ * for use as a `%s` argument in log output. Presentation only; values below
+ * 1000 are rendered unchanged. Uses rotating static buffers (not thread-safe).
+ *
+ * @param[in] value  Integer to format.
+ *
+ * @return Pointer to a NUL-terminated grouped-number string (do not free).
+ */
+const char *formatGroupedInt(PetscInt value);
 
 #endif

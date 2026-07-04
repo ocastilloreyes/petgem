@@ -38,8 +38,7 @@
  * @param[in] argc  Argument count.
  * @param[in] argv  Argument vector.
  *
- * @return int the kernel's exit status, 0 for --version/--help, or 2 on
- *         invalid CLI usage.
+ * @return int the kernel's exit status, 0 for --version/--help, or 2 on invalid CLI usage.
  */
 int main(int argc, char **argv) {
   /* --version short-circuit (no PETSc init) */
@@ -48,14 +47,12 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  if (argc > 1 && (strcmp(argv[1], "--help") == 0 ||
-                   strcmp(argv[1], "-h")     == 0)) {
+  if (argc > 1 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h")     == 0)) {
     printUsage(argv[0]);
     return 0;
   }
 
-  /* (a) positional subcommand: argv[1] is "modeling"/"inverse"/aliases.
-   *     We splice it out of argv before forwarding so that the kernel
+  /* (a) positional subcommand: argv[1] is "modeling"/"inverse"/aliases. We splice it out of argv before forwarding so that the kernel
    *     doesn't see an unrecognized first token.                       */
   PetscInt mode = -1;
   if (argc > 1 && argv[1][0] != '-') {
@@ -73,8 +70,7 @@ int main(int argc, char **argv) {
     argc -= 1;
   }
 
-  /* (b) PETSc -mode option fallback (works with options_file too).
-   *     Done WITHOUT a full PetscInitialize: scan argv directly so we
+  /* (b) PETSc -mode option fallback (works with options_file too). Done WITHOUT a full PetscInitialize: scan argv directly so we
    *     can dispatch before either kernel takes over the lifecycle.   */
   if (mode < 0) {
     for (PetscInt i = 1; i < argc - 1; i++) {
@@ -84,10 +80,8 @@ int main(int argc, char **argv) {
           fprintf(stderr, "PETGEM: -mode value '%s' is invalid (expected 'modeling' or 'inverse')\n", argv[i + 1]);
           return 2;
         }
-        /* Strip "-mode <value>" from argv so the kernel doesn't see it.
-         * Both kernels' options-file readers tolerate unknown options
-         * (PETSc warns rather than errors), but stripping keeps the
-         * downstream log clean.                                       */
+        /* Strip "-mode <value>" from argv so the kernel doesn't see it. Both kernels' options-file readers tolerate unknown options
+         * (PETSc warns rather than errors), but stripping keeps the downstream log clean.                                       */
         for (PetscInt j = i; j < argc - 2; j++) {
           argv[j] = argv[j + 2];
         }

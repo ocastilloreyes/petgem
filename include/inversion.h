@@ -15,8 +15,8 @@
 
 #include "constants.h"
 #include "grid.h"
-#include "hvfem.h"        /* Quadrature3D used by InversionContext workspace */
-#include "inputs.h"       /* fmParams: shared base parameters embedded below */
+#include "fem.h"        /* Quadrature3D used by InversionContext workspace */
+#include "io.h"           /* fmParams: shared base parameters embedded below */
 #include "receiver_interp.h"
 #include "transmitter.h"
 #include <petsc.h>
@@ -63,7 +63,7 @@ typedef struct {
   /** Shared base parameters, parsed by the SAME readfmParams() the forward
    *  kernel uses (input/output paths, basis order, MPI task count, quiet
    *  flag). Unifies the fm.csem / im.csem interface: the inverse-only
-   *  controls below extend this common base. The basis order is `fm.nord`
+   *  controls below extend this common base. The basis order is `fm.order`
    *  and the unified-bundle path (consumed by setupInversionSources,
    *  loadInversionMetaFromBundle, loadObservedData) is `fm.inputFile` -
    *  formerly the separate `bundleFile` mirror. */
@@ -195,7 +195,7 @@ typedef struct {
   PetscReal                     **KeRows;       /**< Row-of-pointers view of KeBuf. */
   /** @} */
   /** 3D quadrature for elemental mass-matrix integration. Depends only on
-   *  iparams->fm.nord (constant across the run). */
+   *  iparams->fm.order (constant across the run). */
   Quadrature3D                    quad3d;       /**< 3D quadrature rule. */
   PetscBool                       quad3dInited; /**< PETSC_TRUE once quad3d is filled. */
 

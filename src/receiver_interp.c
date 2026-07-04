@@ -20,11 +20,12 @@
  * DOFs are routed correctly.
  */
 
+#include "common.h"
 #include "receiver_interp.h"
 
 #include "constants.h"
+#include "fem.h"
 #include "grid.h"
-#include "hvfem.h"
 
 #include <petsc.h>
 #include <petscdmplex.h>
@@ -59,7 +60,7 @@ static inline PetscInt decodeGlobalDOF(PetscInt rawIdx)
  * MPI-invariance argument, and the divide-by-(iωμ) factor for H - is
  * documented in include/receiver_interp.h.
  *
- * @param[in]  nord       Nédélec basis order (dispatched via fem->ops, 1..6).
+ * @param[in]  order       Nédélec basis order (dispatched via fem->ops, 1..6).
  * @param[in]  receivers  Serial Vec of 3·N_recv reals (caller-owned).
  * @param[in]  dm         H(curl) DM the solution lives on.
  * @param[in]  grid       Grid struct produced by setupCsemGrid.
@@ -68,7 +69,7 @@ static inline PetscInt decodeGlobalDOF(PetscInt rawIdx)
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
+PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
                                                   Vec         receivers,
                                                   const DM    dm,
                                                   const Grid *grid,
@@ -78,13 +79,10 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
 
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);
 
-  /* Basis evaluation is dispatched through evaluateNedelecBasis (see
-   * include/hvfem.h) which routes to the per-order ops table - works for
-   * any nord that registers a NedelecOps entry. The unified hierarchical
-   * basis covers nord = 1..6. */
-  PetscCheck(nord >= 1 && nord <= 6, comm, PETSC_ERR_SUP,
-             "buildReceiverInterpolationMatrices: nord must be in 1..6 "
-             "(got %" PetscInt_FMT ")", nord);
+  /* Basis evaluation goes through evaluateNedelecBasis (see include/fem.h),
+   * which builds on the PETGEM-style reference Nedelec element covering
+   * order = 1..6. */
+  PetscCheck(order >= 1 && order <= 6, comm, PETSC_ERR_SUP, "buildReceiverInterpolationMatrices: order must be in 1..6  (got %" PetscInt_FMT ")", order);
 
   /* `receivers` is owned by the caller (produced by loadCsemInputs from
    * the /receivers Vec inside the unified input HDF5). This routine only
@@ -129,27 +127,15 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   PetscCall(MatDuplicate(Q->QEx, MAT_DO_NOT_COPY_VALUES, &Q->QHz));
 
   /* Allocate FEM basis arrays */
-  PetscReal **Ni, **NiCurl, **coeffs, **Dx_Ni, **Dy_Ni, **Dz_Ni, *XiEtaZeta;
+  PetscReal **Ni, **NiCurl, *XiEtaZeta;
 
   PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Ni));
   PetscCall(PetscCalloc1(NUM_DIMENSIONS, &NiCurl));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Dx_Ni));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Dy_Ni));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Dz_Ni));
   PetscCall(PetscCalloc1(NUM_DIMENSIONS, &XiEtaZeta));
-  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
-    PetscCall(PetscCalloc1(grid->numDofInCell, &Ni[d]));
-    PetscCall(PetscCalloc1(grid->numDofInCell, &NiCurl[d]));
-    PetscCall(PetscCalloc1(grid->numDofInCell, &Dx_Ni[d]));
-    PetscCall(PetscCalloc1(grid->numDofInCell, &Dy_Ni[d]));
-    PetscCall(PetscCalloc1(grid->numDofInCell, &Dz_Ni[d]));
+  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+    PetscCall(PetscCalloc1(grid->numDofInCell, &Ni[i]));
+    PetscCall(PetscCalloc1(grid->numDofInCell, &NiCurl[i]));
   }
-  PetscCall(PetscCalloc1(grid->numDofInCell, &coeffs));
-  for (PetscInt d = 0; d < grid->numDofInCell; d++)
-    PetscCall(PetscCalloc1(grid->numDofInCell, &coeffs[d]));
-
-  PetscInt *dofSigns;
-  PetscCall(PetscCalloc1(grid->numDofInCell, &dofSigns));
 
   PetscSection    section;
   const PetscScalar *coords;
@@ -158,9 +144,9 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
 
   /* Fill Q matrices row by row (one row per receiver) */
   PetscInt numSkipped = 0;
-  for (PetscInt j = 0; j < numFound; j++) {
-    PetscInt ridx  = recvFound ? recvFound[j] : j;
-    PetscInt cellID = recvInCell[j].index;
+  for (PetscInt i = 0; i < numFound; i++) {
+    PetscInt ridx  = recvFound ? recvFound[i] : i;
+    PetscInt cellID = recvInCell[i].index;
     if (cellID < 0) continue;
 
     PetscReal recvCoords[NUM_DIMENSIONS];
@@ -180,35 +166,51 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
       PetscInt        closureSize = 0;
       PetscInt       *closure     = NULL;
       PetscCall(DMPlexGetTransitiveClosure(dm, cellID, PETSC_TRUE, &closureSize, &closure));
-      for (PetscInt ci = 0; ci < closureSize * 2; ci += 2) {
-        PetscInt point = closure[ci];
+      for (PetscInt j = 0; j < closureSize * 2; j += 2) {
+        PetscInt point = closure[j];
         PetscInt pdepth;
         PetscCall(DMPlexGetPointDepth(dm, point, &pdepth));
-        if (pdepth != 0) continue;  /* only vertices */
+        
+        if (pdepth != 0) {
+          continue;  /* only vertices */
+        }
+        
         PetscInt        supportSize;
         const PetscInt *support;
         PetscCall(DMPlexGetSupportSize(dm, point, &supportSize));
         PetscCall(DMPlexGetSupport(dm, point, &support));
-        for (PetscInt s = 0; s < supportSize; s++) {
-          PetscInt neighbor = support[s];
-          if (neighbor == cellID) continue;
-          if (neighbor < grid->cellStart || neighbor >= grid->cellEnd) continue;
+        
+        for (PetscInt k = 0; k < supportSize; k++) {
+          PetscInt neighbor = support[k];
+          if (neighbor == cellID) {
+            continue;
+          }
+          if (neighbor < grid->cellStart || neighbor >= grid->cellEnd) {
+            continue;
+          }
+          
           Cell ncell;
           PetscCall(extractCellCoordinates(dm, neighbor, &ncell));
           PetscCall(computeCellJacobian(&ncell));
+          
           if (PetscAbsReal(ncell.detJacobian) > PETSC_SMALL) {
             altCell = neighbor;
             break;
           }
         }
-        if (altCell >= 0) break;
+        if (altCell >= 0) {
+          break;
+        }
       }
+      
       PetscCall(DMPlexRestoreTransitiveClosure(dm, cellID, PETSC_TRUE, &closureSize, &closure));
+      
       if (altCell >= 0) {
         PetscCall(PetscPrintf(PETSC_COMM_SELF,
           "   WARNING: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
           " (|detJ| = %.2e); relocated to cell %" PetscInt_FMT ".\n",
           ridx, cellID, (double)PetscAbsReal(cell.detJacobian), altCell));
+        
         cellID = altCell;
         PetscCall(extractCellCoordinates(dm, cellID, &cell));
         PetscCall(computeCellJacobian(&cell));
@@ -219,24 +221,18 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
           " found, skipping.\n",
           ridx, cellID, (double)PetscAbsReal(cell.detJacobian),
           (double)recvCoords[0], (double)recvCoords[1], (double)recvCoords[2]));
+        
         numSkipped++;
         continue;
       }
     }
 
-    PetscCall(extractCellClousure(dm, cellID, &cell));
-    PetscCall(computeCellOrientation(&cell));
-    PetscCall(tetrahedronXYZToReference(cell.coordinates, recvCoords,
-                                        XiEtaZeta));
+    PetscCall(tetrahedronXYZToReference(cell.coordinates, recvCoords, XiEtaZeta));
 
-    /* Nord-agnostic basis + curl evaluation through the per-order ops
-     * table (cf. include/hvfem.h). Same routine assembly.c uses, so any
-     * basis order with a registered NedelecOps works here uniformly. */
-    PetscCall(evaluateNedelecBasis(&grid->fem, &cell, XiEtaZeta, coeffs, Dx_Ni, Dy_Ni, Dz_Ni, Ni, NiCurl));
-
-    /* Per-DOF sign convention - same routine the forward assembly uses,
-     * so Q aligns with the physical (signed) field evaluation. */
-    PetscCall(buildDofSigns(&cell, &grid->fem, dofSigns));
+    /* Nord-agnostic basis + curl evaluation (1..6). The returned values and
+     * curls are already physical and geometrically oriented, matching the
+     * forward assembly, so no per-DOF sign correction is applied. */
+    PetscCall(evaluateNedelecBasis(&grid->fem, &cell, XiEtaZeta, Ni, NiCurl));
 
     /* Get BOTH local and global DOF indices for this cell's closure.
      *
@@ -261,22 +257,21 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
     PetscInt  numGlobal, *globalIdxRaw;
     PetscCall(DMPlexGetClosureIndices(dm, section, globalSection, cellID, PETSC_TRUE, &numGlobal, &globalIdxRaw, NULL, NULL));
 
-    for (PetscInt k = 0; k < grid->numDofInCell; k++) {
-      if (localIdx[k] < 0) {
+    for (PetscInt j = 0; j < grid->numDofInCell; j++) {
+      if (localIdx[j] < 0) {
         continue;                       /* BC-constrained: skip */
       }
-      PetscInt gidx = decodeGlobalDOF(globalIdxRaw[k]);
+      PetscInt gidx = decodeGlobalDOF(globalIdxRaw[j]);
       if (gidx >= Q->numDof) {
         continue;                     /* safety */
       }
 
-      PetscReal ori = (PetscReal)dofSigns[k];
-      PetscCall(MatSetValue(Q->QEx, ridx, gidx, Ni[0][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QEy, ridx, gidx, Ni[1][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QEz, ridx, gidx, Ni[2][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHx, ridx, gidx, NiCurl[0][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHy, ridx, gidx, NiCurl[1][k] * ori, ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHz, ridx, gidx, NiCurl[2][k] * ori, ADD_VALUES));
+      PetscCall(MatSetValue(Q->QEx, ridx, gidx, Ni[0][j], ADD_VALUES));
+      PetscCall(MatSetValue(Q->QEy, ridx, gidx, Ni[1][j], ADD_VALUES));
+      PetscCall(MatSetValue(Q->QEz, ridx, gidx, Ni[2][j], ADD_VALUES));
+      PetscCall(MatSetValue(Q->QHx, ridx, gidx, NiCurl[0][j], ADD_VALUES));
+      PetscCall(MatSetValue(Q->QHy, ridx, gidx, NiCurl[1][j], ADD_VALUES));
+      PetscCall(MatSetValue(Q->QHz, ridx, gidx, NiCurl[2][j], ADD_VALUES));
     }
 
     PetscCall(DMPlexRestoreClosureIndices(dm, section, globalSection, cellID, PETSC_TRUE, &numGlobal, &globalIdxRaw, NULL, NULL));
@@ -286,9 +281,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   PetscCall(VecRestoreArrayRead(receivers, &coords));
 
   if (numSkipped > 0) {
-    PetscCall(PetscPrintf(comm,
-      "\n   WARNING: %" PetscInt_FMT " receiver(s) skipped due to degenerate cells.\n",
-      numSkipped));
+    PetscCall(PetscPrintf(comm, "\n   WARNING: %s receiver(s) skipped due to degenerate cells.\n", formatGroupedInt(numSkipped)));
   }
 
   /* Assemble all Q matrices */
@@ -306,23 +299,13 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    nord,
   PetscCall(MatAssemblyEnd(Q->QHz, MAT_FINAL_ASSEMBLY));
 
   /* Free FEM basis memory */
-  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
-    PetscCall(PetscFree(Ni[d]));
-    PetscCall(PetscFree(NiCurl[d]));
-    PetscCall(PetscFree(Dx_Ni[d]));
-    PetscCall(PetscFree(Dy_Ni[d]));
-    PetscCall(PetscFree(Dz_Ni[d]));
+  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+    PetscCall(PetscFree(Ni[i]));
+    PetscCall(PetscFree(NiCurl[i]));
   }
-  for (PetscInt d = 0; d < grid->numDofInCell; d++)
-    PetscCall(PetscFree(coeffs[d]));
   PetscCall(PetscFree(Ni));
   PetscCall(PetscFree(NiCurl));
-  PetscCall(PetscFree(Dx_Ni));
-  PetscCall(PetscFree(Dy_Ni));
-  PetscCall(PetscFree(Dz_Ni));
-  PetscCall(PetscFree(coeffs));
   PetscCall(PetscFree(XiEtaZeta));
-  PetscCall(PetscFree(dofSigns));
   PetscCall(PetscSFDestroy(&receiverSF));
   /* Note: `receivers` Vec is owned by the caller and not destroyed here. */
 

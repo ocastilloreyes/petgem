@@ -1,5 +1,0 @@
-# Sources: Frequency in Hz x_position y_position z_position current length dip azimuth
-50      0.0    -4000.0    0.0  1.  1.  0.  0.
-300     0.0    -4000.0    0.0  1.  1.  0.  0.
-800     0.0    -4000.0    0.0  1.  1.  0.  0.
-1500    0.0    -4000.0    0.0  1.  1.  0.  0.

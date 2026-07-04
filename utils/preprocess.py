@@ -19,15 +19,15 @@ Mode-specific arguments (validated by runPreprocessing):
                      optionally records the noise level.
 
 Shared arguments (both modes):
-    -nord, -case_dir, -mesh_filename, -receiver_filename, -sigma_file
+    -order, -case_dir, -mesh_filename, -receiver_filename, -sigma_file
     -input_filename, -params_filename, -output_vtk        (all optional with defaults)
 
 Usage examples:
     # Forward modeling
     python3 utils/preprocess.py \\
         -mode forward \\
-        -nord 1 \\
-        -case_dir tests/cases/csem_model \\
+        -order 1 \\
+        -case_dir tests/cases/<case> \\
         -mesh_filename mesh_p1.msh \\
         -receiver_filename receivers.txt \\
         -source_filename sources.txt \\
@@ -37,8 +37,8 @@ Usage examples:
     # Inverse modeling
     python3 utils/preprocess.py \\
         -mode inverse \\
-        -nord 1 \\
-        -case_dir tests/cases/inverse \\
+        -order 1 \\
+        -case_dir tests/cases/<case> \\
         -mesh_filename mesh_p1.msh \\
         -receiver_filename receivers.txt \\
         -inv_source_filename sources.txt \\
@@ -68,7 +68,7 @@ def main():
     )
     petgem.runPreprocessing(
         mode=args.mode,
-        nord=args.nord,
+        order=args.order,
         case_dir=args.case_dir,
         mesh_filename=args.mesh_filename,
         receiver_filename=args.receiver_filename,

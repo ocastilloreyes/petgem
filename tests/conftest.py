@@ -1,70 +1,146 @@
-"""Shared pytest fixtures for the PETGEM test suite.
+"""Shared pytest fixtures for the FM-CSEM test suite (unit cube, orders 1..6).
 
-Adds the repo root to sys.path so `import petgem` resolves the `utils`
-package without requiring an install. Exposes helper fixtures pointing at
-the repository layout (REPO_ROOT, CASES_DIR, FM_CSEM_BIN).
+Two families share this infrastructure:
+
+  * levels 1-3 (unit): small C harnesses under tests/csrc/ are compiled against
+    the UNCHANGED production sources and run per order. They verify the real
+    reference-element bases, DOF enumeration and elemental matrices directly.
+  * levels 4-5 (e2e): the built `fm.csem` binary is run once per order on the
+    single tests/cases/unit_cube/input.h5 bundle (order forced with `-order N`,
+    which also bypasses the bundle's order dataset).
+
+Fixtures needing a toolchain/binary that may be absent ``pytest.skip`` so the
+suite degrades gracefully (Python-only checkout, or a CI stage without the
+kernel built).
 """
-import os
-import shutil
 import sys
 from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-
-# Make `import petgem` work from anywhere the tests run.  The repo layout
-# has the package source at utils/, which pyproject.toml maps to the
-# distribution name `petgem` at install time.  For local pytest runs we
-# expose the same alias via sys.modules so tests work both with and
-# without `pip install -e .`.
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-try:
-    import petgem  # noqa: F401 - works when the package is installed
-except ImportError:
-    import utils as _petgem_pkg
-    sys.modules["petgem"] = _petgem_pkg
+# Make the plain helper module importable from every test file.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fmcsem_testlib as lib  # noqa: E402
 
 
 @pytest.fixture(scope="session")
 def repo_root() -> Path:
-    """Absolute path to the repository root."""
-    return REPO_ROOT
+    return lib.REPO_ROOT
 
 
 @pytest.fixture(scope="session")
-def cases_dir(repo_root) -> Path:
-    """Absolute path to tests/cases/."""
-    return repo_root / "tests" / "cases"
+def unit_cube() -> Path:
+    """The single dataset the suite is allowed to use."""
+    if not (lib.UNIT_CUBE / "input.h5").exists():
+        pytest.skip("unit_cube/input.h5 dataset not present")
+    return lib.UNIT_CUBE
 
 
+# --------------------------------------------------------------------------- #
+# C harnesses (levels 1-3)
+# --------------------------------------------------------------------------- #
 @pytest.fixture(scope="session")
-def fm_csem_binary(repo_root) -> Path:
-    """Absolute path to the fm.csem binary, if built.
+def harnesses(tmp_path_factory):
+    """Compile every C harness once; return {name: exe_path}.
 
-    Resolution order:
-      1. $PETGEM_FM_CSEM environment variable.
-      2. <repo_root>/fm.csem
-      3. <repo_root>/build/fm.csem
-      4. shutil.which("fm.csem") - PATH lookup.
-
-    Returns the first hit. Tests that need this fixture should `pytest.skip`
-    when the file does not exist (so the suite passes on CI machines that
-    haven't built the C kernels).
+    Skips the whole level 1-3 family when PETSc / mpicc is unavailable.
     """
+    if lib.petsc_paths() is None:
+        pytest.skip("PETSc toolchain (PETSC_DIR + mpicc) not available")
+    outdir = tmp_path_factory.mktemp("harness")
+    built = {}
+    for name in lib.HARNESS_SOURCES:
+        exe, err = lib.build_harness(name, outdir)
+        if exe is None:
+            pytest.fail(f"failed to build harness {name}:\n{err}")
+        built[name] = exe
+    return built
+
+
+# --------------------------------------------------------------------------- #
+# fm.csem binary + per-order runner (levels 4-5)
+# --------------------------------------------------------------------------- #
+@pytest.fixture(scope="session")
+def fm_csem_binary() -> Path:
+    """Resolve the fm.csem binary; skip e2e tests when it is not built."""
+    import os
+    import shutil
     env = os.environ.get("PETGEM_FM_CSEM")
-    if env:
-        return Path(env)
-
-    for candidate in (repo_root / "fm.csem", repo_root / "build" / "fm.csem"):
-        if candidate.exists():
-            return candidate
-
+    candidates = ([Path(env)] if env else []) + [
+        lib.REPO_ROOT / "build" / "fm.csem", lib.REPO_ROOT / "fm.csem"]
     which = shutil.which("fm.csem")
     if which:
-        return Path(which)
+        candidates.append(Path(which))
+    for c in candidates:
+        if c.exists():
+            return c
+    pytest.skip("fm.csem binary not found (set PETGEM_FM_CSEM or build build/fm.csem)")
 
-    # Return the conventional location so test failure messages are helpful;
-    # individual tests must guard with `pytest.skip` when this doesn't exist.
-    return repo_root / "fm.csem"
+
+class FmRun:
+    """Captured result of one fm.csem run on the unit cube."""
+    def __init__(self, order, returncode, stdout, responses):
+        self.order = order
+        self.returncode = returncode
+        self.stdout = stdout
+        self.responses = responses   # Path to responses_p{order}.h5 (may be absent on failure)
+
+
+# Solver profiles selected purely through PETSc runtime options (no code change).
+#   "solve"    - exact serial LU: correct fields, fast at low order (level 5).
+#   "assemble" - trivial preonly/jacobi: exercises assembly + the per-cell
+#                checkGradientKernel only; the "solution" is ignored (level 4).
+#   "bddc"     - the production PCBDDC + discrete-gradient path (params_p1.txt).
+SOLVER_OPTS = {
+    "solve":    ["-dm_mat_type", "aij", "-ksp_type", "preonly", "-pc_type", "lu",
+                 "-ksp_error_if_not_converged"],
+    "assemble": ["-dm_mat_type", "aij", "-ksp_type", "preonly", "-pc_type", "jacobi"],
+}
+
+
+@pytest.fixture(scope="session")
+def fm_run(fm_csem_binary, unit_cube, tmp_path_factory):
+    """Run fm.csem once per (order, solver) on the unit cube; cache + return getter.
+
+    Order is forced with `-order N` (also bypassing the bundle's order dataset);
+    the solver is chosen via runtime PETSc options (see SOLVER_OPTS). Output goes
+    to a temp dir so the repo stays clean. The "bddc" solver reuses the shipped
+    params_p1.txt (MATIS + PCBDDC). Serial by default; set FM_CSEM_NP for mpirun.
+    """
+    import os
+    import subprocess
+    outdir = tmp_path_factory.mktemp("fm_runs")
+    npr = os.environ.get("FM_CSEM_NP")
+    cache = {}
+
+    def _run(order, solver="solve"):
+        key = (order, solver)
+        if key in cache:
+            return cache[key]
+        stem = f"responses_p{order}_{solver}"
+        launch = (["mpirun", "-n", npr] if npr else []) + [str(fm_csem_binary)]
+        base = ["-input_filename", str(unit_cube / "input.h5"),
+                "-order", str(order),
+                "-output_dir", str(outdir), "-output_filename", stem]
+        if solver == "bddc":
+            cmd = (launch + ["-options_file", str(unit_cube / "params_p1.txt")] + base
+                   + ["-ksp_error_if_not_converged"])
+        else:
+            cmd = launch + base + SOLVER_OPTS[solver]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900,
+                              cwd=str(lib.REPO_ROOT))
+        res = FmRun(order, proc.returncode, proc.stdout + proc.stderr, outdir / f"{stem}.h5")
+        cache[key] = res
+        return res
+
+    return _run
+
+
+# --------------------------------------------------------------------------- #
+# HDF5
+# --------------------------------------------------------------------------- #
+@pytest.fixture(scope="session")
+def h5py_mod():
+    h5py = pytest.importorskip("h5py")
+    pytest.importorskip("numpy")
+    return h5py

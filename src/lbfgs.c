@@ -30,6 +30,7 @@
 
 #include <petsc.h>
 
+#include "common.h"
 #include "inversion.h"
 
 /**
@@ -131,7 +132,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
    * when the data misfit stops improving (relative drop below rmsRelTol for
    * `rmsStallWindow` consecutive iterations). This is model-adaptive - it
    * derives the stopping point from the RMS history itself rather than a
-   * fixed threshold - so a case that plateaus above rmsTol (e.g. nord>=2
+   * fixed threshold - so a case that plateaus above rmsTol (e.g. order>=2
    * settling near RMS~1.15) stops once it has converged instead of grinding
    * to maxIter and overfitting. Disable with -inv_rms_rtol 0. */
   PetscReal rmsRelTol     = 1.0e-3;   /* <0.1% improvement/iter => plateau */
@@ -329,8 +330,8 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
   *numIters = maxIter;
 
 cleanup:
-  PetscCall(PetscPrintf(comm, "\n   %-24s = %s (%" PetscInt_FMT " iterations)\n",
-                        "L-BFGS exit reason", *reasonStr, *numIters));
+  PetscCall(PetscPrintf(comm, "\n   %-24s = %s (%s iterations)\n",
+                        "L-BFGS exit reason", *reasonStr, formatGroupedInt(*numIters)));
   PetscCall(VecDestroyVecs(M, &S));
   PetscCall(VecDestroyVecs(M, &Y));
   PetscCall(PetscFree(rho));

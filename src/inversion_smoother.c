@@ -31,7 +31,7 @@
 
 #include "constants.h"
 #include "grid.h"
-#include "hvfem.h"
+#include "fem.h"
 #include "inversion.h"
 #include "inversion_internal.h"
 

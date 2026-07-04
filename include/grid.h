@@ -12,40 +12,34 @@
 #define GRID_H
 
 #include "constants.h"
-#include "inputs.h"
+#include "io.h"
 #include <petsc.h>
-
-/* Forward declaration of the per-order Nédélec dispatch table; the full
- * definition lives in hvfem.h. Callers that need to invoke ops methods
- * include hvfem.h; callers that only pass FEMSpace around do not. */
-struct NedelecOps;
 
 /**
  * @brief Finite-element space descriptor.
  *
- * Bundles the fields needed by the hvfem routines (element matrices,
- * gradient matrix, DOF signs) so those signatures do not need to carry
- * nord + DOF counts separately.
+ * Bundles the fields needed by the fem routines (element matrices,
+ * gradient matrix) so those signatures do not need to carry
+ * order + DOF counts separately.
  *
  * DOF-class layout inside the per-cell H(curl) vector (length numDofInCell)
  * matches PETSc DMPlex's closure-traversal order (cell -> faces -> edges
- * -> vertices), which is also what shape3DETet's permutation table is
- * built against:
- *   nord=1: edges only         [edges 0..5]                       (6)
- *   nord=2: faces-then-edges   [faces 0..7, edges 8..19]           (20)
- *   nord=3: volume-faces-edges [volume 0..2, faces 3..26,
+ * -> vertices), which is also the order the reference Nedelec basis
+ * (femOrient in src/fem.c) emits its per-cell DOFs in:
+ *   order=1: edges only         [edges 0..5]                       (6)
+ *   order=2: faces-then-edges   [faces 0..7, edges 8..19]           (20)
+ *   order=3: volume-faces-edges [volume 0..2, faces 3..26,
  *                               edges 27..44]                     (45)
- *   nord=k (>=3) generally: [volume 0..nVol-1, faces nVol..nVol+nFace-1,
+ *   order=k (>=3) generally: [volume 0..nVol-1, faces nVol..nVol+nFace-1,
  *                            edges nVol+nFace..numDofInCell-1].
  * The *Offset fields mark the first index of each class (== numDofInCell
  * when the class is empty), so loops can iterate `[offset, offset+count)`
  * without a per-order switch.
  */
 typedef struct {
-  PetscInt nord;                  /**< Basis order (1, 2, 3, ...). */
-  PetscInt numDofInCell;          /**< Total H(curl) DOFs per cell. */
-  PetscInt numH1DofInCell_Pnord;  /**< P_nord H1 DOFs per cell; column count of
-                                   *   the G_BDDC discrete gradient. */
+  PetscInt order;               /**< Basis order (1, 2, 3, ...). */
+  PetscInt numDofInCell;       /**< Total H(curl) DOFs per cell. */
+  PetscInt numH1DofInCell;     /**< P_order H1 DOFs per cell; column count of the G discrete gradient. */
 
   /* Per-entity DOF counts */
   PetscInt numDofPerEdge;    /**< H(curl) DOFs per edge. */
@@ -61,25 +55,7 @@ typedef struct {
   PetscInt faceDofOffset;    /**< First index of the face-DOF class. */
   PetscInt edgeDofOffset;    /**< First index of the edge-DOF class. */
   PetscInt volumeDofOffset;  /**< First index of the volume-DOF class. */
-
-  /** Per-order Nédélec dispatch (coefficients / basis / curls / gradient).
-   *  Populated in setupCsemGrid; hot loops call through this table instead
-   *  of a switch (nord). */
-  const struct NedelecOps *ops;
 } FEMSpace;
-
-/**
- * @brief Per-cell orientation data.
- *
- * Built once in computeCellOrientation and consumed by the shape / basis /
- * sign routines. A named struct replaces the earlier opaque
- * `orientation[10]` layout so higher-order codes can extend it (e.g.
- * per-face permutations for nord=3 face DOFs) without touching every accessor.
- */
-typedef struct {
-  PetscInt faces[NUM_FACES_PER_CELL];     /**< Face-orientation code in {0..5}. */
-  PetscInt edgeSigns[NUM_EDGES_PER_CELL]; /**< ±1 sign for each edge. */
-} CellOrientation;
 
 /**
  * @brief Mesh statistics and DOF counts for a CSEM grid.
@@ -108,17 +84,17 @@ typedef struct {
   PetscInt vertexEnd;         /**< Index of global vertex end. */
   PetscInt dim;               /**< Number of spatial dimensions. */
 
-  PetscInt numH1DofInCell_Pnord; /**< P_nord H1 DOFs per cell
-                                  *   (= (nord+1)(nord+2)(nord+3)/6); the column
-                                  *   count of the G_BDDC discrete gradient
+  PetscInt numH1DofInCell;    /**< P_order H1 DOFs per cell
+                                  *   (= (order+1)(order+2)(order+3)/6); the column
+                                  *   count of the G discrete gradient
                                   *   produced by assembleCsemKandM. */
-  DM H1dm_Pnord;                 /**< P_nord H1 DM: column space of the exact
-                                  *   G_BDDC discrete gradient. For nord = 1 it
-                                  *   is the P1 vertex space; for nord >= 2 it
+  DM H1dm;                       /**< P_order H1 DM: column space of the exact
+                                  *   G discrete gradient. For order = 1 it
+                                  *   is the P1 vertex space; for order >= 2 it
                                   *   adds edge/face/volume bubble DOFs per the
                                   *   De Rham complex. */
 
-  FEMSpace fem; /**< Finite-element space descriptor (mirrors nord + DOF counts). */
+  FEMSpace fem; /**< Finite-element space descriptor (mirrors order + DOF counts). */
 } Grid;
 
 /**
@@ -133,14 +109,13 @@ typedef struct {
   PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS];            /**< Geometric Jacobian. */
   PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS];         /**< Inverse Jacobian. */
   PetscReal detJacobian;                                         /**< Jacobian determinant. */
-  CellOrientation orientation;                                   /**< Face/edge orientation data. */
   PetscReal centroid[NUM_DIMENSIONS];                            /**< Cell centroid (vertex barycenter). */
 } Cell;
 
 /**
  * @brief Configures a DMPlex object with H(curl) and H1 sections for CSEM.
  *
- * @param[in]     params  Forward-modeling parameters (nord).
+ * @param[in]     params  Forward-modeling parameters (order).
  * @param[in,out] dm      DMPlex mesh configured with the FE sections.
  * @param[out]    grid    Grid struct filled with mesh statistics and FEMSpace.
  *

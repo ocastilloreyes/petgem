@@ -12,29 +12,29 @@
 #include <petscsys.h>
 
 /* PETGEM functions */
+#include "common.h"
 #include "assembly.h"
 #include "constants.h"
+#include "fem.h"
 #include "grid.h"
-#include "hvfem.h"
-#include "inputs.h"
+#include "io.h"
 #include "transmitter.h"
 
 
 /**
  * @brief Shared per-cell setup used by every LHS-assembly path.
  *
- * Reads geometry, builds the Jacobian, pulls the per-cell conductivity slice
- * out of the conductivity Vec, walks the cell's transitive closure for the
- * vertex ordering, and computes the orientation table. After this returns,
- * `cell` is ready to be handed to computeElementalMatrices / the basis
- * dispatch.
+ * Reads the cell vertex coordinates and pulls the per-cell conductivity slice
+ * out of the conductivity Vec. After this returns, `cell` is ready to be handed
+ * to computeElementalMatrices / buildDiscreteGradientMatrix, which derive the
+ * Jacobian and geometric orientation internally from the coordinates.
  *
  * @param[in]  dm              DMPlex mesh.
  * @param[in]  dmConductivity  DM carrying the conductivity field.
  * @param[in]  conductivity    Per-cell conductivity Vec.
  * @param[in]  cellID          Cell index.
- * @param[out] cell            Cell descriptor filled with geometry, jacobian,
- *                             conductivity, closure, and orientation.
+ * @param[out] cell            Cell descriptor filled with coordinates and
+ *                             conductivity.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
@@ -47,12 +47,10 @@ static PetscErrorCode prepareCellForAssembly(const DM dm,
 {
   PetscFunctionBeginUser;
   PetscCall(extractCellCoordinates(dm, cellID, cell));
-  PetscCall(computeCellJacobian(cell));
   PetscCall(extractCellConductivity(dmConductivity, conductivity, cellID, cell));
-  PetscCall(extractCellClousure(dm, cellID, cell));
-  PetscCall(computeCellOrientation(cell));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /**
  * @brief Assembles the right-hand side matrix for the CSEM system.
@@ -69,7 +67,7 @@ static PetscErrorCode prepareCellForAssembly(const DM dm,
  * into a per-source RHS Vec, and (f) copies the assembled Vec into the
  * corresponding column of `B`. A final complex scaling by iωμ is applied.
  *
- * @param[in]  params   Forward-modeling parameters (nord, MPI tasks).
+ * @param[in]  params   Forward-modeling parameters (order, MPI tasks).
  * @param[in]  sources  Transmitter set (one column of B per source).
  * @param[in]  dm       DMPlex mesh and H(curl) discretization.
  * @param[in]  grid     Finite-element grid descriptor.
@@ -93,8 +91,7 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
   /* Variables declaration */
   Cell cell;
   PetscInt m, M, numDofIndices, *dofIndices;
-  PetscInt dofSigns[grid.numDofInCell];
-  PetscReal **Ni, **NiCurl, **coeffs, **Dx_Ni, **Dy_Ni, **Dz_Ni, *XiEtaZeta;
+  PetscReal **Ni, *XiEtaZeta;
   PetscScalar *closureRHS;
   PetscSection section;
   Vec b, bcol;
@@ -105,22 +102,11 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
   /* Create vector to store one right-hand side */
   PetscCall(DMCreateGlobalVector(dm, &b));
   PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
-  {
-    ISLocalToGlobalMapping mappingBS1;
-    const PetscInt        *l2gIndices;
-    PetscInt               l2gSize;
-    PetscCall(ISLocalToGlobalMappingGetSize(mapping, &l2gSize));
-    PetscCall(ISLocalToGlobalMappingGetIndices(mapping, &l2gIndices));
-    PetscCall(ISLocalToGlobalMappingCreate(comm, 1, l2gSize, l2gIndices,
-                                            PETSC_COPY_VALUES, &mappingBS1));
-    PetscCall(ISLocalToGlobalMappingRestoreIndices(mapping, &l2gIndices));
-    PetscCall(VecSetLocalToGlobalMapping(b, mappingBS1));
-    PetscCall(ISLocalToGlobalMappingDestroy(&mappingBS1));
-  }
+  PetscCall(VecSetLocalToGlobalMapping(b, mapping));
   PetscCall(VecSetOption(b, VEC_IGNORE_NEGATIVE_INDICES, PETSC_TRUE));
   PetscCall(VecSetFromOptions(b));
 
-  /* Create discrete gradient matrix */
+  /* Get vector size */
   PetscCall(VecGetSize(b, &M));
   PetscCall(VecGetLocalSize(b, &m));
 
@@ -135,28 +121,15 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
   PetscCall(PetscCalloc1(grid.numDofInCell, &closureRHS));
   PetscCall(PetscCalloc1(NUM_DIMENSIONS, &XiEtaZeta));
   PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Ni));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &NiCurl));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Dx_Ni));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Dy_Ni));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Dz_Ni));
   for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
     PetscCall(PetscCalloc1(grid.numDofInCell, &Ni[i]));
-    PetscCall(PetscCalloc1(grid.numDofInCell, &NiCurl[i]));
-    PetscCall(PetscCalloc1(grid.numDofInCell, &Dx_Ni[i]));
-    PetscCall(PetscCalloc1(grid.numDofInCell, &Dy_Ni[i]));
-    PetscCall(PetscCalloc1(grid.numDofInCell, &Dz_Ni[i]));
-  }
-
-  PetscCall(PetscCalloc1(grid.numDofInCell, &coeffs));
-  for (PetscInt i = 0; i < grid.numDofInCell; i++) {
-    PetscCall(PetscCalloc1(grid.numDofInCell, &coeffs[i]));
   }
 
   /* Print linear system statistics (suppressed when params.quiet) */
   if (!params.quiet) {
     PetscCall(PetscPrintf(comm, "\n RHS assembly:\n"));
-    PetscCall(PetscPrintf(comm, "   %-24s = %d\n",                "MPI tasks",   params.numMPITasks));
-    PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "Vector size", M));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "MPI tasks",   formatGroupedInt(params.numMPITasks)));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Vector size", formatGroupedInt(M)));
     PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",      "Started"));
   }
 
@@ -196,32 +169,20 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
       /* Get vertices coordinates for cellID */
       PetscCall(extractCellCoordinates(dm, cellID, &cell));
 
-      /* Compute jacobian, inverse jacobian and jacobian determinand for cellID */
-      PetscCall(computeCellJacobian(&cell));
-
-      /* Get transitive clousure for cellID */
-      PetscCall(extractCellClousure(dm, cellID, &cell));
-
-      /* Compute orientation for cellID */
-      PetscCall(computeCellOrientation(&cell));
-
       /* Transform xyz source position to XiEtaZeta coordinates (reference tetrahedral element) */
       PetscCall(tetrahedronXYZToReference(cell.coordinates, sources.sourceArray[i].position, XiEtaZeta));
 
-      /* Compute basis functions for cellID (no curls needed for the RHS) */
-      PetscCall(evaluateNedelecBasis(&grid.fem, &cell, XiEtaZeta, coeffs, Dx_Ni, Dy_Ni, Dz_Ni, Ni, NULL));
+      /* Compute basis functions for cellID (already oriented; no curls needed for the RHS) */
+      PetscCall(evaluateNedelecBasis(&grid.fem, &cell, XiEtaZeta, Ni, NULL));
 
       /* Get closure indices for cellID */
       PetscCall(DMPlexGetClosureIndices(dm, section, section, cellID, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
-
-      /* Per-DOF sign convention for elemental matrices */
-      PetscCall(buildDofSigns(&cell, &grid.fem, dofSigns));
 
       /* Compute contribution for closure */
       for (PetscInt j = 0; j < grid.numDofInCell; j++) {
         closureRHS[j] = 0;
         for (PetscInt k = 0; k < NUM_DIMENSIONS; k++) {
-          closureRHS[j] += (Ni[k][j] * sourceVector[k] * dofSigns[j]);
+          closureRHS[j] += (Ni[k][j] * sourceVector[k]);
         }
       }
 
@@ -254,25 +215,46 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
   /* Free memory */
   for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
     PetscCall(PetscFree(Ni[i]));
-    PetscCall(PetscFree(NiCurl[i]));
-    PetscCall(PetscFree(Dx_Ni[i]));
-    PetscCall(PetscFree(Dy_Ni[i]));
-    PetscCall(PetscFree(Dz_Ni[i]));
   }
   PetscCall(PetscFree(Ni));
-  PetscCall(PetscFree(NiCurl));
-  PetscCall(PetscFree(Dx_Ni));
-  PetscCall(PetscFree(Dy_Ni));
-  PetscCall(PetscFree(Dz_Ni));
   PetscCall(PetscFree(XiEtaZeta));
   PetscCall(PetscFree(closureRHS));
 
-  for (PetscInt i = 0; i < grid.numDofInCell; i++) {
-    PetscCall(PetscFree(coeffs[i]));
-  }
-  PetscCall(PetscFree(coeffs));
-
   PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Verifies that a cell's discrete gradient lies in the stiffness kernel.
+ *
+ * This function checks the De Rham identity K_e G_e = 0 for one cell: with M the
+ * m x m elemental stiffness (Ke) and G the m x n discrete gradient (both
+ * row-major), it forms every entry of the product M·G and reports, via a printed
+ * message, any (i, j) whose value is not within PETSC_SMALL of zero. It is a
+ * read-only diagnostic: no matrix is modified and a non-zero product does not
+ * abort the run.
+ *
+ * @param[in] M  Elemental stiffness matrix Ke (m x m, row-major).
+ * @param[in] G  Discrete gradient block (m x n, row-major).
+ * @param[in] m  Number of H(curl) DOFs per cell (rows of M and G).
+ * @param[in] n  Number of H1 DOFs per cell (columns of G).
+ * @param[in] w  Cell index, used only to label diagnostic messages.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode checkGradientKernel(PetscReal *M, PetscReal *G, PetscInt m, PetscInt n, PetscInt w)
+{
+   PetscFunctionBeginUser;
+   for (PetscInt i = 0; i < m; i++) {
+     for (PetscInt j = 0; j < n; j++) {
+       PetscReal v = 0;
+       for (PetscInt k = 0; k < m; k++) {
+         // M is m x m, G is m x n
+         v += M[i*m + k] * G[k * n + j];
+       }
+       if (!PetscIsCloseAtTol(v, 0, 0, PETSC_SMALL)) PetscCall(PetscPrintf(PETSC_COMM_SELF, "Error element %d (%d %d)\n", (int)w, (int)i, (int)j));
+     }
+   }
+   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /**
@@ -283,12 +265,8 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  *
  *   K       - stiffness (curl–curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
  *   Ms      - mass × σ matrix, ∫ (ε_r ⊙ N_i)·N_j where ε_r encodes σ.
- *   G_BDDC  - high-order discrete gradient (buildDiscreteGradientMatrix)
- *             against the P_nord H¹ DM (grid.H1dm_Pnord): grad(phi_k) =
- *             sum_i G_ik N_i over the full closure, so K·G = 0. Built with
- *             MAT_IGNORE_ZERO_ENTRIES (thresholded zeros stay out of the
- *             pattern), so no MatFilter pass is required. Consumed by
- *             PCBDDCSetDiscreteGradient.
+ *   G       - high-order discrete gradient (buildDiscreteGradientMatrix)
+ *             Consumed by PCBDDCSetDiscreteGradient.
  *
  * The caller forms A_f = K − iωμ·Ms per frequency via
  *     MatDuplicate(K, MAT_COPY_VALUES, &A);
@@ -296,16 +274,27 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  * - the forward kernel does this once for the source frequency,
  * the inverse kernel does it inside a frequency loop.
  *
- * G_BDDC may be passed as NULL to skip its construction (e.g. callers
+ * G may be passed as NULL to skip its construction (e.g. callers
  * that don't go through PCBDDC).
+ *
+ * @param[in]  params       Forward-modeling parameters (order, MPI tasks).
+ * @param[in]  dm           DMPlex mesh and H(curl) discretization.
+ * @param[in]  grid         Finite-element grid descriptor.
+ * @param[in]  conductivity Per-cell conductivity Vec.
+ * @param[in]  constFactor  Fused-mode factor iωμ; ignored when Ms != NULL.
+ * @param[out] KorA         Stiffness K (K/Ms mode) or fused operator A.
+ * @param[out] Ms           Mass-σ matrix in K/Ms mode; pass NULL for fused mode.
+ * @param[out] G            High-order discrete gradient; pass NULL to skip.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemKandM(const fmParams params, 
+PetscErrorCode assembleCsemKandM(const fmParams params,
                                  const DM dm, 
                                  const Grid grid,
                                  const Vec conductivity,
                                  const PetscScalar constFactor,
                                  Mat *KorA, Mat *Ms,
-                                 Mat *G_BDDC) {
+                                 Mat *G) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
@@ -322,84 +311,54 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);
 
   /* fused mode: Ms == NULL -> caller wants the frequency-dependent
-   *   A = K − constFactor·Ms produced directly (element-level
+   *   A = K - constFactor·Ms produced directly (element-level
    *   fusion); no global Ms is built.
    * K/Ms mode: Ms != NULL -> produce K and Ms separately; caller
    *   forms A per frequency via MatDuplicate + MatAXPY. */
   const PetscBool fused = (Ms == NULL) ? PETSC_TRUE : PETSC_FALSE;
 
-  /* Create *KorA via DMCreateMatrix. In K/Ms mode, build Ms by
-   * MatDuplicate so it shares K's parallel layout AND the L2G mapping
-   * attached to the DM.
-   *
-   * On the MATIS / PCBDDC path MatDuplicate does not always propagate
-   * MAT_NEW_NONZERO_ALLOCATION_ERR cleanly, so MatSetValuesLocal on
-   * the duplicate aborts with "New nonzero at (0,0) caused a malloc".
-   * The option is disabled on both matrices to handle that case. */
+  /* Create *KorA via DMCreateMatrix. In K/Ms mode, build Ms by MatDuplicate so it shares K's parallel layout */
   PetscCall(DMSetAdjacency(dm, 0, PETSC_FALSE, PETSC_TRUE));
   PetscCall(DMSetMatrixPreallocateOnly(dm, PETSC_TRUE));
   PetscCall(DMCreateMatrix(dm, KorA));
   PetscCall(MatSetFromOptions(*KorA));
-  PetscCall(MatSetOption(*KorA, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
+  PetscCall(MatSetOption(*KorA, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
   if (!fused) {
     PetscCall(MatDuplicate(*KorA, MAT_DO_NOT_COPY_VALUES, Ms));
-    PetscCall(MatSetOption(*Ms, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
+    PetscCall(MatSetOption(*Ms, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
   }
 
-  /* Create a Vec on the H(curl) DM just to query its sizes (M, m) for
-   * the G_BDDC matrix layout below.  The DM's L2G mapping is also
-   * fetched here for the Mat-side calls (Mats do not enforce the strict
-   * block-size match that trips VecSetLocalToGlobalMapping at nord ≥ 4
-   * - see assembleCsemRHS for the equivalent workaround on the Vec
-   * side). */
+  /* Create a Vec on the H(curl) DM just to query its sizes (M, m) for the G matrix layout below.  */
   PetscCall(DMCreateGlobalVector(dm, &b));
   PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
 
-  /* Row/column layout for G_BDDC: rows index V_h (Nédélec, mapping);
-   * columns index the P_nord H1 space (nodal+bubble, H1mapping). */
-  PetscCall(DMCreateGlobalVector(grid.H1dm_Pnord, &h1v));
+  /* Row/column layout for G: rows index V_h (Nédélec, mapping); columns index the P_order H1 space (nodal+bubble, H1mapping) */
+  PetscCall(DMCreateGlobalVector(grid.H1dm, &h1v));
   PetscCall(VecGetSize(b, &M));
   PetscCall(VecGetLocalSize(b, &m));
   PetscCall(VecGetSize(h1v, &N));
   PetscCall(VecGetLocalSize(h1v, &n));
-  PetscCall(DMGetLocalToGlobalMapping(grid.H1dm_Pnord, &H1mapping));
+  PetscCall(DMGetLocalToGlobalMapping(grid.H1dm, &H1mapping));
   PetscCall(VecDestroy(&h1v));
   PetscCall(VecDestroy(&b));
 
-  /* High-order discrete gradient G_BDDC : Nédélec_nord -> P_nord H1
-   * (buildDiscreteGradientMatrix): grad(phi_k) = sum_i G_ik N_i over the full
-   * P_nord closure, so K·G = 0 and PCBDDC's coarse-space algorithm reads the
-   * true curl-kernel structure.
-   *
-   * Built against grid.H1dm_Pnord (PETSc closure for P_nord H1 is
-   * volume -> face -> edge -> vertex). Rows can touch up to a full P_nord
-   * closure, so we preallocate d_nnz = o_nnz = numH1DofInCell_Pnord and turn
-   * on MAT_IGNORE_ZERO_ENTRIES - thresholded-zero entries in the insertion
-   * buffer stay out of the sparsity pattern, so no MatFilter pass is needed. */
-  if (G_BDDC) {
-    PetscCall(MatCreate(comm, G_BDDC));
-    PetscCall(MatSetSizes(*G_BDDC, m, n, M, N));
-    PetscCall(MatSetType(*G_BDDC, MATAIJ));
-    PetscCall(MatSetLocalToGlobalMapping(*G_BDDC, mapping, H1mapping));
-    /* The high-order gradient can touch up to a full P_nord cell closure
-     * per row; preallocate that width. */
-    PetscCall(MatSeqAIJSetPreallocation(*G_BDDC, grid.numH1DofInCell_Pnord, NULL));
-    PetscCall(MatMPIAIJSetPreallocation(*G_BDDC, grid.numH1DofInCell_Pnord, NULL, grid.numH1DofInCell_Pnord, NULL));
-    PetscCall(MatSetOption(*G_BDDC, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
-    PetscCall(MatSetOption(*G_BDDC, MAT_NEW_NONZERO_ALLOCATION_ERR,
-                           PETSC_TRUE));
+  /* Create gradient matrix */
+  if (G) {    
+    PetscCall(MatCreate(comm, G));
+    PetscCall(MatSetSizes(*G, m, n, M, N));
+    PetscCall(MatSetType(*G, MATAIJ));
+    PetscCall(MatSetLocalToGlobalMapping(*G, mapping, H1mapping));
   }
 
-  /* DM sections: H(curl) on dm and P_nord H1 on grid.H1dm_Pnord. */
+  /* DM sections: H(curl) on dm and P_order H1 on grid.H1dm. */
   PetscCall(DMGetLocalSection(dm, &section));
-  PetscCall(DMGetLocalSection(grid.H1dm_Pnord, &H1section));
+  PetscCall(DMGetLocalSection(grid.H1dm, &H1section));
 
   /* Get the local values of the conductivity components */
   PetscCall(VecGetDM(conductivity, &dmConductivity));
 
-  /* Compute 3D quadrature points (element mass/stiffness; the discrete gradient
-   * builds its own reference quadrature internally). */
-  PetscCall(computeNum3DQuadraturePoints(params.nord, &quadrature_3d));
+  /* Compute 3D quadrature points (element mass/stiffness; the discrete gradient builds its own reference quadrature internally) */
+  PetscCall(computeNum3DQuadraturePoints(params.order, &quadrature_3d));
 
   PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.points));
   for (PetscInt i = 0; i < quadrature_3d.numPoints; i++) {
@@ -408,10 +367,8 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.weights));
   PetscCall(compute3DQuadraturePoints(&quadrature_3d));
 
-  /* Allocate memory. closureK is a square scratch buffer sized
-   * numDofInCell × numDofInCell; in fused mode it carries the fused
-   * A_e = K_e − constFactor·M_e block (still per-cell, no extra
-   * memory). closureM is only allocated in K/Ms mode. Canonical-G
+  /* Allocate memory. closureK is a square scratch buffer sized numDofInCell × numDofInCell; in fused mode it carries the fused
+   * A_e = K_e - constFactor·M_e block (still per-cell, no extra memory). closureM is only allocated in K/Ms mode. Canonical-G
    * scratch is only allocated when G is requested. */
   PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureK));
   PetscCall(PetscCalloc1(grid.numDofInCell, &Me));
@@ -422,34 +379,31 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
     Me[i] = Me[i - 1] + grid.numDofInCell;
     Ke[i] = Ke[i - 1] + grid.numDofInCell;
   }
+
   closureM = NULL;
   if (!fused) {
     PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureM));
   }
   /* Discrete-gradient scratch.
    *
-   * gradientMatrixBDDC is the OUTPUT of buildDiscreteGradientMatrix, sized
-   * numDofInCell × numH1DofInCell_Pnord (all P_nord H1 columns, in DMPlex
-   * closure order). closureGBDDC is the row-major INSERTION buffer of the
-   * same shape passed to MatSetValuesLocal. */
+   * gradientMatrixBDDC is the OUTPUT of buildDiscreteGradientMatrix, sized numDofInCell × numH1DofInCell (all P_order H1 columns, in DMPlex
+   * closure order). closureGBDDC is the row-major INSERTION buffer of the same shape passed to MatSetValuesLocal. */
   gradientMatrixBDDC = NULL;
   closureGBDDC       = NULL;
-  if (G_BDDC) {
+  if (G) {
     PetscCall(PetscCalloc1(grid.numDofInCell, &gradientMatrixBDDC));
-    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell_Pnord,
-                           &gradientMatrixBDDC[0]));
+    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell, &gradientMatrixBDDC[0]));
     for (PetscInt i = 1; i < grid.numDofInCell; i++) {
-      gradientMatrixBDDC[i] = gradientMatrixBDDC[i - 1] + grid.numH1DofInCell_Pnord;
+      gradientMatrixBDDC[i] = gradientMatrixBDDC[i - 1] + grid.numH1DofInCell;
     }
-    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell_Pnord,
-                           &closureGBDDC));
+    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell, &closureGBDDC));
   }
 
   /* Print linear system statistics (suppressed when params.quiet) */
   if (!params.quiet) {
     PetscCall(PetscPrintf(comm, "\n LHS assembly (K and Ms):\n"));
-    PetscCall(PetscPrintf(comm, "   %-24s = %d\n",                                      "MPI tasks",   params.numMPITasks));
-    PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " x %" PetscInt_FMT "\n",   "Matrix size", M, M));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                                      "MPI tasks",   formatGroupedInt(params.numMPITasks)));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s x %s\n",   "Matrix size", formatGroupedInt(M), formatGroupedInt(M)));
     PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                                      "Status",      "Started"));
   }
 
@@ -464,14 +418,11 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
 
     /* Get closure indices for cell i */
     PetscCall(DMPlexGetClosureIndices(dm, section, section, i, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
-    PetscCall(DMPlexGetClosureIndices(grid.H1dm_Pnord, H1section, H1section, i, PETSC_TRUE, &numH1DofIndices, &H1dofIndices, NULL, NULL));
+    PetscCall(DMPlexGetClosureIndices(grid.H1dm, H1section, H1section, i, PETSC_TRUE, &numH1DofIndices, &H1dofIndices, NULL, NULL));
 
-    /* fused: closureK[jk] = K_e[jk] − constFactor·M_e[jk],
-     *        single MatSetValuesLocal into A.
-     * K/Ms : closureK[jk] = K_e[jk]; closureM[jk] = M_e[jk],
-     *        two MatSetValuesLocal into K and Ms.
-     * The (j,k) loop writes every entry of its scratch buffer, so no
-     * PetscArrayzero is needed. */
+    /* fused: closureK[jk] = K_e[jk] − constFactor·M_e[jk], single MatSetValuesLocal into A.
+     * K/Ms : closureK[jk] = K_e[jk]; closureM[jk] = M_e[jk], two MatSetValuesLocal into K and Ms.
+     * The (j,k) loop writes every entry of its scratch buffer, so no PetscArrayzero is needed. */
     if (fused) {
       for (PetscInt j = 0; j < grid.numDofInCell; j++) {
         for (PetscInt k = 0; k < grid.numDofInCell; k++) {
@@ -490,48 +441,45 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
       PetscCall(MatSetValuesLocal(*Ms,   numDofIndices, dofIndices, numDofIndices, dofIndices, closureM, ADD_VALUES));
     }
 
-    /* Build & insert the high-order discrete gradient for PCBDDC:
-     * grad(phi_k) = sum_i G_ik N_i, all P_nord H1 columns in DMPlex closure
-     * order (= H1dofIndices). Insert the full row width; thresholded zeros are
-     * dropped by MAT_IGNORE_ZERO_ENTRIES. */
-    if (G_BDDC) {
+    /* Compute gradient matrix */
+    if (G) {
       PetscCall(buildDiscreteGradientMatrix(&grid.fem, &cell, gradientMatrixBDDC));
+      
+      /* Verify the per-cell discrete gradient lies in the kernel of the stiffness (K_e G_e = 0). */
+      PetscCall(checkGradientKernel(Ke[0], gradientMatrixBDDC[0], grid.numDofInCell, grid.numH1DofInCell, i));
+      
+      /* Fill closure gradient matrix data */
       for (PetscInt j = 0; j < grid.numDofInCell; j++) {
-        for (PetscInt k = 0; k < grid.numH1DofInCell_Pnord; k++) {
-          closureGBDDC[j * grid.numH1DofInCell_Pnord + k] = gradientMatrixBDDC[j][k];
+        for (PetscInt k = 0; k < grid.numH1DofInCell; k++) {
+          closureGBDDC[j * grid.numH1DofInCell + k] = gradientMatrixBDDC[j][k];
         }
       }
-      PetscCall(MatSetValuesLocal(*G_BDDC, numDofIndices, dofIndices, numH1DofIndices, H1dofIndices,
-                                  closureGBDDC, INSERT_VALUES));
+      PetscCall(MatSetValuesLocal(*G, numDofIndices, dofIndices, numH1DofIndices, H1dofIndices, closureGBDDC, INSERT_VALUES));
     }
 
     /* Restore closure indices for cell i */
     PetscCall(DMPlexRestoreClosureIndices(dm, section, section, i, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
-    PetscCall(DMPlexRestoreClosureIndices(grid.H1dm_Pnord, H1section, H1section, i, PETSC_TRUE, &numH1DofIndices, &H1dofIndices, NULL, NULL));
+    PetscCall(DMPlexRestoreClosureIndices(grid.H1dm, H1section, H1section, i, PETSC_TRUE, &numH1DofIndices, &H1dofIndices, NULL, NULL));
   }
 
-  /* Global assembly for the produced matrices. */
+  /* Global assembly for the produced matrices */
   PetscCall(MatAssemblyBegin(*KorA, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(*KorA,   MAT_FINAL_ASSEMBLY));
   if (!fused) {
     PetscCall(MatAssemblyBegin(*Ms, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(*Ms,   MAT_FINAL_ASSEMBLY));
   }
-  if (G_BDDC) {
-    PetscCall(MatAssemblyBegin(*G_BDDC, MAT_FINAL_ASSEMBLY));
-    PetscCall(MatAssemblyEnd(*G_BDDC,   MAT_FINAL_ASSEMBLY));
+
+  if (G) {
+    PetscCall(MatAssemblyBegin(*G, MAT_FINAL_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(*G,   MAT_FINAL_ASSEMBLY));
+    /* The discrete gradient matrix is used to compute mesh connectivity information within the solver. Just use nonzero dofs */
+   PetscCall(MatFilter(*G, 0, PETSC_TRUE, PETSC_FALSE));
   }
 
   /* End of assembly */
   if (!params.quiet)
     PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
-
-  /* Setup matrix views for petgem. In fused mode `KorA` carries A
-   * directly; the `-petgem_k_view` option views A. */
-  PetscCall(MatViewFromOptions(*KorA, NULL,
-                               fused ? "-petgem_a_view" : "-petgem_k_view"));
-  if (!fused) PetscCall(MatViewFromOptions(*Ms, NULL, "-petgem_ms_view"));
-  if (G_BDDC) PetscCall(MatViewFromOptions(*G_BDDC, NULL, "-petgem_grad_bddc_view"));
 
   /* Free memory */
   PetscCall(PetscFree(quadrature_3d.weights));
@@ -545,13 +493,19 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   PetscCall(PetscFree(Me));
   PetscCall(PetscFree(Ke));
   PetscCall(PetscFree(closureK));
-  if (closureM) PetscCall(PetscFree(closureM));
+  
+  if (closureM) { 
+    PetscCall(PetscFree(closureM));
+  }
+  
   if (gradientMatrixBDDC) {
     PetscCall(PetscFree(gradientMatrixBDDC[0]));
     PetscCall(PetscFree(gradientMatrixBDDC));
   }
-  if (closureGBDDC) PetscCall(PetscFree(closureGBDDC));
-
+  if (closureGBDDC) {
+    PetscCall(PetscFree(closureGBDDC));
+  }
+  
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -560,7 +514,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
  *
  * Inverse-kernel companion to assembleCsemKandM: walks the local cells,
  * computes only the mass-matrix entries for the current sigma, and writes them
- * into the supplied Ms matrix. K and G_BDDC are NOT touched - those are
+ * into the supplied Ms matrix. K and G are NOT touched - those are
  * sigma-independent, built once at setup, and reused for every L-BFGS iteration.
  *
  * The per-cell setup is shared with assembleCsemKandM via
@@ -570,7 +524,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
  * discarded - the small extra work is offset by not having to duplicate the
  * basis-evaluation code.
  *
- * @param[in]     params         Forward-modeling parameters (nord).
+ * @param[in]     params         Forward-modeling parameters (order).
  * @param[in]     dm             DMPlex mesh and H(curl) discretization.
  * @param[in]     grid           Finite-element grid descriptor.
  * @param[in]     conductivity   Current per-cell conductivity Vec.
@@ -590,11 +544,12 @@ PetscErrorCode assembleCsemMsRefill(const fmParams params,
                                     Mat Ms)
 {
   PetscFunctionBeginUser;
-  (void)params; /* nord lives in grid->fem.ops via the quadrature */
+  
+  /* order lives in grid->fem.ops via the quadrature */
+  (void)params;
 
-  /* Zero stale values from the previous L-BFGS iteration; sparsity is
-   * preserved (no allocation churn).  MatSetValuesLocal with ADD_VALUES
-   * below would otherwise accumulate on top of the previous iter. */
+  /* Zero stale values from the previous L-BFGS iteration; sparsity is preserved (no allocation churn).  
+  * MatSetValuesLocal with ADD_VALUES below would otherwise accumulate on top of the previous iter. */
   PetscCall(MatZeroEntries(Ms));
 
   PetscSection section;

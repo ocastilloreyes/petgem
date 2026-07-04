@@ -14,7 +14,7 @@
  * several functions that were previously file-static
  * (writeInversionResults, buildNotFixedMask) need linkage across the
  * new files but should not be advertised to im_csem.c or
- * postprocessing.c.  Same pattern as include/hvfem_internal.h.
+ * postprocessing.c.
  */
 
 #ifndef INVERSION_INTERNAL_H

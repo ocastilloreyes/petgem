@@ -37,7 +37,7 @@ OPTIONAL  (inversion control; defaults in brackets)\n\
   -inv_snapshot_interval <n> Write VTU every N steps (0=off)   [0]\n\
   -inv_observed_mode <m>     external | fm_native     [external]\n\
   -inv_observed_file <f>     Observed-data file (req. fm_native)\n\
-  -nord <1..6>               Override bundle basis order.\n\
+  -order <1..6>               Override bundle basis order.\n\
 \n\
 EXAMPLES\n\
   mpirun -n 56 ./im.csem -options_file params_p1.txt -output_dir out/\n\
@@ -67,7 +67,6 @@ MORE\n\
 #include "common.h"
 #include "constants.h"
 #include "grid.h"
-#include "inputs.h"
 #include "inversion.h"
 #include "io.h"
 #include "kernels.h"
@@ -218,8 +217,8 @@ int runInverse(int argc, char **argv)
   PetscCall(loadCsemInputs(&iparams.fm, &dm, &resistivity, &materials_id,
                            NULL,           /* no forward CsemSourceSet; setupInversionSources reads /sources */
                            &receivers));
-  /* Basis order is now single-source: loadCsemInputs fills iparams.fm.nord
-   * from the bundle's /nord when the user did not pass -nord (sentinel 0). */
+  /* Basis order is now single-source: loadCsemInputs fills iparams.fm.order
+   * from the bundle's /order when the user did not pass -order (sentinel 0). */
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[2] = end_timer - start_timer;
@@ -308,7 +307,7 @@ int runInverse(int argc, char **argv)
   /* ---------------------------------------------------------------- */
   /* Free memory                                                       */
   /* ---------------------------------------------------------------- */
-  PetscCall(DMDestroy(&grid.H1dm_Pnord));
+  PetscCall(DMDestroy(&grid.H1dm));
   PetscCall(DMDestroy(&dm));
   PetscCall(VecDestroy(&resistivity));
   PetscCall(VecDestroy(&materials_id));

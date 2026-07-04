@@ -4,7 +4,9 @@
  * Date: 2026-05-20
  *
  * Description:
- * Public surface for the unified PETGEM input loader (loadCsemInputs).
+ * Public surface for PETGEM input handling: the parsed user-input
+ * parameters (fmParams / readfmParams) and the unified input loader
+ * (loadCsemInputs).
  */
 
 /*
@@ -18,9 +20,52 @@
 #ifndef IO_H
 #define IO_H
 
-#include "inputs.h"
 #include "transmitter.h"
 #include <petsc.h>
+
+/**
+ * @brief Parsed user-input parameters consumed by the PETGEM kernels.
+ */
+typedef struct {
+  /**
+   * Unified PETGEM input bundle (HDF5) - contains mesh topology, sections,
+   * per-cell conductivity + materials_id, receivers (under /receivers), and
+   * single-frequency forward sources (under /sources/...). Produced by
+   * runPreprocessing() on the Python side. Consumed by loadCsemInputs().
+   */
+  char inputFile[PETSC_MAX_PATH_LEN];
+
+  char outputDirectory[PETSC_MAX_PATH_LEN]; /**< Output directory path. */
+  char outputFilename[PETSC_MAX_PATH_LEN];  /**< Output filename stem for responses. */
+
+  PetscInt    order;        /**< Finite-element basis order (0 = take from bundle). */
+  PetscMPIInt numMPITasks; /**< Number of MPI tasks in the run. */
+
+  /**
+   * Suppress per-call assembly headers ("Assembly RHS:", "Vector size",
+   * "Initiated", "Finished", "Assembly K + M(sigma)", etc.) emitted by
+   * src/assembly.c. Default PETSC_FALSE preserves current fm.csem output;
+   * the inversion kernel sets this to PETSC_TRUE to silence repeated
+   * per-frequency / per-iteration headers in the L-BFGS loop.
+   */
+  PetscBool quiet;
+} fmParams;
+
+/**
+ * @brief Reads and validates CSEM CLI parameters from PETSc options.
+ *
+ * Extracts the required runtime parameters (input/output paths) from the
+ * PETSc options database. The finite-element basis order -order is optional:
+ * when omitted, params->order is set to 0 so loadCsemInputs takes the order
+ * from the input bundle.
+ *
+ * @param[in]  size    Number of MPI tasks.
+ * @param[out] params  Struct receiving the parsed CSEM parameters.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode readfmParams(const PetscMPIInt size, fmParams* params);
 
 /**
  * @brief Loads all CSEM inputs from the unified PETGEM HDF5 bundle.
@@ -29,7 +74,7 @@
  * topology, sections, and the combined model-data vector (split into the
  * per-cell conductivity and materials_id local Vecs). Opens the same file
  * again on PETSC_COMM_SELF (each rank reads independently) to load:
- *   - /nord                 single-element Vec, written into fm_params->nord
+ *   - /order                 single-element Vec, written into fm_params->order
  *   - /receivers            Vec of 3·N_recv reals
  *   - /sources/frequency    single-frequency scalar
  *   - /sources/position     Vec of 3·N_src reals
@@ -42,8 +87,8 @@
  * receivers-file open path with a single open of the bundle produced by
  * the Python preprocessor (utils/functions.py::writeBundle).
  *
- * @param[in,out] fm_params     Parameters; inputFile is read, nord is
- *                              written from the bundle's /nord dataset.
+ * @param[in,out] fm_params     Parameters; inputFile is read, order is
+ *                              written from the bundle's /order dataset.
  * @param[out]    dm            Loaded DMPlex mesh.
  * @param[out]    conductivity  Per-cell conductivity Vec.
  * @param[out]    materialsID   Per-cell material-id Vec.

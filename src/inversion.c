@@ -42,11 +42,12 @@
 #include <petscksp.h>
 
 /* PETGEM headers */
+#include "common.h"
 #include "assembly.h"
 #include "constants.h"
 #include "grid.h"
-#include "hvfem.h"
-#include "inputs.h"
+#include "fem.h"
+#include "io.h"
 #include "inversion.h"
 #include "inversion_internal.h"
 #include "solver.h"
@@ -60,7 +61,7 @@
  * destroyInversionWorkspace, replacing the per-callback allocate/free dance.
  *
  * What gets precomputed:
- *   - 3D quadrature points + weights (depend only on iparams->fm.nord);
+ *   - 3D quadrature points + weights (depend only on iparams->fm.order);
  *   - Per-cell Me / Ke elemental-matrix buffers (numDof² each);
  *   - Reusable global Vecs b, x, nB, nx and parallel Ex_recv;
  *   - Per-frequency RHS Vec Bvec_per_freq[ifre]
@@ -86,8 +87,8 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   PetscInt  numReceivers = ctx->Q->numReceivers;
   PetscReal errorLevel  = ctx->iparams->errorLevel;
 
-  /* ---- 3D quadrature (depends only on nord) ---- */
-  PetscCall(computeNum3DQuadraturePoints(ctx->iparams->fm.nord, &ctx->quad3d));
+  /* ---- 3D quadrature (depends only on order) ---- */
+  PetscCall(computeNum3DQuadraturePoints(ctx->iparams->fm.order, &ctx->quad3d));
   PetscCall(PetscCalloc1(ctx->quad3d.numPoints, &ctx->quad3d.points));
   for (PetscInt i = 0; i < ctx->quad3d.numPoints; i++)
     PetscCall(PetscCalloc1(NUM_DIMENSIONS, &ctx->quad3d.points[i]));
@@ -122,10 +123,10 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   PetscCall(PetscCalloc1(numFreqs, &ctx->dObsRow_per_freq));
 
   /* Build a quiet fmParams stub for assembleCsemRHS (it only reads
-   * nord, numMPITasks and quiet - same fields the iter loop used to fill). */
+   * order, numMPITasks and quiet - same fields the iter loop used to fill). */
   fmParams stub;
   PetscCall(PetscMemzero(&stub, sizeof(stub)));
-  stub.nord = ctx->iparams->fm.nord;
+  stub.order = ctx->iparams->fm.order;
   PetscCallMPI(MPI_Comm_size(comm, &stub.numMPITasks));
   stub.quiet = PETSC_TRUE;
 
@@ -208,7 +209,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
    * to the right local-to-global mapping). */
   fmParams kandmStub;
   PetscCall(PetscMemzero(&kandmStub, sizeof(kandmStub)));
-  kandmStub.nord        = ctx->iparams->fm.nord;
+  kandmStub.order        = ctx->iparams->fm.order;
   kandmStub.numMPITasks = stub.numMPITasks;
   kandmStub.quiet       = PETSC_TRUE;
   PetscCall(assembleCsemKandM(kandmStub, ctx->dm, ctx->grid,
@@ -344,7 +345,7 @@ PetscErrorCode computeGradientContribution(const DM          dm,
                                            PetscReal       **Ke)
 {
   PetscFunctionBeginUser;
-  /* nord lives in grid->fem.ops via the supplied quadrature */
+  /* order lives in grid->fem.ops via the supplied quadrature */
 
   /* Get local section and conductivity DM */
   PetscSection section;
@@ -359,8 +360,6 @@ PetscErrorCode computeGradientContribution(const DM          dm,
     PetscCall(extractCellCoordinates(dm, i, &cell));
     PetscCall(computeCellJacobian(&cell));
     PetscCall(extractCellConductivity(dmConductivity, conductivity, i, &cell));
-    PetscCall(extractCellClousure(dm, i, &cell));
-    PetscCall(computeCellOrientation(&cell));
 
     /* Zero elemental matrices */
     PetscCall(PetscArrayzero(Me[0], grid->numDofInCell * grid->numDofInCell));
@@ -496,20 +495,19 @@ PetscErrorCode createInvKSP(const imParams *iparams,
                              KSP              *ksp)
 {
   PetscFunctionBeginUser;
-  (void)iparams; /* reserved; currently unused - see header */
 
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);
 
   PetscCall(KSPCreate(comm, ksp));
   PetscCall(KSPSetOperators(*ksp, A, A));
 
-  /* `Gbddc` is the high-order discrete-gradient operator (Nédélec_nord →
-   * P_nord H1) consumed by PCBDDC. It has nothing to do with the inversion
+  /* `Gbddc` is the high-order discrete-gradient operator (Nédélec_order -->
+   * P_order H1) consumed by PCBDDC. It has nothing to do with the inversion
    * gradient ∂F/∂X built by the L-BFGS layer — distinct names so the two never
-   * get conflated. setupBDDCFromPetgemGradient registers it at order 1 (the
-   * coarse-space collapse is driven by G's sparsity, not the order argument).
-   * Matches the forward solver (solver.c). */
-  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, Gbddc));
+   * get conflated. setupBDDCFromPetgemGradient registers it at order = order
+   * (matching the gradient's P_order H1 column space). Matches the forward
+   * solver (solver.c). */
+  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, Gbddc, iparams->fm.order));
   PetscCall(KSPSetFromOptions(*ksp));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -581,7 +579,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
    * overwrites Ms in-place using the cached sparsity pattern. */
   fmParams fwdParams;
   PetscCall(PetscMemzero(&fwdParams, sizeof(fwdParams)));
-  fwdParams.nord = c->iparams->fm.nord;
+  fwdParams.order = c->iparams->fm.order;
   PetscCallMPI(MPI_Comm_size(comm, &fwdParams.numMPITasks));
   fwdParams.quiet = PETSC_TRUE;
 
@@ -844,7 +842,7 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
 
   /* ---- Build receiver Q matrices ---- */
   ReceiverInterpolationMatrices Q;
-  PetscCall(buildReceiverInterpolationMatrices(iparams->fm.nord,
+  PetscCall(buildReceiverInterpolationMatrices(iparams->fm.order,
                                                 receivers,
                                                 dm, grid, &Q));
 
@@ -958,8 +956,8 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
    * We use a custom L-BFGS implementation matching the MATLAB Fortran
    * reference (Nocedal 1980 two-loop recursion).                     */
   PetscCall(PetscPrintf(comm, "\n L-BFGS optimization:\n"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "L-BFGS memory (M)", iparams->lbfgsMemory));
-  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "Max iterations",    iparams->maxIter));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "L-BFGS memory (M)", formatGroupedInt(iparams->lbfgsMemory)));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Max iterations",    formatGroupedInt(iparams->maxIter)));
   PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",            "Started"));
 
   PetscInt    numIters;

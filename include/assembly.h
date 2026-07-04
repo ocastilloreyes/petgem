@@ -11,8 +11,9 @@
 #define ASSEMBLY_H
 
 #include "grid.h"
-#include "inputs.h"
+#include "io.h"
 #include "transmitter.h"
+#include "fem.h"  
 #include <petsc.h>
 
 /**
@@ -21,7 +22,7 @@
  * Produces B with one column per transmitter, with Dirichlet boundary DOFs
  * eliminated, ready for solveCsemSystem.
  *
- * @param[in]  params   Forward-modeling parameters (nord, MPI tasks).
+ * @param[in]  params   Forward-modeling parameters (order, MPI tasks).
  * @param[in]  sources  Transmitter set (one column of B per source).
  * @param[in]  dm       DMPlex mesh and H(curl) discretization.
  * @param[in]  grid     Finite-element grid descriptor.
@@ -62,11 +63,11 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  *   - Ms     : mass × σ,            ∫_K (ε_r ⊙ Ni)·Nj.
  *   - G_BDDC : high-order discrete gradient (buildDiscreteGradientMatrix)
  *              consumed by PCBDDCSetDiscreteGradient. Each H(curl) DOF's
- *              gradient is resolved against the full P_nord H1 closure, so
+ *              gradient is resolved against the full P_order H1 closure, so
  *              grad(phi_k) = sum_i G_ik N_i exactly (K·G = 0). Built against
- *              grid.H1dm_Pnord; one solver code path serves every order.
+ *              grid.H1dm_P_order; one solver code path serves every order.
  *
- * @param[in]  params       Forward-modeling parameters (nord, MPI tasks).
+ * @param[in]  params       Forward-modeling parameters (order, MPI tasks).
  * @param[in]  dm           DMPlex mesh and H(curl) discretization.
  * @param[in]  grid         Finite-element grid descriptor.
  * @param[in]  conductivity Per-cell conductivity Vec.
@@ -83,9 +84,6 @@ PetscErrorCode assembleCsemKandM(const fmParams params, const DM dm, const Grid 
                                  const PetscScalar constFactor,
                                  Mat *KorA, Mat *Ms,
                                  Mat *G_BDDC);
-
-#include "hvfem.h"  /* Quadrature3D used by assembleCsemMsRefill */
-
 /**
  * @brief Refills an existing Ms matrix for the current conductivity field.
  *
@@ -96,7 +94,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params, const DM dm, const Grid 
  *
  * Preconditions:
  *   - `Ms` is already allocated with the same sparsity pattern as the K
- *     produced by assembleCsemKandM for the same mesh / nord (typically
+ *     produced by assembleCsemKandM for the same mesh / order (typically
  *     `MatDuplicate(K, MAT_DO_NOT_COPY_VALUES, &Ms)`).
  *   - `quadrature_3d`, `Me`, `Ke` are caller-owned workspace buffers of the
  *     same shape used inside assembleCsemKandM (numDofInCell² for Me / Ke),
@@ -106,7 +104,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params, const DM dm, const Grid 
  * preserved. Ke is computed by computeElementalMatrices but is unused here
  * (kept in the signature so the caller can share the gradient-pass scratch).
  *
- * @param[in]     params         Forward-modeling parameters (nord).
+ * @param[in]     params         Forward-modeling parameters (order).
  * @param[in]     dm             DMPlex mesh and H(curl) discretization.
  * @param[in]     grid           Finite-element grid descriptor.
  * @param[in]     conductivity   Current per-cell conductivity Vec.

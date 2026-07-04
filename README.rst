@@ -3,7 +3,7 @@
    <div style="display: flex; align-items: center; margin-bottom: 20px;">
        <img src="docs/source/_static/petgem_logo.png" alt="PETGEM Logo" width="100px" style="margin-right: 20px;">
        <div>
-           <h1>Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling</h1>
+           <h1>Parallel Edge-element Toolkit for General Electromagnetic Modeling</h1>
        </div>
    </div>
 
@@ -27,9 +27,8 @@
    :target: https://github.com/ocastilloreyes/petgem/pkgs/container/petgem-ci-env
    :alt: Docker image version
 
-**PETGEM** (Parallel Exascale Toolkit for Electromagnetic Modeling) is a high-performance open-source software designed for 
-the simulation of electromagnetic (EM) fields in geophysical exploration.  
-It is developed and maintained by researchers at the `Universitat Politècnica de Catalunya (UPC) <https://www.ac.upc.edu/en?set_language=en>`_ and the `Barcelona Supercomputing Center (BSC) <https://www.bsc.es/es/discover-bsc/organisation/scientific-structure/geophysical-applications>`_.
+**PETGEM** (Parallel Edge-element Toolkit for General Electromagnetic Modeling) is a high-performance open-source software designed for 
+the simulation of electromagnetic (EM) fields. It is developed and maintained by researchers at the `Universitat Politècnica de Catalunya (UPC) <https://www.ac.upc.edu/en?set_language=en>`_ and the `Barcelona Supercomputing Center (BSC) <https://www.bsc.es/es/discover-bsc/organisation/scientific-structure/geophysical-applications>`_.
 
 Key features include:
 
@@ -81,27 +80,37 @@ You can build and run PETGEM inside Docker for a consistent development and test
    make
 
    # Setup environment
-   export CSEM_TEST_DIR=tests/cases/csem_model
-   export NORD=1
+   export MODEL_DIR=examples/canonical_model
+   export ORDER=1
 
-   # Mesh generation (specific to nord=1)
-   gmsh ${CSEM_TEST_DIR}/mesh_p${NORD}.geo -3
+   # Mesh generation (specific to order=1)
+   gmsh ${MODEL_DIR}/mesh.geo -3
 
-   # Generate input data (mesh, params file. Specific to nord=1)
+   # Generate input data (mesh, params file)
    python3 utils/preprocess.py \
         -mode forward \
-        -nord ${NORD} \
-        -case_dir  ${CSEM_TEST_DIR} \
-        -mesh_filename mesh_p${NORD}.msh \
+        -order ${ORDER} \
+        -case_dir  ${MODEL_DIR} \
+        -mesh_filename mesh.msh \
         -source_filename sources.txt \
         -receiver_filename receivers.txt \
         -sigma_file sigmas.txt \
-        -input_filename input.h5 \
-        -params_filename params.txt \
+        -input_filename input_p${ORDER}.h5 \
+        -params_filename params_p${ORDER}.txt \
         -output_vtk model.vtu
 
-   # Forward modeling (Parallel and specific to nord=1)
-   mpirun -n 4 build/petgem modeling -options_file ${CSEM_TEST_DIR}/params.txt
+   # Forward modeling
+   mpirun -n 14 build/petgem modeling -options_file ${MODEL_DIR}/params_p${ORDER}.txt
+
+   # Postprocess output
+   python3 ${MODEL_DIR}/postprocess.py \
+        -responses_filename responses_p${ORDER}.h5 \
+        -case_dir ${MODEL_DIR} \
+        -input_filename input_p${ORDER}.h5 \
+        -reference_filename reference.h5 \
+        -figure_filename fields_p${ORDER}.png \
+        -tolerance 0.03
+
 
 Documentation
 -------------

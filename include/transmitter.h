@@ -11,7 +11,10 @@
 #ifndef TRANSMITTER_H
 #define TRANSMITTER_H
 
-#include "inputs.h"
+/* Only PETSc scalar/int types are needed here (PetscReal, PetscInt); pull them
+ * from <petsc.h> directly. Including io.h instead would be circular, since io.h
+ * includes this header for CsemSourceSet. */
+#include <petsc.h>
 
 /**
  * @brief A single CSEM transmitter (electric dipole) record.

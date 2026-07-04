@@ -4,8 +4,7 @@
  * Date: 2026-02-03
  *
  * Description:
- * Grid-handling functions used throughout PETGEM, built on
- * PETSc's DMPlex.
+ * Grid-handling functions used throughout PETGEM, built on PETSc's DMPlex.
  */
 
 /* C libraries */
@@ -15,31 +14,31 @@
 #include <petscviewerhdf5.h>
 
 /* PETGEM funcions*/
+#include "common.h"
 #include "constants.h"
 #include "grid.h"
-#include "hvfem.h"
-#include "inputs.h"
+#include "io.h"
 
 /**
  * @brief Configures a DMPlex object with H(curl) and H1 sections for CSEM simulations.
  *
  * This function sets up the primary DMPlex object for CSEM modeling
- * using high-order edge (H(curl)) elements of order `params.nord`
+ * using high-order edge (H(curl)) elements of order `params.order`
  * and a corresponding H1 conforming space. The following steps are performed:
  *
  *   - Sets the number of fields in the DM to 1.
  *   - Creates a "Boundary" label and marks boundary faces with ID 100.
  *   - Computes degrees of freedom (DOFs) per vertex, edge, face, and volume
- *     according to the PETGEM basis order (`params.nord`).
+ *     according to the PETGEM basis order (`params.order`).
  *   - Creates and attaches a PetscSection for H(curl) elements,
  *     applying boundary conditions on the marked faces.
- *   - Clones the DM to create the P_nord H1 DM (`grid->H1dm_Pnord`) used
- *     for the high-order discrete-gradient (G_BDDC) column space.
+ *   - Clones the DM to create the H1 DM (`grid->H1dm`) used
+ *     for the high-order discrete-gradient (G) column space.
  *   - Computes local and global counts of vertices, edges, faces, and cells.
  *   - Stores DOF counts, element start/end indices, and dimension in the `grid` struct.
  *   - Prints mesh and HEFEM statistics for verification.
  *
- * @param[in]  params  Struct containing simulation parameters, especially the basis order `params.nord` and mesh filename.
+ * @param[in]  params  Struct containing simulation parameters, especially the basis order `params.order` and mesh filename.
  * @param[inout] dm    Pointer to the DMPlex object to configure with H(curl) and H1 sections.
  * @param[out] grid    Pointer to the Grid struct to be populated with mesh statistics, DOF counts, and the H1 DM.
  *
@@ -60,16 +59,17 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   PetscInt numBC = 1;
   PetscInt bcField[1] = {0};
   PetscInt numDofInVertex, numDofInEdge, numDofInFace, numDofInVolume, numDofInCell;
+  
   /* Per-depth H1 DOF counts (vertex, edge, face, cell). The H1 space
-   * order tracks params.nord so the Nédélec discrete gradient
-   *     ∇(P_nord H1)  ⊂  Nédélec_nord
+   * order tracks params.order so the Nédélec discrete gradient
+   *     ∇(P_order H1)  ⊂  Nédélec_order
    * is exactly representable, which is the property PCBDDCSetDiscreteGradient
-   * relies on at any order. P_nord nodal layout:
+   * relies on at any order. P_order nodal layout:
    *     vertex:  1
-   *     edge  :  nord - 1
-   *     face  :  (nord-1)(nord-2)/2
-   *     cell  :  (nord-1)(nord-2)(nord-3)/6
-   * Total per cell = (nord+1)(nord+2)(nord+3)/6. For nord=1 this collapses
+   *     edge  :  order - 1
+   *     face  :  (order-1)(order-2)/2
+   *     cell  :  (order-1)(order-2)(order-3)/6
+   * Total per cell = (order+1)(order+2)(order+3)/6. For order=1 this collapses
    * to {1,0,0,0} (4 vertex DOFs), reproducing the previous P1 layout. */
   PetscInt numCellsLocal = 0, numCellsGlobal = 0, numFacesLocal = 0, numFacesGlobal = 0;
   PetscInt numEdgesLocal = 0, numEdgesGlobal = 0, numVerticesLocal = 0, numVerticesGlobal = 0;
@@ -81,9 +81,7 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   PetscCall(DMSetNumFields(*dm, 1));
   PetscCall(DMViewFromOptions(*dm, NULL, "-dm_view"));
 
-  /*  Create label for dirichlet boundary conditions
-      Values for boundaries:
-      - boundaries = 100  */
+  /*  Create label for dirichlet boundary conditions (boundaries = 100)  */
   PetscCall(DMCreateLabel(*dm, "Boundary"));
   PetscCall(DMGetLabel(*dm, "Boundary", &labelBoundary));
   PetscCall(DMPlexMarkBoundaryFaces(*dm, 100, labelBoundary));
@@ -91,10 +89,10 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
 
   /* Compute DOFs for PETGEM basis functions at vertex, edges, faces, and volume */
   numDofInVertex = 0;
-  numDofInEdge = params.nord;
-  numDofInFace = params.nord * (params.nord - 1);
-  numDofInVolume = params.nord * (params.nord - 1) * (params.nord - 2) / 2;
-  numDofInCell = params.nord * (params.nord + 2) * (params.nord + 3) / 2;
+  numDofInEdge   = params.order;
+  numDofInFace   = params.order * (params.order - 1);
+  numDofInVolume = params.order * (params.order - 1) * (params.order - 2) / 2;
+  numDofInCell   = params.order * (params.order + 2) * (params.order + 3) / 2;
   PetscInt numDof[4] = {numDofInVertex, numDofInEdge, numDofInFace, numDofInVolume};
 
   /* Get the IS for boundaries */
@@ -110,25 +108,21 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   PetscCall(DMSetLocalSection(*dm, section));
   PetscCall(PetscSectionDestroy(&section));
 
-  /* DM for the order-k S_h^k space - P_nord nodal + edge/face/volume
-   * bubbles, sized so ∇P_nord = curl-kernel of Nédélec_nord (the De Rham
-   * complex). This is the column space of the G_BDDC consumed by
-   * PCBDDC; for nord = 1 the counts collapse to {1,0,0,0}, for nord >= 2 it
-   * adds bubble DOFs. */
-  PetscInt numH1Dof_Pnord[NUM_H1_DOF_PER_CELL];
-  numH1Dof_Pnord[0] = 1;
-  numH1Dof_Pnord[1] = params.nord - 1;
-  numH1Dof_Pnord[2] = (params.nord - 1) * (params.nord - 2) / 2;
-  numH1Dof_Pnord[3] = (params.nord - 1) * (params.nord - 2) * (params.nord - 3) / 6;
-  const PetscInt numH1DofInCell_Pnord =
-      (params.nord + 1) * (params.nord + 2) * (params.nord + 3) / 6;
+  /* DM for the order-k S_h^k space - P_order nodal + edge/face/volume bubbles, sized so ∇P_order = curl-kernel 
+   * of Nédélec_order (the De Rham complex). This is the column space of the G consumed by PCBDDC; for order = 1 
+   * the counts collapse to {1,0,0,0}, for order >= 2 it adds bubble DOFs. */
+  PetscInt numH1Dof[NUM_H1_DOF_PER_CELL];
+  numH1Dof[0] = 1;
+  numH1Dof[1] = params.order - 1;
+  numH1Dof[2] = (params.order - 1) * (params.order - 2) / 2;
+  numH1Dof[3] = (params.order - 1) * (params.order - 2) * (params.order - 3) / 6;
+  const PetscInt numH1DofInCell = (params.order + 1) * (params.order + 2) * (params.order + 3) / 6;
 
-  DM H1dm_Pnord = NULL;
-  PetscCall(DMClone(*dm, &H1dm_Pnord));
-  PetscCall(DMSetNumFields(H1dm_Pnord, 1));
-  PetscCall(DMPlexCreateSection(H1dm_Pnord, NULL, numComp, numH1Dof_Pnord, 0, NULL,
-                                NULL, NULL, NULL, &section));
-  PetscCall(DMSetLocalSection(H1dm_Pnord, section));
+  DM H1dm = NULL;
+  PetscCall(DMClone(*dm, &H1dm));
+  PetscCall(DMSetNumFields(H1dm, 1));
+  PetscCall(DMPlexCreateSection(H1dm, NULL, numComp, numH1Dof, 0, NULL, NULL, NULL, NULL, &section));
+  PetscCall(DMSetLocalSection(H1dm, section));
   PetscCall(PetscSectionDestroy(&section));
 
   /* Create point numbering */
@@ -145,27 +139,32 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   /* Compute local number of faces (only globally-owned points contribute). */
   PetscCall(DMPlexGetDepthStratum(*dm, 2, &faceStart, &faceEnd));
   for (PetscInt i = faceStart; i < faceEnd; i++) {
-    if (gidxs[i - pStart] >= 0) numFacesLocal += 1;
+    if (gidxs[i - pStart] >= 0) {
+      numFacesLocal += 1;
+    }
   }
 
   /* Compute local number of edges. */
   PetscCall(DMPlexGetDepthStratum(*dm, 1, &edgeStart, &edgeEnd));
   for (PetscInt i = edgeStart; i < edgeEnd; i++) {
-    if (gidxs[i - pStart] >= 0) numEdgesLocal += 1;
+    if (gidxs[i - pStart] >= 0) {
+      numEdgesLocal += 1;
+    }
   }
 
   /* Compute local number of vertices. */
   PetscCall(DMPlexGetDepthStratum(*dm, 0, &vertexStart, &vertexEnd));
   for (PetscInt i = vertexStart; i < vertexEnd; i++) {
-    if (gidxs[i - pStart] >= 0) numVerticesLocal += 1;
+    if (gidxs[i - pStart] >= 0) {
+      numVerticesLocal += 1;
+    }
   }
 
   /* MPI_Allreduce for mesh statististics */
   {
     PetscInt localCounts[4]  = {numCellsLocal, numFacesLocal, numEdgesLocal, numVerticesLocal};
     PetscInt globalCounts[4] = {0, 0, 0, 0};
-    PetscCallMPI(MPI_Allreduce(localCounts, globalCounts, 4, MPIU_INT, MPI_SUM,
-                               PetscObjectComm((PetscObject)*dm)));
+    PetscCallMPI(MPI_Allreduce(localCounts, globalCounts, 4, MPIU_INT, MPI_SUM, PetscObjectComm((PetscObject)*dm)));
     numCellsGlobal    = globalCounts[0];
     numFacesGlobal    = globalCounts[1];
     numEdgesGlobal    = globalCounts[2];
@@ -176,42 +175,42 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
   PetscCall(DMGetDimension(*dm, &dim));
 
   /* Setup petgemGrid */
-  grid->numCellsLocal = numCellsLocal;
-  grid->numCellsGlobal = numCellsGlobal;
-  grid->numFacesLocal = numFacesLocal;
-  grid->numFacesGlobal = numFacesGlobal;
-  grid->numEdgesLocal = numEdgesLocal;
-  grid->numEdgesGlobal = numEdgesGlobal;
-  grid->numVerticesLocal = numVerticesLocal;
+  grid->numCellsLocal     = numCellsLocal;
+  grid->numCellsGlobal    = numCellsGlobal;
+  grid->numFacesLocal     = numFacesLocal;
+  grid->numFacesGlobal    = numFacesGlobal;
+  grid->numEdgesLocal     = numEdgesLocal;
+  grid->numEdgesGlobal    = numEdgesGlobal;
+  grid->numVerticesLocal  = numVerticesLocal;
   grid->numVerticesGlobal = numVerticesGlobal;
-  grid->numDofInVertex = numDofInVertex;
-  grid->numDofInEdge = numDofInEdge;
-  grid->numDofInFace = numDofInFace;
-  grid->numDofInVolume = numDofInVolume;
-  grid->numDofInCell = numDofInCell;
-  grid->cellStart = cellStart;
-  grid->cellEnd = cellEnd;
-  grid->faceStart = faceStart;
-  grid->faceEnd = faceEnd;
-  grid->edgeStart = edgeStart;
-  grid->edgeEnd = edgeEnd;
-  grid->vertexStart = vertexStart;
-  grid->vertexEnd = vertexEnd;
-  grid->dim = dim;
-  grid->numH1DofInCell_Pnord = numH1DofInCell_Pnord;
-  grid->H1dm_Pnord           = H1dm_Pnord;
+  grid->numDofInVertex    = numDofInVertex;
+  grid->numDofInEdge      = numDofInEdge;
+  grid->numDofInFace      = numDofInFace;
+  grid->numDofInVolume    = numDofInVolume;
+  grid->numDofInCell      = numDofInCell;
+  grid->cellStart         = cellStart;
+  grid->cellEnd           = cellEnd;
+  grid->faceStart         = faceStart;
+  grid->faceEnd           = faceEnd;
+  grid->edgeStart         = edgeStart;
+  grid->edgeEnd           = edgeEnd;
+  grid->vertexStart       = vertexStart;
+  grid->vertexEnd         = vertexEnd;
+  grid->dim               = dim;
+  grid->numH1DofInCell    = numH1DofInCell;
+  grid->H1dm              = H1dm;
 
-  /* Mirror the FEM space descriptor used by hvfem/assembly/postprocessing.
+  /* Mirror the FEM space descriptor used by fem/assembly/postprocessing.
    *
    * Layout in the per-cell H(curl) vector matches PETSc DMPlex's
    * closure-traversal order (cell -> faces -> edges -> vertices) so that
    * cell-local slot k aligns with dofIndices[k] from DMPlexGetClosureIndices.
-   * The per-order shape3DETet permutation table in src/hvfem_hierarchical.c
-   * is constructed against this same order.
+   * The reference Nedelec basis (femOrient in src/fem.c) emits its per-cell
+   * DOFs against this same order.
    *
-   *   nord=1: edges only            (edgeDofOffset = 0, rest empty).
-   *   nord=2: faces, then edges     (faces 0..7, edges 8..19).
-   *   nord>=3: volume, then faces, then edges (volume 0..nVol-1,
+   *   order=1: edges only            (edgeDofOffset = 0, rest empty).
+   *   order=2: faces, then edges     (faces 0..7, edges 8..19).
+   *   order>=3: volume, then faces, then edges (volume 0..nVol-1,
    *           faces nVol..nVol+nFace-1, edges nVol+nFace..end).
    *
    * The offset for an empty class is set to numDofInCell so loops can
@@ -222,9 +221,9 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
     const PetscInt nFace = NUM_FACES_PER_CELL * numDofInFace;
     const PetscInt nVol  = numDofInVolume;
 
-    grid->fem.nord            = params.nord;
+    grid->fem.order            = params.order;
     grid->fem.numDofInCell    = numDofInCell;
-    grid->fem.numH1DofInCell_Pnord  = numH1DofInCell_Pnord;
+    grid->fem.numH1DofInCell  = numH1DofInCell;
 
     grid->fem.numDofPerEdge   = numDofInEdge;
     grid->fem.numDofPerFace   = numDofInFace;
@@ -234,47 +233,42 @@ PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
     grid->fem.numFaceDof      = nFace;
     grid->fem.numVolumeDof    = nVol;
 
-    if (params.nord == 1) {
+    if (params.order == 1) {
       /* edges only */
       grid->fem.edgeDofOffset   = 0;
       grid->fem.faceDofOffset   = numDofInCell;
       grid->fem.volumeDofOffset = numDofInCell;
     } else if (nVol == 0) {
-      /* nord=2: faces, then edges (no volume DOFs) */
+      /* order=2: faces, then edges (no volume DOFs) */
       grid->fem.faceDofOffset   = 0;
       grid->fem.edgeDofOffset   = nFace;
       grid->fem.volumeDofOffset = numDofInCell;
     } else {
-      /* nord >= 3: volume, then faces, then edges. Matches PETSc
+      /* order >= 3: volume, then faces, then edges. Matches PETSc
        * DMPlexGetClosureIndices order: cell-DOFs first, then face-DOFs,
        * then edge-DOFs. */
       grid->fem.volumeDofOffset = 0;
       grid->fem.faceDofOffset   = nVol;
       grid->fem.edgeDofOffset   = nVol + nFace;
     }
-
-    /* Per-order Nédélec dispatch table. Hot paths (computeElementalMatrices,
-     * evaluateNedelecBasis) call through this pointer instead of switching
-     * on nord. */
-    grid->fem.ops = nedelecOpsForOrder(params.nord);
   }
 
   /* Print mesh statistics (uniform key = value style; label width 24) */
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Mesh:\n"));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n",                "Input file",         params.inputFile));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "Number of vertices", grid->numVerticesGlobal));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "Number of edges",    grid->numEdgesGlobal));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "Number of faces",    grid->numFacesGlobal));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "Number of cells",    grid->numCellsGlobal));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of vertices", formatGroupedInt(grid->numVerticesGlobal)));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of edges",    formatGroupedInt(grid->numEdgesGlobal)));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of faces",    formatGroupedInt(grid->numFacesGlobal)));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of cells",    formatGroupedInt(grid->numCellsGlobal)));
 
   /* Print FEM-space statistics */
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n FEM space:\n"));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "Basis order",      params.nord));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "DOFs per vertex",  grid->numDofInVertex));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "DOFs per edge",    grid->numDofInEdge));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "DOFs per face",    grid->numDofInFace));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "DOFs per volume",  grid->numDofInVolume));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %" PetscInt_FMT "\n", "DOFs per cell",    grid->numDofInCell));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Basis order",      formatGroupedInt(params.order)));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per vertex",  formatGroupedInt(grid->numDofInVertex)));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per edge",    formatGroupedInt(grid->numDofInEdge)));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per face",    formatGroupedInt(grid->numDofInFace)));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per volume",  formatGroupedInt(grid->numDofInVolume)));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per cell",    formatGroupedInt(grid->numDofInCell)));
 
   /* Restore global numbering and free memory */
   PetscCall(ISRestoreIndices(globalPointNumbering, &gidxs));

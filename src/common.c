@@ -25,6 +25,44 @@
 #define LINE_WIDTH 74
 
 /**
+ * @brief Formats an integer with space-grouped thousands for readable logs.
+ *
+ * Renders `value` with a space every three digits (e.g. 3738963 -> "3 738 963")
+ * into one of a few rotating internal buffers, so several formatted numbers can
+ * appear in a single printf argument list (e.g. "M x N"). Presentation only:
+ * values below 1000 are rendered unchanged. Not thread-safe (static buffers).
+ *
+ * @param[in] value  Integer to format.
+ *
+ * @return Pointer to a NUL-terminated grouped-number string (do not free).
+ */
+const char *formatGroupedInt(PetscInt value) {
+  enum { NUM_BUFS = 6, BUF_LEN = 32 };
+  static char bufs[NUM_BUFS][BUF_LEN];
+  static PetscInt which = 0;
+  char *out = bufs[which];
+  which = (which + 1) % NUM_BUFS;
+
+  /* Absolute-value decimal digits, least-significant first (INT_MIN-safe). */
+  char digits[24];
+  PetscInt nd = 0;
+  unsigned long long uv = (value < 0) ? (unsigned long long)(-(value + 1)) + 1ULL
+                                      : (unsigned long long)value;
+  if (uv == 0) digits[nd++] = '0';
+  while (uv > 0) { digits[nd++] = (char)('0' + (int)(uv % 10ULL)); uv /= 10ULL; }
+
+  /* Emit most-significant first, a space after every third remaining digit. */
+  PetscInt oi = 0;
+  if (value < 0) out[oi++] = '-';
+  for (PetscInt i = nd - 1; i >= 0; i--) {
+    out[oi++] = digits[i];
+    if (i > 0 && (i % 3) == 0) out[oi++] = ' ';
+  }
+  out[oi] = '\0';
+  return out;
+}
+
+/**
  * @brief Computes the display width of a UTF-8 string in characters.
  *
  * This function calculates the number of printable characters in
@@ -202,8 +240,7 @@ static PetscErrorCode PrintTimerHMSPercent(const char* label, PetscLogDouble t, 
 
   percent = (total > 0.0) ? (100.0 * t / total) : 0.0;
 
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %02d:%02d:%06.3f  | %6.2f %% |\n",
-                        label, hours, minutes, seconds, percent));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %02d:%02d:%06.3f  | %6.2f %% |\n", label, hours, minutes, seconds, percent));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -235,12 +272,9 @@ PetscErrorCode printHeader(void) {
   PetscCall(printEmptyLine());
   PetscCall(printEmptyLine());
   PetscCall(printCenteredText("PETGEM"));
-  PetscCall(printCenteredText("Parallel Exascale Toolkit for "
-                              "Geophysical Electromagnetic "
-                              "Modeling"));
+  PetscCall(printCenteredText("Parallel Edge-element Toolkit for General Electromagnetic Modeling"));
   PetscCall(printEmptyLine());
-  PetscCall(printCenteredText("GitHub repository: "
-                              "github.com/ocastilloreyes/petgem"));
+  PetscCall(printCenteredText("GitHub repository: github.com/ocastilloreyes/petgem"));
   PetscCall(printEmptyLine());
   PetscCall(printSeparator('-'));
   PetscCall(printEmptyLine());
@@ -407,8 +441,7 @@ PetscErrorCode printUsage(const char *progname) {
     "  %s -mode inverse  [petsc options]\n"
     "  %s --version\n"
     "\n"
-    "Pass -options_file <file.txt> for the usual params input.\n",
-    progname, progname, progname, progname, progname));
+    "Pass -options_file <file.txt> for the usual params input.\n", progname, progname, progname, progname, progname));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

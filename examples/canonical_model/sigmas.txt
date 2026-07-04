@@ -1,0 +1,14 @@
+# Per-material conductivity table for the canonical_model CSEM example
+# (see mesh.geo / README.md for the layered marine model it describes).
+#
+# One row per material, ordered by 0-based material id (= gmsh physical
+# tag - 1). Columns are the diagonal conductivity: sigma_x sigma_y sigma_z [S/m].
+# Rows below map to the layered mesh volumes as:
+#   row 0  tag 1  "Sediments2"  deep sediments        1.0     S/m  (1    Ohm.m)
+#   row 1  tag 2  "Oil"         thin HC resistor       0.01    S/m  (100  Ohm.m)
+#   row 2  tag 3  "Sediments1"  overburden sediments   1.0     S/m  (1    Ohm.m)
+#   row 3  tag 4  "Water"       seawater               3.3333  S/m  (0.3  Ohm.m)
+1.0 1.0 1.0
+0.01 0.01 0.01
+1.0 1.0 1.0
+3.3333 3.3333 3.3333

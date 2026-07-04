@@ -15,10 +15,11 @@
 #include <petscviewerhdf5.h>
 
 /* PETGEM functions */
+#include "common.h"
 #include "constants.h"
 #include "grid.h"
-#include "hvfem.h"
-#include "inputs.h"
+#include "fem.h"
+#include "io.h"
 #include "postprocessing.h"
 #include "receiver_interp.h"
 #include "version.h"
@@ -33,7 +34,7 @@
  * provenance attributes at the root:
  *
  *   /                              root attrs: petgem_version, input_filename,
- *                                              date, nord, mpi_tasks,
+ *                                              date, order, mpi_tasks,
  *                                              num_sources, frequency
  *   /sources/src{k}/               attrs: frequency, x_pos, y_pos, z_pos,
  *                                         current, length, dip_angle,
@@ -50,7 +51,7 @@
  * by loadCsemInputs - passed through so postprocessing does not re-open the
  * input HDF5.
  *
- * @param[in] params     Forward-modeling parameters (nord, output paths, MPI tasks).
+ * @param[in] params     Forward-modeling parameters (order, output paths, MPI tasks).
  * @param[in] sources    Transmitter set (one solution column per source).
  * @param[in] dm         DMPlex mesh and H(curl) discretization.
  * @param[in] grid       Finite-element grid descriptor.
@@ -94,7 +95,7 @@ PetscErrorCode computeFields(const fmParams params,
    * frequency.  Per-receiver Ex = QEx * x, etc. - MPI-invariant by
    * construction because each Q row is decided once with global column
    * indexing, irrespective of partition. */
-  PetscCall(buildReceiverInterpolationMatrices(params.nord, receivers, dm, &grid, &Q));
+  PetscCall(buildReceiverInterpolationMatrices(params.order, receivers, dm, &grid, &Q));
 
   /* Allocate output Vecs sized to match Q's row layout (left vector).
    * These are parallel Vecs on the kernel communicator, so VecView through
@@ -135,7 +136,7 @@ PetscErrorCode computeFields(const fmParams params,
   /* Print message */
   PetscCall(PetscPrintf(comm, "\n Field interpolation:\n"));
   PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Input file",          params.inputFile));
-  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT "\n", "Number of receivers", Q.numReceivers));
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Number of receivers", formatGroupedInt(Q.numReceivers)));
   PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Output file",         outFileName));
   PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",              "Started"));
 
@@ -149,7 +150,7 @@ PetscErrorCode computeFields(const fmParams params,
   PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "petgem_version", PETSC_STRING, version));
   PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "input_filename", PETSC_STRING, params.inputFile));
   PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "date",           PETSC_STRING, date));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "nord",           PETSC_INT,    &params.nord));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "order",          PETSC_INT,    &params.order));
   PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "mpi_tasks",      PETSC_INT,    &params.numMPITasks));
   PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "num_sources",    PETSC_INT,    &sources.numSources));
   PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "frequency",      PETSC_REAL,   &sources.freq));
@@ -163,7 +164,7 @@ PetscErrorCode computeFields(const fmParams params,
     /* Get the solution column for this source */
     PetscCall(MatDenseGetColumnVecRead(X, i, &x));
 
-    PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " of %" PetscInt_FMT "\n", "Processing source", i + 1, sources.numSources));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s of %s\n", "Processing source", formatGroupedInt(i + 1), formatGroupedInt(sources.numSources)));
 
     /* Apply Q to the H(curl) solution: Ex = QEx*x, Ey = QEy*x, ... */
     PetscCall(MatMult(Q.QEx, x, Ex));
