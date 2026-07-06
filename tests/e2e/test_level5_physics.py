@@ -9,7 +9,7 @@ three receivers) solved with the PRODUCTION PCBDDC + discrete-gradient path
     robust tolerance (a regression guard on the whole assemble->solve->interp
     pipeline).
 
-The goldens in tests/cases/unit_cube/reference/ are exact serial LU solves of
+The goldens in examples/unit_cube/reference/ are exact serial LU solves of
 the current code; PCBDDC converges to them within its iterative tolerance, so a
 loose relative tolerance keeps the check CI-stable across rank counts.
 """

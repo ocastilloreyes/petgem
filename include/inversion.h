@@ -251,7 +251,7 @@ typedef struct {
 /**
  * @brief Reads inversion parameters from the PETSc options database.
  *
- * @param[out] iparams  Struct receiving the parsed inversion parameters.
+ * @param[out] im_Params  Struct receiving the parsed inversion parameters.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */
@@ -266,7 +266,7 @@ PetscErrorCode readInversionParams(imParams *iparams);
  * bundle has no such entries - iparams keeps the readInversionParams defaults.
  *
  * @param[in]     bundleFile  Path to the unified PETGEM HDF5 bundle.
- * @param[in,out] iparams     Inversion parameters updated in place.
+ * @param[in,out] im_Params   Inversion parameters updated in place.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */
@@ -281,7 +281,7 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
  * HDF5 path consumed by loadCsemInputs.
  *
  * @param[in]     bundleFile  Path to the unified PETGEM HDF5 bundle.
- * @param[in,out] iparams     Inversion parameters whose sources are filled.
+ * @param[in,out] im_Params   Inversion parameters whose sources are filled.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */
@@ -509,7 +509,7 @@ typedef PetscErrorCode (*InversionObjGradFn)(Vec X, PetscReal *F, Vec G,
  *
  * @param[in]  X    Current log-perturbation iterate.
  * @param[out] F    Objective value at X.
- * @param[out] G    Gradient at X.
+ * @param[out] Gvec Gradient at X.
  * @param[in]  ctx  InversionContext pointer.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.

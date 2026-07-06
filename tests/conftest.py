@@ -6,7 +6,7 @@ Two families share this infrastructure:
     the UNCHANGED production sources and run per order. They verify the real
     reference-element bases, DOF enumeration and elemental matrices directly.
   * levels 4-5 (e2e): the built `fm.csem` binary is run once per order on the
-    single tests/cases/unit_cube/input.h5 bundle (order forced with `-order N`,
+    single examples/unit_cube/input.h5 bundle (order forced with `-order N`,
     which also bypasses the bundle's order dataset).
 
 Fixtures needing a toolchain/binary that may be absent ``pytest.skip`` so the

@@ -6,14 +6,13 @@
 #   1. Removed-symbol guard. Fails if a retired CODE token reappears. These
 #      tokens are never legitimate (current baseline is zero), so any hit is
 #      real drift:
-#        - MatFilter()            G_BDDC uses MAT_IGNORE_ZERO_ENTRIES instead
 #        - <imParams>->nord       must be ->fm.nord (nord lives in embedded fm)
 #        - <params>->bundleFile   removed struct field (use ->fm.inputFile)
 #        - /inv_sources           removed HDF5 group (unified into /sources)
 #        - -fm_grad_check         removed diagnostic option
-#      Regexes match the CODE form only, so legitimate prose - e.g. the
-#      "no MatFilter pass is required" note in assembly.c or the historical
-#      "canonical gradient" note in solver.c - does NOT trip the guard.
+#      Regexes match the CODE form only (a member access, an HDF5 group, an
+#      option token), so legitimate prose that merely mentions a retired name
+#      does NOT trip the guard.
 #
 #   2. Doxygen @param consistency. If doxygen is installed, parses the
 #      sources and fails on "is not found in the argument list" warnings,
@@ -41,7 +40,6 @@ fail=0
 # Entries are "<extended-regex>|<human description>". The regexes contain no
 # literal '|', so the field split below is unambiguous.
 GUARDS=(
-  'MatFilter\(|MatFilter() call - G_BDDC relies on MAT_IGNORE_ZERO_ENTRIES'
   '[iI]m?_?[Pp]arams->nord\b|imParams->nord - use ->fm.nord (nord is in the embedded fmParams)'
   '[Pp]arams->bundleFile\b|removed struct field bundleFile - use ->fm.inputFile'
   '/inv_sources\b|removed HDF5 group /inv_sources - unified into /sources'

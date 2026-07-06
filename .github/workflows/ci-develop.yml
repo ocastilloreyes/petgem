@@ -69,7 +69,7 @@ jobs:
               - '.github/workflows/tests-fm-csem.yml'
               - 'pytest.ini'
             cases:
-              - 'tests/cases/**'
+              - 'examples/**'
 
   # ==================
   # Build docker image

@@ -32,8 +32,8 @@
  * @param[in]  graph               Neighbor graph describing cell adjacency.
  * @param[in]  dmInversion         DM for the inversion (per-cell) field.
  * @param[in]  grid                Finite-element grid descriptor.
- * @param[out] notFixedMaskGlobal  Global 0/1 mask Vec.
- * @param[out] notFixedMaskLocal   Ghosted local counterpart of the mask.
+ * @param[out] maskGlobal          Global 0/1 mask Vec.
+ * @param[out] maskLocal           Ghosted local counterpart of the mask.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
@@ -71,7 +71,7 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
  * history, and provenance attributes. Called once at the end of
  * runCsemInversion.
  *
- * @param[in] iparams         Inversion parameters / provenance.
+ * @param[in] im_Params       Inversion parameters / provenance.
  * @param[in] dmConductivity  DM for the per-cell conductivity field.
  * @param[in] conductivity    Recovered conductivity Vec.
  * @param[in] X               Recovered log-perturbation / model Vec.

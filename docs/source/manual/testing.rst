@@ -13,7 +13,7 @@ Layout
   (preprocess :math:`\rightarrow` ``fm.csem`` :math:`\rightarrow` postprocess),
   including a structural smoke test and a numerical regression against the
   ModEM reference, parametrized over ``nord``.
-- ``tests/cases/`` - the case data exercised by the integration tests.
+- ``examples/`` - the case data exercised by the integration tests.
 
 Markers (declared in ``pytest.ini``):
 

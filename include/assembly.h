@@ -74,7 +74,7 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  * @param[in]  constFactor  Fused-mode factor iωμ; ignored when Ms != NULL.
  * @param[out] KorA         Stiffness K (K/Ms mode) or fused operator A.
  * @param[out] Ms           Mass-σ matrix in K/Ms mode; pass NULL for fused mode.
- * @param[out] G_BDDC       High-order discrete gradient; pass NULL to skip.
+ * @param[out] G            High-order discrete gradient; pass NULL to skip.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.

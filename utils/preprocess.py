@@ -27,7 +27,7 @@ Usage examples:
     python3 utils/preprocess.py \\
         -mode forward \\
         -order 1 \\
-        -case_dir tests/cases/<case> \\
+        -case_dir examples/<case> \\
         -mesh_filename mesh_p1.msh \\
         -receiver_filename receivers.txt \\
         -source_filename sources.txt \\
@@ -38,7 +38,7 @@ Usage examples:
     python3 utils/preprocess.py \\
         -mode inverse \\
         -order 1 \\
-        -case_dir tests/cases/<case> \\
+        -case_dir examples/<case> \\
         -mesh_filename mesh_p1.msh \\
         -receiver_filename receivers.txt \\
         -inv_source_filename sources.txt \\

@@ -84,6 +84,6 @@ scripts) for:
 - Visualization of the model in VTK format (``-output_vtk``).
 - Comparison of responses against a reference (per-case ``postprocess.py``).
 
-Example cases ship under ``tests/cases/`` (e.g. ``tests/cases/csem_model`` for
-forward modeling and ``tests/cases/inverse`` for inversion). These illustrate
+Example cases ship under ``examples/`` (e.g. ``examples/csem_model`` for
+forward modeling and ``examples/inverse`` for inversion). These illustrate
 the construction of the bundle and parameter files for each mode.

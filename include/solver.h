@@ -51,7 +51,7 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
  *
  * @param[in,out] ksp   KSP whose preconditioner is configured.
  * @param[in]     A     System matrix (probed for MATIS).
- * @param[in]     Gbddc Discrete-gradient hint (may be NULL).
+ * @param[in]     G     Discrete-gradient hint (may be NULL).
  * @param[in]     order  Nédélec basis order registered with the gradient.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,

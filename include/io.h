@@ -60,7 +60,7 @@ typedef struct {
  * from the input bundle.
  *
  * @param[in]  size    Number of MPI tasks.
- * @param[out] params  Struct receiving the parsed CSEM parameters.
+ * @param[out] fm_Params  Struct receiving the parsed CSEM parameters.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
@@ -87,16 +87,16 @@ PetscErrorCode readfmParams(const PetscMPIInt size, fmParams* params);
  * receivers-file open path with a single open of the bundle produced by
  * the Python preprocessor (utils/functions.py::writeBundle).
  *
- * @param[in,out] fm_params     Parameters; inputFile is read, order is
- *                              written from the bundle's /order dataset.
- * @param[out]    dm            Loaded DMPlex mesh.
- * @param[out]    conductivity  Per-cell conductivity Vec.
- * @param[out]    materialsID   Per-cell material-id Vec.
- * @param[out]    sources       Forward transmitter set; pass NULL to skip
- *                              (im.csem pulls multi-frequency sources via
- *                              setupInversionSources instead).
- * @param[out]    receivers     Serial Vec of 3·N_recv receiver reals; pass
- *                              NULL to skip.
+ * @param[in,out] fm_Params           Parameters; inputFile is read, order is
+ *                                    written from the bundle's /order dataset.
+ * @param[out]    odm                 Loaded DMPlex mesh.
+ * @param[out]    conductivity_output Per-cell conductivity Vec.
+ * @param[out]    materials_id_output Per-cell material-id Vec.
+ * @param[out]    sources             Forward transmitter set; pass NULL to skip
+ *                                    (im.csem pulls multi-frequency sources via
+ *                                    setupInversionSources instead).
+ * @param[out]    receivers_output    Serial Vec of 3·N_recv receiver reals; pass
+ *                                    NULL to skip.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.

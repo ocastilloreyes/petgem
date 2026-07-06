@@ -2,7 +2,7 @@
 
 Numerical-correctness and implementation-verification tests for the **forward
 CSEM kernel (`fm.csem`)**, built exclusively around the
-[`tests/cases/unit_cube`](cases/unit_cube) dataset (a homogeneous unit cube,
+[`examples/unit_cube`](../examples/unit_cube) dataset (a homogeneous unit cube,
 one 2 Hz electric dipole at the centre, three receivers).
 
 The production C implementation is treated as correct and is **never modified**
@@ -52,17 +52,16 @@ tests/
 ├── e2e/                          # end-to-end fm.csem tests (levels 4-5)
 │   ├── test_level4_assembly.py
 │   └── test_level5_physics.py
-├── extrae/                       # Extrae trace config for the CI extrae-smoke job
-│   ├── extrae.xml
-│   ├── petgem_functions.cfg
-│   └── petgem_labels.txt
-└── cases/unit_cube/              # the ONLY dataset used (see its README)
-    ├── input.h5                  #   preprocessed input bundle the tests drive
-    ├── params_p1.txt             #   PETSc options for the production PCBDDC solver
-    ├── sources.txt, receivers.txt, sigmas.txt   # bundle provenance
-    └── reference/                # committed exact-LU goldens for orders 1,2,3
-        └── responses_p{1,2,3}.h5
+└── extrae/                       # Extrae trace config for the CI extrae-smoke job
+    ├── extrae.xml
+    ├── petgem_functions.cfg
+    └── petgem_labels.txt
 ```
+
+The dataset the e2e / extrae jobs drive lives under `examples/unit_cube` (a tiny
+homogeneous cube; see its README) — the `tests/` tree holds only test code. It is
+regenerated from its committed `mesh.geo` + `*.txt` via the same
+`gmsh → preprocess` pipeline as the other cases in `examples/`.
 
 ## Test list & validation criteria
 
@@ -136,8 +135,8 @@ into `reference/`:
 ```bash
 for N in 1 2 3; do
   build/fm.csem \
-    -input_filename tests/cases/unit_cube/input.h5 -order $N \
-    -output_dir tests/cases/unit_cube/reference -output_filename responses_p$N \
+    -input_filename examples/unit_cube/input.h5 -order $N \
+    -output_dir examples/unit_cube/reference -output_filename responses_p$N \
     -dm_mat_type aij -ksp_type preonly -pc_type lu \
     -pc_factor_mat_ordering_type nd -ksp_error_if_not_converged
 done

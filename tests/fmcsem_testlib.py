@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-UNIT_CUBE = REPO_ROOT / "tests" / "cases" / "unit_cube"
+UNIT_CUBE = REPO_ROOT / "examples" / "unit_cube"
 CSRC = REPO_ROOT / "tests" / "csrc"
 
 #: All orders validated at the FE-core level (levels 1-3, fast C harnesses).

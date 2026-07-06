@@ -4,7 +4,7 @@ Inverse modeling examples
 This section provides an example inversion to help users get started with 3D
 CSEM inverse modeling using **PETGEM**. The example exercises the full
 inversion workflow - preprocessing, kernel execution, and model recovery - on
-the case shipped under ``tests/cases/inverse``. For the forward workflow, see
+the case shipped under ``examples/inverse``. For the forward workflow, see
 :doc:`examples`.
 
 Canonical inversion example
@@ -41,7 +41,7 @@ Run the following commands to execute the inversion. The case is provided at
    make
 
    # Setup environment
-   export INVERSE_TEST_DIR=tests/cases/inverse
+   export INVERSE_TEST_DIR=examples/inverse
    export NORD=1
 
    # Generate the input bundle and parameter file (inverse mode).

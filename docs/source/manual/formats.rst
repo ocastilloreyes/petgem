@@ -167,5 +167,5 @@ Python readers:
   per-source entry shaped like ``readResponses``.
 
 The per-case ``postprocess.py`` scripts use these readers; see
-``tests/cases/csem_model/postprocess.py`` (single-source reference compare)
+``examples/csem_model/postprocess.py`` (single-source reference compare)
 and ``cicero_models/model_1/postprocess.py`` (multi-source plotting).

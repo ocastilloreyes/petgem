@@ -22,7 +22,8 @@ from fmcsem_testlib import PIPELINE_ORDERS, parse_grid_stats
 pytestmark = pytest.mark.slow
 
 # Fixed unit-cube topology (order-independent) - a regression guard on loading.
-MESH = {"vertices": 365, "edges": 2092, "faces": 3264, "cells": 1536}
+# Matches the structured mesh.geo (N=6): (N+1)^3 vertices, 6*N^3 tetrahedra.
+MESH = {"vertices": 343, "edges": 1854, "faces": 2808, "cells": 1296}
 
 
 @pytest.mark.e2e

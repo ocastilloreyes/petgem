@@ -26,7 +26,7 @@ Run the canonical forward example
 .. code-block:: bash
 
    # Case directory and polynomial order
-   export CSEM_TEST_DIR=tests/cases/csem_model
+   export CSEM_TEST_DIR=examples/csem_model
    export NORD=1
 
    # 1. Mesh

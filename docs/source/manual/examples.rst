@@ -38,7 +38,7 @@ order (``1`` through ``6``) by modifying the ``NORD`` variable:
    make
 
    # Setup environment
-   export CSEM_TEST_DIR=tests/cases/csem_model
+   export CSEM_TEST_DIR=examples/csem_model
    export NORD=1        # any order in 1..6
 
    # Mesh generation
@@ -136,15 +136,15 @@ performance trace:
 
 The Extrae configuration files (``extrae.xml``, ``petgem_labels.txt``, and the
 Paraver configuration ``petgem_functions.cfg``) ship with the canonical case
-under ``tests/cases/csem_model/extrae``; the mesh, sources, receivers, and
-conductivity table are reused from ``tests/cases/csem_model``. This is the same
+under ``examples/csem_model/extrae``; the mesh, sources, receivers, and
+conductivity table are reused from ``examples/csem_model``. This is the same
 execution exercised in CI.
 
 .. code-block:: bash
 
    # Setup environment
    export LD_LIBRARY_PATH=${EXTRAE_HOME}/lib:$LD_LIBRARY_PATH
-   export CSEM_TEST_DIR=tests/cases/csem_model
+   export CSEM_TEST_DIR=examples/csem_model
    export EXTRAE_DIR=${CSEM_TEST_DIR}/extrae
    export EXTRAE_CONFIG_FILE=${EXTRAE_DIR}/extrae.xml
    export EXTRAE_LABELS=${EXTRAE_DIR}/petgem_labels.txt
@@ -187,7 +187,7 @@ Step-by-step
 
    - ``LD_LIBRARY_PATH`` to include Extrae libraries
    - ``CSEM_TEST_DIR`` for the case data (mesh, sources, receivers, conductivity)
-   - ``EXTRAE_DIR`` for the Extrae configuration files (``tests/cases/csem_model/extrae``)
+   - ``EXTRAE_DIR`` for the Extrae configuration files (``examples/csem_model/extrae``)
    - ``EXTRAE_CONFIG_FILE`` for the Extrae configuration (``extrae.xml``)
    - ``EXTRAE_LABELS`` for the labels used in instrumentation (``petgem_labels.txt``)
    - ``TRACE_NAME`` for the output trace
