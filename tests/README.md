@@ -146,16 +146,17 @@ done
 
 Workflow: [`.github/workflows/tests-fm-csem.yml`](../.github/workflows/tests-fm-csem.yml)
 — a **reusable** workflow called by
-[`ci-develop.yml`](../.github/workflows/ci-develop.yml) after it has built the
-CI image and compiled the `fm.csem` binaries (with and without Extrae). It
-consumes those artifacts rather than rebuilding them. All jobs run inside the
-prebuilt CI image (PETSc, mpicc, python, h5py, numpy).
+[`ci-develop.yml`](../.github/workflows/ci-develop.yml) after it has compiled the
+`fm.csem` binary. It consumes that artifact rather than rebuilding it. The CI
+image itself is built separately by
+[`image.yml`](../.github/workflows/image.yml) (only when `docker/**` changes) and
+merely pulled here. All jobs run inside that prebuilt image (PETSc, mpicc, gmsh,
+python, h5py, numpy).
 
 | Job | Runs | Needs |
 |-----|------|-------|
 | `fe-core-tests` | `pytest tests/unit` — levels 1-3, all orders 1-6, ~10 s | CI image (no binary) |
-| `e2e-tests` | `pytest tests/e2e` — levels 4-5, orders 1-3, `FM_CSEM_NP=4` | the `fm.csem` artifact |
-| `extrae-smoke` | runs the Extrae-instrumented `fm.csem.extrae` on the unit cube and asserts a `TRACE.*` is emitted (`tests/extrae/extrae.xml`) | the `fm.csem.extrae` artifact |
+| `e2e-tests` | `pytest tests/e2e` — levels 4-5, orders 1-3, `FM_CSEM_NP=2` | the `fm.csem` artifact |
 
 The order override is passed as `-order N`, which also bypasses the bundle's
 order dataset, so all six orders run against the single committed `input.h5`.

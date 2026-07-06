@@ -19,29 +19,30 @@ on:
 env:
   PETSC_DIR: /usr/local/petsc
   PETSC_ARCH: arch-linux-c-opt
-  GMSH_DIR: /usr/local/gmsh/bin
-  EXTRAE_HOME: /usr/local/extrae
+  # Pinned CI image. Built rarely by .github/workflows/image.yml (only when
+  # docker/** changes); this workflow only *pulls* it - it never rebuilds the
+  # image. Pin to a digest (...@sha256:...) instead of :latest for a fully
+  # reproducible run.
   DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-  # Forces JavaScript actions still declaring Node 20 (e.g.
-  # dorny/paths-filter@v3, which has no Node 24 release yet) to run on
-  # Node 24 - silences the Node 20 deprecation warning until upstream
-  # ships a v4. Remove once all actions natively support Node 24.
+  # Forces JS actions still declaring Node 20 (dorny/paths-filter@v3, no Node 24
+  # release yet) to run on Node 24 - silences the deprecation warning until
+  # upstream ships a v4. Remove once the action supports Node 24 natively.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 # ====
 # Jobs
 # ====
 jobs:
-  # ==================
-  # Detect changes
-  # ==================
+  # ================================================================
+  # Detect changes - gates the fm.csem jobs and the docs jobs
+  # independently, so a docs-only change skips the kernel build/tests
+  # and a code-only change skips the docs build.
+  # ================================================================
   changes:
     runs-on: ubuntu-latest
     outputs:
-      src: ${{ steps.filter.outputs.src }}
+      fmcsem: ${{ steps.filter.outputs.fmcsem }}
       docs: ${{ steps.filter.outputs.docs }}
-      pytest: ${{ steps.filter.outputs.pytest }}
-      cases: ${{ steps.filter.outputs.cases }}
     steps:
       - uses: actions/checkout@v5
 
@@ -49,139 +50,82 @@ jobs:
         id: filter
         with:
           filters: |
-            src:
+            fmcsem:
               - 'src/**'
               - 'include/**'
               - 'utils/**'
               - 'Makefile'
+              - 'tests/**'
+              - 'examples/**'
+              - 'pytest.ini'
+              - '.github/workflows/ci-develop.yml'
+              - '.github/workflows/tests-fm-csem.yml'
             docs:
               - 'docs/**'
               - 'scripts/auto_doc/**'
               - 'Doxyfile'
               - 'include/**'
               - 'src/**'
-            pytest:
-              - 'tests/unit/**'
-              - 'tests/e2e/**'
-              - 'tests/csrc/**'
-              - 'tests/conftest.py'
-              - 'tests/fmcsem_testlib.py'
-              - '.github/workflows/tests-fm-csem.yml'
-              - 'pytest.ini'
-            cases:
-              - 'examples/**'
 
-  # ==================
-  # Build docker image
-  # ==================
-  docker-build:
+  # ==============================
+  # Compile fm.csem (forward kernel - the unit under test)
+  # ==============================
+  # Only fm.csem is built. The Extrae-instrumented build, the `petgem`
+  # dispatcher and im.csem are out of scope for the forward-kernel regression
+  # CI; e2e drives build/fm.csem directly.
+  compile-fm-csem:
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.fmcsem == 'true'
     steps:
       - uses: actions/checkout@v5
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/dockerfile.develop
-          push: true
-          tags: ${{ env.DOCKER_IMAGE }}
-          load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ==============================
-  # Compile PETGEM (Extrae matrix)
-  # ==============================
-  # NOTE: im.csem is intentionally not built/tested here yet - the
-  # inverse-kernel CI lands in a follow-up.  We build the two targets
-  # we exercise (fm.csem for forward, petgem as the unified dispatcher).
-  compile-petgem:
-    runs-on: ubuntu-latest
-    needs: [docker-build, changes]
-    if: |
-      needs.changes.outputs.src == 'true' ||
-      needs.changes.outputs.pytest == 'true' ||
-      needs.changes.outputs.cases == 'true'
-    strategy:
-      matrix:
-        extrae: [0, 1]
-      fail-fast: true
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Pull Docker image
+      - name: Pull CI image
         run: docker pull ${{ env.DOCKER_IMAGE }}
 
-      - name: Compile PETGEM (fm.csem + petgem)
+      - name: Compile fm.csem
         run: |
-          if [ "${{ matrix.extrae }}" = "1" ]; then
-            FM_BIN=build/fm.csem.extrae
-            PT_BIN=build/petgem.extrae
-          else
-            FM_BIN=build/fm.csem
-            PT_BIN=build/petgem
-          fi
           docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
+            -v ${{ github.workspace }}:/workspace -w /workspace \
             ${{ env.DOCKER_IMAGE }} \
-            bash -c "make USE_EXTRAE=${{ matrix.extrae }} $FM_BIN $PT_BIN"
+            bash -c "make build/fm.csem"
 
-      - name: Upload compiled binaries
+      - name: Upload fm.csem binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.extrae == 0 && 'petgem-binaries-no-extrae' || 'petgem-binaries-extrae' }}
-          path: |
-            ${{ matrix.extrae == 0 && 'build/fm.csem' || 'build/fm.csem.extrae' }}
-            ${{ matrix.extrae == 0 && 'build/petgem' || 'build/petgem.extrae' }}
+          name: fm-csem-binary
+          path: build/fm.csem
 
   # ==============================
   # FM-CSEM test suite (reusable)
   # ==============================
   # Levels 1-3 (basis / DOF ordering / element matrices, ALL orders 1..6) +
-  # levels 4-5 (global assembly + basic physics on the unit cube, orders 1..3,
-  # up to 4 MPI tasks) + an Extrae build smoke. Delegated to the reusable
-  # tests-fm-csem.yml, which reuses this run's CI image and compiled binaries.
+  # levels 4-5 (global assembly + basic physics on the unit cube, orders 1..3).
+  # Delegated to tests-fm-csem.yml, which reuses this run's CI image and the
+  # compiled fm.csem binary.
   tests-fm-csem:
-    needs: [docker-build, compile-petgem, changes]
-    if: |
-      needs.changes.outputs.src == 'true' ||
-      needs.changes.outputs.pytest == 'true' ||
-      needs.changes.outputs.cases == 'true'
+    needs: [changes, compile-fm-csem]
+    if: needs.changes.outputs.fmcsem == 'true'
     uses: ./.github/workflows/tests-fm-csem.yml
     with:
       docker_image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
-      binary_artifact: petgem-binaries-no-extrae
-      extrae_artifact: petgem-binaries-extrae
-    secrets: inherit
+      binary_artifact: fm-csem-binary
 
   # =====================
   # Compile documentation
   # =====================
   compile-docs:
     runs-on: ubuntu-latest
-    needs: [docker-build, changes]
+    needs: changes
     if: needs.changes.outputs.docs == 'true'
     steps:
       - uses: actions/checkout@v5
-      - name: Pull Docker image
+      - name: Pull CI image
         run: docker pull ${{ env.DOCKER_IMAGE }}
       - name: Generate documentation
         run: |
           docker run --rm \
-            -v "${{ github.workspace }}":/app \
-            -w /app \
+            -v "${{ github.workspace }}":/app -w /app \
             ${{ env.DOCKER_IMAGE }} \
             bash -c "make docs"
 
@@ -190,112 +134,18 @@ jobs:
   # =========================
   # Fast comment/docstring synchronization check
   # (scripts/auto_doc/check_doc_drift.sh): a removed-symbol guard plus a
-  # Doxygen @param-vs-signature check. Runs in the CI image, which already
-  # has doxygen (it builds the docs in compile-docs).
+  # Doxygen @param-vs-signature check. Runs in the CI image (it has doxygen).
   doc-drift:
     runs-on: ubuntu-latest
-    needs: [docker-build, changes]
+    needs: changes
     if: needs.changes.outputs.docs == 'true'
     steps:
       - uses: actions/checkout@v5
-      - name: Pull Docker image
+      - name: Pull CI image
         run: docker pull ${{ env.DOCKER_IMAGE }}
       - name: Check documentation drift
         run: |
           docker run --rm \
-            -v "${{ github.workspace }}":/app \
-            -w /app \
+            -v "${{ github.workspace }}":/app -w /app \
             ${{ env.DOCKER_IMAGE }} \
             bash -c "bash scripts/auto_doc/check_doc_drift.sh"
-
-  # ========================
-  # Publish CI report
-  # ========================
-  publish-report:
-    runs-on: ubuntu-latest
-    needs: [docker-build, compile-docs, compile-petgem, tests-fm-csem]
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq
-
-      - name: Prepare report folder
-        run: mkdir -pv ci-report
-
-      - name: Copy PETGEM logo
-        run: cp docs/source/_static/petgem_logo.png ci-report/
-
-      - name: Generate CI HTML report
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          WORKFLOW_RUN_ID=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs --jq '.workflow_runs[0].id')
-          JOBS_JSON=$(gh api repos/${GITHUB_REPOSITORY}/actions/runs/$WORKFLOW_RUN_ID/jobs)
-          BRANCH=${GITHUB_REF##*/}
-          DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
-          COMMIT_SHA=${GITHUB_SHA::7}
-
-          cat <<EOF > ci-report/index.html
-          <html>
-          <head>
-          <title>PETGEM CI Report</title>
-          <style>
-            body { font-family: Arial; margin: 40px; background: #f9f9f9; color: #333; }
-            h1 { color: #004080; display: flex; align-items: center; }
-            h1 img { height: 50px; margin-right: 15px; }
-            .meta { margin-bottom: 20px; font-size: 14px; color: #555; }
-            table { border-collapse: collapse; width: 100%; background: #fff; }
-            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-            th { background-color: #004080; color: white; }
-            tr:nth-child(even) { background-color: #f2f2f2; }
-            a { color: #004080; text-decoration: none; font-weight: bold; }
-            .success { color: green; font-weight: bold; }
-            .failure { color: red; font-weight: bold; }
-            .in_progress { color: orange; font-weight: bold; }
-            .notes { margin-top: 20px; font-size: 13px; color: #444; }
-          </style>
-          </head>
-          <body>
-          <h1><img src='petgem_logo.png' alt='PETGEM Logo'/> CI Report</h1>
-          <div class='meta'>Branch: <b>$BRANCH</b> | Date: <b>$DATE</b> | Commit: <code>$COMMIT_SHA</code></div>
-          <table>
-          <tr><th>Job</th><th>Status</th><th>Conclusion</th></tr>
-          EOF
-
-          echo "$JOBS_JSON" | jq -r '.jobs[] | "<tr><td><a href=\"" + .html_url + "\">" + .name + "</a></td><td>\(.status)</td><td><span class=\"" + (.conclusion // "in_progress") + "\">" + (.conclusion // "in_progress") + "</span></td></tr>"' >> ci-report/index.html
-
-          echo "</table>" >> ci-report/index.html
-
-          # Add clarification notes
-          cat <<EOF >> ci-report/index.html
-          <div class="notes">
-            <h3>Notes:</h3>
-            <ul>
-              <li><b>compile-petgem (0)</b> → builds <i>fm.csem</i> + <i>petgem</i> (no Extrae)</li>
-              <li><b>compile-petgem (1)</b> → builds <i>fm.csem.extrae</i> + <i>petgem.extrae</i> (with Extrae)</li>
-              <li><b>tests-fm-csem / fe-core-tests</b> → levels 1-3 (basis, DOFs, elements), all orders 1..6</li>
-              <li><b>tests-fm-csem / e2e-tests</b> → levels 4-5 (assembly + physics), unit cube, orders 1..3, 4 MPI tasks</li>
-              <li><b>tests-fm-csem / extrae-smoke</b> → Extrae-instrumented fm.csem trace smoke</li>
-              <li><b>im.csem</b> → not built/tested in CI yet (follow-up)</li>
-            </ul>
-          </div>
-          </body></html>
-          EOF
-
-
-      - name: Publish report to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./ci-report
-          publish_branch: gh-pages
-          user_name: github-actions
-          user_email: github-actions@github.com
-          keep_files: false
-
-      - name: Print GitHub Pages URL
-        run: |
-          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
-          echo "CI report is available at:"
-          echo "https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/index.html"

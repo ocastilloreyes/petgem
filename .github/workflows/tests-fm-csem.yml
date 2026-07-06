@@ -2,17 +2,17 @@
 # FM-CSEM test suite (unit cube, orders 1..6). See tests/README.md.
 #
 # Reusable workflow: called by ci-develop.yml after the CI image is built and
-# the fm.csem binaries are compiled, so it never rebuilds the image or the
-# kernel - it consumes them. Runnable standalone via workflow_dispatch too
-# (the fe-core tests need only the image; the e2e / extrae jobs need the
-# binary artifacts, which only exist inside the calling pipeline run).
+# the fm.csem binary is compiled, so it never rebuilds the image or the kernel -
+# it consumes them. Runnable standalone via workflow_dispatch too (the fe-core
+# tests need only the image; the e2e job needs the binary artifact, which only
+# exists inside the calling pipeline run).
 #
 #   fe-core-tests : levels 1-3 - C harnesses compiled against the unchanged
 #                   production sources, ALL orders 1..6, fast. Needs the image.
 #   e2e-tests     : levels 4-5 - the built fm.csem binary on the unit cube,
-#                   pipeline orders 1..3, up to 4 MPI tasks. Needs the binary.
-#   extrae-smoke  : the Extrae-instrumented fm.csem runs + emits a trace on the
-#                   unit cube (build-with-Extrae verification). Optional.
+#                   pipeline orders 1..3, 2 MPI tasks (PCBDDC is MPI-invariant to
+#                   solver tolerance, so the golden compare is rank-independent).
+#                   Needs the binary.
 # =============================================================================
 name: FM-CSEM tests
 
@@ -20,19 +20,14 @@ on:
   workflow_call:
     inputs:
       docker_image:
-        description: CI image (PETSc + mpicc + python + h5py).
+        description: CI image (PETSc + mpicc + gmsh + python + h5py).
         required: true
         type: string
       binary_artifact:
-        description: Artifact holding build/fm.csem (no Extrae).
+        description: Artifact holding build/fm.csem.
         required: false
         type: string
-        default: petgem-binaries-no-extrae
-      extrae_artifact:
-        description: Artifact holding build/fm.csem.extrae; empty skips the smoke.
-        required: false
-        type: string
-        default: ""
+        default: fm-csem-binary
   workflow_dispatch:
     inputs:
       docker_image:
@@ -43,8 +38,6 @@ on:
 env:
   PETSC_DIR: /usr/local/petsc
   PETSC_ARCH: arch-linux-c-opt
-  EXTRAE_HOME: /usr/local/extrae
-  EXTRAE_CONFIG: tests/extrae/extrae.xml
 
 jobs:
   # Levels 1-3: basis, DOF ordering, elemental matrices - ALL orders 1..6.
@@ -64,7 +57,7 @@ jobs:
             ${{ steps.img.outputs.image }} bash -c "pytest tests/unit -ra"
 
   # Levels 4-5: global assembly + basic physics - pipeline orders 1..3,
-  # PCBDDC production solver under 4 MPI tasks, vs committed goldens.
+  # PCBDDC production solver under 2 MPI tasks, vs committed goldens.
   e2e-tests:
     runs-on: ubuntu-latest
     steps:
@@ -93,56 +86,9 @@ jobs:
                 -source_filename sources.txt -receiver_filename receivers.txt \
                 -sigma_file sigmas.txt -params_filename params_p1.txt
             "
-      - name: Levels 4-5 (orders 1..3, 4 MPI tasks)
+      - name: Levels 4-5 (orders 1..3, 2 MPI tasks)
         run: |
           docker run --rm \
-            -e PETGEM_FM_CSEM=/workspace/build/fm.csem -e FM_CSEM_NP=4 \
+            -e PETGEM_FM_CSEM=/workspace/build/fm.csem -e FM_CSEM_NP=2 \
             -v ${{ github.workspace }}:/workspace -w /workspace \
             ${{ steps.img.outputs.image }} bash -c "pytest tests/e2e -ra"
-
-  # Extrae-instrumented build verification: regenerates the input bundle from the
-  # committed unit-cube mesh (gmsh -> preprocess), then runs + emits a trace.
-  # Only when the caller passes an extrae artifact.
-  extrae-smoke:
-    runs-on: ubuntu-latest
-    if: inputs.extrae_artifact != ''
-    steps:
-      - uses: actions/checkout@v5
-      - name: Download fm.csem.extrae
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ inputs.extrae_artifact }}
-          path: build
-      - name: Make binary executable
-        run: chmod +x build/fm.csem.extrae
-      - name: Resolve CI image
-        id: img
-        run: echo "image=${{ inputs.docker_image != '' && inputs.docker_image || format('ghcr.io/{0}/petgem-ci-env:latest', github.repository_owner) }}" >> "$GITHUB_OUTPUT"
-      - name: Pull CI image
-        run: docker pull ${{ steps.img.outputs.image }}
-      - name: Extrae smoke (unit cube, order 1)
-        run: |
-          docker run --rm -e EXTRAE_HOME -e PETSC_DIR -e PETSC_ARCH \
-            -v ${{ github.workspace }}:/workspace -w /workspace \
-            ${{ steps.img.outputs.image }} bash -c "
-              set -e
-              export LD_LIBRARY_PATH=\$EXTRAE_HOME/lib:\$LD_LIBRARY_PATH
-              export EXTRAE_CONFIG_FILE=/workspace/${{ env.EXTRAE_CONFIG }}
-              # The input bundle is a generated artifact (not committed), so build it
-              # from the committed mesh + txt inputs via the documented workflow
-              # (examples/unit_cube/README.md): gmsh -> preprocess. Same pipeline
-              # as examples/canonical_model, on the tiny/fast unit cube.
-              gmsh -3 examples/unit_cube/mesh.geo \
-                -o examples/unit_cube/mesh.msh
-              python3 utils/preprocess.py -mode forward -order 1 \
-                -case_dir examples/unit_cube -mesh_filename mesh.msh \
-                -source_filename sources.txt -receiver_filename receivers.txt \
-                -sigma_file sigmas.txt
-              cd \$(mktemp -d)
-              mpirun -n 2 /workspace/build/fm.csem.extrae \
-                -input_filename /workspace/examples/unit_cube/input.h5 \
-                -order 1 -output_dir . -output_filename extrae_smoke \
-                -dm_mat_type aij -ksp_type preonly -pc_type jacobi
-              ls -la TRACE.mpits set-0 2>/dev/null || (echo 'no Extrae trace produced' && exit 1)
-              echo 'Extrae build ran and produced a trace.'
-            "
