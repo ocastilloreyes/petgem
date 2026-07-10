@@ -87,13 +87,16 @@ class FmRun:
 
 
 # Solver profiles selected purely through PETSc runtime options (no code change).
-#   "solve"    - exact serial LU: correct fields, fast at low order (level 5).
+#   "solve"    - direct LU via MUMPS: exact fields, deterministic, and valid both
+#                serially and under MPI (level 5 golden compare). MUMPS is in the
+#                CI image; a direct solve always "converges", so the regression
+#                check never depends on iterative-solver behaviour. The committed
+#                goldens are exact LU solves, so this reproduces them to round-off.
 #   "assemble" - trivial preonly/jacobi: exercises assembly + the per-cell
 #                checkGradientKernel only; the "solution" is ignored (level 4).
-#   "bddc"     - the production PCBDDC + discrete-gradient path (params_p1.txt).
 SOLVER_OPTS = {
     "solve":    ["-dm_mat_type", "aij", "-ksp_type", "preonly", "-pc_type", "lu",
-                 "-ksp_error_if_not_converged"],
+                 "-pc_factor_mat_solver_type", "mumps", "-ksp_error_if_not_converged"],
     "assemble": ["-dm_mat_type", "aij", "-ksp_type", "preonly", "-pc_type", "jacobi"],
 }
 
@@ -104,8 +107,8 @@ def fm_run(fm_csem_binary, unit_cube, tmp_path_factory):
 
     Order is forced with `-order N` (also bypassing the bundle's order dataset);
     the solver is chosen via runtime PETSc options (see SOLVER_OPTS). Output goes
-    to a temp dir so the repo stays clean. The "bddc" solver reuses the shipped
-    params_p1.txt (MATIS + PCBDDC). Serial by default; set FM_CSEM_NP for mpirun.
+    to a temp dir so the repo stays clean. Serial by default; set FM_CSEM_NP to
+    run the (direct) solve under mpirun.
     """
     import os
     import subprocess
@@ -122,11 +125,7 @@ def fm_run(fm_csem_binary, unit_cube, tmp_path_factory):
         base = ["-input_filename", str(unit_cube / "input.h5"),
                 "-order", str(order),
                 "-output_dir", str(outdir), "-output_filename", stem]
-        if solver == "bddc":
-            cmd = (launch + ["-options_file", str(unit_cube / "params_p1.txt")] + base
-                   + ["-ksp_error_if_not_converged"])
-        else:
-            cmd = launch + base + SOLVER_OPTS[solver]
+        cmd = launch + base + SOLVER_OPTS[solver]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900,
                               cwd=str(lib.REPO_ROOT))
         res = FmRun(order, proc.returncode, proc.stdout + proc.stderr, outdir / f"{stem}.h5")

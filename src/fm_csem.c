@@ -47,6 +47,7 @@ MORE\n\
 #include "grid.h"
 #include "io.h"
 #include "kernels.h"
+#include "mms.h"
 #include "postprocessing.h"
 #include "solver.h"
 #include "transmitter.h"
@@ -78,7 +79,7 @@ int runForward(int argc, char** argv) {
   fmParams        params;
   Grid            grid;
   CsemSourceSet   sources = {0, 0, NULL};
-  PetscReal       omega;      
+  PetscReal       omega;
   PetscScalar     constFactor;
   PetscLogDouble  timers[6];
   PetscLogDouble  start_timer, end_timer;
@@ -190,6 +191,27 @@ int runForward(int argc, char** argv) {
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
+
+  /* ----------------------------------------------------------------  */
+  /* MMS verification mode (-mms): the complete verification (Galerkin */
+  /* solve + L2 projection + optional diagnostics).                    */
+  /* All MMS logic lives in src/mms.c.                                 */
+  /* ----------------------------------------------------------------  */
+  if (params.mms) {
+    PetscCall(PetscLogStagePush(stage_assembly));
+    PetscCall(runMMSVerification(params, dm, grid, conductivity, sources));
+    PetscCall(PetscLogStagePop());
+
+    PetscCall(printFooter());
+    PetscCall(DMDestroy(&grid.H1dm));
+    PetscCall(DMDestroy(&dm));
+    PetscCall(VecDestroy(&conductivity));
+    PetscCall(VecDestroy(&materials_id));
+    PetscCall(VecDestroy(&receivers));
+    PetscCall(PetscFree(sources.sourceArray));
+    PetscCall(PetscFinalize());
+    return 0;
+  }
 
   /* ---------------------------------------------------------------- */
   /* Assembly linear system                                           */

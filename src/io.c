@@ -213,8 +213,11 @@ PetscErrorCode readfmParams(const PetscMPIInt size, fmParams* fm_Params) {
                                sizeof(outputFilename), &outputFilenameIsPresent));
   PetscOptionsEnd();
 
+  PetscBool mmsMode = PETSC_FALSE;
   PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "fm.csem: optional options", "PETGEM");
   PetscCall(PetscOptionsInt("-order", "Basis order override (1..6); default = take from bundle /order", "fm.csem", order, &order, &orderIsPresent));
+  PetscCall(PetscOptionsBool("-mms", "Method-of-Manufactured-Solutions verification: volumetric forcing f* and L2/H(curl) error norms (unit cube [0,1]^3)",
+                             "fm.csem", mmsMode, &mmsMode, NULL));
 
   PetscOptionsEnd();
 
@@ -242,6 +245,7 @@ PetscErrorCode readfmParams(const PetscMPIInt size, fmParams* fm_Params) {
 
   fm_Params->numMPITasks = size;
   fm_Params->quiet       = PETSC_FALSE;
+  fm_Params->mms         = mmsMode;
 
   createDirectory(outputDir);
 

@@ -1,0 +1,36 @@
+{
+  "_comment": "Golden MMS relative errors for fm.csem CI (tests/mms/test_level6_mms.py). Regenerate with tests/mms/update_golden.sh only after an intentional discretisation change.",
+  "mesh": "unit cube [0,1]^3 at N=4 (6*4^3 tetrahedra)",
+  "frequency_hz": 2.0,
+  "sigma_S_per_m": 1.0,
+  "solver": "MUMPS direct LU (ksp preonly, pc lu)",
+  "rtol": 0.001,
+  "atol": 1e-08,
+  "residual_max": 1e-10,
+  "orders": {
+    "1": {
+      "dofs": 316,
+      "solve_L2": 1.0438505193731134,
+      "solve_Hcurl": 0.38099559878445854,
+      "proj_L2": 0.2989923881213375,
+      "proj_Hcurl": 0.4827871413237144,
+      "residual": 3.5013638988705455e-15
+    },
+    "3": {
+      "dofs": 6132,
+      "solve_L2": 0.29527402722411455,
+      "solve_Hcurl": 0.06498691909590625,
+      "proj_L2": 0.0023778247821782806,
+      "proj_Hcurl": 0.01789530244565632,
+      "residual": 2.3114346333679027e-14
+    },
+    "6": {
+      "dofs": 45096,
+      "solve_L2": 2.6265147830854207e-05,
+      "solve_Hcurl": 5.956311227400453e-06,
+      "proj_L2": 6.011358178229521e-07,
+      "proj_Hcurl": 1.1419886322714129e-05,
+      "residual": 3.178507297795769e-13
+    }
+  }
+}

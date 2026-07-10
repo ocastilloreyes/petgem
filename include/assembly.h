@@ -32,12 +32,51 @@
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemRHS(const fmParams params, 
-                               const CsemSourceSet sources, 
-                               const DM dm, 
+PetscErrorCode assembleCsemRHS(const fmParams params,
+                               const CsemSourceSet sources,
+                               const DM dm,
                                const Grid grid,
-                               const PetscScalar constFactor, 
+                               const PetscScalar constFactor,
                                Mat* B);
+
+/**
+ * @brief Assembles the volumetric manufactured-source RHS for MMS verification.
+ *
+ * Replaces the point-dipole RHS (assembleCsemRHS) when running in MMS mode
+ * (-mms). Instead of a Dirac source in one cell, it integrates the manufactured
+ * forcing f* (include/mms.h) against the Nedelec basis over EVERY cell:
+ *
+ *     b_j = sum_cells sum_q  w_q * detJ_cell * ( N_j(x_q) . f*(x_q) )
+ *
+ * where x_q is the physical image of reference quadrature point q, f* is
+ * complex, and the same (weights, detJ) measure as computeElementalMatrices is
+ * used so b is consistent with the operator A = K - i omega mu Ms. The single
+ * manufactured RHS is written to a one-column dense matrix B. Boundary DOFs are
+ * eliminated via VEC_IGNORE_NEGATIVE_INDICES (E* already satisfies n x E* = 0).
+ * No final iωμ scaling is applied - f* already carries it.
+ *
+ * With useForcing = PETSC_TRUE the integrand is the manufactured forcing f*
+ * (the ordinary MMS solve RHS). With useForcing = PETSC_FALSE it is the exact
+ * field E* itself, i.e. b_j = sum ∫ E*·N_j - the L2 moments used by the E3
+ * projection/interpolation baseline (no iωμ, no sigma).
+ *
+ * @param[in]  params        Forward-modeling parameters (order, MPI tasks).
+ * @param[in]  sources       Transmitter set; only sources.freq (-> omega) is used.
+ * @param[in]  dm            DMPlex mesh and H(curl) discretization.
+ * @param[in]  grid          Finite-element grid descriptor.
+ * @param[in]  conductivity  Per-cell conductivity Vec (diagonal sigma in f*).
+ * @param[in]  useForcing    PETSC_TRUE: integrate f*; PETSC_FALSE: integrate E*.
+ * @param[out] B             One-column dense RHS matrix (created by this call).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode assembleCsemMMSRHS(const fmParams params,
+                                  const CsemSourceSet sources,
+                                  const DM dm,
+                                  const Grid grid,
+                                  const Vec conductivity,
+                                  const PetscBool useForcing,
+                                  Mat* B);
 
 /**
  * @brief Assembles the CSEM left-hand side operator (unified K/Ms or fused).

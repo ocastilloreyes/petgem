@@ -18,6 +18,7 @@
 #include "fem.h"
 #include "grid.h"
 #include "io.h"
+#include "mms.h"
 #include "transmitter.h"
 
 
@@ -224,6 +225,187 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
 }
 
 /**
+ * @brief Assembles the volumetric manufactured-source RHS for MMS verification.
+ *
+ * MMS counterpart of assembleCsemRHS: instead of a Dirac dipole located in a
+ * single cell, it integrates the manufactured forcing f* (include/mms.h) over
+ * every local cell,
+ *
+ *     b_j = sum_cells sum_q  w_q * detJ_cell * ( N_j(x_q) . f*(x_q) ),
+ *
+ * reusing the SAME quadrature rule and (weights, detJ) measure as
+ * computeElementalMatrices, so the RHS is consistent with the operator
+ * A = K - i omega mu Ms that assembleCsemKandM builds. Contributions from cells
+ * sharing an edge/face DOF accumulate (ADD_VALUES); boundary DOFs are skipped
+ * (negative closure indices + VEC_IGNORE_NEGATIVE_INDICES), which is exact since
+ * n x E* = 0. The single manufactured RHS is written into a one-column dense B.
+ *
+ * @param[in]  params        Forward-modeling parameters (order, MPI tasks).
+ * @param[in]  sources       Transmitter set; only sources.freq (-> omega) is used.
+ * @param[in]  dm            DMPlex mesh and H(curl) discretization.
+ * @param[in]  grid          Finite-element grid descriptor.
+ * @param[in]  conductivity  Per-cell conductivity Vec (diagonal sigma in f*).
+ * @param[out] B             One-column dense RHS matrix, created by this call.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ *
+ * @note The caller is responsible for destroying the returned matrix `B`.
+ */
+PetscErrorCode assembleCsemMMSRHS(const fmParams params,
+                                  const CsemSourceSet sources,
+                                  const DM dm,
+                                  const Grid grid,
+                                  const Vec conductivity,
+                                  const PetscBool useForcing,
+                                  Mat* B) {
+  PetscFunctionBeginUser;
+
+  /* Variables declaration */
+  Cell cell;
+  Quadrature3D quadrature_3d;
+  PetscInt m, M, numDofIndices, *dofIndices;
+  PetscReal **Ni;
+  PetscScalar *closureRHS;
+  PetscSection section;
+  DM dmConductivity;
+  Vec b, bcol;
+  VecType vtype;
+  ISLocalToGlobalMapping mapping;
+  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
+  const PetscReal omega = sources.freq * 2.0 * PETSC_PI;
+
+  /* One right-hand side vector (the single manufactured forcing). */
+  PetscCall(DMCreateGlobalVector(dm, &b));
+  PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
+  PetscCall(VecSetLocalToGlobalMapping(b, mapping));
+  PetscCall(VecSetOption(b, VEC_IGNORE_NEGATIVE_INDICES, PETSC_TRUE));
+  PetscCall(VecSetFromOptions(b));
+  PetscCall(VecGetSize(b, &M));
+  PetscCall(VecGetLocalSize(b, &m));
+
+  /* One-column dense B (MMS has a single RHS). */
+  PetscCall(VecGetType(b, &vtype));
+  PetscCall(MatCreateDenseFromVecType(comm, vtype, m, PETSC_DECIDE, M, 1, m, NULL, B));
+
+  /* DM section and conductivity DM. */
+  PetscCall(DMGetLocalSection(dm, &section));
+  PetscCall(VecGetDM(conductivity, &dmConductivity));
+
+  /* Same quadrature rule as the LHS element integrals. */
+  PetscCall(computeNum3DQuadraturePoints(params.order, &quadrature_3d));
+  PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.points));
+  for (PetscInt i = 0; i < quadrature_3d.numPoints; i++) {
+    PetscCall(PetscCalloc1(NUM_DIMENSIONS, &quadrature_3d.points[i]));
+  }
+  PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.weights));
+  PetscCall(compute3DQuadraturePoints(&quadrature_3d));
+
+  /* Basis-value and closure scratch. */
+  PetscCall(PetscCalloc1(grid.numDofInCell, &closureRHS));
+  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Ni));
+  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+    PetscCall(PetscCalloc1(grid.numDofInCell, &Ni[i]));
+  }
+
+  /* Print statistics (suppressed when params.quiet). */
+  if (!params.quiet) {
+    PetscCall(PetscPrintf(comm, "\n MMS RHS assembly (%s):\n", useForcing ? "volumetric forcing f*" : "L2 moments of E*"));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "MPI tasks",   formatGroupedInt(params.numMPITasks)));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Vector size", formatGroupedInt(M)));
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status",      "Started"));
+  }
+
+  PetscCall(VecZeroEntries(b));
+
+  /* Volumetric integral of f* against the Nedelec basis, cell by cell. */
+  for (PetscInt c = grid.cellStart; c < grid.cellEnd; ++c) {
+
+    /* Geometry + conductivity for cell c; computeCellJacobian fills
+     * cell.jacobian (rows v1-v0, v2-v0, v3-v0) and cell.detJacobian, which
+     * match femComputeJacobian used by evaluateNedelecBasis / the LHS. */
+    PetscCall(extractCellCoordinates(dm, c, &cell));
+    PetscCall(extractCellConductivity(dmConductivity, conductivity, c, &cell));
+    PetscCall(computeCellJacobian(&cell));
+    const PetscReal det = cell.detJacobian;
+    const PetscReal sigma[NUM_DIMENSIONS] = {cell.conductivity[0], cell.conductivity[1], cell.conductivity[2]};
+
+    PetscCall(DMPlexGetClosureIndices(dm, section, section, c, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
+
+    for (PetscInt j = 0; j < grid.numDofInCell; j++) {
+      closureRHS[j] = 0.0;
+    }
+
+    for (PetscInt q = 0; q < quadrature_3d.numPoints; q++) {
+      const PetscReal *ref = quadrature_3d.points[q];
+
+      /* Physical image of the reference quadrature point: x = v0 + F*ref,
+       * with F = J^T, i.e. x_d = coords_d + sum_k jacobian[k][d]*ref[k]. */
+      PetscReal xphys[NUM_DIMENSIONS];
+      for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+        xphys[d] = cell.coordinates[d]
+                 + cell.jacobian[0][d] * ref[0]
+                 + cell.jacobian[1][d] * ref[1]
+                 + cell.jacobian[2][d] * ref[2];
+      }
+
+      /* useForcing: integrate f* (the MMS solve RHS). Otherwise integrate the
+       * exact field E* itself -> L2 moments for the E3 projection baseline. */
+      PetscScalar F[NUM_DIMENSIONS];
+      if (useForcing) {
+        mmsForcingF(xphys, omega, sigma, F);
+      } else {
+        mmsExactE(xphys, F);
+      }
+
+      /* Physical, oriented basis values at this reference point (no curls). */
+      PetscCall(evaluateNedelecBasis(&grid.fem, &cell, ref, Ni, NULL));
+
+      const PetscReal wdet = quadrature_3d.weights[q] * det;
+      for (PetscInt j = 0; j < grid.numDofInCell; j++) {
+        PetscScalar dot = 0.0;
+        for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+          dot += (PetscScalar)Ni[d][j] * F[d];
+        }
+        closureRHS[j] += wdet * dot;
+      }
+    }
+
+    /* Accumulate this cell's contribution (shared DOFs sum across cells). */
+    PetscCall(VecSetValuesLocal(b, numDofIndices, dofIndices, closureRHS, ADD_VALUES));
+    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, c, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
+  }
+
+  PetscCall(VecAssemblyBegin(b));
+  PetscCall(VecAssemblyEnd(b));
+
+  /* Copy the assembled RHS into the single column of B (no iωμ scaling:
+   * f* already carries the frequency/permeability factor). */
+  PetscCall(MatDenseGetColumnVecWrite(*B, 0, &bcol));
+  PetscCall(VecCopy(b, bcol));
+  PetscCall(MatDenseRestoreColumnVecWrite(*B, 0, &bcol));
+
+  PetscCall(VecDestroy(&b));
+
+  if (!params.quiet) {
+    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
+  }
+
+  /* Free memory */
+  PetscCall(PetscFree(quadrature_3d.weights));
+  for (PetscInt i = 0; i < quadrature_3d.numPoints; i++) {
+    PetscCall(PetscFree(quadrature_3d.points[i]));
+  }
+  PetscCall(PetscFree(quadrature_3d.points));
+  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+    PetscCall(PetscFree(Ni[i]));
+  }
+  PetscCall(PetscFree(Ni));
+  PetscCall(PetscFree(closureRHS));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
  * @brief Verifies that a cell's discrete gradient lies in the stiffness kernel.
  *
  * This function checks the De Rham identity K_e G_e = 0 for one cell: with M the
@@ -302,7 +484,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   Quadrature3D quadrature_3d;
   PetscInt m, n, M, N, numDofIndices, numH1DofIndices;
   PetscInt *dofIndices, *H1dofIndices;
-  PetscReal **Me, **Ke, **gradientMatrixBDDC;
+  PetscReal **Me, **Ke, **gradientMatrix;
   PetscScalar *closureK, *closureM, *closureGBDDC;
   PetscSection section, H1section;
   DM dmConductivity;
@@ -386,15 +568,15 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
   }
   /* Discrete-gradient scratch.
    *
-   * gradientMatrixBDDC is the OUTPUT of buildDiscreteGradientMatrix, sized numDofInCell × numH1DofInCell (all P_order H1 columns, in DMPlex
+   * gradientMatrix is the OUTPUT of buildDiscreteGradientMatrix, sized numDofInCell × numH1DofInCell (all P_order H1 columns, in DMPlex
    * closure order). closureGBDDC is the row-major INSERTION buffer of the same shape passed to MatSetValuesLocal. */
-  gradientMatrixBDDC = NULL;
+  gradientMatrix = NULL;
   closureGBDDC       = NULL;
   if (G) {
-    PetscCall(PetscCalloc1(grid.numDofInCell, &gradientMatrixBDDC));
-    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell, &gradientMatrixBDDC[0]));
+    PetscCall(PetscCalloc1(grid.numDofInCell, &gradientMatrix));
+    PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell, &gradientMatrix[0]));
     for (PetscInt i = 1; i < grid.numDofInCell; i++) {
-      gradientMatrixBDDC[i] = gradientMatrixBDDC[i - 1] + grid.numH1DofInCell;
+      gradientMatrix[i] = gradientMatrix[i - 1] + grid.numH1DofInCell;
     }
     PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell, &closureGBDDC));
   }
@@ -443,15 +625,15 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
 
     /* Compute gradient matrix */
     if (G) {
-      PetscCall(buildDiscreteGradientMatrix(&grid.fem, &cell, gradientMatrixBDDC));
+      PetscCall(buildDiscreteGradientMatrix(&grid.fem, &cell, gradientMatrix));
       
       /* Verify the per-cell discrete gradient lies in the kernel of the stiffness (K_e G_e = 0). */
-      PetscCall(checkGradientKernel(Ke[0], gradientMatrixBDDC[0], grid.numDofInCell, grid.numH1DofInCell, i));
+      PetscCall(checkGradientKernel(Ke[0], gradientMatrix[0], grid.numDofInCell, grid.numH1DofInCell, i));
       
       /* Fill closure gradient matrix data */
       for (PetscInt j = 0; j < grid.numDofInCell; j++) {
         for (PetscInt k = 0; k < grid.numH1DofInCell; k++) {
-          closureGBDDC[j * grid.numH1DofInCell + k] = gradientMatrixBDDC[j][k];
+          closureGBDDC[j * grid.numH1DofInCell + k] = gradientMatrix[j][k];
         }
       }
       PetscCall(MatSetValuesLocal(*G, numDofIndices, dofIndices, numH1DofIndices, H1dofIndices, closureGBDDC, INSERT_VALUES));
@@ -498,9 +680,9 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
     PetscCall(PetscFree(closureM));
   }
   
-  if (gradientMatrixBDDC) {
-    PetscCall(PetscFree(gradientMatrixBDDC[0]));
-    PetscCall(PetscFree(gradientMatrixBDDC));
+  if (gradientMatrix) {
+    PetscCall(PetscFree(gradientMatrix[0]));
+    PetscCall(PetscFree(gradientMatrix));
   }
   if (closureGBDDC) {
     PetscCall(PetscFree(closureGBDDC));

@@ -49,6 +49,16 @@ typedef struct {
    * per-frequency / per-iteration headers in the L-BFGS loop.
    */
   PetscBool quiet;
+
+  /**
+   * Method-of-Manufactured-Solutions verification mode (forward kernel only).
+   * When PETSC_TRUE, runForward dispatches to runMMSVerification (src/mms.c),
+   * which runs the complete MMS verification (Galerkin solve + L2 projection +
+   * optional diagnostics) and exits, skipping the normal receiver pipeline.
+   * Enabled with -mms; default PETSC_FALSE. See include/mms.h and
+   * paper/tests_mms/. im.csem ignores it.
+   */
+  PetscBool mms;
 } fmParams;
 
 /**

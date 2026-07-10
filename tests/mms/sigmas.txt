@@ -1,0 +1,4 @@
+# Per-material conductivity for the unit_cube test case (single material).
+# Row index = 0-based material id (gmsh:physical - 1).
+# Columns: sigma_x sigma_y sigma_z
+1.0 1.0 1.0

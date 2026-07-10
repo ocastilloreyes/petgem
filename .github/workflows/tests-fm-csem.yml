@@ -10,8 +10,12 @@
 #   fe-core-tests : levels 1-3 - C harnesses compiled against the unchanged
 #                   production sources, ALL orders 1..6, fast. Needs the image.
 #   e2e-tests     : levels 4-5 - the built fm.csem binary on the unit cube,
-#                   pipeline orders 1..3, 2 MPI tasks (PCBDDC is MPI-invariant to
-#                   solver tolerance, so the golden compare is rank-independent).
+#                   pipeline orders 1..3, 2 MPI tasks. Level 5 uses a direct LU
+#                   (MUMPS) solve, so the golden compare is deterministic and
+#                   rank-independent. Needs the binary.
+#   mms-tests     : level 6 - fm.csem -mms order-of-accuracy regression on the
+#                   [0,1]^3 unit cube (N=4, orders 1/3/6), direct LU vs committed
+#                   golden errors. Self-contained in tests/mms/ (no paper/ deps).
 #                   Needs the binary.
 # =============================================================================
 name: FM-CSEM tests
@@ -57,7 +61,7 @@ jobs:
             ${{ steps.img.outputs.image }} bash -c "pytest tests/unit -ra"
 
   # Levels 4-5: global assembly + basic physics - pipeline orders 1..3,
-  # PCBDDC production solver under 2 MPI tasks, vs committed goldens.
+  # direct LU (MUMPS) solve under 2 MPI tasks, vs committed goldens.
   e2e-tests:
     runs-on: ubuntu-latest
     steps:
@@ -92,3 +96,35 @@ jobs:
             -e PETGEM_FM_CSEM=/workspace/build/fm.csem -e FM_CSEM_NP=2 \
             -v ${{ github.workspace }}:/workspace -w /workspace \
             ${{ steps.img.outputs.image }} bash -c "pytest tests/e2e -ra"
+
+  # Level 6: MMS order-of-accuracy regression - fm.csem -mms on the [0,1]^3 unit
+  # cube at N=4, orders 1/3/6, direct LU (MUMPS), vs committed golden errors.
+  # Fully self-contained in tests/mms/ (mesh + sigma/source/receiver stubs +
+  # golden); reads NOTHING from paper/. Needs the binary + gmsh (in the image).
+  mms-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download fm.csem
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.binary_artifact }}
+          path: build
+      - name: Make binary executable
+        run: chmod +x build/fm.csem
+      - name: Resolve CI image
+        id: img
+        run: echo "image=${{ inputs.docker_image != '' && inputs.docker_image || format('ghcr.io/{0}/petgem-ci-env:latest', github.repository_owner) }}" >> "$GITHUB_OUTPUT"
+      - name: Pull CI image
+        run: docker pull ${{ steps.img.outputs.image }}
+      - name: Build the N=4 MMS bundle (gmsh -> preprocess -> tests/mms/input.h5)
+        run: |
+          docker run --rm -e PETSC_DIR -e PETSC_ARCH \
+            -v ${{ github.workspace }}:/workspace -w /workspace \
+            ${{ steps.img.outputs.image }} bash -c "bash tests/mms/make_bundle.sh 4"
+      - name: Level 6 (orders 1/3/6, 2 MPI tasks) vs golden
+        run: |
+          docker run --rm \
+            -e PETGEM_FM_CSEM=/workspace/build/fm.csem -e FM_CSEM_NP=2 \
+            -v ${{ github.workspace }}:/workspace -w /workspace \
+            ${{ steps.img.outputs.image }} bash -c "pytest tests/mms -ra"

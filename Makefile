@@ -148,7 +148,8 @@ SHARED_SRCS := src/common.c \
                src/fe_nodal.c \
                src/solver.c \
                src/receiver_interp.c \
-               src/postprocessing.c
+               src/postprocessing.c \
+               src/mms.c
 
 # Kernel-specific sources
 # fm_csem.c and im_csem.c expose runForward / runInverse; the *_main.c
