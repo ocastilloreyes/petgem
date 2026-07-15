@@ -16,7 +16,7 @@
 #include "constants.h"
 #include "grid.h"
 #include "fem.h"        /* Quadrature3D used by InversionContext workspace */
-#include "io.h"           /* fmParams: shared base parameters embedded below */
+#include "io.h"           /* petgemParams: shared base parameters embedded below */
 #include "receiver_interp.h"
 #include "transmitter.h"
 #include <petsc.h>
@@ -35,7 +35,7 @@ typedef struct {
   PetscReal length;         /**< Dipole length. */
   PetscReal dipAngle;       /**< Dip angle. */
   PetscReal azimuthAngle;   /**< Azimuth angle. */
-} InvCsemSource;
+} ImCsemSource;
 
 /**
  * @brief Observed-data source mode for the inverse kernel.
@@ -60,14 +60,15 @@ typedef enum {
  * @brief Inversion parameters (read from the PETSc options database).
  */
 typedef struct {
-  /** Shared base parameters, parsed by the SAME readfmParams() the forward
+  /** Shared base parameters, parsed by the SAME readPetgemParams() the forward
    *  kernel uses (input/output paths, basis order, MPI task count, quiet
-   *  flag). Unifies the fm.csem / im.csem interface: the inverse-only
-   *  controls below extend this common base. The basis order is `fm.order`
-   *  and the unified-bundle path (consumed by setupInversionSources,
-   *  loadInversionMetaFromBundle, loadObservedData) is `fm.inputFile` -
-   *  formerly the separate `bundleFile` mirror. */
-  fmParams  fm;
+   *  flag). This is what unifies the fm.csem / im.csem interface: fm.csem
+   *  uses a petgemParams directly, im.csem embeds one here and extends it
+   *  with the inversion-only controls below. The basis order is
+   *  `common.order`, and the unified-bundle path (consumed by
+   *  setupInversionSources, loadInversionMetaFromBundle, loadObservedData)
+   *  is `common.inputFile`. */
+  petgemParams  common;
 
   PetscInt  maxIter;                               /**< Max L-BFGS iterations. */
   PetscInt  lbfgsMemory;                           /**< L-BFGS M parameter. */
@@ -77,13 +78,21 @@ typedef struct {
   PetscReal rmsTol;                                /**< RMS early-stop (<=0 off). */
   PetscReal diagGradientWeight;                    /**< Self-weight in the smoother. */
 
+  /** RMS-plateau early stop, consumed by the L-BFGS loop (src/lbfgs.c).
+   *  Parsed here with every other im.csem option (rather than read straight
+   *  from the options database at the point of use) so both appear under
+   *  -help and can be set from the params file like the rest. Values and
+   *  defaults are unchanged. */
+  PetscReal rmsRelTol;                             /**< Relative RMS-improvement threshold (0 = off). */
+  PetscInt  rmsStallWindow;                        /**< Consecutive stalled iterations before stopping. */
+
   /** Fixed material IDs: cells whose material_id matches one of these values
    *  are excluded from gradient smoothing (treated as self-referencing).
-   *  Defaults come from the bundle's /inv_meta/fixed_materials dataset
+   *  Defaults come from the bundle's /im_meta/fixed_materials dataset
    *  (written by the preprocess from sigmas.txt's `fixed` column);
-   *  -inv_fixed_materials on the CLI is an override. */
+   *  -im_fixed_materials on the CLI is an override. */
   PetscInt  numFixedMaterials;                     /**< Number of fixed IDs. */
-  PetscInt  fixedMaterials[INV_MAX_FIXED_MATERIALS]; /**< Fixed material ID list. */
+  PetscInt  fixedMaterials[IM_MAX_FIXED_MATERIALS]; /**< Fixed material ID list. */
 
   /** @{ Provenance flags: PETSC_TRUE iff the field was set on the CLI (and so
    *  should NOT be overridden by the bundle reader). */
@@ -93,23 +102,23 @@ typedef struct {
 
   /** Source-frequency entries loaded from the unified bundle's /sources group
    *  (freq, position, current, length, dipAngle, azimuthAngle). Populated by
-   *  setupInversionSources. Each entry's frequency lives in invSources[i].freq;
+   *  setupInversionSources. Each entry's frequency lives in imSources[i].freq;
    *  no separate frequency array is kept. */
   PetscInt       numFreqs;                         /**< Number of entries. */
-  InvCsemSource  invSources[INV_MAX_FREQUENCIES];  /**< One source record per entry. */
+  ImCsemSource  imSources[IM_MAX_FREQUENCIES];  /**< One source record per entry. */
 
   /** VTU snapshot: write the conductivity model every N accepted L-BFGS steps.
    *  0 (default) disables snapshots. Output dir is taken from -output_dir. */
   PetscInt  snapshotInterval;                      /**< Snapshot interval (0 = disabled). */
 
   /** Observed-data abstraction: which schema/file the misfit data is read
-   *  from (see ObservedDataMode). Set by readInversionParams from
-   *  -inv_observed_mode. */
+   *  from (see ObservedDataMode). Set by readimParams from
+   *  -im_observed_mode. */
   ObservedDataMode observedMode;                   /**< External vs fm-native source. */
 
   /** Path to the observed-data file. For OBS_EXTERNAL an empty string means
-   *  "use the unified bundle (fm.inputFile)"; for OBS_FM_NATIVE it is the
-   *  fm.csem responses HDF5 file. Set by -inv_observed_file. */
+   *  "use the unified bundle (common.inputFile)"; for OBS_FM_NATIVE it is the
+   *  fm.csem responses HDF5 file. Set by -im_observed_file. */
   char      observedFile[PETSC_MAX_PATH_LEN];      /**< Observed-data file (empty = bundle). */
 } imParams;
 
@@ -195,7 +204,7 @@ typedef struct {
   PetscReal                     **KeRows;       /**< Row-of-pointers view of KeBuf. */
   /** @} */
   /** 3D quadrature for elemental mass-matrix integration. Depends only on
-   *  iparams->fm.order (constant across the run). */
+   *  iparams->common.order (constant across the run). */
   Quadrature3D                    quad3d;       /**< 3D quadrature rule. */
   PetscBool                       quad3dInited; /**< PETSC_TRUE once quad3d is filled. */
 
@@ -255,15 +264,15 @@ typedef struct {
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */
-PetscErrorCode readInversionParams(imParams *iparams);
+PetscErrorCode readimParams(imParams *iparams);
 
 /**
  * @brief Applies case-property defaults from the bundle to iparams.
  *
  * Reads the error_level attribute on /observed and the fixed_materials array
- * under /inv_meta and applies them UNLESS the corresponding CLI override was
+ * under /im_meta and applies them UNLESS the corresponding CLI override was
  * present (see the *FromCLI provenance flags). Safe to call even when the
- * bundle has no such entries - iparams keeps the readInversionParams defaults.
+ * bundle has no such entries - iparams keeps the readimParams defaults.
  *
  * @param[in]     bundleFile  Path to the unified PETGEM HDF5 bundle.
  * @param[in,out] im_Params   Inversion parameters updated in place.
@@ -277,7 +286,7 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
  * @brief Loads multi-frequency inversion sources from the unified bundle.
  *
  * Reads the bundle's /sources group (replacing the legacy text-file format)
- * and populates iparams->numFreqs and invSources[]. `bundleFile` is the same
+ * and populates iparams->numFreqs and imSources[]. `bundleFile` is the same
  * HDF5 path consumed by loadCsemInputs.
  *
  * @param[in]     bundleFile  Path to the unified PETGEM HDF5 bundle.
@@ -335,7 +344,7 @@ PetscErrorCode loadObservedFmNative(const char *responsesFile,
  * Dispatches to loadObservedData() (OBS_EXTERNAL) or loadObservedFmNative()
  * (OBS_FM_NATIVE) according to iparams->observedMode, resolving the file
  * path from iparams->observedFile (falling back to the unified bundle
- * iparams->fm.inputFile when empty). numFreqs is taken from
+ * iparams->common.inputFile when empty). numFreqs is taken from
  * iparams->numFreqs.
  *
  * @param[in]  iparams       Inversion parameters (mode, file, numFreqs, bundle).
@@ -547,7 +556,9 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
  * @brief Writes a VTU snapshot of the current conductivity model (ρ = 1/σ).
  *
  * Called after accepted L-BFGS steps when snapshotInterval > 0; the output
- * file is {output_dir}/inv_model_iter{N:05d}.vtu.
+ * file is {output_dir}/{output_filename}_iter{N:05d}.pvtu, with one
+ * {output_filename}_iter{N:05d}_p{rank:04d}.vtu piece per rank - the same
+ * output stem the kernel's .h5 product uses.
  *
  * @param[in] ctx           Inversion context.
  * @param[in] acceptedIter  Index of the accepted iteration (used in filename).

@@ -48,7 +48,7 @@
  *       and relies on PETSc DMPlex utilities to handle boundary labeling, section creation,
  *       and point numbering. Output is printed collectively using PETSc routines.
  */
-PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid) {
+PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
 
   PetscFunctionBeginUser;
 

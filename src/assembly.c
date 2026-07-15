@@ -81,7 +81,7 @@ static PetscErrorCode prepareCellForAssembly(const DM dm,
  *
  * @note The caller is responsible for destroying the returned matrix `B`.
  */
-PetscErrorCode assembleCsemRHS(const fmParams params, 
+PetscErrorCode assembleCsemRHS(const petgemParams params, 
                                const CsemSourceSet sources, 
                                const DM dm, 
                                const Grid grid, 
@@ -251,7 +251,7 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  *
  * @note The caller is responsible for destroying the returned matrix `B`.
  */
-PetscErrorCode assembleCsemMMSRHS(const fmParams params,
+PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
                                   const CsemSourceSet sources,
                                   const DM dm,
                                   const Grid grid,
@@ -470,7 +470,7 @@ static PetscErrorCode checkGradientKernel(PetscReal *M, PetscReal *G, PetscInt m
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemKandM(const fmParams params,
+PetscErrorCode assembleCsemKandM(const petgemParams params,
                                  const DM dm, 
                                  const Grid grid,
                                  const Vec conductivity,
@@ -718,7 +718,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params,
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemMsRefill(const fmParams params,
+PetscErrorCode assembleCsemMsRefill(const petgemParams params,
                                     const DM dm, const Grid grid,
                                     const Vec conductivity,
                                     const Quadrature3D *quadrature_3d,

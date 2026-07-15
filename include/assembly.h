@@ -32,7 +32,7 @@
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemRHS(const fmParams params,
+PetscErrorCode assembleCsemRHS(const petgemParams params,
                                const CsemSourceSet sources,
                                const DM dm,
                                const Grid grid,
@@ -70,7 +70,7 @@ PetscErrorCode assembleCsemRHS(const fmParams params,
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode assembleCsemMMSRHS(const fmParams params,
+PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
                                   const CsemSourceSet sources,
                                   const DM dm,
                                   const Grid grid,
@@ -118,7 +118,7 @@ PetscErrorCode assembleCsemMMSRHS(const fmParams params,
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemKandM(const fmParams params, const DM dm, const Grid grid,
+PetscErrorCode assembleCsemKandM(const petgemParams params, const DM dm, const Grid grid,
                                  const Vec conductivity,
                                  const PetscScalar constFactor,
                                  Mat *KorA, Mat *Ms,
@@ -155,7 +155,7 @@ PetscErrorCode assembleCsemKandM(const fmParams params, const DM dm, const Grid 
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemMsRefill(const fmParams params,
+PetscErrorCode assembleCsemMsRefill(const petgemParams params,
                                     const DM dm, const Grid grid,
                                     const Vec conductivity,
                                     const Quadrature3D *quadrature_3d,

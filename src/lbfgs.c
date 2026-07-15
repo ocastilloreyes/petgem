@@ -47,7 +47,7 @@
  *   - Absolute: stop when *rmsPtr ≤ rmsTol (matches MATLAB's
  *     `rms <= 1.05` exit in Ex_inv.m).
  *   - Adaptive plateau: stop when the relative drop is below
- *     `-inv_rms_rtol` for `-inv_rms_stall_window` consecutive
+ *     `-im_rms_rtol` for `-im_rms_stall_window` consecutive
  *     iterations (default 1e-3 / 3 iters).
  *
  * References: Nocedal & Wright, "Numerical Optimization", Ch. 7;
@@ -134,12 +134,13 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
    * derives the stopping point from the RMS history itself rather than a
    * fixed threshold - so a case that plateaus above rmsTol (e.g. order>=2
    * settling near RMS~1.15) stops once it has converged instead of grinding
-   * to maxIter and overfitting. Disable with -inv_rms_rtol 0. */
-  PetscReal rmsRelTol     = 1.0e-3;   /* <0.1% improvement/iter => plateau */
-  PetscInt  rmsStallWindow = 3;
-  PetscCall(PetscOptionsGetReal(NULL, NULL, "-inv_rms_rtol", &rmsRelTol, NULL));
-  PetscCall(PetscOptionsGetInt(NULL, NULL, "-inv_rms_stall_window",
-                               &rmsStallWindow, NULL));
+   * to maxIter and overfitting. Disable with -im_rms_rtol 0.
+   *
+   * Both knobs are parsed with every other im.csem option in readimParams
+   * (so they appear under -help and can be set from the params file); read
+   * them from iparams rather than re-querying the options database here. */
+  const PetscReal rmsRelTol      = ((InversionContext *)ctx)->iparams->rmsRelTol;
+  const PetscInt  rmsStallWindow = ((InversionContext *)ctx)->iparams->rmsStallWindow;
   PetscReal prevRms     = (rmsPtr) ? *rmsPtr : PETSC_INFINITY;
   PetscInt  rmsStallCnt = 0;
 

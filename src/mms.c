@@ -245,7 +245,7 @@ static PetscErrorCode mmsConditionProbe(const DM dm, const Grid grid, const Mat 
  * G is never built (MMS uses a MUMPS direct solve, not PCBDDC). Caller destroys
  * A, B, X.
  */
-static PetscErrorCode mmsAssembleSolve(const fmParams params, const CsemSourceSet sources,
+static PetscErrorCode mmsAssembleSolve(const petgemParams params, const CsemSourceSet sources,
                                        const DM dm, const Grid grid, const Vec conductivity,
                                        const PetscScalar constFactor, const PetscBool useForcing,
                                        Mat *A, Mat *B, Mat *X) {
@@ -321,7 +321,7 @@ static PetscErrorCode mmsWriteH5(MPI_Comm comm, const char *dir, const char *fna
  * {output_filename}_s<i>.h5, carrying omega_scale, the solve norms, and the
  * conditioning estimate (proj / residual / hi columns are set to -1).
  */
-static PetscErrorCode mmsConditioningSweep(const fmParams params, CsemSourceSet sources,
+static PetscErrorCode mmsConditioningSweep(const petgemParams params, CsemSourceSet sources,
                                            const DM dm, const Grid grid, const Vec conductivity) {
   PetscFunctionBeginUser;
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);
@@ -373,7 +373,7 @@ static PetscErrorCode mmsConditioningSweep(const fmParams params, CsemSourceSet 
  * Level 3 (-mms_conditioning): instead runs the mass-term scale sweep -> one
  * HDF5 file per scale, {output_filename}_s<i>.h5.
  */
-PetscErrorCode runMMSVerification(const fmParams params, const DM dm, const Grid grid,
+PetscErrorCode runMMSVerification(const petgemParams params, const DM dm, const Grid grid,
                                   const Vec conductivity, const CsemSourceSet sources) {
   PetscFunctionBeginUser;
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);

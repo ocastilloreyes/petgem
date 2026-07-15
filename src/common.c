@@ -433,15 +433,25 @@ PetscErrorCode printTimers(const PetscLogDouble timers[]) {
 PetscErrorCode printUsage(const char *progname) {
   PetscFunctionBeginUser;
 
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD,
+  /* Plain printf, not PetscPrintf: the dispatcher calls printUsage BEFORE
+   * PetscInitialize (for --help and for an unknown subcommand), so MPI is not
+   * up yet and PetscPrintf(PETSC_COMM_WORLD) would abort. Matches the
+   * --version path, which prints the same way. */
+  printf(
     "Usage:\n"
-    "  %s modeling [petsc options...]      # run forward kernel (fm.csem)\n"
-    "  %s inverse  [petsc options...]      # run inverse kernel (im.csem)\n"
-    "  %s -mode modeling [petsc options]   # equivalent (PETSc-option form)\n"
-    "  %s -mode inverse  [petsc options]\n"
+    "  %s fm [petsc options...]      # run forward kernel (fm.csem)\n"
+    "  %s im [petsc options...]      # run inverse kernel (im.csem)\n"
+    "  %s -mode fm [petsc options]   # equivalent (PETSc-option form)\n"
+    "  %s -mode im [petsc options]\n"
     "  %s --version\n"
     "\n"
-    "Pass -options_file <file.txt> for the usual params input.\n", progname, progname, progname, progname, progname));
+    "'fm' and 'im' are the canonical simulation tags, used consistently across\n"
+    "the interface (binaries, -mode, the -im_* options, and the simulation_type\n"
+    "attribute of every output file). 'forward'/'modeling' and 'inverse' are\n"
+    "accepted as aliases.\n"
+    "\n"
+    "Pass -options_file <file.txt> for the usual params input.\n",
+    progname, progname, progname, progname, progname);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

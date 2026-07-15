@@ -7,9 +7,9 @@ Reads CLI arguments, loads the per-material conductivity table from
 unified PETGEM input HDF5 plus the matching params file.
 
 Mode-specific arguments (validated by runPreprocessing):
-    -mode forward    requires -source_filename
-                     forbids  -inv_source_filename, -observed_filename
-    -mode inverse    requires -inv_source_filename, -observed_filename
+    -mode fm    requires -source_filename
+                     forbids  -im_source_filename, -observed_filename
+    -mode im    requires -im_source_filename, -observed_filename
                      forbids  -source_filename
                      (the inverse kernel reads multi-freq sources from
                       /sources/* in the bundle)
@@ -25,7 +25,7 @@ Shared arguments (both modes):
 Usage examples:
     # Forward modeling
     python3 utils/preprocess.py \\
-        -mode forward \\
+        -mode fm \\
         -order 1 \\
         -case_dir examples/<case> \\
         -mesh_filename mesh_p1.msh \\
@@ -36,12 +36,12 @@ Usage examples:
 
     # Inverse modeling
     python3 utils/preprocess.py \\
-        -mode inverse \\
+        -mode im \\
         -order 1 \\
         -case_dir examples/<case> \\
         -mesh_filename mesh_p1.msh \\
         -receiver_filename receivers.txt \\
-        -inv_source_filename sources.txt \\
+        -im_source_filename sources.txt \\
         -observed_filename observed_data.h5 \\
         -sigma_file sigmas.txt \\
         [-output_vtk model.vtu]
@@ -77,7 +77,7 @@ def main():
         fixed_materials=fixed_materials,
         input_filename=args.input_filename,
         params_filename=args.params_filename,
-        inv_source_filename=args.inv_source_filename,
+        im_source_filename=args.im_source_filename,
         observed_filename=args.observed_filename,
         error_level=args.error_level,
         output_vtk=args.output_vtk,
@@ -86,4 +86,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Expected user-input problems (missing file, malformed table, bad mode /
+    # argument combination) are reported as a one-line message and a non-zero
+    # exit, instead of a Python traceback. Unexpected errors are left to
+    # propagate so genuine bugs still show a full traceback.
+    try:
+        main()
+    except (FileNotFoundError, ValueError) as err:
+        sys.exit(f"ERROR: {err}")

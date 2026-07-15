@@ -26,7 +26,7 @@ command -v python3 >/dev/null || { echo "ERROR: python3 not found."; exit 1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 cp "$HERE"/sources.txt "$HERE"/receivers.txt "$HERE"/sigmas.txt "$HERE"/mesh.geo "$WORK/"
 gmsh -3 -setnumber N "$N" -o "$WORK/mesh.msh" "$WORK/mesh.geo" >/dev/null
-python3 "$ROOT/utils/preprocess.py" -mode forward -order 1 \
+python3 "$ROOT/utils/preprocess.py" -mode fm -order 1 \
     -case_dir "$WORK" -mesh_filename mesh.msh \
     -source_filename sources.txt -receiver_filename receivers.txt \
     -sigma_file sigmas.txt -params_filename params.txt >/dev/null

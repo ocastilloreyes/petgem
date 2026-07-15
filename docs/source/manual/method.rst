@@ -2,76 +2,111 @@
 Numerical formulation
 =====================
 
-This page summarizes the numerical method underlying **PETGEM**. For the full
-derivation and validation, see the publications listed in :doc:`publications`.
+This page states the discretization implemented by the kernels. For the
+derivation and for validation studies, see :doc:`publications`.
 
 Forward problem
 ---------------
-**PETGEM** solves the 3D Controlled-Source Electromagnetic (CSEM) problem in the
-frequency domain. For a time-harmonic source, the electric field :math:`E`
-satisfies
+**PETGEM** solves the frequency-domain CSEM problem for the **total** electric
+field :math:`E`, with a constant magnetic permeability :math:`\mu = \mu_0`
+(``MU`` in ``include/constants.h``) and a diagonal conductivity tensor
+:math:`\sigma = \mathrm{diag}(\sigma_x, \sigma_y, \sigma_z)`:
 
 .. math::
 
-   \nabla \times \left( \mu^{-1}\, \nabla \times E \right)
-       + i\omega\sigma\, E = -\,i\omega\, J_s,
+   \nabla \times \nabla \times E \;-\; i\,\omega\,\mu\,\sigma\, E \;=\; f,
 
-where :math:`\mu` is the magnetic permeability, :math:`\sigma` the conductivity,
-:math:`\omega` the angular frequency, and :math:`J_s` the source current density.
+where :math:`\omega = 2\pi f` is the angular frequency. Homogeneous Dirichlet
+boundary conditions :math:`n \times E = 0` are imposed on the domain boundary.
 
-The field is discretized with **high-order Nédélec (edge) vector finite
-elements** of order ``nord`` (1 to 6) on an unstructured tetrahedral mesh. These
+The field is discretized with **Nédélec (edge) vector finite elements** of
+polynomial order 1 to 6 on an unstructured tetrahedral mesh. These
 :math:`H(\mathrm{curl})`-conforming elements enforce tangential continuity
-across faces and represent the curl-curl operator accurately while keeping the
-number of unknowns low relative to low-order formulations. Discretization yields
-the complex linear system
+across faces. Discretization yields the complex-symmetric linear system
 
 .. math::
 
-   (K + i\omega M)\, e = b,
+   A\, e = b, \qquad A = K \;-\; i\,\omega\,\mu\, M_\sigma,
 
 with
 
 .. math::
 
-   K_{ij} = \int_\Omega (\nabla \times N_i)\cdot \mu^{-1}\,(\nabla \times N_j)\,d\Omega,
+   K_{ij} = \int_\Omega (\nabla \times N_i)\cdot(\nabla \times N_j)\,d\Omega,
    \qquad
-   M_{ij} = \int_\Omega N_i\cdot \sigma\, N_j\,d\Omega,
-   \qquad
-   b_i = -\,i\omega \int_\Omega N_i\cdot J_s\,d\Omega,
+   (M_\sigma)_{ij} = \int_\Omega N_i\cdot \sigma\, N_j\,d\Omega,
 
-where :math:`N_i` are the vector basis functions. The receiver responses are
-obtained by interpolating :math:`e` at the receiver locations. The system is
-solved per frequency with PETSc (see :doc:`solver`).
+where :math:`N_i` are the vector basis functions. This is the operator
+assembled by ``assembleCsemKandM`` (``src/assembly.c``). Because :math:`A` is
+complex, **PETGEM** must be built against a PETSc configured with complex
+scalars (see :doc:`install`).
 
-Inverse problem
----------------
-The inverse kernel recovers a conductivity model :math:`m` (one value per
-invertable material) by minimizing the regularized data-misfit functional
+Source term
+***********
+Each transmitter is a point electric dipole with moment
+:math:`p = I\,L\,\hat{d}`, where :math:`I` is the current, :math:`L` the dipole
+length, and :math:`\hat{d}` the unit direction obtained by rotating the axis by
+the dip and azimuth angles. The dipole is located in its host cell, and the
+right-hand side is formed by evaluating the basis functions at the dipole
+position:
 
 .. math::
 
-   \Phi(m) = (d_\mathrm{obs} - d_\mathrm{pre})^H\, C_d^{-1}\,
-             (d_\mathrm{obs} - d_\mathrm{pre})
-           + \lambda\,(m - m_0)^T\, C_m^{-1}\,(m - m_0),
+   b_j = N_j(x_s)\cdot p .
 
-where :math:`d_\mathrm{obs}` and :math:`d_\mathrm{pre}` are the observed and
-predicted responses, :math:`C_d` the data covariance (set from the noise level),
-:math:`m_0` the reference model, and :math:`\lambda` the Tikhonov factor
-(``-inv_lambda``).
+Receiver responses are obtained by interpolating the solution :math:`e` at the
+receiver positions; the magnetic components are recovered from
+:math:`\nabla \times E`. The system is solved with PETSc (see :doc:`solver`).
 
-The gradient of :math:`\Phi` is assembled by the **adjoint-state method**: at
-each iteration, one forward and one adjoint solve per frequency yield the
-sensitivity contribution without forming the full Jacobian. The model is updated
-with a **limited-memory BFGS (L-BFGS)** scheme (``-inv_lbfgs_memory``,
-``-inv_max_iter``). An optional neighbor-smoothing operator regularizes the
-recovered model spatially (``-inv_diag_weight``); materials flagged as fixed are
-excluded from the update.
+Discrete gradient
+*****************
+Alongside :math:`K` and :math:`M_\sigma`, the assembly builds the **discrete
+gradient matrix** :math:`G`, mapping the order-:math:`p` :math:`H^1` (nodal)
+space into the order-:math:`p` Nédélec space, so that
+:math:`\nabla \phi_k = \sum_i G_{ik} N_i` exactly and :math:`K G = 0`. This
+matrix spans the curl-kernel of the Nédélec space; it is handed to the BDDC
+preconditioner (see :doc:`solver`) and is checked by the test suite (the de
+Rham identity :math:`K_e G_e = 0` per cell).
 
-Conventions
------------
-Internally the kernels use the :math:`e^{-i\omega t}` time convention, so the
-assembled operator carries the corresponding sign; this is equivalent to the
-:math:`e^{+i\omega t}` formulation above under complex conjugation and does not
-affect the computed field magnitudes. **PETGEM** must therefore be built against
-a PETSc configured with complex scalars (see :doc:`install`).
+Inverse problem
+---------------
+``im.csem`` recovers a conductivity model :math:`m` - one value per invertable
+material - by minimizing a regularized data-misfit functional combining the
+difference between observed and predicted responses (weighted by the relative
+data-error level, ``-im_error_level``) with a Tikhonov term of weight
+:math:`\lambda` (``-im_lambda``) that penalizes departure from the starting
+model.
+
+The gradient is assembled by the **adjoint-state method**: each iteration
+performs forward and adjoint solves per frequency, avoiding formation of the
+full Jacobian. The model is updated with a **limited-memory BFGS (L-BFGS)**
+scheme (``-im_lbfgs_memory``, ``-im_max_iter``). An optional neighbor
+smoother acts on the gradient (``-im_diag_weight``); materials flagged as
+fixed are excluded from the update. Options are listed in
+:doc:`inverse_modeling`.
+
+Verification
+------------
+The discretization is verified by a **method of manufactured solutions** (MMS)
+mode, enabled with ``fm.csem -mms``. On the unit cube :math:`[0,1]^3` the exact
+field
+
+.. math::
+
+   E^*(x,y,z) = \big(\sin \pi y \sin \pi z,\;
+                     \sin \pi z \sin \pi x,\;
+                     \sin \pi x \sin \pi y\big)
+
+satisfies :math:`\nabla\times\nabla\times E^* = 2\pi^2 E^*` and
+:math:`n \times E^* = 0` on the boundary, so the manufactured forcing consistent
+with the assembled operator is, per component,
+
+.. math::
+
+   f^*_d = \left(2\pi^2 - i\,\omega\,\mu\,\sigma_d\right) E^*_d .
+
+In this mode the kernel assembles a volumetric right-hand side from
+:math:`f^*` instead of a dipole, and reports relative :math:`L^2` and
+:math:`H(\mathrm{curl})` errors against :math:`E^*`. The definitions live in
+``include/mms.h`` and are mirrored in ``tests/mms/mms_reference.py``. See
+:doc:`testing`.

@@ -88,7 +88,7 @@ You can build and run PETGEM inside Docker for a consistent development and test
 
    # Generate input data (mesh, params file)
    python3 utils/preprocess.py \
-        -mode forward \
+        -mode fm \
         -order ${ORDER} \
         -case_dir  ${MODEL_DIR} \
         -mesh_filename mesh.msh \
@@ -100,7 +100,7 @@ You can build and run PETGEM inside Docker for a consistent development and test
         -output_vtk model.vtu
 
    # Forward modeling
-   mpirun -n 14 build/petgem modeling -options_file ${MODEL_DIR}/params_p${ORDER}.txt
+   mpirun -n 14 build/petgem fm -options_file ${MODEL_DIR}/params_p${ORDER}.txt
 
    # Postprocess output
    python3 ${MODEL_DIR}/postprocess.py \

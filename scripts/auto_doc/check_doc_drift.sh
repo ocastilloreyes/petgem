@@ -44,13 +44,25 @@ GUARDS=(
   '[Pp]arams->bundleFile\b|removed struct field bundleFile - use ->fm.inputFile'
   '/inv_sources\b|removed HDF5 group /inv_sources - unified into /sources'
   '_fm_grad_check\b|removed diagnostic option -fm_grad_check'
+  '"-inv_[a-z_]*"|retired option namespace -inv_* - every inversion option is now -im_*'
+  '/inv_meta\b|renamed HDF5 group /inv_meta - now /im_meta'
+  '"Nord"|retired output attribute "Nord" - the unified provenance block writes "order"'
+  '"Petgem_version"|retired output attribute "Petgem_version" - now lowercase "petgem_version"'
+  'inv_model_iter|retired VTU snapshot prefix - snapshots derive their stem from -output_filename'
+  '\bfmParams\b|renamed type fmParams - the shared base is petgemParams (fm.csem uses it directly, imParams embeds it as .common)'
+  '\breadfmParams\b|renamed function readfmParams - now readPetgemParams (it parses the options common to BOTH kernels)'
+  '\bINV_(MAX_FIXED_MATERIALS|MAX_FREQUENCIES|VTU_NUM_FIELDS)\b|retired INV_* constants - now IM_*'
 )
 
 echo "== check_doc_drift: removed-symbol guard =="
 for g in "${GUARDS[@]}"; do
   regex="${g%%|*}"
   desc="${g##*|}"
-  hits="$(grep -rInE "$regex" src/ include/ 2>/dev/null || true)"
+  # DRIFT_GUARD_ALLOW marks the one legitimate mention of a retired token:
+  # the rejection list that exists precisely to catch it (readimParams).
+  # Without the exemption the guard would flag its own enforcement code.
+  hits="$(grep -rInE "$regex" src/ include/ 2>/dev/null \
+            | grep -v 'DRIFT_GUARD_ALLOW' || true)"
   if [ -n "$hits" ]; then
     echo "  DRIFT - $desc"
     echo "$hits" | sed 's/^/      /'

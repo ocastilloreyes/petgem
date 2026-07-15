@@ -4,27 +4,37 @@
 Welcome to PETGEM's documentation!
 ##################################
 
-**PETGEM** (Parallel Exascale Toolkit for Geophysical Electromagnetic Modeling) is an open-source software for large-scale 3D electromagnetic (EM) modeling. It implements a high-order edge finite element method on unstructured tetrahedral meshes, enabling accurate simulations for active-source EM problems in both **forward modeling** and **inverse modeling** (inversion).
+**PETGEM** (Parallel Edge-element Toolkit for General Electromagnetic Modeling)
+is an open-source code for 3D controlled-source electromagnetic (CSEM) modeling
+in the frequency domain. It discretizes the electric field with high-order
+Nédélec (edge) finite elements of polynomial order 1 to 6 on unstructured
+tetrahedral meshes, and is written in C on top of
+`PETSc <https://petsc.org/release/>`_ and MPI.
 
-Originally developed in Python, **PETGEM** has been refactored in C and integrated with `PETSc <https://petsc.org/release/>`_ to improve scalability on massively parallel architectures, memory efficiency, and mesh handling. These advances make **PETGEM** well suited for current and future exascale systems.
+The repository builds two kernels and a dispatcher:
 
-**PETGEM** has been successfully applied to subsurface exploration in oil & gas, geothermal reservoir characterization, and environmental EM surveys.
+- ``fm.csem`` - forward modeling: computes the CSEM response of a given
+  conductivity model.
+- ``im.csem`` - inverse modeling: recovers a per-material conductivity model
+  from observed data with L-BFGS and adjoint-state gradients.
+- ``petgem`` - a dispatcher that selects either kernel
+  (``petgem modeling`` / ``petgem inverse``).
 
-Key features
-------------
-- High-order edge finite element method
-- Forward modeling and inversion (L-BFGS with adjoint-state gradients)
-- Unstructured tetrahedral mesh support (`Gmsh <http://gmsh.info/>`_)
-- Parallel computing with MPI and `PETSc <https://petsc.org/release/>`_
-- Python bindings for pre- and post-processing
-- Integration with performance analysis tools (`Extrae <https://tools.bsc.es/extrae>`_)
+Pre- and post-processing are handled by a small Python package under ``utils/``
+(importable as ``petgem``), which assembles the HDF5 input bundle the kernels
+read.
 
+.. note::
+
+   The verification suite (:doc:`manual/testing`) covers the **forward** kernel
+   only. The inverse kernel is documented from its implementation but is not
+   exercised by the test suite, and the repository ships no inversion example
+   case.
 
 More information
 ----------------
 
 - `PETGEM GitHub repository <https://github.com/ocastilloreyes/petgem/>`_
-
 - See our publication list at :ref:`publications`
 
 .. toctree::
@@ -47,7 +57,6 @@ More information
    :caption: Inverse modeling:
 
    manual/inverse_modeling
-   manual/examples_inverse
 
 .. toctree::
    :maxdepth: 2

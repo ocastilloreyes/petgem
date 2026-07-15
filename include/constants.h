@@ -27,7 +27,7 @@
 #define NUM_CONDUCTIVITY_COMPONENTS 3  /**< Conductivity components (σx, σy, σz). */
 #define NUM_MATERIALS_ID_COMPONENTS 1  /**< Material-id components per cell. */
 #define MAX_TRANSITIVE_CLOSURE_SIZE 90 /**< Upper bound on DMPlex closure size. */
-#define INV_VTU_NUM_FIELDS 1           /**< Cell-data fields written per VTU piece (rho_ohm_m). */
+#define IM_VTU_NUM_FIELDS 1           /**< Cell-data fields written per VTU piece (rho_ohm_m). */
 #define FE_NODAL_MAX_ORDER 64		   /**< Highest supported order; sizes the 1D factor tables. */
 
 /* Largest DOF counts over the input order range (order = 1..6). These size only
@@ -44,8 +44,8 @@
  * errors when exceeded, and the fixed-materials option array is sized to
  * the cap on read.
  */
-#define INV_MAX_FIXED_MATERIALS  8  /**< Max number of held-fixed materials. */
-#define INV_MAX_FREQUENCIES      64 /**< Max number of inversion frequencies. */
+#define IM_MAX_FIXED_MATERIALS  8  /**< Max number of held-fixed materials. */
+#define IM_MAX_FREQUENCIES      64 /**< Max number of inversion frequencies. */
 
 /** @brief Reference-cell local edge-to-vertex table (defined in constants.c). */
 extern const PetscInt EDGE_VERTICES[NUM_EDGES_PER_CELL][NUM_VERTICES_PER_EDGE];

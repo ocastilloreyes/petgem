@@ -26,25 +26,31 @@ REQUIRED\n\
   -output_filename <stem>    Output stem; writes <dir>/<stem>.h5.\n\
 \n\
 OPTIONAL  (inversion control; defaults in brackets)\n\
-  -inv_max_iter <n>          Max L-BFGS iterations            [80]\n\
-  -inv_lbfgs_memory <m>      L-BFGS history depth M            [5]\n\
-  -inv_lambda <r>            Tikhonov regularisation weight  [0.1]\n\
-  -inv_gtol <r>              Gradient-norm tolerance        [1e-5]\n\
-  -inv_rms_tol <r>           Absolute RMS early stop (0=off)   [0]\n\
-  -inv_error_level <r>       Relative data-error level      [0.01]\n\
-  -inv_diag_weight <r>       Gradient-smoother self-weight     [0]\n\
-  -inv_fixed_materials <ids> Material IDs frozen in smoothing\n\
-  -inv_snapshot_interval <n> Write VTU every N steps (0=off)   [0]\n\
-  -inv_observed_mode <m>     external | fm_native     [external]\n\
-  -inv_observed_file <f>     Observed-data file (req. fm_native)\n\
   -order <1..6>              Override bundle basis order.\n\
+  -im_max_iter <n>           Max L-BFGS iterations            [80]\n\
+  -im_lbfgs_memory <m>       L-BFGS history depth M            [5]\n\
+  -im_lambda <r>             Tikhonov regularisation weight  [0.1]\n\
+  -im_error_level <r>        Relative data-error level      [0.01]\n\
+  -im_gtol <r>               Gradient-norm tolerance        [1e-5]\n\
+  -im_rms_tol <r>            Absolute RMS early stop (0=off)   [0]\n\
+  -im_rms_rtol <r>           RMS-plateau rel. threshold     [1e-3]\n\
+  -im_rms_stall_window <n>   Stalled iters before stopping     [3]\n\
+  -im_diag_weight <r>        Gradient-smoother self-weight     [0]\n\
+  -im_fixed_materials <ids>  Material IDs frozen in smoothing\n\
+  -im_snapshot_interval <n>  Write VTU every N steps (0=off)   [0]\n\
+  -im_observed_mode <m>      external | fm_native     [external]\n\
+  -im_observed_file <f>      Observed-data file (req. fm_native)\n\
+\n\
+ Every inversion option is -im_* (matching this kernel and the\n\
+ `petgem im` subcommand). The former -inv_* spelling is retired\n\
+ and is rejected with an error naming its replacement.\n\
 \n\
 EXAMPLES\n\
   mpirun -n 56 ./im.csem -options_file params_p1.txt -output_dir out/\n\
-  mpirun -n 56 ./im.csem -options_file params.txt -inv_max_iter 120 -inv_lambda 0.05\n\
+  mpirun -n 56 ./im.csem -options_file params.txt -im_max_iter 120 -im_lambda 0.05\n\
 \n\
 UNIFIED BINARY\n\
-  mpirun -n 56 ./petgem inverse -options_file params_p1.txt\n\
+  mpirun -n 56 ./petgem im -options_file params_p1.txt\n\
 \n\
 MORE\n\
   -help        Full option database, incl. advanced PETSc flags.\n\
@@ -106,7 +112,7 @@ int runInverse(int argc, char **argv) {
   PetscMPIInt     rank, size;
   DM              dm;
   Vec             conductivity, materials_id, receivers;
-  imParams        iparams;   /* embeds the shared fmParams base as iparams.fm */
+  imParams        iparams;   /* embeds the shared petgemParams base as iparams.common */
   Grid            grid;
   PetscLogDouble  tAssembly = 0.0, tSolver = 0.0;
   PetscLogDouble  timers[6];
@@ -174,8 +180,8 @@ int runInverse(int argc, char **argv) {
 
   PetscCall(PetscLogStagePush(stage_parse));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(readfmParams(size, &iparams.fm));
-  PetscCall(readInversionParams(&iparams));
+  PetscCall(readPetgemParams(size, &iparams.common));
+  PetscCall(readimParams(&iparams));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[0] = end_timer - start_timer;
@@ -188,14 +194,14 @@ int runInverse(int argc, char **argv) {
   }
 
   /* Pull case-property defaults out of the bundle (error_level,
-   * fixed_materials) - CLI overrides applied by readInversionParams
+   * fixed_materials) - CLI overrides applied by readimParams
    * already take precedence via the *FromCLI provenance flags. The bundle
-   * path is the shared base's input file (iparams.fm.inputFile). Runs after
+   * path is the shared base's input file (iparams.common.inputFile). Runs after
    * the -help exit above (it opens the bundle) and folds into the same
    * "Read parameters" bucket. */
   PetscCall(PetscLogStagePush(stage_parse));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(loadInversionMetaFromBundle(iparams.fm.inputFile, &iparams));
+  PetscCall(loadInversionMetaFromBundle(iparams.common.inputFile, &iparams));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[0] += end_timer - start_timer;
@@ -209,10 +215,10 @@ int runInverse(int argc, char **argv) {
   /* ----------------------------------------------------------------------- */
   /* loadCsemInputs is passed NULL for its forward CsemSourceSet - the inverse
    * kernel reads the same /sources group into its multi-frequency
-   * invSources[] via setupInversionSources. The observed Ex dataset is read
+   * imSources[] via setupInversionSources. The observed Ex dataset is read
    * later (once numReceivers is known) by loadObservedDataset inside
    * runCsemInversion. Basis order is single-source: loadCsemInputs fills
-   * iparams.fm.order from the bundle's /order when the user did not pass
+   * iparams.common.order from the bundle's /order when the user did not pass
    * -order (sentinel 0). */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 4);
@@ -220,10 +226,10 @@ int runInverse(int argc, char **argv) {
 
   PetscCall(PetscLogStagePush(stage_load));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(loadCsemInputs(&iparams.fm, &dm, &conductivity, &materials_id,
+  PetscCall(loadCsemInputs(&iparams.common, &dm, &conductivity, &materials_id,
                            NULL,           /* no forward CsemSourceSet; setupInversionSources reads /sources */
                            &receivers));
-  PetscCall(setupInversionSources(iparams.fm.inputFile, &iparams));
+  PetscCall(setupInversionSources(iparams.common.inputFile, &iparams));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[1] = end_timer - start_timer;
@@ -241,7 +247,7 @@ int runInverse(int argc, char **argv) {
 
   PetscCall(PetscLogStagePush(stage_grid));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(setupCsemGrid(iparams.fm, &dm, &grid));
+  PetscCall(setupCsemGrid(iparams.common, &dm, &grid));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[2] = end_timer - start_timer;

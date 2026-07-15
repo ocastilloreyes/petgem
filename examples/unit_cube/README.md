@@ -42,7 +42,7 @@ is deterministic across gmsh versions, so the bundle is reproducible:
 
 ```bash
 gmsh -3 examples/unit_cube/mesh.geo -o examples/unit_cube/mesh.msh
-python3 utils/preprocess.py -mode forward -order 1 \
+python3 utils/preprocess.py -mode fm -order 1 \
     -case_dir examples/unit_cube -mesh_filename mesh.msh \
     -source_filename sources.txt -receiver_filename receivers.txt \
     -sigma_file sigmas.txt -params_filename params_p1.txt

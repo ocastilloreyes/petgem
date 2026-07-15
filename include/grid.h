@@ -121,7 +121,7 @@ typedef struct {
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */
-PetscErrorCode setupCsemGrid(const fmParams params, DM* dm, Grid* grid);
+PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid);
 
 /**
  * @brief Locates the mesh cell containing a given point.

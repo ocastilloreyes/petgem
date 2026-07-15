@@ -48,7 +48,7 @@
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode computeFields(const fmParams params, const CsemSourceSet sources,
+PetscErrorCode computeFields(const petgemParams params, const CsemSourceSet sources,
                              const DM dm, const Grid grid,
                              Vec receivers, const Mat X);
 

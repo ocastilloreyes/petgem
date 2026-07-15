@@ -48,7 +48,7 @@ gmsh -3 examples/canonical_model/mesh.geo -o examples/canonical_model/mesh.msh
 
 # 2. Preprocess: build the input bundle (input.h5) for the chosen order.
 python3 utils/preprocess.py \
-    -mode forward -order 1 \
+    -mode fm -order 1 \
     -case_dir examples/canonical_model \
     -mesh_filename mesh.msh \
     -source_filename sources.txt \

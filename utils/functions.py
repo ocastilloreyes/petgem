@@ -7,6 +7,33 @@ import textwrap
 from petsc4py import PETSc
 
 
+# Canonical mode tags, and the aliases accepted for them. Mirrors exactly the
+# set the C dispatcher accepts (parseModeArg in src/common.c), so `-mode X`
+# here and `petgem X` there take the same words:
+#     fm  <- fm, forward, modeling
+#     im  <- im, inverse
+MODE_ALIASES = {
+    "fm":       "fm",
+    "forward":  "fm",
+    "modeling": "fm",
+    "im":       "im",
+    "inverse":  "im",
+}
+
+
+def normalizeMode(mode):
+    """Map a mode alias onto its canonical tag (``'fm'`` or ``'im'``).
+
+    Raises ValueError on an unknown mode.
+    """
+    try:
+        return MODE_ALIASES[mode]
+    except KeyError:
+        raise ValueError(
+            f"unknown mode {mode!r}; expected one of "
+            f"{sorted(MODE_ALIASES)}") from None
+
+
 def parsePreprocessingArgs():
     """CLI surface for the centralized utils/preprocess.py entry point.
 
@@ -21,9 +48,12 @@ def parsePreprocessingArgs():
         description="Preprocess mesh, conductivity, receivers and sources into a "
                     "single PETGEM input HDF5 file."
     )
-    parser.add_argument("-mode",              choices=["forward", "inverse"],
-                        default="forward",
-                        help="Selects the params-file template (default: forward)")
+    parser.add_argument("-mode",              choices=sorted(MODE_ALIASES),
+                        default="fm",
+                        help="Simulation type: 'fm' (forward) or 'im' (inverse). "
+                             "The aliases accepted by the petgem dispatcher "
+                             "(forward/modeling, inverse) also work. "
+                             "Default: fm")
     parser.add_argument("-order",              type=int, required=True, dest="order",
                         help="Polynomial order (1..6) - written into the params file only")
     parser.add_argument("-case_dir",          type=str, required=True,
@@ -39,19 +69,19 @@ def parsePreprocessingArgs():
                         help="Single-frequency forward sources text file inside "
                              "case_dir. Format: first non-comment line = frequency "
                              "(Hz); subsequent lines = 'x y z current length dip "
-                             "azimuth'. Required when -mode forward; optional "
-                             "(skipped) when -mode inverse - the inverse kernel "
+                             "azimuth'. Required when -mode fm; optional "
+                             "(skipped) when -mode im - the inverse kernel "
                              "reads multi-frequency sources from /sources/* "
-                             "via -inv_source_filename.")
-    parser.add_argument("-inv_source_filename", type=str, default=None,
+                             "via -im_source_filename.")
+    parser.add_argument("-im_source_filename", type=str, default=None,
                         help="Multi-frequency sources text file inside case_dir, "
-                             "required when -mode inverse. Format: one row per "
+                             "required when -mode im. Format: one row per "
                              "(freq, dipole) pair with 8 fields: "
                              "'freq x y z current length dip azimuth'. "
                              "Embedded into the bundle under /sources/*.")
     parser.add_argument("-observed_filename", type=str, default=None,
                         help="Observed-data file inside case_dir, required when "
-                             "-mode inverse. Either an HDF5 (.h5/.hdf5) with "
+                             "-mode im. Either an HDF5 (.h5/.hdf5) with "
                              "/Ex [N_freq, N_recv] complex128 ({r,i} compound), "
                              "OR a raw MATLAB-style invEx.dat text file (parsed "
                              "inline - no separate conversion step). Embedded "
@@ -62,7 +92,7 @@ def parsePreprocessingArgs():
                              "Overrides an HDF5 file's attribute; for a raw "
                              "invEx.dat it is the only way to set it. Omit to "
                              "leave the kernel default (overridable later with "
-                             "-inv_error_level).")
+                             "-im_error_level).")
     parser.add_argument("-sigma_file",        type=str, required=True,
                         help="Whitespace text table of per-material conductivity "
                              "(sigma_x sigma_y sigma_z [fixed]), relative to "
@@ -103,6 +133,10 @@ def readSigmaTable(path):
     a sorted list of 0-based material IDs flagged as fixed (empty list
     when the table has no 4th column).
     """
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"Conductivity table not found: '{path}'. "
+            f"Check -case_dir and -sigma_file.")
     rows = []
     with open(path) as fh:
         for line in fh:
@@ -231,7 +265,7 @@ def readInvExDat(path):
     ``[N_freq, N_recv]`` complex array.  Returns ``(Ex, None)`` to mirror
     :func:`readObservedDataH5` - a raw .dat carries no error-level attribute,
     so the noise level is supplied separately (``-error_level`` /
-    ``-inv_error_level``) or left to the kernel default.
+    ``-im_error_level``) or left to the kernel default.
 
     Folding this in lets ``preprocess.py`` consume ``invEx.dat`` directly, so
     no separate convert-to-HDF5 step is required (the standalone
@@ -290,7 +324,7 @@ def writeInversionPayload(filename, observed_Ex,
     Bundle additions:
         /observed/Ex                          (HDF5 compound complex128)
         /observed @error_level                (HDF5 group attribute, float64; omitted if None)
-        /inv_meta/fixed_materials             (int32[], 0-based material ids; omitted if empty)
+        /im_meta/fixed_materials             (int32[], 0-based material ids; omitted if empty)
 
     Parameters
     ----------
@@ -301,11 +335,11 @@ def writeInversionPayload(filename, observed_Ex,
     error_level : float or None
         Amplitude-relative noise level used to synthesize observed_Ex.
         Stored as a group attribute on /observed; consumed by the C
-        kernel (overridable with -inv_error_level).  Skipped when None.
+        kernel (overridable with -im_error_level).  Skipped when None.
     fixed_materials : iterable of int
         0-based material ids to exclude from inversion. Stored as an
-        int32 dataset under /inv_meta/fixed_materials; consumed by the
-        C kernel (overridable with -inv_fixed_materials).  Skipped when
+        int32 dataset under /im_meta/fixed_materials; consumed by the
+        C kernel (overridable with -im_fixed_materials).  Skipped when
         empty.
     """
     ex  = np.asarray(observed_Ex, dtype=np.complex128)
@@ -313,7 +347,7 @@ def writeInversionPayload(filename, observed_Ex,
                            dtype=np.int32)
 
     with h5py.File(filename, "a") as f:
-        for grp in ("/inv_sources", "/observed", "/inv_meta"):
+        for grp in ("/observed", "/im_meta"):
             if grp in f:
                 del f[grp]
 
@@ -325,7 +359,7 @@ def writeInversionPayload(filename, observed_Ex,
             obs.attrs["error_level"] = float(error_level)
 
         if fixed_arr.size > 0:
-            meta = f.create_group("/inv_meta")
+            meta = f.create_group("/im_meta")
             meta.create_dataset("fixed_materials", data=fixed_arr)
 
 
@@ -379,7 +413,7 @@ def writePetgemInputFile(plex, conductivity, materials_id,
       /order                Vec, length 1 - polynomial order used to size the case
       /sources/...         transmitters, one entry per row of `sources8`
                             (per-entry frequency). Same group for forward and
-                            inverse; inverse adds /observed and /inv_meta later
+                            inverse; inverse adds /observed and /im_meta later
                             via writeInversionPayload.
 
     Parameters
@@ -457,62 +491,81 @@ def writePetgemInputFile(plex, conductivity, materials_id,
     v_model.destroy()
 
 
-def writeForwardModelingParamsFile(order, output_dir, output_filename,
-                                   input_filename, params_filename):
-    """Emit the fm.csem params file.
+# Solver block emitted per mode. fm.csem defaults to the BDDC-preconditioned
+# iterative solve (which requires the MATIS operator); im.csem re-solves the
+# system at every L-BFGS iteration and so defaults to a direct factorization.
+# This is an intrinsic difference between the two problems, not an interface
+# one - everything around it is shared.
+_SOLVER_BLOCK = {
+    "fm": (
+        "-dm_mat_type is\n"
+        "-ksp_type fgmres\n"
+        "-pc_type bddc\n"
+        "-pc_bddc_use_deluxe_scaling 1\n"
+        "-pc_bddc_coarse_pc_type lu\n"
+    ),
+    "im": (
+        "-ksp_type preonly\n"
+        "-pc_type                    lu\n"
+        "-pc_factor_mat_solver_type  mumps\n"
+        "-mat_mumps_icntl_14         80\n"
+        "-mat_mumps_icntl_28         1\n"
+    ),
+}
 
-    `input_filename` is the bundle written by writePetgemInputFile; the
-    same name is fed back to the kernel via -input_filename. The basis
-    order is no longer written here - the C kernel reads it from the
-    bundle's /order dataset (loadCsemInputs). `order` is still accepted as
-    an argument because the caller uses it to compose other defaults,
-    but it is not emitted into the params file."""
-    del order  # bundle is authoritative; CLI -order remains as override
-    content = textwrap.dedent(f"""\
-        -input_filename {output_dir}/{input_filename}
-        -dm_mat_type is
-        -ksp_type fgmres
-        -pc_type bddc
-        -pc_bddc_use_deluxe_scaling 1
-        -pc_bddc_coarse_pc_type lu
-        -output_dir {output_dir}/
-        -output_filename {output_filename}
-    """)
-    filename = f"{output_dir}/{params_filename}"
-    with open(filename, "w") as f:
-        f.write(content)
+# Inversion tuning block (im only). Every option is -im_*, matching the
+# im.csem kernel, the imParams struct and the `petgem im` subcommand.
+# -im_error_level and -im_fixed_materials are deliberately absent: their
+# values come from the bundle (/observed @error_level, /im_meta/fixed_materials)
+# and the CLI flags exist only as overrides.
+_IM_TUNING_BLOCK = (
+    "-im_max_iter                150\n"
+    "-im_lbfgs_memory            2\n"
+    "-im_lambda                  0.1\n"
+    "-im_diag_weight             0.0\n"
+    "-im_gtol                    1.0e-5\n"
+    "-im_rms_tol                 1.05\n"
+    "-im_snapshot_interval       1\n"
+)
 
 
-def writeInverseModelingParamsFile(order, output_dir, output_filename,
-                                   input_filename, params_filename):
-    """Emit the im.csem params file. The inverse kernel now reads EVERYTHING
-    case-specific from `input_filename` - multi-frequency sources
-    (/sources/*), observed Ex (/observed/Ex), the noise level
-    (/observed @error_level) and the fixed-material list
-    (/inv_meta/fixed_materials).  The emitted params.txt only carries
-    runtime/tuning knobs; -inv_error_level and -inv_fixed_materials are
-    accepted as CLI overrides but no longer present in the default
-    template.  -order is sourced from the bundle's /order."""
-    del order  # bundle is authoritative; CLI -order remains as override
-    content = textwrap.dedent(f"""\
-        -input_filename {output_dir}/{input_filename}
-        -ksp_type preonly
-        -pc_type                    lu
-        -pc_factor_mat_solver_type  mumps
-        -mat_mumps_icntl_14         80
-        -mat_mumps_icntl_28         1
-        -inv_max_iter               150
-        -inv_lbfgs_memory           2
-        -inv_lambda                 0.1
-        -inv_diag_weight            0.0
-        -inv_gtol                   1.0e-5
-        -inv_rms_tol                1.05
-        -inv_snapshot_interval      1
-        -output_dir {output_dir}/
-        -output_filename {output_filename}
-    """)
-    filename = f"{output_dir}/{params_filename}"
-    with open(filename, "w") as f:
+def writeParamsFile(mode, output_dir, output_filename, input_filename,
+                    params_filename):
+    """Emit the PETSc options file for either kernel.
+
+    One writer for both modes: the input/output keys are identical, and the
+    mode only selects the solver block (plus the inversion tuning block for
+    ``im``). This replaces the former separate forward/inverse writers, which
+    duplicated the shared keys and could drift apart.
+
+    The polynomial order is NOT written here - both kernels read it from the
+    bundle's ``/order`` dataset, with ``-order`` available as a CLI override.
+
+    Parameters
+    ----------
+    mode : {'fm', 'im'}
+        Canonical mode tag (see MODE_ALIASES).
+    output_dir : str
+        Case/output directory; also where the params file is written.
+    output_filename : str
+        Output stem. Both kernels write ``{output_dir}/{stem}.h5``.
+    input_filename : str
+        Bundle written by writePetgemInputFile, fed back as -input_filename.
+    params_filename : str
+        Name of the params file to emit inside output_dir.
+    """
+    if mode not in _SOLVER_BLOCK:
+        raise ValueError(f"writeParamsFile: unknown mode {mode!r} "
+                         f"(expected 'fm' or 'im')")
+
+    content = (
+        f"-input_filename {output_dir}/{input_filename}\n"
+        + _SOLVER_BLOCK[mode]
+        + (_IM_TUNING_BLOCK if mode == "im" else "")
+        + f"-output_dir {output_dir}/\n"
+        + f"-output_filename {output_filename}\n"
+    )
+    with open(f"{output_dir}/{params_filename}", "w") as f:
         f.write(content)
 
 
@@ -570,13 +623,25 @@ def _extractTetraMaterial(mesh, tetra_idx, path):
     return mat.astype(int), codes
 
 
+def _require_input_file(path, label, hint=None):
+    """Raise a clear FileNotFoundError when a required input file is missing.
+
+    Used to fail preprocessing up front with an actionable message instead of
+    a raw meshio / numpy / open() traceback deeper in the pipeline.
+    """
+    if not os.path.isfile(path):
+        msg = f"{label} not found: '{path}'. Check -case_dir and the filename"
+        msg += f" ({hint})." if hint else "."
+        raise FileNotFoundError(msg)
+
+
 def runPreprocessing(*, mode, order, case_dir,
                      mesh_filename, receiver_filename, source_filename=None,
                      sigma_x, sigma_y, sigma_z,
                      fixed_materials=(),
                      input_filename="input.h5",
                      params_filename="params.txt",
-                     inv_source_filename=None,
+                     im_source_filename=None,
                      observed_filename=None,
                      error_level=None,
                      output_vtk=None, dm_view=False):
@@ -611,30 +676,28 @@ def runPreprocessing(*, mode, order, case_dir,
     dm_view : bool
         If True, dumps DMPlex info to stdout via PETSc options.
     """
-    if mode not in ("forward", "inverse"):
-        raise ValueError(f"runPreprocessing: mode must be 'forward' or 'inverse' "
-                         f"(got {mode!r})")
-    if mode == "forward":
+    mode = normalizeMode(mode)   # 'forward'/'modeling' -> 'fm', 'inverse' -> 'im'
+    if mode == "fm":
         if source_filename is None:
             raise ValueError("runPreprocessing: -source_filename is required "
-                             "when mode='forward'")
-        if inv_source_filename is not None or observed_filename is not None:
+                             "when mode='fm'")
+        if im_source_filename is not None or observed_filename is not None:
             raise ValueError(
-                "runPreprocessing: -inv_source_filename and -observed_filename "
-                "are valid only with mode='inverse'.")
-    if mode == "inverse":
+                "runPreprocessing: -im_source_filename and -observed_filename "
+                "are valid only with mode='im'.")
+    if mode == "im":
         if source_filename is not None:
             raise ValueError(
                 "runPreprocessing: -source_filename is forward-mode only. "
                 "The inverse kernel reads multi-freq sources from "
-                "/sources/* in the bundle; pass -inv_source_filename "
+                "/sources/* in the bundle; pass -im_source_filename "
                 "instead.")
-        if inv_source_filename is None:
-            raise ValueError("runPreprocessing: -inv_source_filename is required "
-                             "when mode='inverse'")
+        if im_source_filename is None:
+            raise ValueError("runPreprocessing: -im_source_filename is required "
+                             "when mode='im'")
         if observed_filename is None:
             raise ValueError("runPreprocessing: -observed_filename is required "
-                             "when mode='inverse'")
+                             "when mode='im'")
 
     sigma_x = np.asarray(sigma_x, dtype=float)
     sigma_y = np.asarray(sigma_y, dtype=float)
@@ -652,8 +715,8 @@ def runPreprocessing(*, mode, order, case_dir,
     output_petgem_filename   = f"responses_p{order}"
     output_vtk_filename      = (os.path.join(case_dir, output_vtk)
                                 if output_vtk is not None else None)
-    input_inv_sources_filename = (os.path.join(case_dir, inv_source_filename)
-                                  if inv_source_filename is not None else None)
+    input_im_sources_filename = (os.path.join(case_dir, im_source_filename)
+                                  if im_source_filename is not None else None)
     input_observed_filename    = (os.path.join(case_dir, observed_filename)
                                   if observed_filename is not None else None)
 
@@ -666,11 +729,24 @@ def runPreprocessing(*, mode, order, case_dir,
     print(f"  Receivers file         : {input_receivers_filename}")
     print(f"  Sources file           : "
           f"{input_sources_filename if input_sources_filename else '(skipped - inverse mode)'}")
-    if mode == "inverse":
-        print(f"  Inv sources file       : {input_inv_sources_filename}")
+    if mode == "im":
+        print(f"  IM sources file        : {input_im_sources_filename}")
         print(f"  Observed data file     : {input_observed_filename}")
     print(f"  Output bundle          : {output_filename}")
     print(f"\n  Number of materials    : {len(sigma_x)}")
+
+    # 0. Validate that every required input file exists up front, so a missing
+    #    or mistyped path fails with a clear message here rather than as a raw
+    #    meshio / numpy / open() traceback several lines down. Pure guard: on
+    #    the success path nothing changes.
+    _require_input_file(input_mesh_filename, "Mesh file",
+                        hint="generate it (e.g. run gmsh on the .geo)")
+    _require_input_file(input_receivers_filename, "Receivers file")
+    if mode == "fm":
+        _require_input_file(input_sources_filename, "Sources file")
+    else:
+        _require_input_file(input_im_sources_filename, "Inverse sources file")
+        _require_input_file(input_observed_filename, "Observed-data file")
 
     # 1. Import mesh (Gmsh .msh or VTK .vtk/.vtu - meshio auto-detects the
     #    format from the extension/header). PETGEM is tetrahedral-only, so
@@ -730,7 +806,7 @@ def runPreprocessing(*, mode, order, case_dir,
     # The same /sources group is written for both modes; forward repeats a
     # single frequency across its transmitters, inverse carries one row per
     # (frequency, dipole).
-    src_path = input_sources_filename if mode == "forward" else input_inv_sources_filename
+    src_path = input_sources_filename if mode == "fm" else input_im_sources_filename
     print("\nReading sources")
     sources8 = readSourcesText(src_path)
     uniq_freqs = np.unique(sources8[:, 0])
@@ -752,9 +828,9 @@ def runPreprocessing(*, mode, order, case_dir,
     if output_vtk_filename:
         print(f"  VTU view  : {output_vtk_filename}")
 
-    # 6b. Inverse-only payload: append /observed/Ex and /inv_meta.
+    # 6b. Inverse-only payload: append /observed/Ex and /im_meta.
     # (The sources already live in the unified /sources group above.)
-    if mode == "inverse":
+    if mode == "im":
         print("\nReading observed data")
         # Accept either a prebuilt HDF5 (.h5/.hdf5) or a raw MATLAB-style
         # invEx.dat text file - the .dat is parsed inline, so no separate
@@ -792,17 +868,13 @@ def runPreprocessing(*, mode, order, case_dir,
         writeInversionPayload(output_filename, observed_Ex,
                               error_level=observed_error_level,
                               fixed_materials=fixed_materials)
-        print(f"  Wrote /observed/Ex, /inv_meta/fixed_materials "
+        print(f"  Wrote /observed/Ex, /im_meta/fixed_materials "
               f"into {output_filename}")
 
-    # 7. Params file
+    # 7. Params file (one writer for both modes; mode selects the solver block)
     print("\nGenerating PETGEM parameter file")
-    if mode == "forward":
-        writeForwardModelingParamsFile(order, case_dir, output_petgem_filename,
-                                       input_filename, params_filename)
-    else:
-        writeInverseModelingParamsFile(order, case_dir, output_petgem_filename,
-                                       input_filename, params_filename)
+    writeParamsFile(mode, case_dir, output_petgem_filename,
+                    input_filename, params_filename)
     print(f"  Params file: {os.path.join(case_dir, params_filename)}")
 
     print("\n====================================================")
@@ -941,6 +1013,42 @@ def readAllResponses(filename):
         'provenance':  provenance,
         'num_sources': num_sources,
         'sources':     sources,
+    }
+
+
+def compareMagnitude(computed, reference):
+    """Magnitude-domain error metrics between a computed and a reference field.
+
+    Shared postprocessing helper so every case reports the same three metrics
+    the same way, instead of re-deriving them inline in each per-case script.
+    Both inputs are 1-D field arrays (complex on a PETSc complex build, or
+    real); the comparison is done on ``|field|``.
+
+    Parameters
+    ----------
+    computed, reference : array_like
+        Field samples to compare (e.g. ``Ex`` at each receiver). Must have the
+        same number of elements.
+
+    Returns
+    -------
+    dict
+        ``nrmsd``  - RMS deviation of ``|computed|`` vs ``|reference|``,
+        normalized by the reference peak-to-peak range.
+        ``rel_l2`` - relative L2 norm of the magnitude difference.
+        ``mape``   - mean absolute percentage error (%).
+    """
+    a = np.abs(np.asarray(computed)).ravel()
+    b = np.abs(np.asarray(reference)).ravel()
+    if a.shape != b.shape:
+        raise ValueError(
+            f"compareMagnitude: length mismatch - computed has {a.size} "
+            f"samples, reference has {b.size}. They must describe the same "
+            f"receivers in the same order.")
+    return {
+        "nrmsd":  float(np.sqrt(np.mean((a - b) ** 2)) / (b.max() - b.min())),
+        "rel_l2": float(np.linalg.norm(a - b) / np.linalg.norm(b)),
+        "mape":   float(np.mean(np.abs((a - b) / b)) * 100),
     }
 
 

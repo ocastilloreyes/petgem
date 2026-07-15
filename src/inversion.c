@@ -61,7 +61,7 @@
  * destroyInversionWorkspace, replacing the per-callback allocate/free dance.
  *
  * What gets precomputed:
- *   - 3D quadrature points + weights (depend only on iparams->fm.order);
+ *   - 3D quadrature points + weights (depend only on iparams->common.order);
  *   - Per-cell Me / Ke elemental-matrix buffers (numDof² each);
  *   - Reusable global Vecs b, x, nB, nx and parallel Ex_recv;
  *   - Per-frequency RHS Vec Bvec_per_freq[i]
@@ -88,7 +88,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   PetscReal errorLevel  = ctx->iparams->errorLevel;
 
   /* ---- 3D quadrature (depends only on order) ---- */
-  PetscCall(computeNum3DQuadraturePoints(ctx->iparams->fm.order, &ctx->quad3d));
+  PetscCall(computeNum3DQuadraturePoints(ctx->iparams->common.order, &ctx->quad3d));
   PetscCall(PetscCalloc1(ctx->quad3d.numPoints, &ctx->quad3d.points));
   for (PetscInt i = 0; i < ctx->quad3d.numPoints; i++)
     PetscCall(PetscCalloc1(NUM_DIMENSIONS, &ctx->quad3d.points[i]));
@@ -122,16 +122,16 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   PetscCall(PetscCalloc1(numFreqs, &ctx->Wf_per_freq));
   PetscCall(PetscCalloc1(numFreqs, &ctx->dObsRow_per_freq));
 
-  /* Build a quiet fmParams stub for assembleCsemRHS (it only reads
+  /* Build a quiet petgemParams stub for assembleCsemRHS (it only reads
    * order, numMPITasks and quiet - same fields the iter loop used to fill). */
-  fmParams stub;
+  petgemParams stub;
   PetscCall(PetscMemzero(&stub, sizeof(stub)));
-  stub.order = ctx->iparams->fm.order;
+  stub.order = ctx->iparams->common.order;
   PetscCallMPI(MPI_Comm_size(comm, &stub.numMPITasks));
   stub.quiet = PETSC_TRUE;
 
   for (PetscInt i = 0; i < numFreqs; i++) {
-    const InvCsemSource *isrc = &ctx->iparams->invSources[i];
+    const ImCsemSource *isrc = &ctx->iparams->imSources[i];
 
     /* Build a single-source CsemSourceSet so assembleCsemRHS can do its
      * usual work.  Lives on the stack - assembleCsemRHS copies what it
@@ -218,9 +218,9 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
    * MatCopy(K) + MatAXPY(-Const·Ms) with SAME_NONZERO_PATTERN in
    * inversionObjGrad valid. Ms needs no initial values here - the first
    * refill overwrites them. */
-  fmParams kandmStub;
+  petgemParams kandmStub;
   PetscCall(PetscMemzero(&kandmStub, sizeof(kandmStub)));
-  kandmStub.order       = ctx->iparams->fm.order;
+  kandmStub.order       = ctx->iparams->common.order;
   kandmStub.numMPITasks = stub.numMPITasks;
   kandmStub.quiet       = PETSC_TRUE;
   PetscCall(assembleCsemKandM(kandmStub, ctx->dm, ctx->grid,
@@ -524,7 +524,7 @@ PetscErrorCode createInvKSP(const imParams *iparams,
    * get conflated. setupBDDCFromPetgemGradient registers it at order = order
    * (matching the gradient's P_order H1 column space). Matches the forward
    * solver (solver.c). */
-  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, Gbddc, iparams->fm.order));
+  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, Gbddc, iparams->common.order));
   PetscCall(KSPSetFromOptions(*ksp));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -594,9 +594,9 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
    * assembleCsemMsRefill walks the local cells, shares the per-cell
    * setup helper (prepareCellForAssembly) with assembleCsemKandM, and
    * overwrites Ms in-place using the cached sparsity pattern. */
-  fmParams fwdParams;
+  petgemParams fwdParams;
   PetscCall(PetscMemzero(&fwdParams, sizeof(fwdParams)));
-  fwdParams.order = c->iparams->fm.order;
+  fwdParams.order = c->iparams->common.order;
   PetscCallMPI(MPI_Comm_size(comm, &fwdParams.numMPITasks));
   fwdParams.quiet = PETSC_TRUE;
 
@@ -632,7 +632,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec,
 
   /* ---- 5. Frequency loop ---- */
   for (PetscInt i = 0; i < numFreqs; i++) {
-    const InvCsemSource *isrc = &c->iparams->invSources[i];
+    const ImCsemSource *isrc = &c->iparams->imSources[i];
 
     PetscReal   omega = isrc->freq * 2.0 * PETSC_PI;
     PetscScalar Const = PETSC_i * omega * MU;
@@ -861,13 +861,13 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
 
   /* ---- Build receiver Q matrices ---- */
   ReceiverInterpolationMatrices Q;
-  PetscCall(buildReceiverInterpolationMatrices(iparams->fm.order,
+  PetscCall(buildReceiverInterpolationMatrices(iparams->common.order,
                                                 receivers,
                                                 dm, grid, &Q));
 
   /* ---- Load observed data via the source-agnostic abstraction ----
    * Backend (external /observed/Ex vs fm-native /sources/src{k}/fields/Ex)
-   * and file are selected from iparams (-inv_observed_mode / -inv_observed_file). */
+   * and file are selected from iparams (-im_observed_mode / -im_observed_file). */
   Mat dObs;
   PetscCall(loadObservedDataset(iparams, Q.numReceivers, &dObs));
 

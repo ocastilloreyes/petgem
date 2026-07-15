@@ -36,7 +36,7 @@
 #define MMS_H
 
 #include "constants.h"   /* MU, NUM_DIMENSIONS */
-#include "grid.h"        /* Grid, and (via io.h) fmParams, CsemSourceSet */
+#include "grid.h"        /* Grid, and (via io.h) petgemParams, CsemSourceSet */
 #include <petsc.h>
 
 /* Exact norms of E* on [0,1]^3, used as relative-error denominators.
@@ -116,7 +116,7 @@ static inline void mmsForcingF(const PetscReal X[NUM_DIMENSIONS], PetscReal omeg
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode runMMSVerification(const fmParams params, const DM dm, const Grid grid,
+PetscErrorCode runMMSVerification(const petgemParams params, const DM dm, const Grid grid,
                                   const Vec conductivity, const CsemSourceSet sources);
 
 #endif /* MMS_H */

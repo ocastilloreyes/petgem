@@ -76,7 +76,7 @@ int runForward(int argc, char** argv) {
   Vec             conductivity, materials_id, receivers;
   Mat             A = NULL, B, X; /* Global matrix (A), RHS (B),  unknown vector solution (X)*/
   Mat             G = NULL;       /* Discrete gradient for PCBDDC */
-  fmParams        params;
+  petgemParams        params;
   Grid            grid;
   CsemSourceSet   sources = {0, 0, NULL};
   PetscReal       omega;
@@ -140,7 +140,7 @@ int runForward(int argc, char** argv) {
 
   PetscCall(PetscLogStagePush(stage_parse));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(readfmParams(size, &params));
+  PetscCall(readPetgemParams(size, &params));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[0] = end_timer - start_timer;

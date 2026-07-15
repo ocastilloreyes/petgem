@@ -2,34 +2,46 @@
 Forward modeling
 ================
 
-The Controlled-Source Electromagnetic (CSEM) forward kernel in **PETGEM**
-implements a three-dimensional forward solver based on a high-order vector
-finite element method formulated on unstructured tetrahedral meshes. This
-numerical approach ensures accurate representation of complex geological
-structures and enables scalable computations on parallel architectures. The
-kernel is optimized for high-order polynomial basis functions, allowing
-enhanced accuracy in electromagnetic field simulations while reducing the
-number of unknowns compared to low-order formulations.
+``fm.csem`` computes the 3D CSEM response of a conductivity model at a single
+frequency, discretizing the electric field with Nédélec elements of order 1 to
+6 on an unstructured tetrahedral mesh. The formulation is described in
+:doc:`method`.
 
 Workflow
 --------
-The typical workflow for CSEM forward modeling in **PETGEM** consists of the
-following steps (the shared stages are described in :doc:`overview`):
-
-1. Generate or import a mesh using `Gmsh <http://gmsh.info/>`_.
-2. Define the subsurface conductivity model in ``sigmas.txt``.
-3. Run ``utils/preprocess.py -mode forward`` to produce the input bundle and
+1. Generate or import a mesh (see :doc:`meshing`).
+2. Define the conductivity model in ``sigmas.txt``.
+3. Run ``utils/preprocess.py -mode fm`` to produce the input bundle and
    the parameter file.
-4. Execute the CSEM kernel (``fm.csem``) to perform the forward simulation.
-5. Post-process the results with the case ``postprocess.py``.
+4. Run ``fm.csem``.
+5. Post-process the responses.
 
-Parameter files
-***************
-The forward parameter file (emitted by ``utils/preprocess.py``) provides the
-link between the input bundle and the kernel execution. It carries the bundle
-path and the solver configuration; the polynomial order is read from the
-bundle's ``/nord`` dataset, not from the parameter file. A representative
-forward parameter file is:
+Kernel options
+--------------
+``fm.csem`` takes its options from a PETSc options file
+(``-options_file params.txt``) or directly on the command line.
+
+**Required**
+
+- ``-input_filename`` - the input bundle (HDF5).
+- ``-output_dir`` - output directory (created if absent).
+- ``-output_filename`` - output stem; writes ``<output_dir>/<stem>.h5``.
+
+**Optional**
+
+- ``-order <1..6>`` - override the bundle's ``/order``.
+- ``-mms`` - run the method-of-manufactured-solutions verification instead of a
+  CSEM simulation (see :doc:`testing`).
+
+Everything else in the options file is passed to PETSc (solver, preconditioner,
+matrix type); see :doc:`solver`.
+
+``-help intro`` prints a usage summary and exits; ``-help`` prints the full
+PETSc option database; ``--version`` prints the version.
+
+Parameter file
+**************
+The parameter file emitted by ``utils/preprocess.py -mode fm`` is:
 
 .. code-block::
 
@@ -42,61 +54,58 @@ forward parameter file is:
    -output_dir <case_dir>/
    -output_filename responses
 
-where:
+The polynomial order is **not** written here - the kernel reads it from the
+bundle's ``/order`` dataset.
 
-- ``-input_filename``: Path to the unified input bundle (HDF5).
-- ``-ksp_type`` / ``-pc_type``: PETSc Krylov solver and preconditioner. The
-  default is FGMRES with the BDDC preconditioner (deluxe scaling, LU coarse
-  solve), which converges in a handful of iterations at low to moderate order.
-- ``-output_dir`` / ``-output_filename``: Directory and base name for the
-  computed responses.
+Input files
+-----------
 
 Source file
-^^^^^^^^^^^
-
-The ``-source_filename`` file describes the transmitter configuration for
-forward modeling. It starts with the operating frequency, then one row per
-source with its dipole parameters. The number of sources is determined
-automatically by the number of non-empty lines after the frequency line. The
-format is:
+***********
+``-source_filename`` describes the transmitters. Two layouts are accepted and
+auto-detected (see :doc:`formats`). The shipped examples use the second:
 
 .. code-block::
 
+   # 8 fields per row (canonical)
+   freq x_pos y_pos z_pos current length dip_angle azimuth_angle
+
+.. code-block::
+
+   # a lone frequency line, then 7-field rows
    freq
    x_pos y_pos z_pos current length dip_angle azimuth_angle
-   x_pos y_pos z_pos current length dip_angle azimuth_angle
-   ...
 
-where:
+Fields are: frequency (Hz), dipole position ``x y z`` (m), ``current`` (A),
+``length`` (m), ``dip_angle`` and ``azimuth_angle`` (degrees).
 
-- ``freq``: Operating frequency (Hz)
-- ``x_pos y_pos z_pos``: Cartesian coordinates of the dipole position (m)
-- ``current``: Source current amplitude (A)
-- ``length``: Dipole length (m)
-- ``dip_angle``: Dipole inclination angle (degrees)
-- ``azimuth_angle``: Dipole azimuth angle (degrees)
-
-The forward source file is embedded into the bundle by the preprocessing step;
-inverse modeling uses a different, multi-frequency source file (see
-:doc:`inverse_modeling`).
+A forward run is **single-frequency**: the kernel's transmitter set carries one
+operating frequency shared by all transmitters. Inverse modeling uses a
+multi-frequency source file (see :doc:`inverse_modeling`).
 
 Receiver file
-^^^^^^^^^^^^^
-The ``-receiver_filename`` file specifies the receiver locations as a list of
-Cartesian coordinates ``(x, y, z)``, one measurement point per row.
+*************
+``-receiver_filename`` lists receiver positions, one Cartesian point ``x y z``
+per row. Whitespace- or comma-separated; ``#`` comments and blank lines are
+allowed.
 
-Running PETGEM
-**************
-A typical command for a parallel forward execution is:
+Running
+-------
+.. code-block:: bash
+
+   mpirun -n 4 build/fm.csem -options_file path/to/params.txt
+
+or through the dispatcher:
 
 .. code-block:: bash
 
-   mpirun -n 4 build/fm.csem -options_file path_to_params_file.txt
+   mpirun -n 4 build/petgem modeling -options_file path/to/params.txt
 
-or, equivalently, through the unified dispatcher:
+Output
+------
+The kernel writes a single HDF5 file, ``<output_dir>/<output_filename>.h5``,
+holding all six field components (``Ex``, ``Ey``, ``Ez``, ``Hx``, ``Hy``,
+``Hz``) at the receivers, for every transmitter. The layout is documented in
+:doc:`formats`.
 
-.. code-block:: bash
-
-   mpirun -n 4 build/petgem modeling -options_file path_to_params_file.txt
-
-A complete, runnable walkthrough is given in :doc:`examples`.
+A runnable walkthrough is given in :doc:`examples`.

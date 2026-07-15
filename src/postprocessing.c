@@ -64,7 +64,7 @@
  * @note Assumes 3D H(curl) Nédélec elements. Receivers outside the
  *       computational domain trigger a warning and are skipped.
  */
-PetscErrorCode computeFields(const fmParams params, 
+PetscErrorCode computeFields(const petgemParams params, 
                              const CsemSourceSet sources,
                              const DM dm, const Grid grid,
                              Vec receivers, const Mat X) {
@@ -73,13 +73,8 @@ PetscErrorCode computeFields(const fmParams params,
   /* Variable declarations */
   PetscReal omega;
   PetscScalar constFactor;
-  PetscInt day, year;
-  PetscInt month = 0;
-  PetscBool flag;
   Vec Ex, Ey, Ez, Hx, Hy, Hz;
   PetscViewer viewerOutput;
-  char date[30], monthStr[4], version[50];
-  char formattedDate[11]; // YYYY-MM-DD format (10 chars + null terminator)
   char outFileName[PETSC_MAX_PATH_LEN];
   char groupPath[64];
   ReceiverInterpolationMatrices Q;
@@ -107,31 +102,9 @@ PetscErrorCode computeFields(const fmParams params,
   PetscCall(MatCreateVecs(Q.QHy, NULL, &Hy));
   PetscCall(MatCreateVecs(Q.QHz, NULL, &Hz));
 
-  /* Build the single output file name: {output_dir}/{output_filename}.h5 */
-  PetscCall(PetscStrncpy(outFileName, params.outputDirectory, sizeof(outFileName)));
-  size_t len = strlen(outFileName);
-  if (len > 0 && outFileName[len - 1] != '/') {
-    PetscCall(PetscStrlcat(outFileName, "/", sizeof(outFileName)));
-  }
-  PetscCall(PetscStrlcat(outFileName, params.outputFilename, sizeof(outFileName)));
-  PetscCall(PetscStrlcat(outFileName, ".h5", sizeof(outFileName)));
-
-  /* Run-wide timestamp (recorded once for the root provenance attrs). */
-  PetscCall(PetscGetDate(date, sizeof(date)));
-  sscanf(date, "%*s %3s %" PetscInt_FMT "%*s %" PetscInt_FMT, monthStr, &day, &year);
-  PetscCall(PetscStrcmp(monthStr, "Jan", &flag)); if (flag) month = 1;
-  PetscCall(PetscStrcmp(monthStr, "Feb", &flag)); if (flag) month = 2;
-  PetscCall(PetscStrcmp(monthStr, "Mar", &flag)); if (flag) month = 3;
-  PetscCall(PetscStrcmp(monthStr, "Apr", &flag)); if (flag) month = 4;
-  PetscCall(PetscStrcmp(monthStr, "May", &flag)); if (flag) month = 5;
-  PetscCall(PetscStrcmp(monthStr, "Jun", &flag)); if (flag) month = 6;
-  PetscCall(PetscStrcmp(monthStr, "Jul", &flag)); if (flag) month = 7;
-  PetscCall(PetscStrcmp(monthStr, "Aug", &flag)); if (flag) month = 8;
-  PetscCall(PetscStrcmp(monthStr, "Sep", &flag)); if (flag) month = 9;
-  PetscCall(PetscStrcmp(monthStr, "Oct", &flag)); if (flag) month = 10;
-  PetscCall(PetscStrcmp(monthStr, "Nov", &flag)); if (flag) month = 11;
-  PetscCall(PetscStrcmp(monthStr, "Dec", &flag)); if (flag) month = 12;
-  snprintf(formattedDate, sizeof(formattedDate), "%04" PetscInt_FMT "-%02" PetscInt_FMT "-%02" PetscInt_FMT, year, month, day);
+  /* Build the single output file name: {output_dir}/{output_filename}.h5
+   * (shared with im.csem, so both kernels name their products alike). */
+  PetscCall(buildOutputPath(&params, ".h5", outFileName, sizeof(outFileName)));
 
   /* Print message */
   PetscCall(PetscPrintf(comm, "\n Field interpolation:\n"));
@@ -145,15 +118,13 @@ PetscErrorCode computeFields(const fmParams params,
    * when PETSc is linked against a parallel HDF5 build. */
   PetscCall(PetscViewerHDF5Open(comm, outFileName, FILE_MODE_WRITE, &viewerOutput));
 
-  /* Root provenance attributes - written ONCE for the whole file. */
-  sprintf(version, "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "petgem_version", PETSC_STRING, version));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "input_filename", PETSC_STRING, params.inputFile));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "date",           PETSC_STRING, date));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "order",          PETSC_INT,    &params.order));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "mpi_tasks",      PETSC_INT,    &params.numMPITasks));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "num_sources",    PETSC_INT,    &sources.numSources));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "frequency",      PETSC_REAL,   &sources.freq));
+  /* Root provenance attributes - written ONCE for the whole file. The common
+   * block (version, simulation type, input bundle, order, solver, tasks,
+   * date) is shared with im.csem; only the forward-specific attributes below
+   * are added here. */
+  PetscCall(writeRunProvenance(viewerOutput, &params, PETGEM_SIM_FM));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "num_sources", PETSC_INT,  &sources.numSources));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "frequency",   PETSC_REAL, &sources.freq));
 
   /* Postprocessing fields for each source */
   for (PetscInt i = 0; i < sources.numSources; i++) {

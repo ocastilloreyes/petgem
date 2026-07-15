@@ -1,13 +1,14 @@
 ============
 Installation
 ============
-This section guides you through installing **PETGEM**. You will find instructions for setting up the environment, building the code, running tests, and generating documentation. **PETGEM** supports Linux-based systems and can be run natively or via Docker for a ready-to-use environment.
+
+**PETGEM** is built with ``make`` against an existing PETSc installation. It
+targets Linux; a Docker image with the full dependency stack is provided.
 
 Requirements
 ------------
-Before installing **PETGEM**, ensure the following dependencies are available:
-
-- `PETSc <https://petsc.org/release/>`_ compiled with MPI and support for complex numbers. A recommended configuration is:
+- `PETSc <https://petsc.org/release/>`_ built with MPI and **complex** scalars.
+  The configuration used by the project image is:
 
   .. code-block:: bash
 
@@ -16,88 +17,98 @@ Before installing **PETGEM**, ensure the following dependencies are available:
                  --with-scalar-type=complex --download-mumps --download-scalapack \
                  --download-ptscotch --download-cmake --with-debugging=1 \
                  --download-hdf5 --download-triangle
-- `Gmsh <http://gmsh.info/>`_
-- Python 3.10+ with packages: `numpy`, `h5py`, `meshio`, `matplotlib`, `sphinx`
-- `Extrae <https://tools.bsc.es/extrae>`_ for performance tracing (optional)
 
-Docker installation
--------------------
-**PETGEM** provides a ready-to-use Docker environment for easy setup:
+- ``petsc4py`` (used by the Python preprocessing).
+- `Gmsh <http://gmsh.info/>`_ - mesh generation.
+- Python 3 with ``numpy``, ``h5py``, ``meshio``; ``matplotlib`` for the example
+  post-processing scripts, ``pytest`` for the test suite.
+- `Extrae <https://tools.bsc.es/extrae>`_ - optional, for performance tracing
+  (``make USE_EXTRAE=1``).
+- ``doxygen`` plus the packages in ``docs/requirements.txt`` - optional, to
+  build the documentation.
+
+``PETSC_DIR`` and ``PETSC_ARCH`` must be set; the Makefile stops with an
+explicit error if ``PETSC_DIR`` does not point at a PETSc installation.
+
+Docker
+------
+The image in ``docker/`` provides PETSc (complex scalars), Gmsh, Extrae, and
+the Python stack:
 
 .. code-block:: bash
 
-   # Clone the repository
    git clone https://github.com/ocastilloreyes/petgem.git
    cd petgem
 
-   # Build Docker image
    docker build -t petgem-env -f docker/dockerfile.release .
+   docker run --rm -it -v $(pwd):/workspace -w /workspace petgem-env bash
 
-   # Run Docker
-   docker run --rm -it -v $(pwd):/workspace -w /workspace petgem-env
+   # inside the container
+   make
 
-   # Compile PETGEM (inside container)
-   make USE_EXTRAE=0
+See :doc:`quickstart` for a first run.
 
-   # Run a test model
-   gmsh tests/csem_model/mesh_p1.geo -3
-   python3 tests/csem_model/generate_resistivity_model.py 1
-   python3 tests/csem_model/generate_params_file.py 1 
-   mpirun -n 4 build/fm.csem -options_file tests/csem_model/params_nord1.txt
-   python3 tests/csem_model/compare_responses.py 1 
+Building
+--------
+``make`` builds all three binaries into ``build/``:
 
-Makefile usage
---------------
-**PETGEM** provides a Makefile to simplify building the code and generating documentation.
+- ``build/fm.csem`` - forward kernel
+- ``build/im.csem`` - inverse kernel
+- ``build/petgem`` - dispatcher
 
-**Common makefile targets:**
+With ``USE_EXTRAE=1`` the binaries are suffixed ``.extrae``
+(``build/fm.csem.extrae``, ...). A single binary can be built on its own, e.g.
+``make build/fm.csem``.
+
+Makefile targets
+****************
 
 .. list-table::
    :header-rows: 1
 
    * - Target
      - Description
-   * - all
-     - Build the PETGEM kernels (default)
-   * - clean
-     - Remove object files and executables
-   * - docs
-     - Generate all documentation
-   * - clean_doc
-     - Clean documentation
-   * - help
-     - Show Makefile help message
+   * - ``all`` (default)
+     - Build ``fm.csem``, ``im.csem``, and ``petgem``
+   * - ``clean``
+     - Remove ``build/`` and object files
+   * - ``docs``
+     - Build the documentation (Doxygen XML + API stubs + Sphinx HTML)
+   * - ``clean_doc``
+     - Remove generated documentation artifacts
+   * - ``help``
+     - List targets and build options
 
-**Optional build options:**
-
-You can set optional flags when invoking `make`: `make <target> OPTION=1`
+Build options
+*************
+Set as ``make <target> OPTION=1``:
 
 .. list-table::
    :header-rows: 1
 
    * - Option
      - Description
-   * - USE_INTEL=1
-     - Use Intel MPI compiler (`mpiicc`) instead of PETSc default
-   * - USE_EXTRAE=1
-     - Enable Extrae instrumentation for performance tracing
+   * - ``USE_EXTRAE=1``
+     - Build with Extrae instrumentation (requires ``EXTRAE_HOME``)
+   * - ``USE_INTEL=1``
+     - Force Intel compiler flags. Auto-detected from PETSc's ``$(PCC)``, so it
+       is normally not needed; ``USE_INTEL=0`` forces gcc-style flags.
+   * - ``V=1``
+     - Echo full compiler and linker command lines
+   * - ``NO_COLOR=1``
+     - Disable colored build output
 
 Python helpers
 --------------
-The pre- and post-processing scripts under ``utils/`` (e.g.
-``utils/preprocess.py``) run directly from a clone - they add the in-tree
-package to the path automatically, so no installation step is required:
+The scripts under ``utils/`` run directly from a clone - ``utils/preprocess.py``
+adds the in-tree package to ``sys.path`` itself, so no install step is required:
 
 .. code-block:: bash
 
-   python3 utils/preprocess.py -mode forward ...
+   python3 utils/preprocess.py -mode fm ...
 
-Optionally, install the Python layer so it is importable as ``petgem`` from
-your own scripts (e.g. ``import petgem; petgem.readResponses(...)``):
+To import the package as ``petgem`` from your own scripts:
 
 .. code-block:: bash
 
    pip install -e .
-
-This requires ``numpy``, ``meshio``, and ``petsc4py`` (already present in the
-Docker image).
