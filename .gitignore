@@ -50,6 +50,7 @@ examples/inverse/sigmas_true.txt
 utils/convert_invex_to_hdf5.py
 cicero_models
 data
+gaussian_beam_boundary_excitation
 
 # Run-time artifacts dropped at repo root
 petgem.err
