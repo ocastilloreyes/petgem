@@ -1,15 +1,14 @@
 .. PETGEM documentation master file.
 
-##################################
-Welcome to PETGEM's documentation!
-##################################
+######################
+PETGEM's documentation
+######################
 
 **PETGEM** (Parallel Edge-element Toolkit for General Electromagnetic Modeling)
-is an open-source code for 3D controlled-source electromagnetic (CSEM) modeling
-in the frequency domain. It discretizes the electric field with high-order
-Nédélec (edge) finite elements of polynomial order 1 to 6 on unstructured
-tetrahedral meshes, and is written in C on top of
-`PETSc <https://petsc.org/release/>`_ and MPI.
+is an open-source code for 3D forward and inverse modeling in the frequency
+domain. It discretizes the electric field with high-order Nédélec (edge) finite
+elements of polynomial order 1 to 6 on unstructured tetrahedral meshes, and is
+written in C on top of `PETSc <https://petsc.org/release/>`_ and MPI.
 
 The repository builds two kernels and a dispatcher:
 
@@ -18,18 +17,11 @@ The repository builds two kernels and a dispatcher:
 - ``im.csem`` - inverse modeling: recovers a per-material conductivity model
   from observed data with L-BFGS and adjoint-state gradients.
 - ``petgem`` - a dispatcher that selects either kernel
-  (``petgem modeling`` / ``petgem inverse``).
+  (``petgem fm`` / ``petgem im``).
 
 Pre- and post-processing are handled by a small Python package under ``utils/``
 (importable as ``petgem``), which assembles the HDF5 input bundle the kernels
 read.
-
-.. note::
-
-   The verification suite (:doc:`manual/testing`) covers the **forward** kernel
-   only. The inverse kernel is documented from its implementation but is not
-   exercised by the test suite, and the repository ships no inversion example
-   case.
 
 More information
 ----------------
@@ -82,7 +74,6 @@ More information
    :caption: About:
 
    manual/publications
-   manual/changelog
    manual/contact
 
 

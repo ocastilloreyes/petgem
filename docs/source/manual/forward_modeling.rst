@@ -99,7 +99,7 @@ or through the dispatcher:
 
 .. code-block:: bash
 
-   mpirun -n 4 build/petgem modeling -options_file path/to/params.txt
+   mpirun -n 4 build/petgem fm -options_file path/to/params.txt
 
 Output
 ------

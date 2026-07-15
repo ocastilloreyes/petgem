@@ -75,7 +75,7 @@ to:
 
 .. code-block:: bash
 
-   mpirun -n 4 build/petgem modeling \
+   mpirun -n 4 build/petgem fm \
       -options_file ${MODEL_DIR}/params_p${ORDER}.txt
 
 Next steps

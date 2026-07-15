@@ -68,10 +68,6 @@ kernel and the ``petgem im`` subcommand. A parameter file still using the old
 options (``-inv_max_iter`` → ``-im_max_iter``, and so on); the values and
 meanings are unchanged.
 
-The kernel fails loudly rather than ignoring the stale keys, because PETSc
-silently discards unknown options - a run would otherwise proceed with default
-inversion settings and no sign that its tuning had been dropped.
-
 ``-im_observed_mode fm_native`` aborts
 ***************************************
 In ``fm_native`` mode the observed data lives in an ``fm.csem`` responses file

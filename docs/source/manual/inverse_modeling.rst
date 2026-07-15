@@ -9,13 +9,6 @@ by the adjoint-state method, and updates the model with L-BFGS. The model is
 parameterized **per material**, not per cell: one conductivity value per row of
 ``sigmas.txt``, with materials flagged ``fixed`` excluded from the update.
 
-.. note::
-
-   The test suite (:doc:`testing`) covers the forward kernel only, and the
-   repository ships no inversion example case. This page documents the
-   kernel's interface as implemented; the numerical behavior of the inverse
-   kernel is not verified by any check in this repository.
-
 Workflow
 --------
 1. Generate or import a mesh (see :doc:`meshing`).
@@ -136,10 +129,8 @@ Parameter file
    -output_dir <case_dir>/
    -output_filename responses
 
-Note that this template overrides several kernel defaults (iteration cap,
-L-BFGS memory, RMS stop, snapshots). Because the inverse kernel re-solves the
-system at every iteration, the template selects a **direct** solve (MUMPS)
-rather than the iterative forward default; see :doc:`solver`.
+This template overrides several kernel defaults and selects a **direct** solve
+(MUMPS) instead of the iterative forward default; see :doc:`solver`.
 
 ``-im_error_level`` and ``-im_fixed_materials`` are accepted but absent from
 the template, since their values come from the bundle.
@@ -154,6 +145,6 @@ or through the dispatcher:
 
 .. code-block:: bash
 
-   mpirun -n 4 build/petgem inverse -options_file path/to/params.txt
+   mpirun -n 4 build/petgem im -options_file path/to/params.txt
 
 Any option can be overridden on the command line, e.g. ``-im_max_iter 30``.

@@ -2,8 +2,7 @@
 Forward modeling examples
 =========================
 
-Two example cases ship under ``examples/``. Both are forward-modeling cases;
-the repository contains no inversion example.
+Two example cases ship under ``examples/``. Both are forward-modeling cases.
 
 Canonical marine CSEM model
 ---------------------------
@@ -164,7 +163,7 @@ instrumentation to produce execution traces for
    export LD_LIBRARY_PATH=${EXTRAE_HOME}/lib:$LD_LIBRARY_PATH
    export EXTRAE_CONFIG_FILE=$PWD/tests/extrae/extrae.xml
 
-   mpirun -n 2 build/fm.csem.extrae \
+   mpirun -n 4 build/fm.csem.extrae \
        -input_filename examples/unit_cube/input.h5 \
        -order 1 -output_dir . -output_filename extrae_smoke
 
