@@ -1,5 +1,5 @@
 ---
-title: 'PETGEM v2.0.0: A parallel edge-element toolkit for high-order 3D electromagnetic modeling in geophysics'
+title: 'PETGEM v2.0.0: Parallel Edge-element Toolkit for General Electromagnetic Modeling'
 tags:
   - geophysics
   - computational electromagnetics
