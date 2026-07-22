@@ -1,4 +1,4 @@
-# Per-material conductivity table for the canonical_model CSEM example
+# Per-material conductivity table for the fm_model CSEM example
 # (see mesh.geo / README.md for the layered marine model it describes).
 #
 # One row per material, ordered by 0-based material id (= gmsh physical

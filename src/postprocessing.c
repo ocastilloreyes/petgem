@@ -86,15 +86,13 @@ PetscErrorCode computeFields(const petgemParams params,
   constFactor = (0.0 + 1.0 * PETSC_i) * (omega * MU);
 
   /* Build the receiver interpolation operator (shared with im.csem).
-   * One global Q assembly handles all receivers and all sources at this
-   * frequency.  Per-receiver Ex = QEx * x, etc. - MPI-invariant by
-   * construction because each Q row is decided once with global column
-   * indexing, irrespective of partition. */
+   * One global Q assembly handles all receivers and all sources at this frequency.  Per-receiver Ex = QEx * x, etc. Q uses global 
+   * column indexing and assembles each row exactly once (single owner per receiver), so it is MPI-invariant. A small residual 
+   * remains for receivers that lie exactly on a cell face (z=0 survey plane). See receiver_interp.c. */
   PetscCall(buildReceiverInterpolationMatrices(params.order, receivers, dm, &grid, &Q));
 
-  /* Allocate output Vecs sized to match Q's row layout (left vector).
-   * These are parallel Vecs on the kernel communicator, so VecView through
-   * the HDF5 viewer below performs collective MPI-IO writes. */
+  /* Allocate output Vecs sized to match Q's row layout (left vector). These are parallel Vecs on the kernel communicator, 
+   * so VecView through the HDF5 viewer below performs collective MPI-IO writes. */
   PetscCall(MatCreateVecs(Q.QEx, NULL, &Ex));
   PetscCall(MatCreateVecs(Q.QEy, NULL, &Ey));
   PetscCall(MatCreateVecs(Q.QEz, NULL, &Ez));
@@ -102,26 +100,22 @@ PetscErrorCode computeFields(const petgemParams params,
   PetscCall(MatCreateVecs(Q.QHy, NULL, &Hy));
   PetscCall(MatCreateVecs(Q.QHz, NULL, &Hz));
 
-  /* Build the single output file name: {output_dir}/{output_filename}.h5
-   * (shared with im.csem, so both kernels name their products alike). */
+  /* Build the single output file name: {output_dir}/{output_filename}.h5 (shared with im.csem, so both kernels name their products alike). */
   PetscCall(buildOutputPath(&params, ".h5", outFileName, sizeof(outFileName)));
 
   /* Print message */
-  PetscCall(PetscPrintf(comm, "\n Field interpolation:\n"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Input file",          params.inputFile));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Number of receivers", formatGroupedInt(Q.numReceivers)));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Output file",         outFileName));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",              "Started"));
+  PetscCall(logSection(comm, "Field interpolation"));
+  PetscCall(logKVStr(comm, "Input file", params.inputFile));
+  PetscCall(logKVInt(comm, "Number of receivers", Q.numReceivers));
+  PetscCall(logKVStr(comm, "Output file", outFileName));
+  PetscCall(logKVStr(comm, "Status", "Started"));
 
-  /* Open the single HDF5 output file on the kernel communicator. PETSc's
-   * HDF5 viewer routes the collective VecView calls below through MPI-IO
+  /* Open the single HDF5 output file on the kernel communicator. PETSc's HDF5 viewer routes the collective VecView calls below through MPI-IO
    * when PETSc is linked against a parallel HDF5 build. */
   PetscCall(PetscViewerHDF5Open(comm, outFileName, FILE_MODE_WRITE, &viewerOutput));
 
-  /* Root provenance attributes - written ONCE for the whole file. The common
-   * block (version, simulation type, input bundle, order, solver, tasks,
-   * date) is shared with im.csem; only the forward-specific attributes below
-   * are added here. */
+  /* Root provenance attributes - written ONCE for the whole file. The common block (version, simulation type, input bundle, order, solver, tasks,
+   * date) is shared with im.csem; only the forward-specific attributes below are added here. */
   PetscCall(writeRunProvenance(viewerOutput, &params, PETGEM_SIM_FM));
   PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "num_sources", PETSC_INT,  &sources.numSources));
   PetscCall(PetscViewerHDF5WriteAttribute(viewerOutput, NULL, "frequency",   PETSC_REAL, &sources.freq));
@@ -135,7 +129,7 @@ PetscErrorCode computeFields(const petgemParams params,
     /* Get the solution column for this source */
     PetscCall(MatDenseGetColumnVecRead(X, i, &x));
 
-    PetscCall(PetscPrintf(comm, "   %-24s = %s of %s\n", "Processing source", formatGroupedInt(i + 1), formatGroupedInt(sources.numSources)));
+    PetscCall(logKVf(comm, "Processing source", "%s of %s", formatGroupedInt(i + 1), formatGroupedInt(sources.numSources)));
 
     /* Apply Q to the H(curl) solution: Ex = QEx*x, Ey = QEy*x, ... */
     PetscCall(MatMult(Q.QEx, x, Ex));
@@ -152,8 +146,7 @@ PetscErrorCode computeFields(const petgemParams params,
     PetscCall(VecScale(Hy, 1.0 / constFactor));
     PetscCall(VecScale(Hz, 1.0 / constFactor));
 
-    /* Per-source group path. Field components land under
-     * /sources/src{k}/fields/, and the per-source metadata attributes
+    /* Per-source group path. Field components land under /sources/src{k}/fields/, and the per-source metadata attributes
      * attach to the /sources/src{k} group itself. */
     snprintf(groupPath, sizeof(groupPath), "/sources/src%" PetscInt_FMT "/fields", i + 1);
     PetscCall(PetscObjectSetName((PetscObject)Ex, "Ex"));
@@ -189,7 +182,7 @@ PetscErrorCode computeFields(const petgemParams params,
   /* Close the single output file. */
   PetscCall(PetscViewerDestroy(&viewerOutput));
 
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
+  PetscCall(logKVStr(comm, "Status", "Finished"));
 
   /* Free memory */
   PetscCall(VecDestroy(&Ex));

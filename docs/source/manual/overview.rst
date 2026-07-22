@@ -102,13 +102,13 @@ The Python package under ``utils/`` (importable as ``petgem``) provides:
 - Readers for the bundle and for the kernel responses (``readBundle``,
   ``readResponses``, ``readAllResponses``) - see :doc:`python_api`.
 
-Comparison against a reference is done by the per-case ``postprocess.py``.
+Comparison against a reference is done by the per-case ``scripts/postprocess.py``.
 
 Example cases
 *************
 Two cases ship under ``examples/``:
 
-- ``examples/canonical_model`` - a marine CSEM benchmark with a thin resistive
+- ``examples/fm_model`` - a marine CSEM benchmark with a thin resistive
   layer, with a precomputed reference for validation.
 - ``examples/unit_cube`` - a small homogeneous cube; the dataset the test suite
   is built around.

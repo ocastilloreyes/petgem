@@ -26,7 +26,7 @@ export EXTRAE_CONFIG_FILE=$PWD/tests/extrae/extrae.xml
 export LD_LIBRARY_PATH=$EXTRAE_HOME/lib:$LD_LIBRARY_PATH
 cd "$(mktemp -d)"
 mpirun -n 2 build/fm.csem.extrae \
-    -input_filename examples/unit_cube/input.h5 \
+    -input_filename examples/unit_cube/outputs/input.h5 \
     -order 1 -output_dir . -output_filename extrae_smoke \
     -dm_mat_type aij -ksp_type preonly -pc_type jacobi
 ls TRACE.mpits set-0        # emitted next to the run
@@ -37,8 +37,8 @@ ls TRACE.mpits set-0        # emitted next to the run
 ```sh
 EXTRAE_CONFIG_FILE=tests/extrae/extrae.xml \
 LD_PRELOAD=$EXTRAE_HOME/lib/libmpitrace.so \
-mpirun -n 4 build/fm.csem -options_file examples/unit_cube/params_p1.txt \
-    -input_filename examples/unit_cube/input.h5 -order 1
+mpirun -n 4 build/fm.csem -options_file examples/unit_cube/configs/params_p1.txt \
+    -input_filename examples/unit_cube/outputs/input.h5 -order 1
 
 # Merge the per-rank traces and post-process with Paraver afterwards.
 ${EXTRAE_HOME}/bin/mpi2prv -f TRACE.mpits -o petgem.prv

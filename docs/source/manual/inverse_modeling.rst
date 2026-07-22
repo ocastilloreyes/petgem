@@ -90,7 +90,7 @@ option is absent from both the parameter file and the command line.
    * - ``-im_snapshot_interval``
      - ``0`` (off)
      - Write a VTU snapshot every N accepted L-BFGS steps, into ``-output_dir``.
-       Each snapshot carries a single cell field, ``rho_ohm_m``.
+       Each snapshot carries a single cell field, ``rho`` (Ohm.m).
    * - ``-im_observed_mode``
      - ``external``
      - Where the observed data comes from. ``external`` reads the bundle's

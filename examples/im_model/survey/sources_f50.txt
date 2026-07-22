@@ -1,0 +1,4 @@
+# x-directed electric dipole at (0, -4000, 0) m, unit current and length,
+# dip = azimuth = 0.
+# freq  x  y  z  current  length  dip  azimuth
+50          0.0    -4000.0    0.0    1.0    1.0   0.0   0.0

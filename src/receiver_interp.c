@@ -9,16 +9,20 @@
 
 /*
  * Notes:
- * See receiver_interp.h for the interface and rationale.  The body of
- * buildReceiverInterpolationMatrices was moved out of inversion.c so
- * that postprocessing.c (fm.csem) and inversion.c (im.csem) can both
- * obtain Ex/Ey/Ez/Hx/Hy/Hz at receivers via a common Q*x MatMult,
- * guaranteeing MPI-invariant outputs at any rank count.
- *
  * Conventions (sign, dofSigns, basis evaluation order) match the forward
  * kernel; the column indexing uses the global section so cross-rank ghost
  * DOFs are routed correctly.
- */
+ *
+ * MPI-invariance of Q requires TWO things, both handled below:
+ *   (1) COLUMNS: closure DOFs addressed through the GLOBAL section, so a
+ *       receiver's row carries the same global column ids on every rank.
+ *   (2) ROWS: each receiver assembled EXACTLY ONCE. Because `receivers` is a
+ *       replicated (COMM_SELF) Vec, every rank locates every receiver against
+ *       its local cells, and a receiver on a partition boundary is found by
+ *       several ranks; with ADD_VALUES those duplicates would accumulate and
+ *       make Q (and Q*x, the misfit, the inversion) rank-count-dependent. Each
+ *       receiver is therefore assigned to a single owner (the lowest rank that
+ *       located it) and skipped on every other rank. */
 
 #include "common.h"
 #include "receiver_interp.h"
@@ -79,13 +83,11 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
 
   MPI_Comm comm = PetscObjectComm((PetscObject)dm);
 
-  /* Basis evaluation goes through evaluateNedelecBasis (see include/fem.h),
-   * which builds on the PETGEM-style reference Nedelec element covering
+  /* Basis evaluation goes through evaluateNedelecBasis (see include/fem.h), which builds on the PETGEM-style reference Nedelec element covering
    * order = 1..6. */
   PetscCheck(order >= 1 && order <= 6, comm, PETSC_ERR_SUP, "buildReceiverInterpolationMatrices: order must be in 1..6  (got %" PetscInt_FMT ")", order);
 
-  /* `receivers` is owned by the caller (produced by loadCsemInputs from
-   * the /receivers Vec inside the unified input HDF5). This routine only
+  /* `receivers` is owned by the caller (produced by loadCsemInputs from the /receivers Vec inside the unified input HDF5). This routine only
    * reads it: locates the points in the mesh and assembles the Q matrices. */
   PetscInt globalSizeReceivers, numGlobalReceivers;
   PetscCall(VecGetSize(receivers, &globalSizeReceivers));
@@ -104,6 +106,27 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
 
   PetscCall(DMLocatePoints(dm, receivers, DM_POINTLOCATION_REMOVE, &receiverSF));
   PetscCall(PetscSFGetGraph(receiverSF, NULL, &numFound, &recvFound, &recvInCell));
+
+ /* Receivers on partition boundaries may be located by multiple ranks. Assign ownership to the lowest-ranked locator so each receiver row 
+  * is assembled exactly once, avoiding MPI-decomposition-dependent double counting. Receivers exactly on an interface can still show 
+  * small rank-dependent differences because different adjacent cells may be selected for interpolation. */
+  PetscMPIInt rank, nprocs;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  PetscCallMPI(MPI_Comm_size(comm, &nprocs));
+  PetscInt  *foundByRank, *ownerRank;
+  PetscBool *rowAssembled;
+  PetscCall(PetscMalloc3(numGlobalReceivers, &foundByRank, numGlobalReceivers, &ownerRank, numGlobalReceivers, &rowAssembled));
+  for (PetscInt r = 0; r < numGlobalReceivers; r++) { 
+    foundByRank[r] = nprocs; rowAssembled[r] = PETSC_FALSE; 
+  }
+  
+  for (PetscInt i = 0; i < numFound; i++) {
+    PetscInt ridx = recvFound ? recvFound[i] : i;
+    if (recvInCell[i].index >= 0 && ridx >= 0 && ridx < numGlobalReceivers && rank < foundByRank[ridx]) {
+      foundByRank[ridx] = rank;
+    }
+  }
+  PetscCallMPI(MPI_Allreduce(foundByRank, ownerRank, numGlobalReceivers, MPIU_INT, MPI_MIN, comm));
 
   /* Global DOF count for matrix column size */
   Vec  tmpVec;
@@ -147,7 +170,16 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
   for (PetscInt i = 0; i < numFound; i++) {
     PetscInt ridx  = recvFound ? recvFound[i] : i;
     PetscInt cellID = recvInCell[i].index;
-    if (cellID < 0) continue;
+    if (cellID < 0) {
+      continue;
+    }
+
+    /* Only the canonical owner assembles this receiver's row, and only once (a rank may locate the same on-interface 
+    * receiver in two local cells). Every other locating rank skips it, so the row is written exactly once. */
+    if (rank != ownerRank[ridx] || rowAssembled[ridx]) {
+      continue;
+    }
+    rowAssembled[ridx] = PETSC_TRUE;
 
     PetscReal recvCoords[NUM_DIMENSIONS];
     recvCoords[0] = PetscRealPart(coords[3 * ridx]);
@@ -229,26 +261,18 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
 
     PetscCall(tetrahedronXYZToReference(cell.coordinates, recvCoords, XiEtaZeta));
 
-    /* Nord-agnostic basis + curl evaluation (1..6). The returned values and
-     * curls are already physical and geometrically oriented, matching the
-     * forward assembly, so no per-DOF sign correction is applied. */
+    /* order-agnostic basis + curl evaluation (1..6). The returned values and curls are already physical and geometrically oriented, 
+     * matching the forward assembly, so no per-DOF sign correction is applied. */
     PetscCall(evaluateNedelecBasis(&grid->fem, &cell, XiEtaZeta, Ni, NiCurl));
 
     /* Get BOTH local and global DOF indices for this cell's closure.
      *
      * - Local section idxSection => local indices.  Negative entries mark
      *   BC-constrained DOFs (skip: they aren't free variables).
-     * - Global section idxSection => global indices, with PETSc's ghost
-     *   encoding: a ghost DOF (owned by another rank) is returned as
+     * - Global section idxSection => global indices, with PETSc's ghost  encoding: a ghost DOF (owned by another rank) is returned as
      *   -(gOff + 1).  Owned DOFs are returned as a non-negative gOff.
      *
-     * The two calls traverse the closure in the SAME order (driven by
-     * dmplex + useClosurePermutation=PETSC_TRUE), so slot k lines up.
-     *
-     * The prior code used the LOCAL index as a GLOBAL column to MatSetValue.
-     * That works on 1 rank (local==global) but aliases across ranks on N>1,
-     * producing a mis-addressed Q.  ‖Q‖_F is invariant (same set of values
-     * written) but Q*x differs. */
+     * The two calls traverse the closure in the SAME order (driven by dmplex + useClosurePermutation=PETSC_TRUE), so slot k lines up */
     PetscSection globalSection;
     PetscCall(DMGetGlobalSection(dm, &globalSection));
 
@@ -307,6 +331,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
   PetscCall(PetscFree(NiCurl));
   PetscCall(PetscFree(XiEtaZeta));
   PetscCall(PetscSFDestroy(&receiverSF));
+  PetscCall(PetscFree3(foundByRank, ownerRank, rowAssembled));
   /* Note: `receivers` Vec is owned by the caller and not destroyed here. */
 
   PetscFunctionReturn(PETSC_SUCCESS);

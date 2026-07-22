@@ -4,7 +4,7 @@
 * (http://petgem.bsc.es/)
 *
 * Homogeneous unit cube [0,1]^3 with a single material, driven through the
-* same forward workflow as examples/canonical_model (gmsh -> preprocess ->
+* same forward workflow as examples/fm_model (gmsh -> preprocess ->
 * fm.csem). It is the small, fast, canonical fixture the whole FM-CSEM test
 * suite is built around (see README.md and ../../tests/README.md).
 *

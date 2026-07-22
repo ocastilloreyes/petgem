@@ -121,13 +121,13 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
   PetscCall(MatGetLocalSize(B, &m, &n));
   PetscCall(MatGetVecType(A, &vtype));
   PetscCall(MatCreateDenseFromVecType(comm, vtype, m, n, M, N, m, NULL, X));
-  PetscCall(PetscPrintf(comm, "\n Linear solve:\n"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Number of systems", formatGroupedInt(N)));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",            "Started"));
+  PetscCall(logSection(comm, "Linear solve"));
+  PetscCall(logKVInt(comm, "Number of systems", N));
+  PetscCall(logKVStr(comm, "Status", "Started"));
 
   PetscCall(KSPMatSolve(ksp, B, *X));
 
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
+  PetscCall(logKVStr(comm, "Status", "Finished"));
   PetscCall(KSPDestroy(&ksp));
 
   PetscFunctionReturn(PETSC_SUCCESS);

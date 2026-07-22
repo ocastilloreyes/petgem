@@ -254,21 +254,21 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
   }
 
   /* Print mesh statistics (uniform key = value style; label width 24) */
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Mesh:\n"));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n",                "Input file",         params.inputFile));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of vertices", formatGroupedInt(grid->numVerticesGlobal)));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of edges",    formatGroupedInt(grid->numEdgesGlobal)));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of faces",    formatGroupedInt(grid->numFacesGlobal)));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of cells",    formatGroupedInt(grid->numCellsGlobal)));
+  PetscCall(logSection(PETSC_COMM_WORLD, "Mesh"));
+  PetscCall(logKVStr(PETSC_COMM_WORLD, "Input file", params.inputFile));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of vertices", grid->numVerticesGlobal));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of edges", grid->numEdgesGlobal));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of faces", grid->numFacesGlobal));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of cells", grid->numCellsGlobal));
 
   /* Print FEM-space statistics */
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n FEM space:\n"));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Basis order",      formatGroupedInt(params.order)));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per vertex",  formatGroupedInt(grid->numDofInVertex)));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per edge",    formatGroupedInt(grid->numDofInEdge)));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per face",    formatGroupedInt(grid->numDofInFace)));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per volume",  formatGroupedInt(grid->numDofInVolume)));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "DOFs per cell",    formatGroupedInt(grid->numDofInCell)));
+  PetscCall(logSection(PETSC_COMM_WORLD, "FEM space"));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "Basis order", params.order));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per vertex", grid->numDofInVertex));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per edge", grid->numDofInEdge));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per face", grid->numDofInFace));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per volume", grid->numDofInVolume));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per cell", grid->numDofInCell));
 
   /* Restore global numbering and free memory */
   PetscCall(ISRestoreIndices(globalPointNumbering, &gidxs));
@@ -330,8 +330,7 @@ PetscErrorCode locatePoint(const DM dm, const PetscReal* position, PetscInt* poi
     *pointInCell = pointCell[i].index;
   }
 
-  /* Perform validation (at least one MPI task must found the point). 
-     Each process sets its local flag */
+  /* Perform validation (at least one MPI task must found the point). Each process sets its local flag */
   pointFoundLocal = (*pointInCell < 0) ? PETSC_FALSE : PETSC_TRUE;
 
   /* Gather all local flags to the master process */
@@ -521,8 +520,7 @@ PetscErrorCode extractCellClousure(const DM dm, const PetscInt cellID, Cell* cel
   PetscCall(DMPlexGetTransitiveClosure(dm, cellID, PETSC_TRUE, &transitiveClosureSize, &transitiveClosure));
 
   PetscCheck(transitiveClosureSize < MAX_TRANSITIVE_CLOSURE_SIZE, PETSC_COMM_SELF, PETSC_ERR_SUP,
-             "Exiting: clousure size greater than "
-             "MAX_TRANSITIVE_CLOSURE_SIZE.\n");
+             "Exiting: clousure size greater than MAX_TRANSITIVE_CLOSURE_SIZE.\n");
 
   cell->closureSize = transitiveClosureSize;
 

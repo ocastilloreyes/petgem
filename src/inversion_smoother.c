@@ -20,7 +20,7 @@
  *                                 sequential sweep on the owned cells.
  *   destroyNeighborGraph        - frees both graph variants
  *   buildNotFixedMask           - 0/1 Vec used to zero gradient at fixed cells
- *   applyLogToSigma             - sigma = 1/exp(smoothed_X + X0), MATLAB tempX path
+ *   applyLogToSigma             - sigma = 1/exp(smoothed_X + X0), tempX path
  */
 
 #include <stdio.h>
@@ -78,8 +78,7 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
   graph->oLocalScratch     = NULL;
   graph->oGlobalScratch    = NULL;
 
-  /* ---- Pass 1: count neighbors per cell to size CSR arrays ---- */
-  /* We use a temporary dynamic approach: collect neighbors per cell */
+  /* 1. count neighbors per cell to size CSR arrays. We use a temporary dynamic approach: collect neighbors per cell */
 
   /* Allocate temporary per-cell neighbor lists (worst-case 200 neighbors) */
   PetscInt maxNeighbors = 200;
@@ -131,38 +130,35 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
     /* Get the 4 vertices of this cell */
     PetscInt        closureSize = 0;
     PetscInt       *closure     = NULL;
-    PetscCall(DMPlexGetTransitiveClosure(dm, i, PETSC_TRUE,
-                                         &closureSize, &closure));
+    PetscCall(DMPlexGetTransitiveClosure(dm, i, PETSC_TRUE, &closureSize, &closure));
 
-    /* Collect all cells sharing any vertex.
-       In DMPlex the direct support of a vertex is edges (depth 1),
-       not cells.  We use the upward transitive closure (star) of
-       each vertex to find all cells that contain it.              */
+    /* Collect all cells sharing any vertex. In DMPlex the direct support of a vertex is edges (depth 1),
+       not cells.  We use the upward transitive closure (star) of each vertex to find all cells that contain it. */
     PetscInt cnt = 0;
     for (PetscInt ci = 0; ci < closureSize * 2; ci += 2) {
       PetscInt point = closure[ci];
       /* Only vertices (depth 0) */
       PetscInt pdepth = 0;
       PetscCall(DMPlexGetPointDepth(dm, point, &pdepth));
-      if (pdepth != 0) continue;
+      if (pdepth != 0) {
+        continue;
+      }
 
       /* Get upward star of this vertex to find all cells */
       PetscInt        starSize = 0;
       PetscInt       *star     = NULL;
-      PetscCall(DMPlexGetTransitiveClosure(dm, point, PETSC_FALSE,
-                                           &starSize, &star));
+      PetscCall(DMPlexGetTransitiveClosure(dm, point, PETSC_FALSE, &starSize, &star));
       for (PetscInt s = 0; s < starSize * 2; s += 2) {
         PetscInt neighbor = star[s];
-        if (neighbor == i) continue;
-        if (neighbor < grid->cellStart || neighbor >= grid->cellEnd) continue;
+        if (neighbor == i) {
+          continue;
+        }
+        if (neighbor < grid->cellStart || neighbor >= grid->cellEnd) {
+          continue;
+        }
         PetscInt ln = neighbor - grid->cellStart;
-        /* Keep fixed (air/padding) neighbors in the list - they act as a
-         * fixed-value bath the smoother averages non-fixed boundary cells
-         * toward.  applyGaussSeidelSmoothing skips updating fixed cells
-         * themselves (their stored value is preserved), so dropping them
-         * here produced sharp anomaly contours in MATLAB-comparable runs:
-         * boundary non-fixed cells lost most of their averaging support.
-         * Including them restores MATLAB-style smooth transitions. */
+        /* Keep fixed (air/padding) neighbors in the list - they act as a fixed-value bath the smoother averages non-fixed boundary cells
+         * toward */
 
         /* Check for duplicate */
         PetscBool found = PETSC_FALSE;
@@ -177,25 +173,24 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
           cnt++;
         }
       }
-      PetscCall(DMPlexRestoreTransitiveClosure(dm, point, PETSC_FALSE,
-                                               &starSize, &star));
+      PetscCall(DMPlexRestoreTransitiveClosure(dm, point, PETSC_FALSE, &starSize, &star));
     }
-    PetscCall(DMPlexRestoreTransitiveClosure(dm, i, PETSC_TRUE,
-                                             &closureSize, &closure));
+    PetscCall(DMPlexRestoreTransitiveClosure(dm, i, PETSC_TRUE, &closureSize, &closure));
 
     if (cnt == 0) {
       /* No valid neighbors: self-reference */
       tmpNeighbors[li * maxNeighbors + 0] = li;
-      tmpCount[li]                         = 1;
+      tmpCount[li]                        = 1;
     } else {
       tmpCount[li] = cnt;
     }
   }
 
-  /* ---- Build CSR structure ---- */
+  /* Build CSR structure */
   graph->neighborStart[0] = 0;
-  for (PetscInt i = 0; i < numCells; i++)
+  for (PetscInt i = 0; i < numCells; i++) {
     graph->neighborStart[i + 1] = graph->neighborStart[i] + tmpCount[i];
+  }
 
   PetscInt totalNeighbors = graph->neighborStart[numCells];
   PetscCall(PetscMalloc1(totalNeighbors, &graph->neighborList));
@@ -228,8 +223,9 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
       wsum += w;
     }
     /* Normalize */
-    for (PetscInt k = 0; k < cnt; k++)
+    for (PetscInt k = 0; k < cnt; k++) {
       graph->neighborWeights[start + k] /= wsum;
+    }
   }
 
   PetscCall(PetscFree(tmpNeighbors));
@@ -243,14 +239,7 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM          dm,
  * @brief Applies forward + reverse Jacobi smoothing using the neighbor graph.
  *
  * Each updated value is computed from a frozen snapshot of the array (not in
- * place), so the result is independent of the visiting order. This is the key
- * property that makes the smoother bit-reproducible across any MPI partition:
- * an in-place Gauss-Seidel sweep depends on the (partition-derived) cell order
- * and on stale ghost values, which at high rank counts under-regularizes the
- * many partition boundaries and drives runaway overfitting there (observed ρ
- * up to ~1e6 at 336 ranks). Jacobi removes that order dependence. The legacy
- * name is retained for call-site stability. Operates on a partition-local
- * Vec; non-owned DOFs are not visited.
+ * place), so the result is independent of the visiting order. 
  *
  * @param[in]     graph      Neighbor smoothing graph.
  * @param[in]     diagWeight Self-weight applied to the diagonal during sweeps.
@@ -265,16 +254,10 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
 {
   PetscFunctionBeginUser;
 
-  /* ============================================================== */
-  /* Fully-parallel Jacobi path. Each rank refreshes ghosts, then    */
-  /* applies a Jacobi sweep on its OWNED cells reading a frozen       */
-  /* snapshot of (owned+ghost) values, exchanges ghosts, and applies */
-  /* a second Jacobi sweep. Because each cell's new value depends     */
-  /* only on the snapshot (never on already-updated cells), the       */
-  /* result is identical to the single-rank sequential path up to     */
-  /* floating-point summation order - i.e. partition-independent. No  */
-  /* rank-0 bottleneck.                                              */
-  /* ============================================================== */
+  /* Fully-parallel Jacobi path. Each rank refreshes ghosts, then applies a Jacobi sweep on its OWNED cells reading a frozen
+   * snapshot of (owned+ghost) values, exchanges ghosts, and applies a second Jacobi sweep. Because each cell's new value 
+   * depends only on the snapshot (never on already-updated cells), the result is identical to the single-rank sequential 
+   * path up to floating-point summation order - i.e. partition-independent. No rank-0 bottleneck. */
   if (graph->hasParallelGraph) {
     PetscInt     nOwned = graph->numLocalCells;
     PetscInt     nOver;
@@ -282,46 +265,44 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
     PetscCall(VecGetLocalSize(graph->oLocalScratch, &nOver));
     PetscCall(PetscMalloc1(nOver, &snap));
 
-    /* 1. Copy owned values from input local Vec into the overlap-1
-     *    local scratch (owned slot only; ghost slot still stale). */
+    /* 1. Copy owned values from input local Vec into the overlap-1 local scratch (owned slot only; ghost slot still stale). */
     {
       const PetscScalar *arrIn;
       PetscScalar       *arrOver;
       PetscCall(VecGetArrayRead(v, &arrIn));
       PetscCall(VecGetArray(graph->oLocalScratch, &arrOver));
-      for (PetscInt i = 0; i < nOwned; i++) arrOver[i] = arrIn[i];
+      for (PetscInt i = 0; i < nOwned; i++) {
+        arrOver[i] = arrIn[i];
+      }
       PetscCall(VecRestoreArray(graph->oLocalScratch, &arrOver));
       PetscCall(VecRestoreArrayRead(v, &arrIn));
     }
 
     /* 2. Refresh ghosts: L->G (owners contribute) then G->L (pull ghosts). */
-    PetscCall(DMLocalToGlobal(graph->dmInversionOver, graph->oLocalScratch,
-                               INSERT_VALUES, graph->oGlobalScratch));
-    PetscCall(DMGlobalToLocal(graph->dmInversionOver, graph->oGlobalScratch,
-                               INSERT_VALUES, graph->oLocalScratch));
+    PetscCall(DMLocalToGlobal(graph->dmInversionOver, graph->oLocalScratch, INSERT_VALUES, graph->oGlobalScratch));
+    PetscCall(DMGlobalToLocal(graph->dmInversionOver, graph->oGlobalScratch, INSERT_VALUES, graph->oLocalScratch));
 
-    /* 3. Forward Jacobi sweep: snapshot the (owned+ghost) array, then
-     *    write each owned cell from the frozen snapshot. */
+    /* 3. Forward Jacobi sweep: snapshot the (owned+ghost) array, then write each owned cell from the frozen snapshot. */
     {
       PetscScalar *arrOver;
       PetscCall(VecGetArray(graph->oLocalScratch, &arrOver));
       PetscCall(PetscArraycpy(snap, arrOver, nOver));
       for (PetscInt i = 0; i < nOwned; i++) {
-        if (graph->isFixed[i]) continue;
+        if (graph->isFixed[i]) {
+          continue;
+        }
         PetscScalar newVal = diagWeight * snap[i];
-        for (PetscInt k = graph->oNeighborStart[i];
-             k < graph->oNeighborStart[i + 1]; k++)
+        for (PetscInt k = graph->oNeighborStart[i]; k < graph->oNeighborStart[i + 1]; k++) {
           newVal += graph->oNeighborWeights[k] * snap[graph->oNeighborList[k]];
+        }
         arrOver[i] = newVal;
       }
       PetscCall(VecRestoreArray(graph->oLocalScratch, &arrOver));
     }
 
     /* 4. Refresh ghosts so other ranks see updated owned values. */
-    PetscCall(DMLocalToGlobal(graph->dmInversionOver, graph->oLocalScratch,
-                               INSERT_VALUES, graph->oGlobalScratch));
-    PetscCall(DMGlobalToLocal(graph->dmInversionOver, graph->oGlobalScratch,
-                               INSERT_VALUES, graph->oLocalScratch));
+    PetscCall(DMLocalToGlobal(graph->dmInversionOver, graph->oLocalScratch, INSERT_VALUES, graph->oGlobalScratch));
+    PetscCall(DMGlobalToLocal(graph->dmInversionOver, graph->oGlobalScratch, INSERT_VALUES, graph->oLocalScratch));
 
     /* 5. Reverse Jacobi sweep (frozen snapshot again). */
     {
@@ -329,18 +310,22 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
       PetscCall(VecGetArray(graph->oLocalScratch, &arrOver));
       PetscCall(PetscArraycpy(snap, arrOver, nOver));
       for (PetscInt i = nOwned - 1; i >= 0; i--) {
-        if (graph->isFixed[i]) continue;
+        if (graph->isFixed[i]) {
+          continue;
+        }
         PetscScalar newVal = diagWeight * snap[i];
-        for (PetscInt k = graph->oNeighborStart[i];
-             k < graph->oNeighborStart[i + 1]; k++)
+        for (PetscInt k = graph->oNeighborStart[i]; k < graph->oNeighborStart[i + 1]; k++) {
           newVal += graph->oNeighborWeights[k] * snap[graph->oNeighborList[k]];
+        }
         arrOver[i] = newVal;
       }
 
       /* 6. Copy owned slot back into input local Vec. */
       PetscScalar *arrOut;
       PetscCall(VecGetArray(v, &arrOut));
-      for (PetscInt i = 0; i < nOwned; i++) arrOut[i] = arrOver[i];
+      for (PetscInt i = 0; i < nOwned; i++) {
+        arrOut[i] = arrOver[i];
+      }
       PetscCall(VecRestoreArray(v, &arrOut));
       PetscCall(VecRestoreArray(graph->oLocalScratch, &arrOver));
     }
@@ -349,13 +334,9 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
     PetscFunctionReturn(PETSC_SUCCESS);
   }
 
-  /* ============================================================== */
-  /* Single-rank path: forward+reverse Jacobi sweep on the input    */
-  /* local Vec. The setup phase leaves hasParallelGraph=false at     */
-  /* MPI=1 because the local mesh IS the global mesh. Each sweep      */
-  /* reads a frozen snapshot, matching the parallel path so the      */
-  /* smoothed result is the same at any rank count.                  */
-  /* ============================================================== */
+  /* Single-rank path: forward+reverse Jacobi sweep on the input local Vec. The setup phase leaves hasParallelGraph=false at
+   * MPI=1 because the local mesh IS the global mesh. Each sweep reads a frozen snapshot, matching the parallel path so the
+   * smoothed result is the same at any rank count */
   PetscInt     N;
   PetscScalar *arr, *snap;
   PetscCall(VecGetLocalSize(v, &N));
@@ -365,12 +346,15 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
   /* Forward Jacobi sweep (frozen snapshot -> order-independent). */
   PetscCall(PetscArraycpy(snap, arr, N));
   for (PetscInt i = 0; i < graph->numLocalCells && i < N; i++) {
-    if (graph->isFixed[i]) continue;
+    if (graph->isFixed[i]) {
+      continue;
+    }
     PetscScalar newVal = diagWeight * snap[i];
-    for (PetscInt k = graph->neighborStart[i];
-         k < graph->neighborStart[i + 1]; k++) {
+    for (PetscInt k = graph->neighborStart[i]; k < graph->neighborStart[i + 1]; k++) {
       PetscInt nb = graph->neighborList[k];
-      if (nb < N) newVal += graph->neighborWeights[k] * snap[nb];
+      if (nb < N) {
+        newVal += graph->neighborWeights[k] * snap[nb];
+      }
     }
     arr[i] = newVal;
   }
@@ -378,13 +362,18 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
   /* Reverse Jacobi sweep (frozen snapshot again). */
   PetscCall(PetscArraycpy(snap, arr, N));
   for (PetscInt i = graph->numLocalCells - 1; i >= 0; i--) {
-    if (i >= N) continue;
-    if (graph->isFixed[i]) continue;
+    if (i >= N) {
+      continue;
+    }
+    if (graph->isFixed[i]) {
+      continue;
+    }
     PetscScalar newVal = diagWeight * snap[i];
-    for (PetscInt k = graph->neighborStart[i];
-         k < graph->neighborStart[i + 1]; k++) {
+    for (PetscInt k = graph->neighborStart[i]; k < graph->neighborStart[i + 1]; k++) {
       PetscInt nb = graph->neighborList[k];
-      if (nb < N) newVal += graph->neighborWeights[k] * snap[nb];
+      if (nb < N) {
+        newVal += graph->neighborWeights[k] * snap[nb];
+      }
     }
     arr[i] = newVal;
   }
@@ -393,12 +382,14 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
   PetscCall(VecRestoreArray(v, &arr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+
 /**
  * @brief Builds the per-rank overlap=1 neighbor graph and ghost workspace.
  *
  * Used by the fully-parallel Jacobi path of applyGaussSeidelSmoothing.
  * Steps:
- *   1. DMPlexDistributeOverlap(dm, 1, …) → permanent overlap=1 EM-DM kept
+ *   1. DMPlexDistributeOverlap(dm, 1, …) -> permanent overlap=1 EM-DM kept
  *      alive for the lifetime of the inversion run.
  *   2. Clone the EM-DM-over and install a 1-DOF/cell PetscSection on it,
  *      identical in shape to the original dmInversion section. The owned
@@ -431,19 +422,17 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
   PetscMPIInt size;
   PetscCallMPI(MPI_Comm_size(comm, &size));
 
-  if (size == 1) PetscFunctionReturn(PETSC_SUCCESS);
+  if (size == 1) {
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
 
-  /* ---- 1. Permanent overlap=1 EM-DM ----
-   * The overlap MUST capture every cell sharing a VERTEX with an owned cell,
-   * because the smoother's neighbour graph is built from vertex stars. The
-   * DM's default basic adjacency is face-based (support-of-cone), which would
-   * leave vertex-only cross-rank neighbours out of the overlap and make the
-   * smoothing operator partition-dependent (boundary seams). We temporarily
-   * force closure (vertex) adjacency - useCone=PETSC_FALSE, useClosure=PETSC_TRUE,
-   * the same adjacency the forward H(curl) assembly uses - for the overlap
-   * distribution, then restore the DM's adjacency exactly as found so the
-   * shared dm is untouched for everything downstream (assembly sets its own
-   * field adjacency later). This makes the parallel smoother graph identical
+  /* 1. Permanent overlap=1 EM-DM 
+   * The overlap MUST capture every cell sharing a VERTEX with an owned cell, because the smoother's neighbour graph is built from 
+   * vertex stars. The DM's default basic adjacency is face-based (support-of-cone), which would leave vertex-only cross-rank 
+   * neighbours out of the overlap and make the smoothing operator partition-dependent (boundary seams). We temporarily
+   * force closure (vertex) adjacency - useCone=PETSC_FALSE, useClosure=PETSC_TRUE, the same adjacency the forward H(curl) 
+   * assembly uses - for the overlap distribution, then restore the DM's adjacency exactly as found so the shared dm is untouched 
+   * for everything downstream (assembly sets its own field adjacency later). This makes the parallel smoother graph identical
    * in CONTENT to the single-rank full-mesh graph at every rank count. */
   PetscBool savedCone, savedClosure;
   PetscCall(DMGetBasicAdjacency(dm, &savedCone, &savedClosure));
@@ -456,13 +445,14 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
 
   PetscCall(DMSetBasicAdjacency(dm, savedCone, savedClosure));
 
-  /* A NULL overlap at size>1 means the mesh was not actually distributed
-   * (all cells on one rank). The single-rank smoother path then sweeps the
-   * full owned-cell graph on that rank (complete vertex stars) and is correct;
-   * empty ranks have nothing to smooth. Safe to leave hasParallelGraph=false. */
-  if (!dmEMOver) PetscFunctionReturn(PETSC_SUCCESS);
+  /* A NULL overlap at size>1 means the mesh was not actually distributed (all cells on one rank). The single-rank smoother path 
+   * then sweeps the full owned-cell graph on that rank (complete vertex stars) and is correct; empty ranks have nothing to smooth. 
+   * Safe to leave hasParallelGraph=false. */
+  if (!dmEMOver) {
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
 
-  /* ---- 2. Build dmInversionOver: clone + install 1-DOF/cell section ---- */
+  /* 2. Build dmInversionOver: clone + install 1-DOF/cell section */
   DM dmInvOver;
   PetscCall(DMClone(dmEMOver, &dmInvOver));
 
@@ -498,7 +488,7 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
 
   graph->dmInversionOver = dmInvOver;
 
-  /* ---- 3. Walk vertex stars; build local-overlap-1 neighbor graph ---- */
+  /* 3. Walk vertex stars; build local-overlap-1 neighbor graph */
   PetscInt nCellsOver = cEndO - cStartO;
   PetscInt nOwned     = grid->cellEnd - grid->cellStart;
 
@@ -531,23 +521,27 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
 
     PetscInt  closureSize = 0;
     PetscInt *closure     = NULL;
-    PetscCall(DMPlexGetTransitiveClosure(dmInvOver, i, PETSC_TRUE,
-                                          &closureSize, &closure));
+    PetscCall(DMPlexGetTransitiveClosure(dmInvOver, i, PETSC_TRUE, &closureSize, &closure));
     PetscInt cnt = 0;
     for (PetscInt ci = 0; ci < closureSize * 2; ci += 2) {
       PetscInt point = closure[ci];
       PetscInt pdepth = 0;
       PetscCall(DMPlexGetPointDepth(dmInvOver, point, &pdepth));
-      if (pdepth != 0) continue;
+      if (pdepth != 0) {
+        continue;
+      }
 
       PetscInt  starSize = 0;
       PetscInt *star     = NULL;
-      PetscCall(DMPlexGetTransitiveClosure(dmInvOver, point, PETSC_FALSE,
-                                            &starSize, &star));
+      PetscCall(DMPlexGetTransitiveClosure(dmInvOver, point, PETSC_FALSE, &starSize, &star));
       for (PetscInt s = 0; s < starSize * 2; s += 2) {
         PetscInt nb = star[s];
-        if (nb == i) continue;
-        if (nb < cStartO || nb >= cEndO) continue;
+        if (nb == i) {
+          continue;
+        }
+        if (nb < cStartO || nb >= cEndO) {
+          continue;
+        }
         PetscInt nbLi = nb - cStartO;
 
         PetscBool found = PETSC_FALSE;
@@ -560,11 +554,9 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
           cnt++;
         }
       }
-      PetscCall(DMPlexRestoreTransitiveClosure(dmInvOver, point, PETSC_FALSE,
-                                                &starSize, &star));
+      PetscCall(DMPlexRestoreTransitiveClosure(dmInvOver, point, PETSC_FALSE, &starSize, &star));
     }
-    PetscCall(DMPlexRestoreTransitiveClosure(dmInvOver, i, PETSC_TRUE,
-                                              &closureSize, &closure));
+    PetscCall(DMPlexRestoreTransitiveClosure(dmInvOver, i, PETSC_TRUE, &closureSize, &closure));
 
     if (cnt == 0) {
       tmpNeighbors[liOver * maxNeighbors + 0] = liOwned;
@@ -577,8 +569,9 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
   /* CSR */
   PetscCall(PetscMalloc1(nOwned + 1, &graph->oNeighborStart));
   graph->oNeighborStart[0] = 0;
-  for (PetscInt i = 0; i < nOwned; i++)
+  for (PetscInt i = 0; i < nOwned; i++) {
     graph->oNeighborStart[i + 1] = graph->oNeighborStart[i] + tmpCount[i];
+  }
 
   PetscInt totalArcs = graph->oNeighborStart[nOwned];
   PetscCall(PetscMalloc1(totalArcs, &graph->oNeighborList));
@@ -610,16 +603,18 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
       graph->oNeighborWeights[start + k] = (d > 0.0) ? 1.0 / d : 0.0;
       wsum += graph->oNeighborWeights[start + k];
     }
-    if (wsum > 0.0)
-      for (PetscInt k = 0; k < cnt; k++)
+    if (wsum > 0.0) {
+      for (PetscInt k = 0; k < cnt; k++) {
         graph->oNeighborWeights[start + k] /= wsum;
+      }
+    }
   }
 
   PetscCall(PetscFree(tmpNeighbors));
   PetscCall(PetscFree(tmpCount));
   PetscCall(PetscFree(centroids));
 
-  /* ---- 4. Persistent scratch Vecs on dmInvOver ---- */
+  /* 4. Persistent scratch Vecs on dmInvOver */
   PetscCall(DMCreateLocalVector(dmInvOver, &graph->oLocalScratch));
   PetscCall(DMCreateGlobalVector(dmInvOver, &graph->oGlobalScratch));
 
@@ -657,15 +652,16 @@ PetscErrorCode buildNotFixedMask(const NeighborGraph *graph,
   PetscCall(DMCreateLocalVector(dmInversion, maskLocal));
   PetscCall(VecSet(*maskLocal, 1.0));
 
-  /* Zero the local mask entry for each fixed cell using the
-   * section offset - local section has exactly 1 DOF/cell. */
+  /* Zero the local mask entry for each fixed cell using the section offset - local section has exactly 1 DOF/cell. */
   PetscSection localSec;
   PetscCall(DMGetLocalSection(dmInversion, &localSec));
 
   PetscScalar *arr;
   PetscCall(VecGetArray(*maskLocal, &arr));
   for (PetscInt li = 0; li < graph->numLocalCells; li++) {
-    if (!graph->isFixed[li]) continue;
+    if (!graph->isFixed[li]) {
+      continue;
+    }
     PetscInt cellID = grid->cellStart + li;
     PetscInt offset;
     PetscCall(PetscSectionGetOffset(localSec, cellID, &offset));
@@ -673,12 +669,10 @@ PetscErrorCode buildNotFixedMask(const NeighborGraph *graph,
   }
   PetscCall(VecRestoreArray(*maskLocal, &arr));
 
-  /* Global mirror - INSERT_VALUES is unambiguous because each cell
-   * is owned by exactly one rank for a cell-based 1-DOF section. */
+  /* Global mirror - INSERT_VALUES is unambiguous because each cell is owned by exactly one rank for a cell-based 1-DOF section. */
   PetscCall(DMCreateGlobalVector(dmInversion, maskGlobal));
   PetscCall(VecSet(*maskGlobal, 0.0));
-  PetscCall(DMLocalToGlobal(dmInversion, *maskLocal, INSERT_VALUES,
-                             *maskGlobal));
+  PetscCall(DMLocalToGlobal(dmInversion, *maskLocal, INSERT_VALUES, *maskGlobal));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -689,8 +683,7 @@ PetscErrorCode buildNotFixedMask(const NeighborGraph *graph,
  * X and X0 are global Vecs on dmInversion (1 DOF/cell); sigmaModel is a
  * local Vec on dmConductivity (3 DOF/cell), with components 0-2
  * (res_x, res_y, res_z) set to σ. The smoother (graph/diagWeight) is applied
- * to a local copy of X before exp, matching MATLAB's tempX smoothing after
- * each L-BFGS step; X itself is NOT modified.
+ * to a local copy of X before exp; X itself is NOT modified.
  *
  * @param[in]  dmInversion     DM for the inversion field (1 DOF/cell).
  * @param[in]  dmConductivity  DM for the conductivity field.
@@ -722,17 +715,16 @@ PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity,
   PetscCall(DMGlobalToLocal(dmInversion, X,  INSERT_VALUES, xLocal));
   PetscCall(DMGlobalToLocal(dmInversion, X0, INSERT_VALUES, x0Local));
 
-  /* MATLAB applies forward + reverse Gauss-Seidel smoothing to the
-   * model perturbation (tempX = X_lbfgs) before converting to sigma.
-   * Apply the same sweep here on a local copy so that the assembled
-   * conductivity is always spatially smooth, matching the reference.
+  /* Apply forward + reverse Gauss-Seidel smoothing to the model perturbation (tempX = X_lbfgs) before converting to sigma.
+   * Apply the sweep here on a local copy so that the assembled conductivity is always spatially smooth.
    * The optimizer's X is not modified - only the physical sigma changes. */
   PetscCall(applyGaussSeidelSmoothing(graph, diagWeight, xLocal));
 
-  /* Expose the smoothed tempX to the caller for VTU diagnostics (MATLAB
-   * X_guanghuahou). Copy happens before exp() so the user sees the same
+  /* Expose the smoothed tempX to the caller for VTU diagnostics. Copy happens before exp() so the user sees the same
    * log-space quantity the reference writes. */
-  if (xPostSmoothOut) PetscCall(VecCopy(xLocal, xPostSmoothOut));
+  if (xPostSmoothOut) {
+    PetscCall(VecCopy(xLocal, xPostSmoothOut));
+  }
 
   /* Get section offsets for the conductivity Vec (3 DOF/cell) */
   PetscSection resSec;
@@ -749,8 +741,7 @@ PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity,
     PetscInt resOff;
     PetscCall(PetscSectionGetOffset(resSec, i, &resOff));
 
-    PetscScalar sigma = 1.0 / PetscExpScalar(
-        PetscRealPart(xArr[li] + x0Arr[li]));
+    PetscScalar sigma = 1.0 / PetscExpScalar(PetscRealPart(xArr[li] + x0Arr[li]));
 
     sArr[resOff + 0] = sigma;  /* res_x */
     sArr[resOff + 1] = sigma;  /* res_y */
@@ -785,11 +776,23 @@ PetscErrorCode destroyNeighborGraph(NeighborGraph *graph)
 
   /* Parallel block-Jacobi resources (set by setupParallelSmoothingGraph;
    * remain NULL on a single MPI rank). */
-  if (graph->oNeighborStart)   PetscCall(PetscFree(graph->oNeighborStart));
-  if (graph->oNeighborList)    PetscCall(PetscFree(graph->oNeighborList));
-  if (graph->oNeighborWeights) PetscCall(PetscFree(graph->oNeighborWeights));
-  if (graph->oLocalScratch)    PetscCall(VecDestroy(&graph->oLocalScratch));
-  if (graph->oGlobalScratch)   PetscCall(VecDestroy(&graph->oGlobalScratch));
-  if (graph->dmInversionOver)  PetscCall(DMDestroy(&graph->dmInversionOver));
+  if (graph->oNeighborStart) {
+    PetscCall(PetscFree(graph->oNeighborStart));
+  }
+  if (graph->oNeighborList) {
+     PetscCall(PetscFree(graph->oNeighborList));
+  }
+  if (graph->oNeighborWeights) {
+    PetscCall(PetscFree(graph->oNeighborWeights));
+  }
+  if (graph->oLocalScratch) { 
+    PetscCall(VecDestroy(&graph->oLocalScratch));
+  }
+  if (graph->oGlobalScratch) {
+    PetscCall(VecDestroy(&graph->oGlobalScratch));
+  }
+  if (graph->dmInversionOver) {
+    PetscCall(DMDestroy(&graph->dmInversionOver));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

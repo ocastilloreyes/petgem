@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  /* (a) positional subcommand: argv[1] is "modeling"/"inverse"/aliases. We splice it out of argv before forwarding so that the kernel
+  /* 1. positional subcommand: argv[1] is "modeling"/"inverse"/aliases. We splice it out of argv before forwarding so that the kernel
    *     doesn't see an unrecognized first token.                       */
   PetscInt mode = -1;
   if (argc > 1 && argv[1][0] != '-') {
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
     argc -= 1;
   }
 
-  /* (b) PETSc -mode option fallback (works with options_file too). Done WITHOUT a full PetscInitialize: scan argv directly so we
+  /* 2. PETSc -mode option fallback (works with options_file too). Done WITHOUT a full PetscInitialize: scan argv directly so we
    *     can dispatch before either kernel takes over the lifecycle.   */
   if (mode < 0) {
     for (PetscInt i = 1; i < argc - 1; i++) {

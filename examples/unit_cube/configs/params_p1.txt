@@ -1,0 +1,12 @@
+# fm.csem forward config - unit_cube fixture, order 1. Production MATIS +
+# PCBDDC solver (the level-5 e2e / Extrae profile). Consumes the bundle built
+# by scripts/build_bundles.sh.
+-input_filename   examples/unit_cube/outputs/input.h5
+-output_dir       examples/unit_cube/outputs/
+-output_filename  responses_p1
+
+-dm_mat_type                 is
+-ksp_type                    fgmres
+-pc_type                     bddc
+-pc_bddc_use_deluxe_scaling  1
+-pc_bddc_coarse_pc_type      lu

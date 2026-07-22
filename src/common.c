@@ -4,12 +4,12 @@
  * Date: 2026-02-03
  *
  * Description:
- * Common utility functions used throughout the PETGEM toolkit,
- * including printing helpers and timers.
+ * Common utility functions used throughout the PETGEM toolkit, including printing helpers and timers.
  */
 
 /* C libraries */
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -23,44 +23,6 @@
 #include "version.h"
 
 #define LINE_WIDTH 74
-
-/**
- * @brief Formats an integer with space-grouped thousands for readable logs.
- *
- * Renders `value` with a space every three digits (e.g. 3738963 -> "3 738 963")
- * into one of a few rotating internal buffers, so several formatted numbers can
- * appear in a single printf argument list (e.g. "M x N"). Presentation only:
- * values below 1000 are rendered unchanged. Not thread-safe (static buffers).
- *
- * @param[in] value  Integer to format.
- *
- * @return Pointer to a NUL-terminated grouped-number string (do not free).
- */
-const char *formatGroupedInt(PetscInt value) {
-  enum { NUM_BUFS = 6, BUF_LEN = 32 };
-  static char bufs[NUM_BUFS][BUF_LEN];
-  static PetscInt which = 0;
-  char *out = bufs[which];
-  which = (which + 1) % NUM_BUFS;
-
-  /* Absolute-value decimal digits, least-significant first (INT_MIN-safe). */
-  char digits[24];
-  PetscInt nd = 0;
-  unsigned long long uv = (value < 0) ? (unsigned long long)(-(value + 1)) + 1ULL
-                                      : (unsigned long long)value;
-  if (uv == 0) digits[nd++] = '0';
-  while (uv > 0) { digits[nd++] = (char)('0' + (int)(uv % 10ULL)); uv /= 10ULL; }
-
-  /* Emit most-significant first, a space after every third remaining digit. */
-  PetscInt oi = 0;
-  if (value < 0) out[oi++] = '-';
-  for (PetscInt i = nd - 1; i >= 0; i--) {
-    out[oi++] = digits[i];
-    if (i > 0 && (i % 3) == 0) out[oi++] = ' ';
-  }
-  out[oi] = '\0';
-  return out;
-}
 
 /**
  * @brief Computes the display width of a UTF-8 string in characters.
@@ -244,6 +206,167 @@ static PetscErrorCode PrintTimerHMSPercent(const char* label, PetscLogDouble t, 
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/**
+ * @brief Formats an integer with space-grouped thousands for readable logs.
+ *
+ * Renders `value` with a space every three digits (e.g. 3738963 -> "3 738 963")
+ * into one of a few rotating internal buffers, so several formatted numbers can
+ * appear in a single printf argument list (e.g. "M x N"). Presentation only:
+ * values below 1000 are rendered unchanged. Not thread-safe (static buffers).
+ *
+ * @param[in] value  Integer to format.
+ *
+ * @return Pointer to a NUL-terminated grouped-number string (do not free).
+ */
+const char *formatGroupedInt(PetscInt value) {
+  enum { NUM_BUFS = 6, BUF_LEN = 32 };
+  static char bufs[NUM_BUFS][BUF_LEN];
+  static PetscInt which = 0;
+  char *out = bufs[which];
+  which = (which + 1) % NUM_BUFS;
+
+  /* Absolute-value decimal digits, least-significant first (INT_MIN-safe). */
+  char digits[24];
+  PetscInt nd = 0;
+  unsigned long long uv = (value < 0) ? (unsigned long long)(-(value + 1)) + 1ULL
+                                      : (unsigned long long)value;
+  if (uv == 0) {
+    digits[nd++] = '0';
+  }
+
+  while (uv > 0) { 
+    digits[nd++] = (char)('0' + (int)(uv % 10ULL)); uv /= 10ULL; 
+  }
+
+  /* Emit most-significant first, a space after every third remaining digit. */
+  PetscInt oi = 0;
+  if (value < 0) {
+    out[oi++] = '-';
+  }
+  for (PetscInt i = nd - 1; i >= 0; i--) {
+    out[oi++] = digits[i];
+    if (i > 0 && (i % 3) == 0) {
+      out[oi++] = ' ';
+    }
+  }
+  out[oi] = '\0';
+  return out;
+}
+
+
+/**
+ * @brief Prints a titled section header in the PETGEM run report.
+ *
+ * Emits a blank line followed by a section title and trailing colon
+ * (e.g. "Mesh:" or "Inversion parameters:") using PETSc collective
+ * printing. Used as a visual separator between logical groups of
+ * runtime information.
+ *
+ * @param[in] comm   MPI communicator used by PetscPrintf().
+ * @param[in] title  Section title to display.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode logSection(MPI_Comm comm, const char *title) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscPrintf(comm, "\n %s:\n", title));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
+ * @brief Prints a string-valued key/value entry in the PETGEM run report.
+ *
+ * Formats a report line using the standard PETGEM layout
+ * ("   %-24s = %s") so all modules produce aligned output.
+ * Intended for textual values such as filenames, modes, states,
+ * or descriptive labels.
+ *
+ * @param[in] comm  MPI communicator used by PetscPrintf().
+ * @param[in] key   Entry label displayed in the left column.
+ * @param[in] val   String value displayed in the right column.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode logKVStr(MPI_Comm comm, const char *key, const char *val) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", key, val));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
+ * @brief Prints an integer-valued key/value entry in the PETGEM run report.
+ *
+ * Formats the integer through formatGroupedInt() before printing so
+ * large values appear with space-grouped thousands (e.g. 44447 ->
+ * "44 447"). Uses the standard PETGEM key/value layout to keep
+ * console output aligned and consistent across kernels.
+ *
+ * @param[in] comm  MPI communicator used by PetscPrintf().
+ * @param[in] key   Entry label displayed in the left column.
+ * @param[in] val   Integer value to display.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", key, formatGroupedInt(val)));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
+ * @brief Prints a floating-point key/value entry in the PETGEM run report.
+ *
+ * Renders the supplied value using PETSc's standard console output path
+ * and the "%g" numeric format. Intended for tolerances, weights,
+ * frequencies, physical parameters, and other scalar quantities.
+ *
+ * @param[in] comm  MPI communicator used by PetscPrintf().
+ * @param[in] key   Entry label displayed in the left column.
+ * @param[in] val   Floating-point value to display.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode logKVReal(MPI_Comm comm, const char *key, PetscReal val) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscPrintf(comm, "   %-24s = %g\n", key, (double)val));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
+ * @brief Prints a formatted key/value entry in the PETGEM run report.
+ *
+ * Builds the value string from a printf-style format specification and
+ * variable argument list, then emits the result using the standard
+ * PETGEM key/value layout. Useful when the displayed value combines
+ * multiple quantities or requires custom formatting.
+ *
+ * The formatted value is written into a fixed-size internal stack buffer
+ * before printing. Output longer than the buffer capacity is truncated by
+ * vsnprintf().
+ *
+ * @param[in] comm    MPI communicator used by PetscPrintf().
+ * @param[in] key     Entry label displayed in the left column.
+ * @param[in] valfmt  printf-style format string used to build the value.
+ * @param[in] ...     Arguments consumed by valfmt.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode logKVf(MPI_Comm comm, const char *key, const char *valfmt, ...) {
+  PetscFunctionBeginUser;
+  char    buf[256];
+  va_list ap;
+  va_start(ap, valfmt);
+  vsnprintf(buf, sizeof(buf), valfmt, ap);
+  va_end(ap);
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", key, buf));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 
 /**
  * @brief Prints a formatted PETGEM header banner.

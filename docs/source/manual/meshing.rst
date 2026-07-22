@@ -14,7 +14,7 @@ Each volumetric region is tagged with a Gmsh **physical volume**. The tag maps
 to a **0-based material id** as ``material_id = gmsh:physical - 1``, and that id
 is the row index into ``sigmas.txt`` (see :doc:`formats`).
 
-For example, ``examples/canonical_model`` declares four regions with tags 1-4,
+For example, ``examples/fm_model`` declares four regions with tags 1-4,
 so ``sigmas.txt`` row 0 is the volume tagged 1, row 1 the volume tagged 2, and
 so on. Number physical volumes consecutively from 1, and provide one
 ``sigmas.txt`` row per material.
@@ -33,7 +33,7 @@ Element sizing
 --------------
 The shipped ``.geo`` files parameterize the characteristic length with named
 constants applied to different parts of the geometry - for example, in
-``examples/canonical_model/mesh.geo``, a coarse far-field size, a fine size
+``examples/fm_model/geometry/mesh.geo``, a coarse far-field size, a fine size
 along the source/receiver line, and a size inside the target layer. Adjust them
 in the ``.geo`` file to control the mesh.
 
@@ -41,7 +41,7 @@ Generating a mesh
 -----------------
 .. code-block:: bash
 
-   gmsh -3 examples/canonical_model/mesh.geo -o examples/canonical_model/mesh.msh
+   gmsh -3 examples/fm_model/geometry/mesh.geo -o examples/fm_model/outputs/mesh.msh
 
 The resulting ``.msh`` is passed to ``utils/preprocess.py`` via
 ``-mesh_filename``, which embeds the mesh and the per-cell conductivity (looked

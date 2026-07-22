@@ -6,7 +6,7 @@ Two families share this infrastructure:
     the UNCHANGED production sources and run per order. They verify the real
     reference-element bases, DOF enumeration and elemental matrices directly.
   * levels 4-5 (e2e): the built `fm.csem` binary is run once per order on the
-    single examples/unit_cube/input.h5 bundle (order forced with `-order N`,
+    single examples/unit_cube/outputs/input.h5 bundle (order forced with `-order N`,
     which also bypasses the bundle's order dataset).
 
 Fixtures needing a toolchain/binary that may be absent ``pytest.skip`` so the
@@ -31,8 +31,8 @@ def repo_root() -> Path:
 @pytest.fixture(scope="session")
 def unit_cube() -> Path:
     """The single dataset the suite is allowed to use."""
-    if not (lib.UNIT_CUBE / "input.h5").exists():
-        pytest.skip("unit_cube/input.h5 dataset not present")
+    if not lib.INPUT_BUNDLE.exists():
+        pytest.skip("unit_cube/outputs/input.h5 dataset not present")
     return lib.UNIT_CUBE
 
 
@@ -122,7 +122,7 @@ def fm_run(fm_csem_binary, unit_cube, tmp_path_factory):
             return cache[key]
         stem = f"responses_p{order}_{solver}"
         launch = (["mpirun", "-n", npr] if npr else []) + [str(fm_csem_binary)]
-        base = ["-input_filename", str(unit_cube / "input.h5"),
+        base = ["-input_filename", str(lib.INPUT_BUNDLE),
                 "-order", str(order),
                 "-output_dir", str(outdir), "-output_filename", stem]
         cmd = launch + base + SOLVER_OPTS[solver]

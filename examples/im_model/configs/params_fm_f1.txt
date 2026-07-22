@@ -1,0 +1,13 @@
+# fm.csem forward config - im_model benchmark, 1 Hz, order 2. Iterative solver:
+# PCBDDC on the MATIS operator with the exact Nedelec discrete-gradient coarse
+# space. Consumes the bundle built by scripts/build_bundles.sh fm.
+
+-input_filename   examples/im_model/outputs/input_fm_f1.h5
+-output_dir       examples/im_model/outputs/
+-output_filename  responses_fm_f1_p2
+
+-dm_mat_type                 is
+-ksp_type                    fgmres
+-pc_type                     bddc
+-pc_bddc_use_deluxe_scaling  1
+-pc_bddc_coarse_pc_type      lu

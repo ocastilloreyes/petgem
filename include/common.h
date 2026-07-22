@@ -90,4 +90,25 @@ PetscErrorCode printUsage(const char *progname);
  */
 const char *formatGroupedInt(PetscInt value);
 
+/**
+ * @brief Structured console-log helpers - the single place that owns the
+ *        PETGEM run-report layout (section headers and 24-column key-value
+ *        lines), keeping fm.csem and im.csem output consistent.
+ *
+ * - logSection prints "\n <title>:\n".
+ * - logKVStr/Int/Real print "   %-24s = <value>\n" with a string, a
+ *   space-grouped integer, or a %g real, respectively.
+ * - logKVf prints "   %-24s = <value>\n" with a printf-formatted value for the
+ *   few lines that need a custom value layout.
+ *
+ * @param[in] comm  Communicator to print on (rank 0 emits).
+ * @param[in] key   Left-hand label (padded to 24 columns; KV helpers only).
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode logSection(MPI_Comm comm, const char *title);
+PetscErrorCode logKVStr(MPI_Comm comm, const char *key, const char *val);
+PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val);
+PetscErrorCode logKVReal(MPI_Comm comm, const char *key, PetscReal val);
+PetscErrorCode logKVf(MPI_Comm comm, const char *key, const char *valfmt, ...);
+
 #endif

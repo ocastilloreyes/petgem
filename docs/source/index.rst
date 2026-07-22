@@ -49,6 +49,7 @@ More information
    :caption: Inverse modeling:
 
    manual/inverse_modeling
+   manual/inverse_examples
 
 .. toctree::
    :maxdepth: 2

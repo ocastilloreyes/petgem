@@ -38,19 +38,59 @@
 #include "transmitter.h"
 #include "version.h"
 
-/* Over-integration added to the basis order for the quadrature check. */
+/**
+ * @brief Additional quadrature order used by MMS diagnostic checks.
+ *
+ * Added to the finite-element basis order when recomputing MMS error
+ * norms under over-integration. The resulting higher-order quadrature
+ * provides a simple sensitivity check for quadrature-induced error in
+ * the reported verification metrics.
+ */
 #define MMS_DIAG_QUAD_EXTRA 3
 
-/* Mass-term (frequency) scales swept by the Level-3 conditioning sweep. */
-static const PetscReal MMS_COND_SCALES[] = {1.0, 100.0, 10000.0};
-#define MMS_COND_NUM_SCALES 3
 
 /**
- * @brief Global relative L2 / H(curl) error norms at one quadrature rule.
+ * @brief Mass-term scaling factors used by the Level-3 conditioning sweep.
  *
- * Reconstructs E_h and curl E_h at the cell quadrature points from the ghosted
- * DOF array, integrates the squared differences against E* / curl E* with the
- * |detJ| measure, MPI-reduces, and returns the relative norms.
+ * Each value scales the physical frequency (and therefore the mass term
+ * iωμM) before reassembling and solving the MMS system. The sweep probes
+ * how solution accuracy and estimated conditioning change as the operator
+ * becomes increasingly mass dominated.
+ */
+static const PetscReal MMS_COND_SCALES[] = {1.0, 100.0, 10000.0};
+
+
+/**
+ * @brief Number of mass-term scales evaluated by the conditioning sweep.
+ *
+ * Defines the number of entries stored in MMS_COND_SCALES and the number
+ * of MMS solves performed during a Level-3 conditioning analysis.
+ */
+#define MMS_COND_NUM_SCALES 3
+
+
+/**
+ * @brief Computes global relative L2 and H(curl) MMS error norms.
+ *
+ * Reconstructs the discrete electric field E_h and curl(E_h) at the
+ * quadrature points of every local cell from the ghosted DOF vector.
+ * The squared differences against the manufactured exact solution
+ * E* and curl(E*) are integrated using the cell Jacobian determinant
+ * and quadrature weights, summed over all MPI ranks, and normalized
+ * by the reference MMS norms.
+ *
+ * The resulting values measure discretization error only; solver
+ * residuals are handled separately by mmsResidual().
+ *
+ * @param[in]  dm         DMPlex mesh.
+ * @param[in]  grid       Finite-element discretization information.
+ * @param[in]  section    Local DOF layout for dm.
+ * @param[in]  xarr       Ghosted solution-vector entries.
+ * @param[in]  quadOrder  Quadrature order used for integration.
+ * @param[out] relL2      Relative L2 error norm.
+ * @param[out] relHcurl   Relative H(curl) error norm.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
 static PetscErrorCode mmsErrorNormsAtQuad(const DM dm, const Grid grid, PetscSection section,
                                           const PetscScalar *xarr, PetscInt quadOrder,
@@ -152,7 +192,27 @@ static PetscErrorCode mmsErrorNormsAtQuad(const DM dm, const Grid grid, PetscSec
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/** @brief Relative error norms for column 0 of a solution matrix. */
+
+/**
+ * @brief Computes MMS error norms for the first column of a solution matrix.
+ *
+ * Extracts column 0 from the dense solution matrix, creates the required
+ * local ghosted representation through DMGlobalToLocal, and evaluates the
+ * relative L2 and H(curl) MMS error norms using
+ * mmsErrorNormsAtQuad().
+ *
+ * PETGEM MMS solves currently produce a single right-hand side, so the
+ * first matrix column contains the solution of interest.
+ *
+ * @param[in]  dm         DMPlex mesh.
+ * @param[in]  grid       Finite-element discretization information.
+ * @param[in]  X          Dense matrix containing the solution vector.
+ * @param[in]  quadOrder  Quadrature order used for error integration.
+ * @param[out] relL2      Relative L2 error norm.
+ * @param[out] relHcurl   Relative H(curl) error norm.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
 static PetscErrorCode mmsColumnErrors(const DM dm, const Grid grid, const Mat X,
                                       PetscInt quadOrder, PetscReal *relL2, PetscReal *relHcurl) {
   PetscFunctionBeginUser;
@@ -172,7 +232,23 @@ static PetscErrorCode mmsColumnErrors(const DM dm, const Grid grid, const Mat X,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/** @brief Backward error ||A x - b|| / ||b|| for column 0. */
+
+/**
+ * @brief Computes the rela*ive residual norm of an MMS solve.* *
+ * Forms the residual vector r * A x - b using column 0 of the sol*tion
+ * and right-hand-side matric*s, computes ||r||₂ and ||b||₂, and*returns
+ * the backward-error esti*ate ||A x - b||₂ / ||b||₂.
+ *
+ * I* the right-hand side is identicall* zero, the absolute residual
+ * no*m is returned instead.
+ *
+ * @para*[in]  A       System matrix.
+ * @p*ram[in]  B       Right-hand-side m*trix.
+ * @param[in]  X       Solut*on matrix.
+ * @param[out] relRes  *elative residual norm.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
 static PetscErrorCode mmsResidual(const Mat A, const Mat B, const Mat X, PetscReal *relRes) {
   PetscFunctionBeginUser;
   Vec xc, bc, r;
@@ -191,11 +267,28 @@ static PetscErrorCode mmsResidual(const Mat A, const Mat B, const Mat X, PetscRe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
- * @brief Conditioning probe: effective condition number and forward-error floor
- * of the operator, estimated from a relatively perturbed RHS re-solve. The
- * amplification of the perturbation gives kappa(A), and kappa(A)*eps is the
- * attainable forward-error floor.
+ * @brief Estimates conditioning and attainable forward accuracy.
+ *
+ * Perturbs the right-hand side by a small relative amount, resolves the
+ * linear system, and measures the induced relative solution change. The
+ * amplification factor provides an estimate of the operator condition
+ * number, while kappa(A) multiplied by machine precision estimates the
+ * practical forward-error floor imposed by finite-precision arithmetic.
+ *
+ * The estimate is intended as a diagnostic indicator rather than a
+ * rigorous condition-number computation.
+ *
+ * @param[in]  dm        DMPlex mesh.
+ * @param[in]  grid      Finite-element discretization information.
+ * @param[in]  A         System matrix.
+ * @param[in]  B         Right-hand-side matrix.
+ * @param[in]  X         Reference solution matrix.
+ * @param[out] condEst   Estimated condition number.
+ * @param[out] floorEst  Estimated forward-error floor.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
 static PetscErrorCode mmsConditionProbe(const DM dm, const Grid grid, const Mat A,
                                         const Mat B, const Mat X,
@@ -237,13 +330,40 @@ static PetscErrorCode mmsConditionProbe(const DM dm, const Grid grid, const Mat 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
- * @brief Assemble and solve one MMS system.
+ * @brief Assembles and solves one MMS verification system.
  *
- * useForcing = PETSC_TRUE : A = K - iωμ·Ms, b = ∫ f*·N   (the Galerkin solve).
- * useForcing = PETSC_FALSE: A = mass (Ms, σ=1),  b = ∫ E*·N (the L2 projection).
- * G is never built (MMS uses a MUMPS direct solve, not PCBDDC). Caller destroys
- * A, B, X.
+ * Builds the MMS right-hand side and associated operator, then solves
+ * the resulting linear system and returns the assembled matrices and
+ * solution.
+ *
+ * When useForcing is PETSC_TRUE, the routine assembles the physical
+ * Galerkin MMS problem:
+ *
+ *   A = K - iωμM
+ *   b = ∫ f* · N
+ *
+ * When useForcing is PETSC_FALSE, the routine assembles the L2
+ * projection problem:
+ *
+ *   A = M
+ *   b = ∫ E* · N
+ *
+ * The caller assumes ownership of the returned matrices and solution.
+ *
+ * @param[in]  params        PETGEM runtime parameters.
+ * @param[in]  sources       MMS source configuration.
+ * @param[in]  dm            DMPlex mesh.
+ * @param[in]  grid          Finite-element discretization information.
+ * @param[in]  conductivity  Cell conductivity field.
+ * @param[in]  constFactor   Frequency-dependent mass coefficient.
+ * @param[in]  useForcing    Select Galerkin solve or L2 projection.
+ * @param[out] A             Assembled system matrix.
+ * @param[out] B             Assembled right-hand-side matrix.
+ * @param[out] X             Computed solution matrix.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
 static PetscErrorCode mmsAssembleSolve(const petgemParams params, const CsemSourceSet sources,
                                        const DM dm, const Grid grid, const Vec conductivity,
@@ -262,14 +382,35 @@ static PetscErrorCode mmsAssembleSolve(const petgemParams params, const CsemSour
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
- * @brief Write one MMS measurement to {dir}/{fname}.h5.
+ * @brief Writes MMS verification metrics to an HDF5 results file.
  *
- * PETGEM writes its responses in HDF5 (computeFields); the MMS metrics follow
- * the same convention. One file is written per run, with all scalars stored as
- * root-group attributes (plus the petgem_version / date provenance attributes
- * used elsewhere), so a directory of these files reconstructs the full table.
- * Collective on `comm` (all ranks carry the same, already-reduced values).
+ * Creates {dir}/{fname}.h5 and stores all MMS measurements as root-group
+ * HDF5 attributes, together with PETGEM version and execution-date
+ * provenance information. One file corresponds to one MMS run or one
+ * conditioning-sweep point.
+ *
+ * All numerical values are assumed to be globally reduced before the
+ * call. The operation is collective on the supplied communicator.
+ *
+ * @param[in] comm          MPI communicator used for HDF5 I/O.
+ * @param[in] dir           Output directory.
+ * @param[in] fname         Output filename without extension.
+ * @param[in] order         FEM basis order.
+ * @param[in] dofs          Global number of degrees of freedom.
+ * @param[in] omegaScale    Frequency scaling factor.
+ * @param[in] solveL2       Galerkin-solve relative L2 error.
+ * @param[in] solveHcurl    Galerkin-solve relative H(curl) error.
+ * @param[in] projL2        Projection relative L2 error.
+ * @param[in] projHcurl     Projection relative H(curl) error.
+ * @param[in] residual      Relative solve residual.
+ * @param[in] solveL2hi     Over-integrated L2 error.
+ * @param[in] solveHcurlhi  Over-integrated H(curl) error.
+ * @param[in] condEst       Estimated condition number.
+ * @param[in] floorEst      Estimated forward-error floor.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
 static PetscErrorCode mmsWriteH5(MPI_Comm comm, const char *dir, const char *fname,
                                  PetscInt order, PetscInt dofs, PetscReal omegaScale,
@@ -314,12 +455,24 @@ static PetscErrorCode mmsWriteH5(MPI_Comm comm, const char *dir, const char *fna
 }
 
 /**
- * @brief Level 3: re-solve at a set of mass-term scales to vary kappa(A).
+ * @brief Performs the MMS Level-3 conditioning study.
  *
- * Self-contained (its scale=1 point is the physical solve), so it is run instead
- * of the standard Level-1 pass. Writes one HDF5 file per scale,
- * {output_filename}_s<i>.h5, carrying omega_scale, the solve norms, and the
- * conditioning estimate (proj / residual / hi columns are set to -1).
+ * Reassembles and resolves the MMS problem for each mass-term scaling
+ * factor defined in MMS_COND_SCALES. For every solve, the routine
+ * computes discretization errors, estimates operator conditioning, and
+ * writes a dedicated HDF5 results file.
+ *
+ * The scale=1 case corresponds to the physical MMS problem, making the
+ * sweep self-contained and allowing it to replace the standard MMS
+ * verification workflow.
+ *
+ * @param[in] params        PETGEM runtime parameters.
+ * @param[in] sources       MMS source configuration.
+ * @param[in] dm            DMPlex mesh.
+ * @param[in] grid          Finite-element discretization information.
+ * @param[in] conductivity  Cell conductivity field.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
 static PetscErrorCode mmsConditioningSweep(const petgemParams params, CsemSourceSet sources,
                                            const DM dm, const Grid grid, const Vec conductivity) {
@@ -363,15 +516,32 @@ static PetscErrorCode mmsConditioningSweep(const petgemParams params, CsemSource
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
 /**
- * @brief Complete MMS verification for one (order, mesh). Single entry point.
+ * @brief Executes the complete MMS verification workflow.
  *
- * Level 1 (-mms): Galerkin solve + L2 projection, both error norms and the
- * solve residual -> one HDF5 file {output_filename}.h5.
- * Level 2 (-mms_diagnostics): also the over-integrated solve norms and the
- * kappa/floor conditioning probe (extra attributes in the same file).
- * Level 3 (-mms_conditioning): instead runs the mass-term scale sweep -> one
- * HDF5 file per scale, {output_filename}_s<i>.h5.
+ * Serves as the single entry point for all MMS validation modes.
+ *
+ * Standard MMS execution (Level 1) performs a Galerkin solve and an
+ * L2-projection solve, computes relative L2 and H(curl) errors, evaluates
+ * the solve residual, reports the results, and writes a single HDF5 file.
+ *
+ * With -mms_diagnostics enabled (Level 2), the routine additionally
+ * recomputes the solution norms using an over-integrated quadrature rule
+ * and estimates operator conditioning and the corresponding forward-error
+ * floor.
+ *
+ * With -mms_conditioning enabled (Level 3), the standard workflow is
+ * skipped and replaced by a mass-term scaling sweep performed by
+ * mmsConditioningSweep().
+ *
+ * @param[in] params        PETGEM runtime parameters.
+ * @param[in] dm            DMPlex mesh.
+ * @param[in] grid          Finite-element discretization information.
+ * @param[in] conductivity  Cell conductivity field.
+ * @param[in] sources       MMS source configuration.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
 PetscErrorCode runMMSVerification(const petgemParams params, const DM dm, const Grid grid,
                                   const Vec conductivity, const CsemSourceSet sources) {

@@ -11,6 +11,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 UNIT_CUBE = REPO_ROOT / "examples" / "unit_cube"
+#: Generated fm.csem input bundle (built into the case's outputs/ by preprocess).
+INPUT_BUNDLE = UNIT_CUBE / "outputs" / "input.h5"
 CSRC = REPO_ROOT / "tests" / "csrc"
 
 #: All orders validated at the FE-core level (levels 1-3, fast C harnesses).

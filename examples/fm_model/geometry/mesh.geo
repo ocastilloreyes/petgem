@@ -1,7 +1,6 @@
 /*********************************************************************
 *
-* canonical_model - Gmsh geometry for the PETGEM marine CSEM example
-* (http://petgem.bsc.es/)
+* fm_model - Gmsh geometry for the PETGEM marine CSEM example
 *
 * Canonical 3D controlled-source electromagnetic (CSEM) benchmark: a
 * thin, resistive hydrocarbon layer buried in conductive marine

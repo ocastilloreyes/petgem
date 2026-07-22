@@ -4,7 +4,7 @@
  * Date: 2026-05-20
  *
  * Description:
- * Centralized I/O and parameter parsing for both PETGEM kernels.
+ * Centralized I/O and parameter parsing for PETGEM kernels.
  */
 
 /* C libraries */
@@ -92,7 +92,7 @@ static void writeVtuCellField(FILE *fp, const char *name,
  * guarantees compatibility with visualization tools such as ParaView.
  */
 static const char *imVtuFieldNames[IM_VTU_NUM_FIELDS] = {
-  "rho_ohm_m"
+  "rho"
 };
 
 /**
@@ -237,7 +237,9 @@ PetscErrorCode writeRunProvenance(PetscViewer viewer, const petgemParams *params
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "order",           PETSC_INT,    &params->order));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "ksp_type",        PETSC_STRING, kspType));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "pc_type",         PETSC_STRING, pcType));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "mpi_tasks",       PETSC_INT,    &params->numMPITasks));
+  
+  PetscInt mpiTasks = (PetscInt)params->numMPITasks;
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "mpi_tasks",       PETSC_INT,    &mpiTasks));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "date",            PETSC_STRING, date));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -279,12 +281,10 @@ PetscErrorCode readPetgemParams(const PetscMPIInt size, petgemParams* pg_Params)
    * are skipped so a help run prints usage cleanly instead of aborting on a missing -input_filename. The caller exits after parsing in that case. */
   PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
 
-  /* Two PetscOptionsBegin/End groups so `-help` renders a clean "required"
-   * vs "optional" split (PETSc prints groups in registration order).
+  /* Two PetscOptionsBegin/End groups so `-help` renders a clean "required" vs "optional" split (PETSc prints groups in registration order).
    *
-   * These are the options COMMON to both kernels, so the groups are labelled
-   * "PETGEM", not "fm.csem": im.csem registers them through this same reader,
-   * and previously its -help presented them under an "fm.csem:" heading. */
+   * These are the options COMMON to both kernels, so the groups are labelled "PETGEM", not "fm.csem": im.csem registers them through this same 
+   * reader, and previously its -help presented them under an "fm.csem:" heading. */
   PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "PETGEM: required options", "PETGEM");
 
   PetscCall(PetscOptionsString("-input_filename", "[REQUIRED] Unified PETGEM input bundle (mesh, sigma, materials_id, receivers, sources)",
@@ -378,8 +378,7 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
   PetscCheck(pg_Params->inputFile[0] != '\0', PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL,
              "loadCsemInputs: pg_Params->inputFile is empty (set -input_filename).");
 
-  /* Phase 1: read mesh + sections + combined model vector (parallel I/O)
-   * Replicates the legacy importGrid behavior so downstream code          
+  /* Phase 1: read mesh + sections + combined model vector (parallel I/O). Replicates the legacy importGrid behavior so downstream code          
    * sees the same DMPlex / sub-DM / local-Vec configuration. */
   {
     PetscViewer  viewer;
@@ -414,12 +413,9 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
     }
     PetscCall(DMViewFromOptions(dm, NULL, "-load_dm_view"));
 
-    /* 2-field section: field 0 = conductivity (3 dofs/cell),
-     *                  field 1 = materials_id (1 dof/cell).
-     * DMSetNumFields is intentionally NOT called - for plain section-based
-     * DMs (no PetscFE/FV) it triggers DMCreateLocalSection_Plex which fails
-     * without a discretization object.  The 2-field layout is recovered
-     * from the loaded section directly. */
+    /* 2-field section: field 0 = conductivity (3 dofs/cell), field 1 = materials_id (1 dof/cell).
+     * DMSetNumFields is intentionally NOT called - for plain section-based DMs (no PetscFE/FV) it triggers DMCreateLocalSection_Plex which fails
+     * without a discretization object.  The 2-field layout is recovered from the loaded section directly. */
     PetscCall(DMPlexSectionLoad(dm, viewer, NULL, sfXC, &sfG, NULL));
 
     /* Combined global vector - 4 dofs/cell [sigma_x sigma_y sigma_z mat_id] */
@@ -435,8 +431,7 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
     PetscCall(PetscSFDestroy(&sfXC));
     PetscCall(PetscSFDestroy(&sfG));
 
-    /* Global -> local so ghosts (needed for closure walks across partition
-     * boundaries) are populated on every rank. */
+    /* Global -> local so ghosts (needed for closure walks across partition boundaries) are populated on every rank. */
     PetscCall(DMCreateLocalVector(dm, &combinedLocal));
     PetscCall(DMGlobalToLocal(dm, combinedGlobal, INSERT_VALUES, combinedLocal));
     PetscCall(VecDestroy(&combinedGlobal));
@@ -445,8 +440,7 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
     PetscCall(DMPlexGetChart(dm, &pStart, &pEnd));
     PetscCall(DMPlexGetHeightStratum(dm, 0, &cellStart, &cellEnd));
 
-    /* Conductivity sub-DM: clone dm, install a plain section with
-     * NUM_CONDUCTIVITY_COMPONENTS dofs/cell. */
+    /* Conductivity sub-DM: clone dm, install a plain section with NUM_CONDUCTIVITY_COMPONENTS dofs/cell. */
     PetscCall(DMClone(dm, &subDMSigma));
     PetscCall(PetscSectionCreate(PetscObjectComm((PetscObject)dm), &secSigma));
     PetscCall(PetscSectionSetChart(secSigma, pStart, pEnd));
@@ -499,8 +493,7 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
     PetscCall(DMDestroy(&subDMSigma));
     PetscCall(DMDestroy(&subDMMat));
 
-    /* Cloned DM is the public-facing handle; setupCsemGrid installs the
-     * H(curl) section on it without disturbing the original */
+    /* Cloned DM is the public-facing handle; setupCsemGrid installs the H(curl) section on it without disturbing the original */
     PetscCall(DMClone(dm, odm));
     PetscCall(DMDestroy(&dm));
 
@@ -517,18 +510,14 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
     }
   }
 
-  /* Phase 2: /order, receivers, and sources (rank-local serial I/O)  
-   * /order is always read so the caller does not need -order in the   
-   * pg_Params file. CLI -order (if set) overrides the bundle value, but 
-   * normally readPetgemParams leaves it at zero and the bundle wins */
+  /* Phase 2: /order, receivers, and sources (rank-local serial I/O) /order is always read so the caller does not need -order in the   
+   * pg_Params file. CLI -order (if set) overrides the bundle value, but normally readPetgemParams leaves it at zero and the bundle wins */
   {
     PetscViewer viewer;
-    PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, pg_Params->inputFile,
-                                  FILE_MODE_READ, &viewer));
+    PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, pg_Params->inputFile, FILE_MODE_READ, &viewer));
 
-    /* /order - single-element Vec. Bundle is the source of truth unless
-     * the caller explicitly set -order on the command line (pg_Params->order
-     * non-zero at entry). */
+    /* /order - single-element Vec. Bundle is the source of truth unless the caller explicitly set -order on the command line 
+    * (pg_Params->order non-zero at entry). */
     if (pg_Params->order <= 0) {
       Vec orderV;
       const PetscScalar *nArr;
@@ -553,8 +542,7 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
     if (sources) {
       Vec freqV, posV, curV, lenV, dipV, azV;
       PetscCall(PetscViewerHDF5PushGroup(viewer, "/sources"));
-      /* Unified /sources schema: per-entry frequency (one row per
-       * transmitter). Forward modeling is monochromatic - all entries
+      /* Unified /sources schema: per-entry frequency (one row per transmitter). Forward modeling is monochromatic - all entries
        * share the same frequency - so we use freq[0] for the whole set */
       PetscCall(loadSelfVecByName(viewer, "freq",         &freqV));
       PetscCall(loadSelfVecByName(viewer, "position",     &posV));
@@ -602,9 +590,9 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
       PetscCall(VecDestroy(&dipV));
       PetscCall(VecDestroy(&azV));
 
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n CSEM sources:\n"));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %g\n",                "Frequency (Hz)",    (double)sources->freq));
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %s\n", "Number of sources", formatGroupedInt(sources->numSources)));
+      PetscCall(logSection(PETSC_COMM_WORLD, "CSEM sources"));
+      PetscCall(logKVReal(PETSC_COMM_WORLD, "Frequency (Hz)", sources->freq));
+      PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of sources", sources->numSources));
       for (PetscInt i = 0; i < sources->numSources; i++) {
         const CsemSource *s = &sources->sourceArray[i];
         PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Source %" PetscInt_FMT ":\n", i + 1));
@@ -669,159 +657,87 @@ PetscErrorCode readimParams(imParams *im_Params)
   im_Params->rmsRelTol              = 1.0e-3;    /* <0.1% improvement/iter => plateau */
   im_Params->rmsStallWindow         = 3;
 
-  /* Retired option namespace: every im.csem option was renamed -inv_* ->
-   * -im_* to match the kernel, the imParams struct and the `petgem im`
-   * subcommand. PETSc silently ignores unknown options, so a params file
-   * still carrying the old spelling would otherwise run with default
-   * inversion settings and no indication that its tuning was dropped.
-   * Fail loudly instead, naming the replacement. */
-  {
-    static const char *retired[] = {                                  /* DRIFT_GUARD_ALLOW */
-      "-inv_max_iter",           "-inv_lbfgs_memory",  "-inv_lambda", /* DRIFT_GUARD_ALLOW */
-      "-inv_error_level",        "-inv_gtol",          "-inv_rms_tol",/* DRIFT_GUARD_ALLOW */
-      "-inv_rms_rtol",           "-inv_rms_stall_window",             /* DRIFT_GUARD_ALLOW */
-      "-inv_diag_weight",        "-inv_fixed_materials",              /* DRIFT_GUARD_ALLOW */
-      "-inv_snapshot_interval",  "-inv_observed_mode",                /* DRIFT_GUARD_ALLOW */
-      "-inv_observed_file"                                            /* DRIFT_GUARD_ALLOW */
-    };
-    for (size_t i = 0; i < sizeof(retired) / sizeof(retired[0]); i++) {
-      PetscBool present = PETSC_FALSE;
-      PetscCall(PetscOptionsHasName(NULL, NULL, retired[i], &present));
-      PetscCheck(!present, PETSC_COMM_WORLD, PETSC_ERR_ARG_WRONG,
-                 "Option %s was renamed to -im_%s. Update your params file "
-                 "(every -inv_* option is now -im_*).",
-                 retired[i], retired[i] + 5);
-    }
-  }
-
   /* Group every im.csem option under one PetscOptionsBegin/End block so
    * `-help` renders a structured "im.csem: inversion options" section,
    * printed after the shared "fm.csem: required/optional" groups that
    * readPetgemParams() registers. Note: -order is parsed (and range-validated)
    * once by readPetgemParams() into im_Params->common.order - the shared base both
    * kernels use - so it is intentionally NOT re-registered here. */
-  PetscOptionsBegin(PETSC_COMM_WORLD, NULL,
-                    "im.csem: inversion options (optional)", "PETGEM");
-  PetscCall(PetscOptionsInt   ("-im_max_iter",
-                               "Maximum L-BFGS iterations", "im.csem",
-                               im_Params->maxIter, &im_Params->maxIter, NULL));
-  PetscCall(PetscOptionsInt   ("-im_lbfgs_memory",
-                               "L-BFGS memory size M", "im.csem",
-                               im_Params->lbfgsMemory, &im_Params->lbfgsMemory, NULL));
-  PetscCall(PetscOptionsReal  ("-im_lambda",
-                               "Tikhonov regularisation weight", "im.csem",
-                               im_Params->lambda, &im_Params->lambda, NULL));
-  PetscCall(PetscOptionsReal  ("-im_error_level",
-                               "Relative data-error level (CLI overrides "
-                               "bundle /observed@error_level)", "im.csem",
-                               im_Params->errorLevel, &im_Params->errorLevel,
-                               &im_Params->errorLevelFromCLI));
-  PetscCall(PetscOptionsReal  ("-im_gtol",
-                               "Gradient-norm convergence tolerance",
-                               "im.csem",
-                               im_Params->gtol, &im_Params->gtol, NULL));
-  PetscCall(PetscOptionsReal  ("-im_rms_tol",
-                               "Absolute RMS early-stop threshold (0 = disabled)",
-                               "im.csem",
-                               im_Params->rmsTol, &im_Params->rmsTol, NULL));
-  PetscCall(PetscOptionsReal  ("-im_rms_rtol",
-                               "Relative RMS-improvement threshold for the "
-                               "plateau early stop (0 = disabled)", "im.csem",
+  PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "im.csem: inversion options (optional)", "PETGEM");
+  PetscCall(PetscOptionsInt("-im_max_iter", "Maximum L-BFGS iterations", "im.csem", im_Params->maxIter, &im_Params->maxIter, NULL));
+  PetscCall(PetscOptionsInt("-im_lbfgs_memory", "L-BFGS memory size M", "im.csem", im_Params->lbfgsMemory, &im_Params->lbfgsMemory, NULL));
+  PetscCall(PetscOptionsReal("-im_lambda", "Tikhonov regularisation weight", "im.csem", im_Params->lambda, &im_Params->lambda, NULL));
+  PetscCall(PetscOptionsReal("-im_error_level", "Relative data-error level (CLI overrides bundle /observed@error_level)", "im.csem",
+                               im_Params->errorLevel, &im_Params->errorLevel, &im_Params->errorLevelFromCLI));
+  PetscCall(PetscOptionsReal("-im_gtol", "Gradient-norm convergence tolerance", "im.csem", im_Params->gtol, &im_Params->gtol, NULL));
+  PetscCall(PetscOptionsReal("-im_rms_tol", "Absolute RMS early-stop threshold (0 = disabled)", "im.csem", im_Params->rmsTol, &im_Params->rmsTol, NULL));
+  PetscCall(PetscOptionsReal("-im_rms_rtol", "Relative RMS-improvement threshold for the plateau early stop (0 = disabled)", "im.csem",
                                im_Params->rmsRelTol, &im_Params->rmsRelTol, NULL));
-  PetscCall(PetscOptionsInt   ("-im_rms_stall_window",
-                               "Consecutive iterations below -im_rms_rtol "
-                               "required to declare an RMS plateau", "im.csem",
-                               im_Params->rmsStallWindow,
-                               &im_Params->rmsStallWindow, NULL));
-  PetscCall(PetscOptionsReal  ("-im_diag_weight",
-                               "Self-weight in the gradient smoother",
-                               "im.csem",
-                               im_Params->diagGradientWeight,
-                               &im_Params->diagGradientWeight, NULL));
-  PetscCall(PetscOptionsIntArray("-im_fixed_materials",
-                                 "Comma-separated list of material IDs "
-                                 "excluded from gradient smoothing "
-                                 "(CLI overrides bundle /im_meta/fixed_materials)",
-                                 "im.csem", im_Params->fixedMaterials,
-                                 &im_Params->numFixedMaterials,
-                                 &im_Params->fixedMaterialsFromCLI));
-  PetscCall(PetscOptionsInt   ("-im_snapshot_interval",
-                               "Write VTU snapshot every N accepted L-BFGS "
-                               "steps (0 = disabled)", "im.csem",
-                               im_Params->snapshotInterval,
-                               &im_Params->snapshotInterval, NULL));
+  PetscCall(PetscOptionsInt   ("-im_rms_stall_window", "Consecutive iterations below -im_rms_rtol required to declare an RMS plateau", "im.csem",
+                               im_Params->rmsStallWindow, &im_Params->rmsStallWindow, NULL));
+  PetscCall(PetscOptionsReal  ("-im_diag_weight", "Self-weight in the gradient smoother", "im.csem",
+                               im_Params->diagGradientWeight, &im_Params->diagGradientWeight, NULL));
+  PetscCall(PetscOptionsIntArray("-im_fixed_materials", "Comma-separated list of material IDs excluded from gradient smoothing (CLI overrides bundle /im_meta/fixed_materials)",
+                                 "im.csem", im_Params->fixedMaterials, &im_Params->numFixedMaterials, &im_Params->fixedMaterialsFromCLI));
+  PetscCall(PetscOptionsInt   ("-im_snapshot_interval", "Write VTU snapshot every N accepted L-BFGS steps (0 = disabled)", "im.csem",
+                               im_Params->snapshotInterval, &im_Params->snapshotInterval, NULL));
   {
     /* Observed-data abstraction: source schema + file. */
     const char *obsModes[] = {"external", "fm_native"};
     PetscInt    obsModeIdx = (PetscInt)im_Params->observedMode;
-    PetscCall(PetscOptionsEList("-im_observed_mode",
-                                "Observed-data source: 'external' "
-                                "(bundle /observed/Ex) or 'fm_native' "
-                                "(fm.csem /sources/src*/fields/Ex)", "im.csem",
-                                obsModes, 2, obsModes[obsModeIdx],
-                                &obsModeIdx, NULL));
+    PetscCall(PetscOptionsEList("-im_observed_mode", "Observed-data source: 'external' (bundle /observed/Ex) or 'fm_native' (fm.csem /sources/src*/fields/Ex)", 
+                                "im.csem", obsModes, 2, obsModes[obsModeIdx], &obsModeIdx, NULL));
     im_Params->observedMode = (ObservedDataMode)obsModeIdx;
-    PetscCall(PetscOptionsString("-im_observed_file",
-                                 "Observed-data file (default: the input "
-                                 "bundle for 'external'; required for "
-                                 "'fm_native')", "im.csem",
-                                 im_Params->observedFile,
-                                 im_Params->observedFile,
-                                 sizeof(im_Params->observedFile), NULL));
+    PetscCall(PetscOptionsString("-im_observed_file", "Observed-data file (default: the input bundle for 'external'; required for 'fm_native')", "im.csem",
+                                 im_Params->observedFile, im_Params->observedFile, sizeof(im_Params->observedFile), NULL));
   }
   PetscOptionsEnd();
 
-  /* A -help run has now printed the inversion option group; skip validation
-   * and the parameter summary so usage prints cleanly. The caller
+  /* A -help run has now printed the inversion option group; skip validation and the parameter summary so usage prints cleanly. The caller
    * (runInverse) exits right after parsing. */
   {
     PetscBool helpRequested = PETSC_FALSE;
     PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
-    if (helpRequested) PetscFunctionReturn(PETSC_SUCCESS);
+    if (helpRequested) {
+      PetscFunctionReturn(PETSC_SUCCESS);
+    }
   }
 
   /* -order is validated by readPetgemParams() (im_Params->common.order); no re-check here. */
   if (!im_Params->fixedMaterialsFromCLI) im_Params->numFixedMaterials = 0;
 
-  /* fm-native observed data lives in a forward responses file, not the
-   * bundle, so a path is mandatory in that mode. */
+  /* fm-native observed data lives in a forward responses file, not the bundle, so a path is mandatory in that mode. */
   PetscCheck(im_Params->observedMode != OBS_FM_NATIVE ||
              im_Params->observedFile[0] != '\0',
              PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL,
-             "-im_observed_mode fm_native requires -im_observed_file "
-             "(path to the fm.csem responses HDF5).");
+             "-im_observed_mode fm_native requires -im_observed_file (path to the fm.csem responses HDF5).");
 
-  /* numFreqs/imSources are populated later by setupInversionSources
-   * (from the unified bundle's /sources group). */
+  /* numFreqs/imSources are populated later by setupInversionSources (from the unified bundle's /sources group). */
   im_Params->numFreqs = 0;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
-  PetscCall(PetscPrintf(comm, "\n Inversion parameters:\n"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Basis order",       formatGroupedInt(im_Params->common.order)));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Max iterations",    formatGroupedInt(im_Params->maxIter)));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "L-BFGS memory (M)", formatGroupedInt(im_Params->lbfgsMemory)));
-  PetscCall(PetscPrintf(comm, "   %-24s = %g\n",                "Tikhonov lambda",   (double)im_Params->lambda));
+  PetscCall(logSection(comm, "Inversion parameters"));
+  /* Basis order comes from the bundle (loaded after this block, so it is not yet known here); it is reported once in the shared "FEM space" block,
+   * matching fm.csem. */
+  PetscCall(logKVInt(comm, "Max iterations", im_Params->maxIter));
+  PetscCall(logKVInt(comm, "L-BFGS memory (M)", im_Params->lbfgsMemory));
+  PetscCall(logKVReal(comm, "Tikhonov lambda", im_Params->lambda));
 
-  /* error_level and fixed_materials are printed by
-   * loadInversionMetaFromBundle after bundle resolution (so the line
-   * reflects the final value used by the kernel, including bundle
-   * overrides). */
+  /* error_level and fixed_materials are printed by loadInversionMetaFromBundle after bundle resolution (so the line
+   * reflects the final value used by the kernel, including bundle overrides). */
   if (im_Params->rmsTol > 0.0) {
-    PetscCall(PetscPrintf(comm, "   %-24s = %g\n", "RMS early-stop", (double)im_Params->rmsTol));
+    PetscCall(logKVReal(comm, "RMS early-stop", im_Params->rmsTol));
   }
   else {
-    PetscCall(PetscPrintf(comm, "   %-24s = disabled\n", "RMS early-stop"));
+    PetscCall(logKVStr(comm, "RMS early-stop", "disabled"));
   }
   if (im_Params->snapshotInterval > 0) {
-    PetscCall(PetscPrintf(comm, "   %-24s = every %s accepted L-BFGS step(s)\n",
-                          "VTU snapshot", formatGroupedInt(im_Params->snapshotInterval)));
+    PetscCall(logKVf(comm, "VTU snapshot", "every %s accepted L-BFGS step(s)", formatGroupedInt(im_Params->snapshotInterval)));
   }
   else {
-    PetscCall(PetscPrintf(comm, "   %-24s = disabled\n", "VTU snapshot"));
+    PetscCall(logKVStr(comm, "VTU snapshot", "disabled"));
   }
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Observed data mode",
-                        im_Params->observedMode == OBS_FM_NATIVE ? "fm_native"
-                                                                 : "external"));
+  PetscCall(logKVStr(comm, "Observed data mode", im_Params->observedMode == OBS_FM_NATIVE ? "fm_native" : "external"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -926,9 +842,9 @@ PetscErrorCode setupInversionSources(const char *bundleFile,
 
   /* Print parsed source data */
   MPI_Comm comm = PETSC_COMM_WORLD;
-  PetscCall(PetscPrintf(comm, "\n Inversion sources:\n"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Bundle file",       bundleFile));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Number of entries", formatGroupedInt(im_Params->numFreqs)));
+  PetscCall(logSection(comm, "Inversion sources"));
+  PetscCall(logKVStr(comm, "Bundle file", bundleFile));
+  PetscCall(logKVInt(comm, "Number of entries", im_Params->numFreqs));
 
   for (PetscInt i = 0; i < im_Params->numFreqs; i++) {
     ImCsemSource *s = &im_Params->imSources[i];
@@ -1013,8 +929,7 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
       hid_t file = -1;
       PetscCall(PetscViewerHDF5GetFileId(viewer, &file));
       hid_t dset = H5Dopen2(file, "/im_meta/fixed_materials", H5P_DEFAULT);
-      PetscCheck(dset >= 0, comm, PETSC_ERR_FILE_READ,
-                 "/im_meta/fixed_materials present but H5Dopen2 failed");
+      PetscCheck(dset >= 0, comm, PETSC_ERR_FILE_READ, "/im_meta/fixed_materials present but H5Dopen2 failed");
       hid_t   sp = H5Dget_space(dset);
       hsize_t dims[1] = {0};
       H5Sget_simple_extent_dims(sp, dims, NULL);
@@ -1026,7 +941,9 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
       int *buf;
       PetscCall(PetscMalloc1(n, &buf));
       H5Dread(dset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
-      for (PetscInt i = 0; i < n; i++) im_Params->fixedMaterials[i] = (PetscInt)buf[i];
+      for (PetscInt i = 0; i < n; i++) {
+        im_Params->fixedMaterials[i] = (PetscInt)buf[i];
+      }
       im_Params->numFixedMaterials = n;
       PetscCall(PetscFree(buf));
       H5Sclose(sp);
@@ -1038,13 +955,11 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
   PetscCall(PetscViewerDestroy(&viewer));
 
   /* Final-value banner (matches the style of readimParams) */
-  PetscCall(PetscPrintf(comm, "   %-24s = %g  (%s)\n",
-                        "Error level", (double)im_Params->errorLevel, errLevelOrigin));
-  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " IDs (%s):",
-                        "Fixed materials", im_Params->numFixedMaterials, fixedMatsOrigin));
-  for (PetscInt i = 0; i < im_Params->numFixedMaterials; i++)
-    PetscCall(PetscPrintf(comm, " %" PetscInt_FMT,
-                          im_Params->fixedMaterials[i]));
+  PetscCall(logKVf(comm, "Error level", "%g  (%s)", (double)im_Params->errorLevel, errLevelOrigin));
+  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " IDs (%s):", "Fixed materials", im_Params->numFixedMaterials, fixedMatsOrigin));
+  for (PetscInt i = 0; i < im_Params->numFixedMaterials; i++) {
+    PetscCall(PetscPrintf(comm, " %" PetscInt_FMT, im_Params->fixedMaterials[i]));
+  }
   PetscCall(PetscPrintf(comm, "\n"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1084,31 +999,26 @@ PetscErrorCode loadObservedData(const char *bundleFile,
 
   PetscCallMPI(MPI_Comm_rank(comm, &rank));
 
-  PetscCheck(bundleFile && bundleFile[0] != '\0', comm, PETSC_ERR_ARG_NULL,
-             "loadObservedData: bundleFile is empty.");
+  PetscCheck(bundleFile && bundleFile[0] != '\0', comm, PETSC_ERR_ARG_NULL, "loadObservedData: bundleFile is empty.");
 
   /* Create sequential dense matrix (all ranks) */
-  PetscCall(MatCreateDense(PETSC_COMM_SELF, numFreqs, numReceivers,
-                           numFreqs, numReceivers, NULL, dObs));
+  PetscCall(MatCreateDense(PETSC_COMM_SELF, numFreqs, numReceivers, numFreqs, numReceivers, NULL, dObs));
   PetscCall(MatZeroEntries(*dObs));
 
   /* Only rank 0 reads the HDF5 file, then broadcasts */
   if (rank == 0) {
     hid_t file_id = H5Fopen(bundleFile, H5F_ACC_RDONLY, H5P_DEFAULT);
-    PetscCheck(file_id >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN,
-               "Cannot open bundle HDF5 file: %s", bundleFile);
+    PetscCheck(file_id >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "Cannot open bundle HDF5 file: %s", bundleFile);
 
     /* Open /observed/Ex dataset (complex128 compound type {r, i}) */
     hid_t dset = H5Dopen2(file_id, "/observed/Ex", H5P_DEFAULT);
-    PetscCheck(dset >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-               "Cannot find /observed/Ex dataset in %s", bundleFile);
+    PetscCheck(dset >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "Cannot find /observed/Ex dataset in %s", bundleFile);
 
     /* Verify dimensions [numFreqs x numReceivers] */
     hid_t   space = H5Dget_space(dset);
     int     ndims = H5Sget_simple_extent_ndims(space);
     hsize_t dims[2];
-    PetscCheck(ndims == 2, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-               "/observed/Ex must be 2D, got %d dimensions", ndims);
+    PetscCheck(ndims == 2, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "/observed/Ex must be 2D, got %d dimensions", ndims);
     H5Sget_simple_extent_dims(space, dims, NULL);
     PetscCheck((PetscInt)dims[0] == numFreqs &&
                (PetscInt)dims[1] == numReceivers,
@@ -1138,9 +1048,7 @@ PetscErrorCode loadObservedData(const char *bundleFile,
     /* Fill Mat from row-major buffer */
     for (PetscInt ifre = 0; ifre < numFreqs; ifre++) {
       for (PetscInt irec = 0; irec < numReceivers; irec++) {
-        PetscCall(MatSetValue(*dObs, ifre, irec,
-                              buf[ifre * numReceivers + irec],
-                              INSERT_VALUES));
+        PetscCall(MatSetValue(*dObs, ifre, irec, buf[ifre * numReceivers + irec], INSERT_VALUES));
       }
     }
     PetscCall(PetscFree(buf));
@@ -1158,7 +1066,9 @@ PetscErrorCode loadObservedData(const char *bundleFile,
   if (rank == 0) {
     const PetscScalar *arr;
     PetscCall(MatDenseGetArrayRead(*dObs, &arr));
-    for (PetscInt i = 0; i < totalElems; i++) bcast[i] = arr[i];
+    for (PetscInt i = 0; i < totalElems; i++) { 
+      bcast[i] = arr[i];
+    }
     PetscCall(MatDenseRestoreArrayRead(*dObs, &arr));
   }
   PetscCallMPI(MPI_Bcast(bcast, totalElems, MPIU_SCALAR, 0, comm));
@@ -1166,18 +1076,20 @@ PetscErrorCode loadObservedData(const char *bundleFile,
   if (rank != 0) {
     PetscScalar *arr;
     PetscCall(MatDenseGetArray(*dObs, &arr));
-    for (PetscInt i = 0; i < totalElems; i++) arr[i] = bcast[i];
+    for (PetscInt i = 0; i < totalElems; i++) {
+      arr[i] = bcast[i];
+    }
     PetscCall(MatDenseRestoreArray(*dObs, &arr));
     PetscCall(MatAssemblyBegin(*dObs, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(*dObs, MAT_FINAL_ASSEMBLY));
   }
   PetscCall(PetscFree(bcast));
 
-  PetscCall(PetscPrintf(comm, "\n Observed data:\n"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Source",       "external (/observed/Ex)"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "File",         bundleFile));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Frequencies",  formatGroupedInt(numFreqs)));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Receivers",    formatGroupedInt(numReceivers)));
+  PetscCall(logSection(comm, "Observed data"));
+  PetscCall(logKVStr(comm, "Source", "external (/observed/Ex)"));
+  PetscCall(logKVStr(comm, "File", bundleFile));
+  PetscCall(logKVInt(comm, "Frequencies", numFreqs));
+  PetscCall(logKVInt(comm, "Receivers", numReceivers));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1185,12 +1097,10 @@ PetscErrorCode loadObservedData(const char *bundleFile,
 /**
  * @brief OBS_FM_NATIVE backend: read per-source Ex from an fm.csem file.
  *
- * Counterpart to loadObservedData() that consumes the forward kernel's native
- * output schema (/sources/src{k}/fields/Ex PETSc Vecs) instead of the
- * pre-reshaped /observed/Ex dataset. Source k (1-based) maps to frequency row
- * k-1 of the returned dense Mat. Every rank opens the COMM_SELF viewer and
- * VecLoads each row independently, so the resulting PETSC_COMM_SELF Mat is
- * identical on all ranks (mirroring loadObservedData's post-broadcast state).
+ * Counterpart to loadObservedData() that consumes the forward kernel's native output schema (/sources/src{k}/fields/Ex PETSc Vecs) instead of
+ * the pre-reshaped /observed/Ex dataset. Source k (1-based) maps to frequency row k-1 of the returned dense Mat. Every rank opens the COMM_SELF 
+ * viewer and VecLoads each row independently, so the resulting PETSC_COMM_SELF Mat is identical on all ranks (mirroring loadObservedData's 
+ * post-broadcast state).
  *
  * See the inversion.h prototype for parameter semantics.
  */
@@ -1203,12 +1113,10 @@ PetscErrorCode loadObservedFmNative(const char *responsesFile,
 
   MPI_Comm comm = PETSC_COMM_WORLD;
 
-  PetscCheck(responsesFile && responsesFile[0] != '\0', comm, PETSC_ERR_ARG_NULL,
-             "loadObservedFmNative: responsesFile is empty.");
+  PetscCheck(responsesFile && responsesFile[0] != '\0', comm, PETSC_ERR_ARG_NULL, "loadObservedFmNative: responsesFile is empty.");
 
   /* Sequential dense Mat on every rank (same layout the external path yields). */
-  PetscCall(MatCreateDense(PETSC_COMM_SELF, numFreqs, numReceivers,
-                           numFreqs, numReceivers, NULL, dObs));
+  PetscCall(MatCreateDense(PETSC_COMM_SELF, numFreqs, numReceivers, numFreqs, numReceivers, NULL, dObs));
   PetscCall(MatZeroEntries(*dObs));
 
   PetscViewer viewer;
@@ -1216,8 +1124,7 @@ PetscErrorCode loadObservedFmNative(const char *responsesFile,
 
   for (PetscInt ifre = 0; ifre < numFreqs; ifre++) {
     char groupPath[PETSC_MAX_PATH_LEN];
-    PetscCall(PetscSNPrintf(groupPath, sizeof(groupPath),
-                            "/sources/src%" PetscInt_FMT "/fields", ifre + 1));
+    PetscCall(PetscSNPrintf(groupPath, sizeof(groupPath), "/sources/src%" PetscInt_FMT "/fields", ifre + 1));
     PetscCall(PetscViewerHDF5PushGroup(viewer, groupPath));
 
     Vec exV;
@@ -1243,11 +1150,11 @@ PetscErrorCode loadObservedFmNative(const char *responsesFile,
   PetscCall(MatAssemblyBegin(*dObs, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(*dObs, MAT_FINAL_ASSEMBLY));
 
-  PetscCall(PetscPrintf(comm, "\n Observed data:\n"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Source",       "fm-native (/sources/src*/fields/Ex)"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "File",         responsesFile));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Frequencies",  formatGroupedInt(numFreqs)));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Receivers",    formatGroupedInt(numReceivers)));
+  PetscCall(logSection(comm, "Observed data"));
+  PetscCall(logKVStr(comm, "Source", "fm-native (/sources/src*/fields/Ex)"));
+  PetscCall(logKVStr(comm, "File", responsesFile));
+  PetscCall(logKVInt(comm, "Frequencies", numFreqs));
+  PetscCall(logKVInt(comm, "Receivers", numReceivers));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1320,25 +1227,21 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
 
   MPI_Comm comm = PetscObjectComm((PetscObject)dmConductivity);
 
-  /* Output path: composed by the shared builder from the parameters already
-   * parsed (and validated as required) by readPetgemParams. Re-reading
-   * -output_dir / -output_filename from the options database here would
-   * duplicate that parse and its required-checks. */
+  /* Output path: composed by the shared builder from the parameters already parsed (and validated as required) by readPetgemParams. Re-reading
+   * -output_dir / -output_filename from the options database here would duplicate that parse and its required-checks. */
   char outFile[PETSC_MAX_PATH_LEN];
   PetscCall(buildOutputPath(&im_Params->common, ".h5", outFile, sizeof(outFile)));
 
-  PetscCall(PetscPrintf(comm, "\n Inversion output:\n"));
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Output file", outFile));
+  PetscCall(logSection(comm, "Inversion output"));
+  PetscCall(logKVStr(comm, "Output file", outFile));
 
   /* Scatter local conductivity to global for output */
   Vec globalConductivity;
   PetscCall(DMCreateGlobalVector(dmConductivity, &globalConductivity));
   PetscCall(DMLocalToGlobal(dmConductivity, conductivity, INSERT_VALUES, globalConductivity));
 
-  /* Create plain MPI Vec copies (no DM association) for HDF5 output.
-   * The dmConductivity section has numComp=3 but 4 DOFs/cell, so
-   * VecView_Plex_HDF5 would fail with a block-size mismatch.
-   * Writing through plain Vecs avoids that. */
+  /* Create plain MPI Vec copies (no DM association) for HDF5 output. The dmConductivity section has numComp=3 but 4 vertex/cell, so
+   * VecView_Plex_HDF5 would fail with a block-size mismatch. Writing through plain Vecs avoids that. */
   PetscInt localSize, globalSize;
   Vec outRes, outX;
 
@@ -1361,10 +1264,8 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
   PetscCall(VecView(outRes, viewer));
   PetscCall(VecView(outX, viewer));
 
-  /* Root provenance attributes. The common block (version, simulation type,
-   * input bundle, order, solver, tasks, date) is the SAME one fm.csem writes,
-   * emitted by the shared writer under identical names; only the
-   * inversion-specific attributes below are added here. */
+  /* Root provenance attributes. The common block (version, simulation type, input bundle, order, solver, tasks, date) is the SAME one fm.csem writes,
+   * emitted by the shared writer under identical names; only the inversion-specific attributes below are added here. */
   PetscCall(writeRunProvenance(viewer, &im_Params->common, PETGEM_SIM_IM));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "num_frequencies",    PETSC_INT,    &im_Params->numFreqs));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "lambda",             PETSC_REAL,   &im_Params->lambda));
@@ -1372,8 +1273,7 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "num_iterations",     PETSC_INT,    &numIters));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "convergence_reason", PETSC_STRING, reasonStr));
 
-  /* Write RMS history as an MPI Vec so all ranks participate in the
-   * collective VecView.  Only rank 0 owns the data (size numIters);
+  /* Write RMS history as an MPI Vec so all ranks participate in the collective VecView.  Only rank 0 owns the data (size numIters);
    * all other ranks contribute zero entries */
   if (numIters > 0) {
     PetscMPIInt rank;
@@ -1387,8 +1287,9 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
     if (rank == 0) {
       PetscScalar *rArr;
       PetscCall(VecGetArray(rmsVec, &rArr));
-      for (PetscInt i = 0; i < numIters; i++)
+      for (PetscInt i = 0; i < numIters; i++) {
         rArr[i] = allRMS[i];
+      }
       PetscCall(VecRestoreArray(rmsVec, &rArr));
     }
 
@@ -1401,8 +1302,7 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
   PetscCall(VecDestroy(&outX));
   PetscCall(VecDestroy(&globalConductivity));
 
-  PetscCall(PetscPrintf(comm, "   %-24s = conductivity, log_perturbation, rms_history\n",
-                        "Datasets written"));
+  PetscCall(logKVStr(comm, "Datasets written", "conductivity, log_perturbation, rms_history"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1420,7 +1320,7 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
  * point renumbering.
  *
  * The snapshot carries a single cell-centered scalar field:
- *   - rho_ohm_m      : 1 / sigma_x (conductivity-derived resistivity)
+ *   - rho            : 1 / sigma_x (conductivity-derived resistivity, Ohm.m)
  *
  * Output structure:
  *   - {output_filename}_iterXXXXX.pvtu       (master file, rank 0)
@@ -1446,10 +1346,8 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx, PetscInt a
   PetscCallMPI(MPI_Comm_rank(comm, &rank));
   PetscCallMPI(MPI_Comm_size(comm, &size));
 
-  /* Snapshot names derive from the run's output stem, exactly like the
-   * kernels' .h5 products, instead of a hardcoded "inv_model" prefix - so a
-   * snapshot is attributable to its run and two runs writing to the same
-   * directory do not overwrite each other. The parameters were already
+  /* Snapshot names derive from the run's output stem, exactly like the kernels' .h5 products, instead of a hardcoded "inv_model" prefix - so a
+   * snapshot is attributable to its run and two runs writing to the same directory do not overwrite each other. The parameters were already
    * parsed by readPetgemParams; no re-read of the options database here.
    *
    *   {output_dir}/{output_filename}_iterNNNNN.pvtu        (master, rank 0)
@@ -1467,9 +1365,7 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx, PetscInt a
   PetscCall(buildOutputPath(pg, suffix, pieceFile, sizeof(pieceFile)));
 
   /* Per-owned-cell field values + exploded vertex coordinates.
-   * The VTU snapshot carries only the recovered model rho_ohm_m = 1/sigma;
-   * the former MATLAB-parity diagnostic fields (X_pre_smooth, X_post_smooth,
-   * DfDm_raw, DfDm_final) were output-only and have been removed. */
+   * The VTU snapshot carries only the recovered model rho = 1/sigma */
   PetscReal *rho, *coords;
   PetscCall(PetscCalloc1(nOwned, &rho));
   PetscCall(PetscCalloc1(12 * nOwned, &coords));
@@ -1503,10 +1399,8 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx, PetscInt a
     PetscCall(writeVtuPiece(pieceFile, nOwned, coords, fields));
   }
 
-  /* Rank 0 writes the .pvtu master after all pieces exist 
-     Holds only field/topology declarations + one <Piece Source=.../> per
-     rank (O(numRanks) text, no field data). The barrier guarantees every
-     piece file is on disk before the master that references them */
+  /* Rank 0 writes the .pvtu master after all pieces exist. Holds only field/topology declarations + one <Piece Source=.../> per
+     rank (O(numRanks) text, no field data). The barrier guarantees every piece file is on disk before the master that references them */
   PetscCallMPI(MPI_Barrier(comm));
   if (rank == 0) {
     FILE *fp = fopen(pvtuFile, "w");
@@ -1524,11 +1418,11 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx, PetscInt a
     fprintf(fp, "      <PDataArray type=\"UInt8\" Name=\"types\"/>\n");
     fprintf(fp, "    </PCells>\n");
     fprintf(fp, "    <PCellData Scalars=\"%s\">\n", imVtuFieldNames[0]);
-    for (PetscInt f = 0; f < IM_VTU_NUM_FIELDS; f++)
+    for (PetscInt f = 0; f < IM_VTU_NUM_FIELDS; f++) {
       fprintf(fp, "      <PDataArray type=\"Float64\" Name=\"%s\"/>\n", imVtuFieldNames[f]);
+    }
     fprintf(fp, "    </PCellData>\n");
-    /* Piece names must match the ones each rank writes above - same stem,
-     * same pattern - or ParaView cannot resolve the pieces. */
+    /* Piece names must match the ones each rank writes above - same stem, same pattern - or ParaView cannot resolve the pieces. */
     for (PetscMPIInt r = 0; r < size; r++) {
       char rBase[PETSC_MAX_PATH_LEN];
       PetscCall(PetscSNPrintf(rBase, sizeof(rBase),

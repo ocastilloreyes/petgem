@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-canonical_model - CSEM example validation script.
+fm_model - CSEM example validation script.
 
 Compares the PETGEM Ex response for this canonical marine CSEM model
 (see mesh.geo / README.md) against a precomputed reference solution and
@@ -18,12 +18,12 @@ petgem.readBundle / petgem.readResponses / petgem.readVectorH5; only the
 comparison and plot live here.
 
 Usage:
-    python3 examples/canonical_model/postprocess.py \\
-        [-responses_filename responses_p<order>.h5] \\  # default from bundle order
-        [-case_dir DIR]    \\  # default: directory of this script
-        [-input_filename input.h5] \\
-        [-reference_filename reference.h5] \\
-        [-figure_filename figure.png] \\
+    python3 examples/fm_model/scripts/postprocess.py \\
+        [-responses_filename outputs/responses_p<order>.h5] \\  # default from bundle order
+        [-case_dir DIR]    \\  # default: the example root (scripts/'s parent)
+        [-input_filename outputs/input.h5] \\
+        [-reference_filename reference/reference.h5] \\
+        [-figure_filename outputs/figure.png] \\
         [-tolerance 0.03]
 """
 import argparse
@@ -37,23 +37,24 @@ import numpy as np
 import petgem
 
 
-# Default case dir = the directory this script lives in, so callers running
-# it directly never need to repeat that path with -case_dir.
+# Default case dir = the example root (this script lives in <case>/scripts/),
+# so callers running it directly never need to repeat that path with -case_dir.
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CASE_NAME = os.path.basename(SCRIPT_DIR)
+CASE_DIR = os.path.dirname(SCRIPT_DIR)
+CASE_NAME = os.path.basename(CASE_DIR)
 
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("-case_dir",           default=SCRIPT_DIR,
-                   help="Directory holding the bundle / responses / reference "
-                        "files. Default: directory of this script.")
-    p.add_argument("-input_filename",     default="input.h5")
+    p.add_argument("-case_dir",           default=CASE_DIR,
+                   help="Example root holding outputs/ (bundle + responses) and "
+                        "reference/. Default: the parent of this script's dir.")
+    p.add_argument("-input_filename",     default="outputs/input.h5")
     p.add_argument("-responses_filename", default=None,
-                   help="Responses HDF5. Default: responses_p<order>.h5, "
-                        "the name the preprocess/kernel produce for the "
-                        "bundle's order.")
-    p.add_argument("-reference_filename", default="reference.h5")
+                   help="Responses HDF5 (relative to -case_dir). Default: "
+                        "outputs/responses_p<order>.h5, the name the "
+                        "preprocess/kernel produce for the bundle's order.")
+    p.add_argument("-reference_filename", default="reference/reference.h5")
     p.add_argument("-figure_filename",    default=None)
     p.add_argument("-tolerance",          type=float, default=0.03)
     return p.parse_args()
@@ -69,9 +70,9 @@ def main():
     order      = bundle['order']
     x_coords  = bundle['receivers'][:, 0]
 
-    # Responses default to the fixed responses_p<order>.h5 convention, so a
-    # bare run needs no -responses_filename; the order comes from the bundle.
-    responses_name = args.responses_filename or f"responses_p{order}.h5"
+    # Responses default to the fixed outputs/responses_p<order>.h5 convention,
+    # so a bare run needs no -responses_filename; the order comes from the bundle.
+    responses_name = args.responses_filename or f"outputs/responses_p{order}.h5"
     responses_path = os.path.join(args.case_dir, responses_name)
     responses = petgem.readResponses(responses_path)
     Ex        = responses['Ex']
@@ -86,7 +87,7 @@ def main():
     print(f"  Relative L2 error : {metrics['rel_l2']:.6e}")
     print(f"  MAPE (%)          : {metrics['mape']:.6e}")
 
-    fig_name = args.figure_filename or f"figure_p{order}.png"
+    fig_name = args.figure_filename or f"outputs/figure_p{order}.png"
     fig_path = os.path.join(args.case_dir, fig_name)
     matplotlib.rcParams['font.family'] = 'Serif'
     plt.figure(figsize=(8, 4))

@@ -208,7 +208,7 @@ stem::
     {output_dir}/{output_filename}_iter00001.pvtu          (master)
     {output_dir}/{output_filename}_iter00001_p0000.vtu     (one piece per rank)
 
-Each snapshot carries a single cell field, ``rho_ohm_m``.
+Each snapshot carries a single cell field, ``rho`` (resistivity in Ohm.m).
 
 Python readers:
 
@@ -217,5 +217,5 @@ Python readers:
 - ``petgem.readAllResponses(path)`` - ``{'provenance': ..., 'num_sources': N,
   'sources': {1: {...}, ...}}``, each entry shaped like ``readResponses``.
 
-``examples/canonical_model/postprocess.py`` uses these readers to compare
+``examples/fm_model/scripts/postprocess.py`` uses these readers to compare
 against a reference.

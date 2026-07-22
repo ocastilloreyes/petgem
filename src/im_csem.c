@@ -14,7 +14,7 @@ static char imHelp[] =
 ================================================================\n\
 \n\
  Recovers a 3-D conductivity model from CSEM data by L-BFGS with\n\
- an adjoint-state gradient (PETSc, Nedelec FEM).\n\
+ an adjoint-state gradient.\n\
 \n\
 QUICK START\n\
   mpirun -n <np> ./im.csem -options_file params.txt -output_dir out/\n\
@@ -42,8 +42,7 @@ OPTIONAL  (inversion control; defaults in brackets)\n\
   -im_observed_file <f>      Observed-data file (req. fm_native)\n\
 \n\
  Every inversion option is -im_* (matching this kernel and the\n\
- `petgem im` subcommand). The former -inv_* spelling is retired\n\
- and is rejected with an error naming its replacement.\n\
+ `petgem im` subcommand). \n\
 \n\
 EXAMPLES\n\
   mpirun -n 56 ./im.csem -options_file params_p1.txt -output_dir out/\n\
@@ -141,12 +140,6 @@ int runInverse(int argc, char **argv) {
   /* ---------------------------------------------------------------- */
   /* Register the im.csem phase stages with PETSc's logging system    */
   /* ---------------------------------------------------------------- */
-  /* Same six stages, in the same order and under the same names as
-   * fm.csem, so -log_view produces a directly comparable stage table for
-   * both kernels. The inversion driver spans assembly + solve +
-   * postprocessing in a single call, so it is wrapped as the "Linear solve"
-   * outer stage; its internal split is reported through the timers table
-   * below (tAssembly / tSolver, populated by runCsemInversion). */
   PetscCall(PetscLogStageRegister("Read parameters",     &stage_parse));
   PetscCall(PetscLogStageRegister("Load input bundle",   &stage_load));
   PetscCall(PetscLogStageRegister("Setup grid",          &stage_grid));
@@ -165,7 +158,9 @@ int runInverse(int argc, char **argv) {
   Extrae_event(1000, 2);
 #endif
 
-  if (!helpRequested) PetscCall(printHeader());
+  if (!helpRequested) {
+    PetscCall(printHeader());
+  }
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -193,11 +188,9 @@ int runInverse(int argc, char **argv) {
     return 0;
   }
 
-  /* Pull case-property defaults out of the bundle (error_level,
-   * fixed_materials) - CLI overrides applied by readimParams
-   * already take precedence via the *FromCLI provenance flags. The bundle
-   * path is the shared base's input file (iparams.common.inputFile). Runs after
-   * the -help exit above (it opens the bundle) and folds into the same
+  /* Pull case-property defaults out of the bundle (error_level, fixed_materials) - CLI overrides applied by readimParams
+   * already take precedence via the *FromCLI provenance flags. The bundle path is the shared base's input file 
+   * (iparams.common.inputFile). Runs after the -help exit above (it opens the bundle) and folds into the same
    * "Read parameters" bucket. */
   PetscCall(PetscLogStagePush(stage_parse));
   PetscCall(PetscTime(&start_timer));
@@ -213,13 +206,6 @@ int runInverse(int argc, char **argv) {
   /* ----------------------------------------------------------------------- */
   /* Load input data: mesh, conductivity, materials_id, sources, receivers   */
   /* ----------------------------------------------------------------------- */
-  /* loadCsemInputs is passed NULL for its forward CsemSourceSet - the inverse
-   * kernel reads the same /sources group into its multi-frequency
-   * imSources[] via setupInversionSources. The observed Ex dataset is read
-   * later (once numReceivers is known) by loadObservedDataset inside
-   * runCsemInversion. Basis order is single-source: loadCsemInputs fills
-   * iparams.common.order from the bundle's /order when the user did not pass
-   * -order (sentinel 0). */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 4);
 #endif
@@ -265,9 +251,7 @@ int runInverse(int argc, char **argv) {
 
   PetscCall(PetscLogStagePush(stage_solve));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(runCsemInversion(&iparams,
-                             dm, &grid, conductivity, materials_id,
-                             receivers, &tAssembly, &tSolver));
+  PetscCall(runCsemInversion(&iparams, dm, &grid, conductivity, materials_id, receivers, &tAssembly, &tSolver));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
 
@@ -275,11 +259,10 @@ int runInverse(int argc, char **argv) {
   Extrae_event(1000, 0);
 #endif
 
-  /* Split the inversion wall time across the same six buckets fm.csem uses,
-   * so printTimers labels them consistently for both kernels. tAssembly and
-   * tSolver are accumulated inside the L-BFGS loop (Ms refill + A build, and
-   * factorize + forward/adjoint solves); the remainder (gradient, smoothing,
-   * line search, results I/O, L-BFGS overhead) lands in the last bucket. */
+  /* Split the inversion wall time across the same six buckets fm.csem uses, so printTimers labels them consistently 
+   * for both kernels. tAssembly and tSolver are accumulated inside the L-BFGS loop (Ms refill + A build, and
+   * factorize + forward/adjoint solves); the remainder (gradient, smoothing, line search, results I/O, 
+   * L-BFGS overhead) lands in the last bucket. */
   timers[3] = tAssembly;
   timers[4] = tSolver;
   timers[5] = (end_timer - start_timer) - tAssembly - tSolver;

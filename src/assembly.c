@@ -4,8 +4,7 @@
  * Date: 2026-02-03
  *
  * Description:
- * This file contains functions for assembling the linear system
- * (CSEM) in a PETGEM simulation.
+ * This file contains functions for assembling the linear system (CSEM) in a PETGEM simulation.
  */
 
 /* PETSc libraries */
@@ -20,6 +19,41 @@
 #include "io.h"
 #include "mms.h"
 #include "transmitter.h"
+
+
+/**
+ * @brief Verifies that a cell's discrete gradient lies in the stiffness kernel.
+ *
+ * This function checks the De Rham identity K_e G_e = 0 for one cell: with M the
+ * m x m elemental stiffness (Ke) and G the m x n discrete gradient (both
+ * row-major), it forms every entry of the product M·G and reports, via a printed
+ * message, any (i, j) whose value is not within PETSC_SMALL of zero. It is a
+ * read-only diagnostic: no matrix is modified and a non-zero product does not
+ * abort the run.
+ *
+ * @param[in] M  Elemental stiffness matrix Ke (m x m, row-major).
+ * @param[in] G  Discrete gradient block (m x n, row-major).
+ * @param[in] m  Number of H(curl) DOFs per cell (rows of M and G).
+ * @param[in] n  Number of H1 DOFs per cell (columns of G).
+ * @param[in] w  Cell index, used only to label diagnostic messages.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode checkGradientKernel(PetscReal *M, PetscReal *G, PetscInt m, PetscInt n, PetscInt w)
+{
+   PetscFunctionBeginUser;
+   for (PetscInt i = 0; i < m; i++) {
+     for (PetscInt j = 0; j < n; j++) {
+       PetscReal v = 0;
+       for (PetscInt k = 0; k < m; k++) {
+         // M is m x m, G is m x n
+         v += M[i*m + k] * G[k * n + j];
+       }
+       if (!PetscIsCloseAtTol(v, 0, 0, PETSC_SMALL)) PetscCall(PetscPrintf(PETSC_COMM_SELF, "Error element %d (%d %d)\n", (int)w, (int)i, (int)j));
+     }
+   }
+   PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 
 /**
@@ -128,10 +162,10 @@ PetscErrorCode assembleCsemRHS(const petgemParams params,
 
   /* Print linear system statistics (suppressed when params.quiet) */
   if (!params.quiet) {
-    PetscCall(PetscPrintf(comm, "\n RHS assembly:\n"));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "MPI tasks",   formatGroupedInt(params.numMPITasks)));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Vector size", formatGroupedInt(M)));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                "Status",      "Started"));
+    PetscCall(logSection(comm, "RHS assembly"));
+    PetscCall(logKVInt(comm, "MPI tasks", params.numMPITasks));
+    PetscCall(logKVInt(comm, "Vector size", M));
+    PetscCall(logKVStr(comm, "Status", "Started"));
   }
 
   /* Perform finite element assembly for RHS (one vector per source) */
@@ -211,7 +245,7 @@ PetscErrorCode assembleCsemRHS(const petgemParams params,
 
   /* Print message */
   if (!params.quiet)
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
+    PetscCall(logKVStr(comm, "Status", "Finished"));
 
   /* Free memory */
   for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
@@ -310,9 +344,9 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
   /* Print statistics (suppressed when params.quiet). */
   if (!params.quiet) {
     PetscCall(PetscPrintf(comm, "\n MMS RHS assembly (%s):\n", useForcing ? "volumetric forcing f*" : "L2 moments of E*"));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "MPI tasks",   formatGroupedInt(params.numMPITasks)));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Vector size", formatGroupedInt(M)));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status",      "Started"));
+    PetscCall(logKVInt(comm, "MPI tasks", params.numMPITasks));
+    PetscCall(logKVInt(comm, "Vector size", M));
+    PetscCall(logKVStr(comm, "Status", "Started"));
   }
 
   PetscCall(VecZeroEntries(b));
@@ -378,8 +412,7 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
   PetscCall(VecAssemblyBegin(b));
   PetscCall(VecAssemblyEnd(b));
 
-  /* Copy the assembled RHS into the single column of B (no iωμ scaling:
-   * f* already carries the frequency/permeability factor). */
+  /* Copy the assembled RHS into the single column of B (no iωμ scaling: f* already carries the frequency/permeability factor). */
   PetscCall(MatDenseGetColumnVecWrite(*B, 0, &bcol));
   PetscCall(VecCopy(b, bcol));
   PetscCall(MatDenseRestoreColumnVecWrite(*B, 0, &bcol));
@@ -387,7 +420,7 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
   PetscCall(VecDestroy(&b));
 
   if (!params.quiet) {
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
+    PetscCall(logKVStr(comm, "Status", "Finished"));
   }
 
   /* Free memory */
@@ -405,39 +438,6 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/**
- * @brief Verifies that a cell's discrete gradient lies in the stiffness kernel.
- *
- * This function checks the De Rham identity K_e G_e = 0 for one cell: with M the
- * m x m elemental stiffness (Ke) and G the m x n discrete gradient (both
- * row-major), it forms every entry of the product M·G and reports, via a printed
- * message, any (i, j) whose value is not within PETSC_SMALL of zero. It is a
- * read-only diagnostic: no matrix is modified and a non-zero product does not
- * abort the run.
- *
- * @param[in] M  Elemental stiffness matrix Ke (m x m, row-major).
- * @param[in] G  Discrete gradient block (m x n, row-major).
- * @param[in] m  Number of H(curl) DOFs per cell (rows of M and G).
- * @param[in] n  Number of H1 DOFs per cell (columns of G).
- * @param[in] w  Cell index, used only to label diagnostic messages.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
- */
-static PetscErrorCode checkGradientKernel(PetscReal *M, PetscReal *G, PetscInt m, PetscInt n, PetscInt w)
-{
-   PetscFunctionBeginUser;
-   for (PetscInt i = 0; i < m; i++) {
-     for (PetscInt j = 0; j < n; j++) {
-       PetscReal v = 0;
-       for (PetscInt k = 0; k < m; k++) {
-         // M is m x m, G is m x n
-         v += M[i*m + k] * G[k * n + j];
-       }
-       if (!PetscIsCloseAtTol(v, 0, 0, PETSC_SMALL)) PetscCall(PetscPrintf(PETSC_COMM_SELF, "Error element %d (%d %d)\n", (int)w, (int)i, (int)j));
-     }
-   }
-   PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 /**
  * @brief CSEM LHS assembly.
@@ -583,10 +583,10 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
 
   /* Print linear system statistics (suppressed when params.quiet) */
   if (!params.quiet) {
-    PetscCall(PetscPrintf(comm, "\n LHS assembly (K and Ms):\n"));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                                      "MPI tasks",   formatGroupedInt(params.numMPITasks)));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s x %s\n",   "Matrix size", formatGroupedInt(M), formatGroupedInt(M)));
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n",                                      "Status",      "Started"));
+    PetscCall(logSection(comm, "LHS assembly (K and Ms)"));
+    PetscCall(logKVInt(comm, "MPI tasks", params.numMPITasks));
+    PetscCall(logKVf(comm, "Matrix size", "%s x %s", formatGroupedInt(M), formatGroupedInt(M)));
+    PetscCall(logKVStr(comm, "Status", "Started"));
   }
 
   /* Perform finite element assembly for LHS */
@@ -661,7 +661,7 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
 
   /* End of assembly */
   if (!params.quiet)
-    PetscCall(PetscPrintf(comm, "   %-24s = %s\n", "Status", "Finished"));
+    PetscCall(logKVStr(comm, "Status", "Finished"));
 
   /* Free memory */
   PetscCall(PetscFree(quadrature_3d.weights));

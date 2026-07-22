@@ -1,0 +1,7 @@
+# TRUE model conductivities for im_true.msh -> fm.csem.
+# Row = 0-based material id (gmsh physical tag - 1).
+# sigma_x sigma_y sigma_z
+1e-08    1e-08    1e-08      # AIR      1e8 ohm-m
+0.01     0.01     0.01       # BG       100 ohm-m
+0.01     0.01     0.01       # INVERT   100 ohm-m (background here)
+0.1      0.1      0.1        # ANOMALY   10 ohm-m  <- target

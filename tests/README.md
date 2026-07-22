@@ -79,8 +79,10 @@ tests/
 
 The dataset the e2e / extrae jobs drive lives under `examples/unit_cube` (a tiny
 homogeneous cube; see its README) — the `tests/` tree otherwise holds only test
-code. It is regenerated from its committed `mesh.geo` + `*.txt` via the same
-`gmsh → preprocess` pipeline as the other cases in `examples/`. Level 6's
+code. Its `outputs/input.h5` bundle is regenerated from the committed
+`geometry/mesh.geo` + `survey/*.txt` via the same `gmsh → preprocess` pipeline
+as the other cases in `examples/` (`bash examples/unit_cube/scripts/build_bundles.sh`).
+Level 6's
 `tests/mms/` package is the one exception: it carries its own `[0,1]³` mesh and
 preprocess stubs so the MMS check runs with **no `paper/` (or `examples/`)
 dependence** — its N=4 bundle is built on the fly by `make_bundle.sh`.
@@ -175,12 +177,16 @@ whatever coverage they can run.
 The goldens are exact serial LU solves of the current code. Regenerate them
 from a trusted build whenever the forward result legitimately changes — run
 `fm.csem` on the unit cube for orders 1, 2, 3 with a direct LU solve, writing
-into `reference/`:
+into `reference/`. The `examples/unit_cube/scripts/regen_reference.sh` wrapper
+does exactly this:
 
 ```bash
+bash examples/unit_cube/scripts/regen_reference.sh
+
+# equivalently, explicit:
 for N in 1 2 3; do
   build/fm.csem \
-    -input_filename examples/unit_cube/input.h5 -order $N \
+    -input_filename examples/unit_cube/outputs/input.h5 -order $N \
     -output_dir examples/unit_cube/reference -output_filename responses_p$N \
     -dm_mat_type aij -ksp_type preonly -pc_type lu \
     -pc_factor_mat_ordering_type nd -ksp_error_if_not_converged

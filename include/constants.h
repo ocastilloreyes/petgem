@@ -27,7 +27,7 @@
 #define NUM_CONDUCTIVITY_COMPONENTS 3  /**< Conductivity components (σx, σy, σz). */
 #define NUM_MATERIALS_ID_COMPONENTS 1  /**< Material-id components per cell. */
 #define MAX_TRANSITIVE_CLOSURE_SIZE 90 /**< Upper bound on DMPlex closure size. */
-#define IM_VTU_NUM_FIELDS 1           /**< Cell-data fields written per VTU piece (rho_ohm_m). */
+#define IM_VTU_NUM_FIELDS 1           /**< Cell-data fields written per VTU piece (rho). */
 #define FE_NODAL_MAX_ORDER 64		   /**< Highest supported order; sizes the 1D factor tables. */
 
 /* Largest DOF counts over the input order range (order = 1..6). These size only
