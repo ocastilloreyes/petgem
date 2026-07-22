@@ -77,6 +77,21 @@ The ``INVERT`` region is the invertable subset of cells; ``AIR`` and ``BG`` are
 held fixed during the inversion (the ``fixed`` column of
 ``survey/sigmas_im.txt``).
 
+Both meshes come from the single source ``geometry/im_model.geo``, which meshes
+only ``AIR`` and ``BG``; ``INVERT`` and ``ANOMALY`` are then assigned by
+*re-tagging* cells whose centroid falls in the corresponding box. Re-tagging
+changes material labels only, leaving the mesh topology - and therefore the
+discrete gradient that PCBDDC is built from - untouched, whereas embedding the
+bodies as geometric volumes would introduce new edges and faces. The step is
+scripted, with the mask read from the ``.geo`` itself so it cannot drift from
+the refinement fields::
+
+    python3 examples/im_model/scripts/build_meshes.py --verify   # check, no writes
+    python3 examples/im_model/scripts/build_meshes.py --force    # re-mesh (needs gmsh)
+
+Under the ``petgem-env`` image this reproduces both shipped meshes
+byte-identically.
+
 Directory layout
 ****************
 .. code-block::
@@ -87,10 +102,17 @@ Directory layout
      survey/      receivers, sources (im + per-frequency fm), frequencies,
                   sigmas_im.txt (starting model), sigmas_true.txt (true model)
      configs/     params_im.txt, params_fm_f<F>.txt
-     scripts/     gen_survey.py, build_bundles.sh,
+     scripts/     build_meshes.py, gen_survey.py, build_bundles.sh,
                   run_forward.slurm, run_inversion.slurm
      reference/   observed.h5, reference_metrics.json, reference_metrics.md
      outputs/     generated files (bundles, responses, logs, VTU snapshots)
+
+``outputs/`` is git-ignored and disposable: a fresh clone starts empty there and
+each workflow recreates what it needs, so nothing in it is required to run the
+benchmark. Note that the solver stages write to fixed filenames, so re-running
+them overwrites earlier results; since the directory is untracked, an
+overwritten run can only be recovered by rerunning the simulation. Copy any run
+worth keeping outside ``outputs/`` first.
 
 General, reusable tools live in the ``utils/`` package, not in the example:
 ``utils/preprocess.py`` (build a bundle), ``utils/make_observed.py`` (assemble

@@ -48,8 +48,12 @@ fm_model/
 │   ├── build_bundles.sh   gmsh + preprocess --> outputs/input.h5
 │   ├── run_forward.slurm  run fm.csem
 │   └── postprocess.py     compare Ex to the reference, print metrics, plot
-└── outputs/           generated files (bundle, responses, figures, logs)
+└── outputs/           generated files (bundle, responses, figures, logs) - git-ignored
 ```
+
+`outputs/` is git-ignored and disposable: a fresh clone starts empty there and
+`build_bundles.sh` recreates it. Re-running the forward stage overwrites
+`outputs/responses_p<order>.h5`, so copy any run worth keeping elsewhere first.
 
 General, reusable tools live in the PETGEM `utils/` package, not here
 (`utils/preprocess.py` builds the solver input bundle from a mesh + survey).

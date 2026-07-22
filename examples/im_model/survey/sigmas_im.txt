@@ -1,4 +1,4 @@
-# INVERSION starting model for im_model.msh -> im.csem.
+# INVERSION starting model for im_model.msh --> im.csem.
 # Uniform 100 ohm-m halfspace (no anomaly - recovering it is
 # the objective). Row = 0-based material id (tag - 1).
 # 4th column: 1 = held fixed, 0 = invertable.

@@ -59,6 +59,7 @@ im_model/
 │   ├── params_fm_f<F>.txt  forward, one per frequency (PCBDDC)
 │   └── params_im.txt       inversion (MUMPS)
 ├── scripts/           benchmark-specific drivers
+│   ├── build_meshes.py     mesh im_model.geo + tag INVERT/ANOMALY → the .msh
 │   ├── gen_survey.py       regenerate the survey files
 │   ├── build_bundles.sh    preprocess meshes+survey → solver input bundles
 │   ├── run_forward.slurm   run fm.csem
@@ -80,6 +81,7 @@ General, reusable tools live in the PETGEM `utils/` package, not here:
 
 | step | action | tool | outputs |
 |---|---|---|---|
+| 0 | meshes (shipped) | `build_meshes.py` | `geometry/im_model.msh`, `geometry/im_true.msh` |
 | 1 | true model | `geometry/im_true.msh`, `survey/` | - |
 | 2 | forward modelling | `build_bundles.sh fm` → `run_forward.slurm` | `outputs/responses_fm_f<F>_p2.h5` |
 | 3 | add noise | `utils/make_observed.py` | `outputs/observed.h5` |
@@ -123,6 +125,13 @@ docker run --rm -v "$PWD":/workspace -w /workspace petgem-env:latest \
 ### Full workflow (from scratch)
 
 ```bash
+# (optional) check the shipped meshes carry the expected tags
+python3 examples/im_model/scripts/build_meshes.py --verify
+
+# (optional) regenerate the meshes from im_model.geo (needs gmsh; byte-identical
+# under the petgem-env image, see the script header before using --force)
+python3 examples/im_model/scripts/build_meshes.py --force
+
 # (optional) regenerate the survey definition
 python3 examples/im_model/scripts/gen_survey.py
 
@@ -174,7 +183,18 @@ tolerance. RMS decreases monotonically at every iteration.
 
 ## Outputs
 
-All generated files are written under `outputs/`:
+All generated files are written under `outputs/`, which is **git-ignored**: a
+fresh clone starts empty there, and every workflow above recreates what it
+needs. Nothing in `outputs/` is required to run the benchmark - the committed
+inputs are `geometry/`, `survey/`, `configs/` and `reference/`.
+
+> **Re-running overwrites.** `run_forward.slurm` and `run_inversion.slurm` write
+> to fixed filenames (`responses_fm_f<F>_p2.h5`, `responses_im_p2.h5`), so
+> launching them again replaces whatever is already there. Because the directory
+> is git-ignored, an overwritten run is not recoverable and can only be
+> reproduced by rerunning the simulation - the forward stage is 7 cluster jobs,
+> and the reference inversion took 01:40 on 336 MPI tasks. Copy any run you want
+> to keep somewhere outside `outputs/` first.
 
 | file | description |
 |---|---|
@@ -193,5 +213,13 @@ All generated files are written under `outputs/`:
   and therefore an exact gradient solution.
 - **Reproducibility.** The noise seed is fixed (20260720) and recorded in
   `observed.h5`; the recovered model is independent of the MPI rank count.
+  Every input is regenerable from this directory: `build_meshes.py` rebuilds
+  both meshes from `im_model.geo`, `gen_survey.py` the survey, and
+  `build_bundles.sh` the solver bundles.
+- **Mesh tagging.** `INVERT` and `ANOMALY` are assigned by re-tagging cells
+  after meshing, not by embedding volumes. Re-tagging changes only material
+  labels, so the topology - and with it the discrete gradient PCBDDC relies on -
+  is untouched; an embedded body would add edges and faces and can trip the
+  preconditioner. See `scripts/build_meshes.py`.
 - **Regularization.** Tikhonov weight λ = 0.1. Only the `INVERT` region is
   updated; air and background are held fixed (4th column of `sigmas_im.txt`).
