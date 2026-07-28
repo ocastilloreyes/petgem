@@ -42,7 +42,7 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
  *        the operator is MATIS and a gradient was supplied.
  *
  * Shared helper that captures the single BDDC policy used by both the
- * forward solver (solveCsemSystem) and the inverse solver (createInvKSP):
+ * forward solver (solveCsemSystem) and the inverse solver (setupForwardKSP):
  * when A is of type MATIS and Gbddc is non-NULL, set PC to PCBDDC and
  * register Gbddc (the high-order discrete gradient) via
  * PCBDDCSetDiscreteGradient(..., order, 0, PETSC_TRUE, PETSC_TRUE). When the

@@ -55,9 +55,11 @@ im_model/
 ├── survey/            transmitters, receivers, frequencies, conductivities
 │   ├── receivers.txt      sources_im.txt      sources_f<F>.txt
 │   ├── frequencies.txt     sigmas_im.txt      sigmas_true.txt
-├── configs/           solver / inversion options
-│   ├── params_fm_f<F>.txt  forward, one per frequency (PCBDDC)
-│   └── params_im.txt       inversion (MUMPS)
+├── configs/           case options + solver presets
+│   ├── params_fm_f<F>.txt  forward case, one per frequency (I/O only)
+│   ├── params_im.txt       inversion case (I/O + L-BFGS + solver options)
+│   ├── solver_mumps.txt    fm.csem solver preset: MUMPS direct
+│   └── solver_bddc.txt     fm.csem solver preset: PCBDDC iterative
 ├── scripts/           benchmark-specific drivers
 │   ├── build_meshes.py     mesh im_model.geo + tag INVERT/ANOMALY → the .msh
 │   ├── gen_survey.py       regenerate the survey files
@@ -207,10 +209,23 @@ inputs are `geometry/`, `survey/`, `configs/` and `reference/`.
 
 ## Notes
 
-- **Solvers.** The forward stage uses an iterative solver (PCBDDC on the H(curl)
-  operator with the exact Nédélec discrete-gradient coarse space). The inversion
-  uses the MUMPS direct solver, which gives exact forward and adjoint solves -
-  and therefore an exact gradient solution.
+- **Solvers.**
+  - `im.csem` uses PCBDDC for the forward solve and MUMPS for the adjoint solve.
+    The forward (`-im_fwd_*`) and adjoint (`-im_adj_*`) solver options are set in
+    `configs/params_im.txt`.
+  - `fm.csem` selects one solver at run time by adding a preset to the case
+    config — the case options and the solver are separate `-options_file`s:
+    - `configs/solver_mumps.txt` — MUMPS direct (LU).
+    - `configs/solver_bddc.txt` — PCBDDC iterative (FGMRES on the MATIS operator
+      with the exact Nédélec discrete-gradient coarse space).
+
+    ```bash
+    build/fm.csem -options_file configs/params_fm_f1.txt -options_file configs/solver_bddc.txt
+    build/fm.csem -options_file configs/params_fm_f1.txt -options_file configs/solver_mumps.txt
+    ```
+
+    `run_forward.slurm` takes a `SOLVER` variable (`SOLVER=mumps` / `SOLVER=bddc`),
+    defaulting to PCBDDC.
 - **Reproducibility.** The noise seed is fixed (20260720) and recorded in
   `observed.h5`; the recovered model is independent of the MPI rank count.
   Every input is regenerable from this directory: `build_meshes.py` rebuilds

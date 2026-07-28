@@ -440,6 +440,331 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
 
 
 /**
+ * @brief True numerical rank test of the discrete gradient G.
+ *
+ * Uses the smallest eigenvalues of H = Gᵀ·G (the weighted nodal graph
+ * Laplacian, whose only kernel is the constant field) via a PETSc GMRES Arnoldi
+ * cycle with PC=none, so the Ritz values are those of H itself. For a connected
+ * mesh the expected spectrum is one numerically-zero eigenvalue and the rest
+ * strictly positive: rank(G) = N-1. Ported from the legacy KG_validation.c
+ * battery; used by reportGradientValidation under -petgem_validate_gradient.
+ *
+ * @param[in] comm  Communicator for the collective solve.
+ * @param[in] G     Discrete gradient matrix.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode gradientRankTestEig(MPI_Comm comm, Mat G)
+{
+  PetscFunctionBeginUser;
+
+  Mat         H;
+  KSP         ksp;
+  PC          pc;
+  Vec         x, b;
+  PetscRandom rnd;
+  PetscInt    N, kdim, neig = 0, nullDim = 0;
+  PetscReal   scale, emax = 0.0, emin = 0.0, zeroTol, lam2 = -1.0;
+  PetscReal  *er, *ei;
+
+  PetscCall(MatTransposeMatMult(G, G, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &H));
+  PetscCall(MatSetOption(H, MAT_SYMMETRIC, PETSC_TRUE));
+  PetscCall(MatGetSize(H, &N, NULL));
+  PetscCall(MatNorm(H, NORM_INFINITY, &scale));
+  if (scale == 0.0) {
+    scale = 1.0;
+  }
+
+  kdim = PetscMin(N, 100);
+
+  PetscCall(MatCreateVecs(H, &x, &b));
+  PetscCall(PetscRandomCreate(comm, &rnd));
+  PetscCall(PetscRandomSetFromOptions(rnd));
+  PetscCall(VecSetRandom(b, rnd));
+  PetscCall(PetscRandomDestroy(&rnd));
+
+  PetscCall(KSPCreate(comm, &ksp));
+  PetscCall(KSPSetOptionsPrefix(ksp, "petgem_rank_"));
+  PetscCall(KSPSetOperators(ksp, H, H));
+  PetscCall(KSPSetType(ksp, KSPGMRES));
+  PetscCall(KSPGMRESSetRestart(ksp, kdim));
+  PetscCall(KSPSetTolerances(ksp, 1.0e-12, 1.0e-50, PETSC_DEFAULT, kdim));
+  PetscCall(KSPGetPC(ksp, &pc));
+  PetscCall(PCSetType(pc, PCNONE));
+  PetscCall(KSPSetComputeEigenvalues(ksp, PETSC_TRUE));
+  PetscCall(KSPSetComputeSingularValues(ksp, PETSC_TRUE));
+  PetscCall(KSPSetFromOptions(ksp));
+  PetscCall(KSPSolve(ksp, b, x));
+
+  PetscCall(KSPComputeExtremeSingularValues(ksp, &emax, &emin));
+  if (emax > 0.0) {
+    scale = emax;
+  }
+  zeroTol = scale * 1.0e-9;
+
+  PetscCall(PetscMalloc2(kdim, &er, kdim, &ei));
+  PetscCall(KSPComputeEigenvalues(ksp, kdim, er, ei, &neig));
+  PetscCall(PetscSortReal(neig, er));
+
+  for (PetscInt i = 0; i < neig; i++) {
+    if (PetscAbsReal(er[i]) < zeroTol) {
+      nullDim++;
+    }
+    else if (lam2 < 0.0) {
+      lam2 = er[i];
+    }
+  }
+  (void)nullDim;
+  PetscCall(PetscPrintf(comm, "   eigen    lambda_min(nonzero)=%.2e  lambda_max=%.2e  separation=%.1e\n",
+                        (double)(lam2 > 0.0 ? lam2 : 0.0), (double)scale, (double)(lam2 > 0.0 ? lam2 / scale : 0.0)));
+
+  PetscCall(PetscFree2(er, ei));
+  PetscCall(VecDestroy(&x));
+  PetscCall(VecDestroy(&b));
+  PetscCall(KSPDestroy(&ksp));
+  PetscCall(MatDestroy(&H));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Column-space mask that is 0 on boundary H1 dofs and 1 on interior ones.
+ *
+ * H(curl) carries Dirichlet conditions on the "Boundary" label (grid.c, one BC
+ * field), so boundary edge dofs are removed; the H1 column space has no BC, so
+ * every vertex/edge/face nodal dof is a column of G. The gradient of a boundary
+ * H1 dof is therefore truncated and pollutes the raw K·G product. Scaling G's
+ * columns by this mask isolates the BC-consistent interior residual. Ported from
+ * KG_validation.c; the "Boundary" stratum id (100) matches setupCsemGrid.
+ *
+ * @param[in]  dm               H(curl) DMPlex (source of the "Boundary" label).
+ * @param[in]  grid             Grid descriptor (grid.H1dm supplies the section).
+ * @param[in]  G                Discrete gradient (defines the column layout).
+ * @param[out] mask             Column-space Vec, 0 on boundary / 1 on interior.
+ * @param[out] numBoundaryCols  Count of masked (boundary) H1 columns.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode buildInteriorColumnMask(DM dm, Grid grid, Mat G, Vec *mask, PetscInt *numBoundaryCols)
+{
+  PetscFunctionBeginUser;
+
+  Vec             dcol;
+  DMLabel         label = NULL;
+  IS              bdIS = NULL;
+  PetscSection    gH1section;
+  PetscInt        nbd = 0, Bcount = 0;
+  const PetscInt *bd;
+
+  PetscCall(MatCreateVecs(G, &dcol, NULL));
+  PetscCall(VecSet(dcol, 1.0));
+
+  PetscCall(DMGetGlobalSection(grid.H1dm, &gH1section));
+  PetscCall(DMGetLabel(dm, "Boundary", &label));
+  if (label) {
+    PetscCall(DMLabelGetStratumIS(label, 100, &bdIS));
+  }
+
+  if (bdIS) {
+    PetscCall(ISGetLocalSize(bdIS, &nbd));
+    PetscCall(ISGetIndices(bdIS, &bd));
+    for (PetscInt i = 0; i < nbd; i++) {
+      PetscInt dof, off;
+      PetscCall(PetscSectionGetDof(gH1section, bd[i], &dof));
+      PetscCall(PetscSectionGetOffset(gH1section, bd[i], &off));
+      if (dof > 0 && off >= 0) {
+        for (PetscInt d = 0; d < dof; d++) {
+          PetscCall(VecSetValue(dcol, off + d, 0.0, INSERT_VALUES));
+          Bcount++;
+        }
+      }
+    }
+    PetscCall(ISRestoreIndices(bdIS, &bd));
+    PetscCall(ISDestroy(&bdIS));
+  }
+  PetscCall(VecAssemblyBegin(dcol));
+  PetscCall(VecAssemblyEnd(dcol));
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, &Bcount, 1, MPIU_INT, MPI_SUM, PetscObjectComm((PetscObject)G)));
+
+  *mask            = dcol;
+  *numBoundaryCols = Bcount;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Structural check of G against what PCBDDCNedelecSupport expects.
+ *
+ * PCBDDC's Nedelec support (PETSc bddcprivate.c) groups edge dofs into coarse
+ * edges using the row structure of the discrete gradient: on a coarse edge every
+ * participating edge-dof row of G must connect to exactly order+1 nodal dofs
+ * (the two endpoints plus the order-1 interior nodal dofs), and the local edge
+ * dof count must be a multiple of order. This does NOT assemble anything or run
+ * BDDC - it just reports, per MPI rank, the histogram of nonzeros-per-row of the
+ * assembled (filtered) G, so a run at order 1/2/3 shows whether the order-2 row
+ * structure is anomalous. A clean order-p Nedelec gradient has edge-dof rows
+ * with a tight nnz distribution centered near order+1; a spread or outliers on
+ * the interface is what makes the coarse-edge second pass fail.
+ *
+ * @param[in] comm   Communicator (for the reduction and print).
+ * @param[in] grid   Grid descriptor (order, per-class dof counts).
+ * @param[in] G      Assembled, filtered discrete gradient.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode reportGradientBDDCStructure(MPI_Comm comm, Grid grid, Mat G)
+{
+  PetscFunctionBeginUser;
+
+  PetscInt rStart, rEnd, order = grid.fem.order;
+  PetscInt minNnz = PETSC_MAX_INT, maxNnz = 0;
+  PetscInt zeroRows = 0, localRows;
+  PetscInt expected = order + 1;   /* nodal dofs per edge-dof row on a coarse edge */
+  PetscInt hist[16] = {0};         /* nnz-per-row histogram, clamped at 15 */
+  PetscInt offExpected = 0;        /* rows whose nnz is neither 0 nor expected */
+
+  PetscCall(MatGetOwnershipRange(G, &rStart, &rEnd));
+  localRows = rEnd - rStart;
+  for (PetscInt r = rStart; r < rEnd; r++) {
+    PetscInt ncols;
+    PetscCall(MatGetRow(G, r, &ncols, NULL, NULL));
+    if (ncols == 0) {
+      zeroRows++;
+    }
+    else {
+      minNnz = PetscMin(minNnz, ncols);
+      maxNnz = PetscMax(maxNnz, ncols);
+      if (ncols != expected) {
+        offExpected++;
+      }
+    }
+    hist[PetscMin(ncols, 15)]++;
+    PetscCall(MatRestoreRow(G, r, &ncols, NULL, NULL));
+  }
+  if (minNnz == PETSC_MAX_INT) minNnz = 0;
+
+  /* Global reduction so the report is one line regardless of rank count. */
+  PetscInt gmin, gmax, gzero, goff, grows, ghist[16];
+  PetscCallMPI(MPI_Allreduce(&minNnz,      &gmin,  1,  MPIU_INT, MPI_MIN, comm));
+  PetscCallMPI(MPI_Allreduce(&maxNnz,      &gmax,  1,  MPIU_INT, MPI_MAX, comm));
+  PetscCallMPI(MPI_Allreduce(&zeroRows,    &gzero, 1,  MPIU_INT, MPI_SUM, comm));
+  PetscCallMPI(MPI_Allreduce(&offExpected, &goff,  1,  MPIU_INT, MPI_SUM, comm));
+  PetscCallMPI(MPI_Allreduce(&localRows,   &grows, 1,  MPIU_INT, MPI_SUM, comm));
+  PetscCallMPI(MPI_Allreduce(hist,          ghist, 16, MPIU_INT, MPI_SUM, comm));
+
+  /* PCBDDC's per-row Nedelec contract (ii[i+1]-ii[i] == order+1) applies to the EDGE dofs, which are the minimum-nnz rows: 2 endpoints + order-1 interior
+   * nodal dofs. Face and volume dof rows legitimately connect to more nodal dofs and are NOT what BDDC checks per row, so they are reported separately, not
+   * flagged. gedge is the count of order+1 rows (the edge-dof class). */
+  PetscInt gedge = ghist[PetscMin(expected, 15)];
+  (void)gmax; (void)goff; (void)gedge;
+  PetscCall(PetscPrintf(comm, "   bddc     edge-dof nnz/row=%" PetscInt_FMT " (order+1)  %s  [rows=%" PetscInt_FMT ", zero=%" PetscInt_FMT "]\n",
+                        expected, (gmin == expected) ? "uniform  PASS" : "MIN != order+1  CHECK", grows, gzero));
+  PetscCall(PetscPrintf(comm, "   bddc     nnz/row histogram ="));
+  for (PetscInt k = 1; k < 16; k++) {
+    if (ghist[k]) PetscCall(PetscPrintf(comm, " %" PetscInt_FMT ":%" PetscInt_FMT, k, ghist[k]));
+  }
+  PetscCall(PetscPrintf(comm, "\n"));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief De Rham / discrete-gradient validation battery (opt-in diagnostic).
+ *
+ * Enabled by -petgem_validate_gradient. Prints one compact block per
+ * (order, ranks), verifying the assembled discrete gradient G against the De
+ * Rham complex using the pure curl-curl matrix Acurl:
+ *   derham : ||Acurl·G_int|| / (||Acurl|| ||G||) with boundary columns masked
+ *            (curl of a gradient vanishes) → ~machine eps; plus ||G·1|| ~ 0;
+ *   rank   : rank(G) = N-1 (only kernel is the constant field);
+ *   eigen  : smallest nonzero / largest eigenvalue of GᵀG (gradientRankTestEig);
+ *   bddc   : reportGradientBDDCStructure — the row structure PCBDDC consumes.
+ * Ported from KG_validation.c and adapted to the current Grid/petgemParams API.
+ *
+ * @param[in] comm   Communicator.
+ * @param[in] dm     H(curl) DMPlex.
+ * @param[in] grid   Grid descriptor.
+ * @param[in] Acurl  Pure curl-curl matrix (Ke only, no mass term).
+ * @param[in] G      Assembled discrete gradient.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode reportGradientValidation(MPI_Comm comm, DM dm, Grid grid, Mat Acurl, Mat G)
+{
+  PetscFunctionBeginUser;
+
+  /* (1) Column rank of G modulo the constant nullspace. */
+  Vec       x, y;
+  PetscInt  N, nzero = 0;
+  PetscReal nrmConstInf, nrmConst2, *colNorms, cmin = PETSC_MAX_REAL, cmax = 0.0;
+
+  PetscCall(MatCreateVecs(G, &x, &y));
+  PetscCall(VecSet(x, 1.0));
+  PetscCall(MatMult(G, x, y));
+  PetscCall(VecNorm(y, NORM_INFINITY, &nrmConstInf));
+  PetscCall(VecNorm(y, NORM_2, &nrmConst2));
+
+  PetscCall(MatGetSize(G, NULL, &N));
+  PetscCall(PetscMalloc1(N, &colNorms));
+  PetscCall(MatGetColumnNorms(G, NORM_2, colNorms));
+  for (PetscInt j = 0; j < N; j++) {
+    if (colNorms[j] < PETSC_SQRT_MACHINE_EPSILON) {
+      nzero++;
+    }
+    else { 
+      cmin = PetscMin(cmin, colNorms[j]); cmax = PetscMax(cmax, colNorms[j]);
+    }
+  }
+  if (cmin == PETSC_MAX_REAL) {
+    cmin = 0.0;
+  }
+  PetscCall(PetscFree(colNorms));
+
+  Vec      mask;
+  PetscInt numBoundaryCols = 0;
+  PetscCall(buildInteriorColumnMask(dm, grid, G, &mask, &numBoundaryCols));
+
+  PetscBool constInNull = (PetscBool)(nrmConstInf < PETSC_SQRT_MACHINE_EPSILON);
+  PetscBool rankOK      = (PetscBool)(constInNull && nzero <= numBoundaryCols);
+  PetscCall(VecDestroy(&x));
+  PetscCall(VecDestroy(&y));
+  (void)nrmConst2; (void)cmin; (void)cmax;
+
+  /* (2) Interior De Rham residual R = Acurl·G_int, expect ~machine eps
+   * (curl of a gradient vanishes). Boundary columns are masked out first,
+   * since the H(curl) Dirichlet / H1 no-BC asymmetry pollutes the raw product. */
+  Mat       AccAij, Gmask, Rint;
+  PetscReal rFroInt, aFro, gFroInt, deRham;
+
+  PetscCall(MatConvert(Acurl, MATAIJ, MAT_INITIAL_MATRIX, &AccAij));
+  PetscCall(MatNorm(AccAij, NORM_FROBENIUS, &aFro));
+  PetscCall(MatDuplicate(G, MAT_COPY_VALUES, &Gmask));
+  PetscCall(MatDiagonalScale(Gmask, NULL, mask));
+  PetscCall(MatMatMult(AccAij, Gmask, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &Rint));
+  PetscCall(MatNorm(Rint, NORM_FROBENIUS, &rFroInt));
+  PetscCall(MatNorm(Gmask, NORM_FROBENIUS, &gFroInt));
+  deRham = (aFro * gFroInt > 0.0) ? rFroInt / (aFro * gFroInt) : 0.0;
+
+  /* Compact report: one block per (order, ranks). */
+  PetscMPIInt commSize;
+  PetscCallMPI(MPI_Comm_size(comm, &commSize));
+  PetscCall(PetscPrintf(comm, "\n Gradient validation  order=%" PetscInt_FMT "  ranks=%d\n", grid.fem.order, (int)commSize));
+  PetscCall(PetscPrintf(comm, "   derham   ||A*G_int||/(||A||||G||)=%.1e  %s   (||G*1||=%.1e)\n",
+                        (double)deRham, (deRham < 1.0e-10) ? "PASS" : "CHECK", (double)nrmConstInf));
+  PetscCall(PetscPrintf(comm, "   rank     N=%" PetscInt_FMT "  decoupled=%" PetscInt_FMT "  rank(G)=N-1  %s\n",
+                        N, nzero, rankOK ? "PASS" : "CHECK"));
+
+  /* (1b) numerical rank via smallest eigenvalues of GᵀG (prints one line). */
+  PetscCall(gradientRankTestEig(comm, G));
+
+  /* (3) row structure PCBDDC's Nedelec support consumes (prints two lines). */
+  PetscCall(reportGradientBDDCStructure(comm, grid, G));
+
+  PetscCall(MatDestroy(&Rint));
+  PetscCall(MatDestroy(&Gmask));
+  PetscCall(VecDestroy(&mask));
+  PetscCall(MatDestroy(&AccAij));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
  * @brief CSEM LHS assembly.
  *
  * Single-pass element loop that assembles the frequency-INDEPENDENT
@@ -499,6 +824,15 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
    *   forms A per frequency via MatDuplicate + MatAXPY. */
   const PetscBool fused = (Ms == NULL) ? PETSC_TRUE : PETSC_FALSE;
 
+  /* Optional De Rham / PCBDDC-structure diagnostics on the discrete gradient (reportGradientValidation). 
+   * Only meaningful when G is being built. Needs the PURE curl-curl matrix, so in fused mode (*KorA = K - constFactor·Ms) we
+   * accumulate a separate Acurl from Ke alone. */
+  PetscBool validate = PETSC_FALSE;
+  Mat       Acurl    = NULL;
+  if (G) {
+    PetscCall(PetscOptionsHasName(NULL, NULL, "-petgem_validate_gradient", &validate));
+  }
+
   /* Create *KorA via DMCreateMatrix. In K/Ms mode, build Ms by MatDuplicate so it shares K's parallel layout */
   PetscCall(DMSetAdjacency(dm, 0, PETSC_FALSE, PETSC_TRUE));
   PetscCall(DMSetMatrixPreallocateOnly(dm, PETSC_TRUE));
@@ -508,6 +842,11 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
   if (!fused) {
     PetscCall(MatDuplicate(*KorA, MAT_DO_NOT_COPY_VALUES, Ms));
     PetscCall(MatSetOption(*Ms, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
+  }
+  if (validate) {
+    PetscCall(DMCreateMatrix(dm, &Acurl));
+    PetscCall(MatSetFromOptions(Acurl));
+    PetscCall(MatSetOption(Acurl, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
   }
 
   /* Create a Vec on the H(curl) DM just to query its sizes (M, m) for the G matrix layout below.  */
@@ -566,12 +905,10 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
   if (!fused) {
     PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureM));
   }
-  /* Discrete-gradient scratch.
-   *
-   * gradientMatrix is the OUTPUT of buildDiscreteGradientMatrix, sized numDofInCell × numH1DofInCell (all P_order H1 columns, in DMPlex
+  /* gradientMatrix is the OUTPUT of buildDiscreteGradientMatrix, sized numDofInCell × numH1DofInCell (all P_order H1 columns, in DMPlex
    * closure order). closureGBDDC is the row-major INSERTION buffer of the same shape passed to MatSetValuesLocal. */
   gradientMatrix = NULL;
-  closureGBDDC       = NULL;
+  closureGBDDC   = NULL;
   if (G) {
     PetscCall(PetscCalloc1(grid.numDofInCell, &gradientMatrix));
     PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell, &gradientMatrix[0]));
@@ -623,6 +960,16 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
       PetscCall(MatSetValuesLocal(*Ms,   numDofIndices, dofIndices, numDofIndices, dofIndices, closureM, ADD_VALUES));
     }
 
+    /* Optional: accumulate the pure curl-curl block (Ke only) for validation. */
+    if (validate) {
+      for (PetscInt j = 0; j < grid.numDofInCell; j++) {
+        for (PetscInt k = 0; k < grid.numDofInCell; k++) {
+          closureK[j * grid.numDofInCell + k] = (PetscScalar)Ke[j][k];
+        }
+      }
+      PetscCall(MatSetValuesLocal(Acurl, numDofIndices, dofIndices, numDofIndices, dofIndices, closureK, ADD_VALUES));
+    }
+
     /* Compute gradient matrix */
     if (G) {
       PetscCall(buildDiscreteGradientMatrix(&grid.fem, &cell, gradientMatrix));
@@ -657,6 +1004,19 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
     PetscCall(MatAssemblyEnd(*G,   MAT_FINAL_ASSEMBLY));
     /* The discrete gradient matrix is used to compute mesh connectivity information within the solver. Just use nonzero dofs */
    PetscCall(MatFilter(*G, 0, PETSC_TRUE, PETSC_FALSE));
+    /* Diagnostic: dump the assembled, filtered discrete gradient (the exact matrix
+     * PCBDDCSetDiscreteGradient consumes), e.g. -petgem_grad_view binary:G.dat */
+    PetscCall(MatViewFromOptions(*G, NULL, "-petgem_grad_view"));
+  }
+
+  /* Optional discrete-gradient / PCBDDC-structure validation on the assembled, filtered G (the exact matrix PCBDDCSetDiscreteGradient consumes). 
+   * Runs at whatever order/rank the kernel is invoked with -petgem_validate_gradient. It shows whether PETGEM's G is a valid discrete gradient 
+   * and how its row structure matches what PCBDDCNedelecSupport expects. */
+  if (validate) {
+    PetscCall(MatAssemblyBegin(Acurl, MAT_FINAL_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(Acurl,   MAT_FINAL_ASSEMBLY));
+    PetscCall(reportGradientValidation(comm, dm, grid, Acurl, *G));
+    PetscCall(MatDestroy(&Acurl));
   }
 
   /* End of assembly */

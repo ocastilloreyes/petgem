@@ -24,7 +24,7 @@
  *
  * Shared helper that captures the single PCBDDC + Nédélec discrete-gradient
  * policy used by BOTH kernels: the forward solver (solveCsemSystem) and the
- * inverse solver (createInvKSP). When @p A is of type MATIS and @p G is
+ * inverse solver (setupForwardKSP). When @p A is of type MATIS and @p G is
  * non-NULL, the preconditioner is set to PCBDDC and @p G is registered via
  * PCBDDCSetDiscreteGradient(pc, G, 1, 0, PETSC_TRUE, PETSC_TRUE). When those
  * conditions are not met the call is a no-op, so the caller's default PC stays.
@@ -53,9 +53,21 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order
   PetscBool ismatis = PETSC_FALSE;
   PetscCall(PetscObjectTypeCompare((PetscObject)A, MATIS, &ismatis));
   if (ismatis && G) {
-    PC pc;
+    PC       pc;
+    Mat      lA;
+    IS       allDofs;
+    PetscInt nloc;
     PetscCall(KSPGetPC(ksp, &pc));
     PetscCall(PCSetType(pc, PCBDDC));
+    /* Prescribe a single field before registering the gradient. Without this, BDDC calls DMCreateFieldDecomposition on the DM that 
+     * DMCreateMatrix left attached to A, and DMPlex tags the field IS with block size = dofs per edge (= order for Nedelec). BDDC 
+     * reads that block size as a field count, so for order >= 2 PCBDDCNedelecSupport sees only one dof per geometric edge and aborts 
+     * with "SIZE OF EDGE > EXTCOL SECOND PASS". The splitting is local, so the index count must come from the MATIS local matrix. */
+    PetscCall(MatISGetLocalMat(A, &lA));
+    PetscCall(MatGetSize(lA, &nloc, NULL));
+    PetscCall(ISCreateStride(PetscObjectComm((PetscObject)A), nloc, 0, 1, &allDofs));
+    PetscCall(PCBDDCSetDofsSplittingLocal(pc, 1, &allDofs));
+    PetscCall(ISDestroy(&allDofs));
     PetscCall(PCBDDCSetDiscreteGradient(pc, G, order, 0, PETSC_TRUE, PETSC_TRUE));
   }
   PetscFunctionReturn(PETSC_SUCCESS);

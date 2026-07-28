@@ -38,6 +38,50 @@
 #include "solver.h"
 #include "transmitter.h"
 
+
+/* Configure and pre-factor the forward EM solve. Builds the KSP used by
+ * repeated forward evaluations, attaching the system matrix A and the
+ * PETSc-PCBDDC auxiliary graph/operator G required by the discretisation.
+ * Intended to be called once during workspace setup and reused across
+ * iterations and sources. */
+ /**
+  * @brief Creates and configures the forward solver KSP.
+  *
+  * Sets up the PETSc Krylov solver used for forward modelling, attaching
+  * the forward operator and any preconditioner-specific auxiliary data.
+  *
+  * @param[in]  order  Finite-element polynomial order.
+  * @param[in]  dm     Distributed mesh associated with the problem.
+  * @param[in]  A      Forward system matrix.
+  * @param[in]  G      Auxiliary matrix required by the preconditioner.
+  * @param[out] ksp    Configured forward solver.
+  *
+  * @return PetscErrorCode PETSC_SUCCESS on success,
+  *         or a PETSc error code otherwise.
+  */
+static PetscErrorCode setupForwardKSP(PetscInt order, const DM dm, const Mat A, const Mat G, KSP *ksp);
+
+
+/* Configure and pre-factor the adjoint solve used by gradient evaluations.
+ * The resulting KSP is reused across inversion iterations, avoiding solver
+ * reconstruction for every frequency and objective-function evaluation. */
+ /**
+  * @brief Creates and configures the adjoint solver KSP.
+  *
+  * Sets up the PETSc Krylov solver used for adjoint field computations,
+  * attaching the adjoint system operator and configuring the associated
+  * preconditioner hierarchy.
+  *
+  * @param[in]  dm     Distributed mesh associated with the problem.
+  * @param[in]  A      Adjoint system matrix.
+  * @param[out] ksp    Configured adjoint solver.
+  *
+  * @return PetscErrorCode PETSC_SUCCESS on success,
+  *         or a PETSc error code otherwise.
+  */
+static PetscErrorCode setupAdjointKSP(const DM dm, const Mat A, KSP *ksp);
+
+
 /**
  * @brief Allocates all iterate-independent inversion workspace.
  *
@@ -181,6 +225,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
     }
   }
 
+
   /* K, Ms (template), G_BDDC built once 
    * K is σ-independent (μ_r = I, no σ enters the curl-curl integrand).
    * G_BDDC is the high-order discrete gradient (σ-independent geometry).
@@ -207,6 +252,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
   kandmStub.order       = ctx->iparams->common.order;
   kandmStub.numMPITasks = stub.numMPITasks;
   kandmStub.quiet       = PETSC_TRUE;
+  PetscCall(DMSetMatType(ctx->dm, MATIS));
   PetscCall(assembleCsemKandM(kandmStub, ctx->dm, ctx->grid,
                               ctx->conductivity,
                               0.0,             /* fused, constFactor = 0 -> A = K */
@@ -214,22 +260,25 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
                               &ctx->Gmat_BDDC));
   PetscCall(MatDuplicate(ctx->Kmat, MAT_DO_NOT_COPY_VALUES, &ctx->Msmat));
 
-  /* Persistent per-frequency A_f and KSP (built once, reused)
-   * A_f shares K's nonzero pattern; we allocate it without copying values
-   * (the inversionObjGrad loop refills it via MatCopy(K)+MatAXPY(-Const·Ms)
-   * every evaluation).  The KSP is bound to A_f here so the symbolic
-   * factorization (MUMPS analysis) / PCBDDC topological setup is computed
-   * once on the first solve and reused for every subsequent iteration -
-   * only numeric refactorization is repeated when A_f's values change. */
-  PetscCall(PetscCalloc1(numFreqs, &ctx->Avec_per_freq));
-  PetscCall(PetscCalloc1(numFreqs, &ctx->ksp_per_freq));
+  /* Persistent per-frequency operators and solvers (built once, reused). The
+   * forward operator Afwd shares K's MATIS pattern; the adjoint operator Aadj
+   * is its AIJ image. Both are allocated without values here - the
+   * inversionObjGrad loop refills Afwd (MatCopy(K)+MatAXPY(-Const·Ms)) and
+   * updates Aadj (MatConvert, MAT_REUSE_MATRIX) every evaluation. */
+  PetscCall(PetscCalloc1(numFreqs, &ctx->Afwd_per_freq));
+  PetscCall(PetscCalloc1(numFreqs, &ctx->Aadj_per_freq));
+  PetscCall(PetscCalloc1(numFreqs, &ctx->kspFwd_per_freq));
+  PetscCall(PetscCalloc1(numFreqs, &ctx->kspAdj_per_freq));
   for (PetscInt i = 0; i < numFreqs; i++) {
-    PetscCall(MatDuplicate(ctx->Kmat, MAT_DO_NOT_COPY_VALUES, &ctx->Avec_per_freq[i]));
-    PetscCall(createInvKSP(ctx->iparams, ctx->dm, ctx->Avec_per_freq[i], ctx->Gmat_BDDC, &ctx->ksp_per_freq[i]));
+    PetscCall(MatDuplicate(ctx->Kmat, MAT_DO_NOT_COPY_VALUES, &ctx->Afwd_per_freq[i]));
+    PetscCall(MatConvert(ctx->Afwd_per_freq[i], MATAIJ, MAT_INITIAL_MATRIX, &ctx->Aadj_per_freq[i]));
+    PetscCall(setupForwardKSP(ctx->iparams->common.order, ctx->dm, ctx->Afwd_per_freq[i], ctx->Gmat_BDDC, &ctx->kspFwd_per_freq[i]));
+    PetscCall(setupAdjointKSP(ctx->dm, ctx->Aadj_per_freq[i], &ctx->kspAdj_per_freq[i]));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /* Tear-down counterpart to setupInversionWorkspace: free everything that
  * helper allocated on the context (quadrature, Me/Ke buffers, per-iter
@@ -277,19 +326,31 @@ static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx)
   PetscCall(PetscFree(ctx->Wf_per_freq));
   PetscCall(PetscFree(ctx->dObsRow_per_freq));
 
-  /* Per-frequency persistent solvers + system matrices (NULL-safe: the arrays may be NULL if setup bailed before allocating them). Freed
+  /* Per-frequency persistent solvers + operators (NULL-safe: the arrays may be NULL if setup bailed before allocating them). Freed
    * before numFreqsAlloc is reset since the loop bounds depend on it. */
-  if (ctx->ksp_per_freq) {
+  if (ctx->kspFwd_per_freq) {
     for (PetscInt i = 0; i < ctx->numFreqsAlloc; i++) {
-      PetscCall(KSPDestroy(&ctx->ksp_per_freq[i]));
+      PetscCall(KSPDestroy(&ctx->kspFwd_per_freq[i]));
     }
-    PetscCall(PetscFree(ctx->ksp_per_freq));
+    PetscCall(PetscFree(ctx->kspFwd_per_freq));
   }
-  if (ctx->Avec_per_freq) {
+  if (ctx->kspAdj_per_freq) {
     for (PetscInt i = 0; i < ctx->numFreqsAlloc; i++) {
-      PetscCall(MatDestroy(&ctx->Avec_per_freq[i]));
+      PetscCall(KSPDestroy(&ctx->kspAdj_per_freq[i]));
     }
-    PetscCall(PetscFree(ctx->Avec_per_freq));
+    PetscCall(PetscFree(ctx->kspAdj_per_freq));
+  }
+  if (ctx->Afwd_per_freq) {
+    for (PetscInt i = 0; i < ctx->numFreqsAlloc; i++) {
+      PetscCall(MatDestroy(&ctx->Afwd_per_freq[i]));
+    }
+    PetscCall(PetscFree(ctx->Afwd_per_freq));
+  }
+  if (ctx->Aadj_per_freq) {
+    for (PetscInt i = 0; i < ctx->numFreqsAlloc; i++) {
+      PetscCall(MatDestroy(&ctx->Aadj_per_freq[i]));
+    }
+    PetscCall(PetscFree(ctx->Aadj_per_freq));
   }
 
   ctx->numFreqsAlloc = 0;
@@ -300,6 +361,71 @@ static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx)
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+
+/**
+ * @brief Creates the forward-solve KSP (PCBDDC) bound to a MATIS operator.
+ *
+ * FGMRES + PCBDDC with the high-order discrete gradient G registered for the
+ * curl-kernel coarse space. The "im_fwd_" options prefix exposes the KSP/PC
+ * numeric parameters to the options database.
+ *
+ * @param[in]  order  Basis order (registers the discrete gradient with PCBDDC).
+ * @param[in]  dm     H(curl) DM (communicator source).
+ * @param[in]  A      Forward operator (MATIS).
+ * @param[in]  G      High-order discrete-gradient operator for PCBDDC.
+ * @param[out] ksp    Created KSP bound to A.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+static PetscErrorCode setupForwardKSP(PetscInt order, const DM dm, const Mat A, const Mat G, KSP *ksp)
+{
+  PetscFunctionBeginUser;
+
+  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
+
+  PetscCall(KSPCreate(comm, ksp));
+  PetscCall(KSPSetOperators(*ksp, A, A));
+  PetscCall(KSPSetType(*ksp, KSPFGMRES));
+  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, G, order));
+  PetscCall(KSPSetOptionsPrefix(*ksp, "im_fwd_"));
+  PetscCall(KSPSetFromOptions(*ksp));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Creates the adjoint-solve KSP (MUMPS) bound to an AIJ operator.
+ *
+ * The "im_adj_" options prefix exposes the factorization parameters to the
+ * options database.
+ *
+ * @param[in]  dm   H(curl) DM (communicator source).
+ * @param[in]  A    Adjoint operator (AIJ).
+ * @param[out] ksp  Created KSP bound to A.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+static PetscErrorCode setupAdjointKSP(const DM dm, const Mat A, KSP *ksp)
+{
+  PetscFunctionBeginUser;
+
+  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
+  PC       pc;
+
+  PetscCall(KSPCreate(comm, ksp));
+  PetscCall(KSPSetOperators(*ksp, A, A));
+  PetscCall(KSPSetType(*ksp, KSPPREONLY));
+  PetscCall(KSPGetPC(*ksp, &pc));
+  PetscCall(PCSetType(pc, PCLU));
+  PetscCall(PCFactorSetMatSolverType(pc, MATSOLVERMUMPS));
+  PetscCall(KSPSetOptionsPrefix(*ksp, "im_adj_"));
+  PetscCall(KSPSetFromOptions(*ksp));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
 /**
  * @brief Accumulates the per-element adjoint gradient into DfDm.
  *
@@ -459,51 +585,11 @@ PetscErrorCode createInversionDM(DM dmConductivity, const Grid *grid, DM *dmInv)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/**
- * @brief Creates a KSP for the inversion (same setup as solveCsemSystem, no solve).
- *
- * The caller invokes solveInvSystem twice (forward + adjoint) then KSPDestroy.
- * The MUMPS factorization is triggered on the first KSPSolve.
- *
- * @param[in]  iparams  Inversion parameters. Reserved; currently unused
- *                      (solver options come from KSPSetFromOptions).
- * @param[in]  dm       H(curl) DM.
- * @param[in]  A        System matrix.
- * @param[in]  G        High-order discrete-gradient operator for PCBDDC.
- * @param[out] ksp      Created KSP bound to A.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success,
- *         or a PETSc error code otherwise.
- */
-PetscErrorCode createInvKSP(const imParams *iparams,
-                             const DM          dm,
-                             const Mat         A,
-                             const Mat         G,
-                             KSP              *ksp)
-{
-  PetscFunctionBeginUser;
-
-  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
-
-  PetscCall(KSPCreate(comm, ksp));
-  PetscCall(KSPSetOperators(*ksp, A, A));
-
-  /* `G` is the high-order discrete-gradient operator (Nédélec_order -->
-   * P_order H1) consumed by PCBDDC. It has nothing to do with the inversion
-   * gradient ∂F/∂X built by the L-BFGS layer — distinct names so the two never
-   * get conflated. setupBDDCFromPetgemGradient registers it at order = order
-   * (matching the gradient's P_order H1 column space). Matches the forward
-   * solver (solver.c). */
-  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, G, iparams->common.order));
-  PetscCall(KSPSetFromOptions(*ksp));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 /**
- * @brief Solves A·sol = rhs using an already-created (factored) KSP.
+ * @brief Solves A·sol = rhs using an already-created KSP.
  *
- * @param[in]  ksp  KSP previously created by createInvKSP.
+ * @param[in]  ksp  KSP bound to the system operator.
  * @param[in]  rhs  Right-hand side vector.
  * @param[out] sol  Solution vector.
  *
@@ -516,6 +602,7 @@ PetscErrorCode solveInvSystem(const KSP ksp, const Vec rhs, Vec sol)
   PetscCall(KSPSolve(ksp, rhs, sol));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /**
  * @brief Objective + gradient callback for the L-BFGS optimizer.
@@ -599,15 +686,17 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
     PetscReal   omega = isrc->freq * 2.0 * PETSC_PI;
     PetscScalar Const = PETSC_i * omega * MU;
 
-    /* Persistent per-frequency system matrix and solver (allocated once in setupInversionWorkspace). A_f is refilled in place each evaluation:
-     * A_f = K - iωμ·Ms.  SAME_NONZERO_PATTERN guarantees the symbolic factorization / PCBDDC topological setup attached to ksp is preserved -
-     * KSPSolve detects the matrix-value change and redoes ONLY the numeric factorization. */
-    Mat A   = c->Avec_per_freq[i];
-    KSP ksp = c->ksp_per_freq[i];
+    /* Persistent per-frequency operators and solvers (allocated once in setupInversionWorkspace). Afwd is refilled in place each evaluation
+     * as A_f = K - iωμ·Ms (SAME_NONZERO_PATTERN), and Aadj is refreshed as its AIJ image (MatConvert, MAT_REUSE_MATRIX). */
+    Mat Afwd   = c->Afwd_per_freq[i];
+    Mat Aadj   = c->Aadj_per_freq[i];
+    KSP kspFwd = c->kspFwd_per_freq[i];
+    KSP kspAdj = c->kspAdj_per_freq[i];
 
     PetscCall(PetscTime(&tA0));
-    PetscCall(MatCopy(Kmat, A, SAME_NONZERO_PATTERN));
-    PetscCall(MatAXPY(A, -Const, Msmat, SAME_NONZERO_PATTERN));
+    PetscCall(MatCopy(Kmat, Afwd, SAME_NONZERO_PATTERN));
+    PetscCall(MatAXPY(Afwd, -Const, Msmat, SAME_NONZERO_PATTERN));
+    PetscCall(MatConvert(Afwd, MATAIJ, MAT_REUSE_MATRIX, &Aadj));
     PetscCall(PetscTime(&tA1));
     c->tAssembly += tA1 - tA0;
 
@@ -617,9 +706,9 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
     Vec dObs_row = c->dObsRow_per_freq[i];
     Vec Wf       = c->Wf_per_freq[i];
 
-    /* Solve forward system: A_f * x = b (numeric refactor on the cached symbolic factorization, triggered by the in-place A_f value update). */
+    /* Forward solve: A_f * x = b */
     PetscCall(PetscTime(&tA0));
-    PetscCall(solveInvSystem(ksp, b, x));
+    PetscCall(solveInvSystem(kspFwd, b, x));
     PetscCall(PetscTime(&tA1));
     c->tSolver += tA1 - tA0;
 
@@ -667,9 +756,9 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
     /* Adjoint RHS: nB = QEx^T * wcdtD_mpi */
     PetscCall(MatMultTranspose(c->Q->QEx, wcdtD_mpi, nB));
 
-    /* Adjoint solve: A_f * nx = nB  (reuse factorization from forward) */
+    /* Adjoint solve: A_f * nx = nB */
     PetscCall(PetscTime(&tA0));
-    PetscCall(solveInvSystem(ksp, nB, nx));
+    PetscCall(solveInvSystem(kspAdj, nB, nx));
     PetscCall(PetscTime(&tA1));
     c->tSolver += tA1 - tA0;
 
@@ -685,7 +774,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
                                           c->dmInversion, c->DfDm,
                                           &c->quad3d, c->MeRows, c->KeRows));
 
-    /* Cleanup frequency-level objects. The per-frequency A_f and ksp live on the context (reused next evaluation); only the borrowed local
+    /* Cleanup frequency-level objects. The per-frequency operators and KSPs live on the context (reused next evaluation); only the borrowed local
      * vectors are returned here. */
     PetscCall(DMRestoreLocalVector(c->dm, &xLocal));
     PetscCall(DMRestoreLocalVector(c->dm, &nxLocal));
@@ -757,6 +846,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /**
  * @brief Top-level inversion driver.
@@ -891,9 +981,8 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
     .lastRegTerm        = 0.0,
     .iterCount          = 0,
     .acceptedIter       = 0,
-    /* Workspace fields (quad3d, MeRows, KeRows, b/x/nB/nx/Ex_recv,
-     * Bvec_per_freq, Wf_per_freq, dObsRow_per_freq) are zero-initialized
-     * by C designated-init and populated by setupInversionWorkspace next. */
+    /* Workspace fields (quad3d, MeRows, KeRows, b/x/nB/nx/Ex_recv, Bvec_per_freq, Wf_per_freq, dObsRow_per_freq) are
+     * zero-initialized by C designated-init and populated by setupInversionWorkspace next. */
   };
 
   /* Precompute everything that doesn't depend on the L-BFGS iterate X. */
@@ -912,10 +1001,7 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
                           &ctx.lastRMS, iparams->rmsTol,
                           &numIters, &reasonStr));
 
-  /* The per-evaluation RMS history is written to the /rms_history dataset in
-   * the output HDF5 (below) for analysis */
-
-  /* ---- Write results to HDF5 ---- */
+  /* The per-evaluation RMS history is written to the /rms_history dataset in the output HDF5 (below) for analysis */
   PetscCall(writeInversionResults(iparams, dmConductivity, conductivity, X, allRMS, ctx.iterCount, reasonStr));
 
   /* Cleanup */
@@ -933,8 +1019,13 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
 
   /* Hand the accumulated phase timers back to the caller (im.csem) so it
    * can report an Assembly/Solver breakdown consistent with fm.csem. */
-  if (tAssemblyOut) *tAssemblyOut = ctx.tAssembly;
-  if (tSolverOut)   *tSolverOut   = ctx.tSolver;
+  if (tAssemblyOut) {
+    *tAssemblyOut = ctx.tAssembly;
+  }
+
+  if (tSolverOut) {
+    *tSolverOut   = ctx.tSolver;
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -1,0 +1,3 @@
+# Generated candidate meshes (regenerate with gmsh -3 *.geo). Tracked: the .geo
+# candidates, analyze_candidates.py, results/, and MESHING_ASSESSMENT.md.
+*.msh

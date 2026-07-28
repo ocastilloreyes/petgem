@@ -90,25 +90,123 @@ PetscErrorCode printUsage(const char *progname);
  */
 const char *formatGroupedInt(PetscInt value);
 
+
 /**
- * @brief Structured console-log helpers - the single place that owns the
- *        PETGEM run-report layout (section headers and 24-column key-value
- *        lines), keeping fm.csem and im.csem output consistent.
+ * @brief Prints a section header in the PETGEM run-report layout.
  *
- * - logSection prints "\n <title>:\n".
- * - logKVStr/Int/Real print "   %-24s = <value>\n" with a string, a
- *   space-grouped integer, or a %g real, respectively.
- * - logKVf prints "   %-24s = <value>\n" with a printf-formatted value for the
- *   few lines that need a custom value layout.
+ * Emits:
  *
- * @param[in] comm  Communicator to print on (rank 0 emits).
- * @param[in] key   Left-hand label (padded to 24 columns; KV helpers only).
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ *     "\n<title>:\n"
+ *
+ * Only rank 0 of the communicator produces output.
+ *
+ * @param[in] comm   Communicator to print on (rank 0 emits).
+ * @param[in] title  Section title.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logSection(MPI_Comm comm, const char *title);
+
+
+/**
+ * @brief Prints a string key-value line in the PETGEM run-report layout.
+ *
+ * Emits:
+ *
+ *     "   %-24s = <value>\n"
+ *
+ * where the value is a string. Only rank 0 of the communicator produces
+ * output.
+ *
+ * @param[in] comm  Communicator to print on (rank 0 emits).
+ * @param[in] key   Left-hand label (padded to 24 columns).
+ * @param[in] val   String value.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode logKVStr(MPI_Comm comm, const char *key, const char *val);
+
+
+/**
+ * @brief Prints an integer key-value line in the PETGEM run-report layout.
+ *
+ * Emits:
+ *
+ *     "   %-24s = <value>\n"
+ *
+ * where the value is printed as a space-grouped integer. Only rank 0 of the
+ * communicator produces output.
+ *
+ * @param[in] comm  Communicator to print on (rank 0 emits).
+ * @param[in] key   Left-hand label (padded to 24 columns).
+ * @param[in] val   Integer value.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val);
+
+
+/**
+ * @brief Prints a real-valued key-value line in the PETGEM run-report layout.
+ *
+ * Emits:
+ *
+ *     "   %-24s = <value>\n"
+ *
+ * where the value is printed using %g. Only rank 0 of the communicator
+ * produces output.
+ *
+ * @param[in] comm  Communicator to print on (rank 0 emits).
+ * @param[in] key   Left-hand label (padded to 24 columns).
+ * @param[in] val   Real value.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode logKVReal(MPI_Comm comm, const char *key, PetscReal val);
+
+
+/**
+ * @brief Prints a printf-formatted key-value line in the PETGEM run-report
+ *        layout.
+ *
+ * Emits:
+ *
+ *     "   %-24s = <value>\n"
+ *
+ * where the value is generated from a printf-style format string. Only rank 0
+ * of the communicator produces output.
+ *
+ * @param[in] comm    Communicator to print on (rank 0 emits).
+ * @param[in] key     Left-hand label (padded to 24 columns).
+ * @param[in] valfmt  printf-style format string for the value.
+ * @param[in] ...     Arguments consumed by valfmt.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 PetscErrorCode logKVf(MPI_Comm comm, const char *key, const char *valfmt, ...);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #endif

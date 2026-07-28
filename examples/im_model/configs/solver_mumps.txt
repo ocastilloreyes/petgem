@@ -1,0 +1,9 @@
+# Solver preset: MUMPS direct solver (LU factorization).
+# Usable by both kernels. Add it after the case config, e.g.:
+#   build/im.csem -options_file configs/params_im.txt   -options_file configs/solver_mumps.txt
+#   build/fm.csem -options_file configs/params_fm_f1.txt -options_file configs/solver_mumps.txt
+-ksp_type                    preonly
+-pc_type                     lu
+-pc_factor_mat_solver_type   mumps
+-mat_mumps_icntl_14          80
+-mat_mumps_icntl_28          1

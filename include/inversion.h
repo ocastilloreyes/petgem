@@ -185,7 +185,7 @@ typedef struct {
    *  im.csem can report an Assembly/Solver breakdown consistent with fm.csem
    *  instead of lumping the whole inversion into one bucket. */
   PetscLogDouble                  tAssembly;   /**< Ms refill + A = K - iωμ·Ms. */
-  PetscLogDouble                  tSolver;     /**< Factorize + fwd/adjoint solves. */
+  PetscLogDouble                  tSolver;     /**< Solver setup + fwd/adjoint solves. */
   /** @} */
 
   /* ---- Pre-allocated workspace ----
@@ -239,17 +239,16 @@ typedef struct {
   Mat                             Gmat_BDDC;   /**< High-order discrete gradient (BDDC hint). */
   /** @} */
 
-  /** @{ Persistent per-frequency system matrices and solvers. The sparsity
-   *  pattern of A_f = K - iωμ·Ms is invariant across both frequency and L-BFGS
-   *  iteration (SAME_NONZERO_PATTERN), so each Avec_per_freq[f] is allocated
-   *  ONCE and refilled in place every objgrad evaluation, and each
-   *  ksp_per_freq[f] is created ONCE bound to it. Reusing the KSP keeps the
-   *  (expensive) symbolic factorization / BDDC topological setup across all
-   *  iterations; only the cheap numeric refactorization is redone when the
-   *  matrix values change. Created by setupInversionWorkspace, freed by
-   *  destroyInversionWorkspace. */
-  Mat                            *Avec_per_freq;     /**< numFreqs, sized on dm. */
-  KSP                            *ksp_per_freq;      /**< numFreqs. */
+  /** @{ Persistent per-frequency operators and solvers. The sparsity of
+   *  A_f = K - iωμ·Ms is invariant across frequency and L-BFGS iteration, so the
+   *  forward MATIS operator Afwd_per_freq[f] and its AIJ image Aadj_per_freq[f]
+   *  are allocated once and refilled in place every objgrad evaluation, and the
+   *  forward and adjoint KSPs are created once bound to them. Created by
+   *  setupInversionWorkspace, freed by destroyInversionWorkspace. */
+  Mat                            *Afwd_per_freq;     /**< numFreqs, MATIS; forward solve. */
+  Mat                            *Aadj_per_freq;     /**< numFreqs, AIJ; adjoint solve. */
+  KSP                            *kspFwd_per_freq;   /**< numFreqs; forward solve. */
+  KSP                            *kspAdj_per_freq;   /**< numFreqs; adjoint solve. */
   /** @} */
 } InversionContext;
 
@@ -469,34 +468,12 @@ PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity,
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */
-PetscErrorCode createInversionDM(DM dmConductivity, const Grid *grid,
-                                  DM *dmInv);
+PetscErrorCode createInversionDM(DM dmConductivity, const Grid *grid, DM *dmInv);
 
 /**
- * @brief Creates a KSP for inversion (same setup as solveCsemSystem, no solve).
+ * @brief Solves A·sol = rhs with an already-created KSP.
  *
- * `Gbddc` is the forward-formulation high-order discrete-gradient operator
- * passed to PCBDDC (distinct from the inversion gradient ∂F/∂X). The caller
- * must KSPDestroy it after the forward + adjoint solves.
- *
- * @param[in]  iparams  Inversion parameters.
- * @param[in]  dm       H(curl) DM.
- * @param[in]  A        System matrix.
- * @param[in]  Gbddc    High-order discrete-gradient operator for PCBDDC.
- * @param[out] ksp      Created KSP bound to A.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
- */
-PetscErrorCode createInvKSP(const imParams *iparams,
-                             const DM dm,
-                             const Mat A,
-                             const Mat Gbddc,
-                             KSP *ksp);
-
-/**
- * @brief Solves A·sol = rhs with an already-created (factored) KSP.
- *
- * @param[in]  ksp  KSP previously created by createInvKSP.
+ * @param[in]  ksp  KSP bound to the system operator.
  * @param[in]  rhs  Right-hand side vector.
  * @param[out] sol  Solution vector.
  *

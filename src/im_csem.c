@@ -261,7 +261,7 @@ int runInverse(int argc, char **argv) {
 
   /* Split the inversion wall time across the same six buckets fm.csem uses, so printTimers labels them consistently 
    * for both kernels. tAssembly and tSolver are accumulated inside the L-BFGS loop (Ms refill + A build, and
-   * factorize + forward/adjoint solves); the remainder (gradient, smoothing, line search, results I/O, 
+   * solver setup + forward/adjoint solves); the remainder (gradient, smoothing, line search, results I/O,
    * L-BFGS overhead) lands in the last bucket. */
   timers[3] = tAssembly;
   timers[4] = tSolver;

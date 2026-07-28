@@ -1,13 +1,10 @@
-# fm.csem forward config - im_model benchmark, 300 Hz, order 2. Iterative solver:
-# PCBDDC on the MATIS operator with the exact Nedelec discrete-gradient coarse
-# space. Consumes the bundle built by scripts/build_bundles.sh fm.
+# fm.csem forward config - im_model benchmark, 300 Hz, order 2. Case options
+# only (I/O); the linear solver is selected separately by adding a solver preset,
+# so this kernel runs with either PCBDDC or MUMPS:
+#   -options_file configs/params_fm_f300.txt -options_file configs/solver_bddc.txt
+#   -options_file configs/params_fm_f300.txt -options_file configs/solver_mumps.txt
+# Consumes the bundle built by scripts/build_bundles.sh fm.
 
 -input_filename   examples/im_model/outputs/input_fm_f300.h5
 -output_dir       examples/im_model/outputs/
 -output_filename  responses_fm_f300_p2
-
--dm_mat_type                 is
--ksp_type                    fgmres
--pc_type                     bddc
--pc_bddc_use_deluxe_scaling  1
--pc_bddc_coarse_pc_type      lu

@@ -1,25 +1,29 @@
 /*********************************************************************
-* im_model.geo  --  INVERSION mesh base (im.csem)
+* im_model_smooth.geo -- CANDIDATE M3: extra-gentle grading (trend point).
 *
-* A HOMOGENEOUS earth under air 
-* In inverse modelling the invertable region is a parameter MASK
-* (a logical subset of cells), not a physical body, so it is assigned by
-* re-tagging cells AFTER meshing (see the re-tag step that produces
-* im_model.msh and im_true.msh) rather than by embedding a volume that
-* would create an artificial mesh interface with no conductivity contrast.
+* Same physical model and geometry as geometry/im_model.geo (homogeneous
+* earth under air; z POSITIVE DOWN; transmitter at (0,-4000,0)). The
+* INVERT/ANOMALY regions are still parameter MASKS applied by re-tagging
+* cells after meshing, NOT geometric volumes, so no artificial interface is
+* introduced.
 *
-* This .geo yields only:  tag 1 AIR (z<0), tag 2 BG/earth (z>0).
-* Starting model is a uniform 100 ohm-m halfspace. Refinement is placed
-* (via size fields) at the true-anomaly footprint, the region of interest,
-* the survey centre and the transmitter, so the later cell-masks are well
-* resolved. Coordinates: z POSITIVE DOWN. Transmitter at (0,-4000,0).
+* ONLY the meshing strategy changes relative to the original:
+*   - graded box transition widened   Thickness 400/200 -> 1500/800
+*   - radial size gradient softened    0.32 -> 0.22 (per metre)
+*   - far-field cap lowered            h_far 10000 -> 5000
+*   - 3D algorithm                     Delaunay(1) -> HXT(10)
+* The CRITICAL element sizes are UNCHANGED (h_roi=40, h_an=25, h_near=40),
+* so anomaly/ROI resolution -- and thus inversion accuracy -- is preserved.
+* The softer grading removes the abrupt fine->coarse size jump that produced
+* the high-valence, topologically complex subdomain interfaces implicated in
+* the PCBDDC coarse-edge (Nedelec support) failure at order 2.
 *********************************************************************/
 
 X  = 30000;  ZA = -60000;  ZB = 30000;   // domain
 RX =   400;  RZ =   600;                  // region-of-interest footprint (for refinement only)
 AX =   100;  AZT = 100;   AZB = 300;      // true-anomaly footprint (for refinement only)
 SY = -4000;
-h_roi = 40;  h_an = 25;  h_near = 40;  h_far = 5000;   // smooth grading for PCBDDC robustness (h_far was 10000)
+h_roi = 40;  h_an = 25;  h_near = 40;  h_far = 4000;    // h_far 10000 -> 5000
 
 // ---- POINTS: earth top z=0 (1-4), earth bottom z=ZB (5-8), air top z=ZA (9-12)
 Point(1)={-X,-X,0}; Point(2)={X,-X,0}; Point(3)={X,X,0}; Point(4)={-X,X,0};
@@ -52,20 +56,15 @@ Surface Loop(2)={1,7,8,9,10,11};      Volume(2)={2};   // air (z=0 face shared)
 Physical Volume("AIR", 1)={2};
 Physical Volume("BG",  2)={1};
 
-// ---- MESH SIZE (refine where the masks will land)
-// Grading is deliberately SMOOTH: wide box transitions and a gentle radial
-// gradient keep the fine->coarse size jump small so the air-earth interface
-// stays topologically simple for PCBDDC coarse-edge construction. Critical
-// sizes (h_roi/h_an/h_near) are unchanged, so resolution/accuracy is preserved.
-// Keep the fine boxes on the earth side of z=0 (do NOT refine across z=0).
+// ---- MESH SIZE (refine where the masks will land) -- SMOOTH GRADING
 Field[1]=Box; Field[1].VIn=h_roi; Field[1].VOut=h_far;
 Field[1].XMin=-RX;Field[1].XMax=RX;Field[1].YMin=-RX;Field[1].YMax=RX;Field[1].ZMin=0;Field[1].ZMax=RZ;
-Field[1].Thickness=1500;                                 // smoother transition (was 400)
+Field[1].Thickness=2500;                                 // 400 -> 1500
 Field[2]=Box; Field[2].VIn=h_an; Field[2].VOut=h_far;
 Field[2].XMin=-AX;Field[2].XMax=AX;Field[2].YMin=-AX;Field[2].YMax=AX;Field[2].ZMin=AZT;Field[2].ZMax=AZB;
-Field[2].Thickness=800;                                  // smoother transition (was 200)
-Field[3]=MathEval; Field[3].F=Sprintf("%g + 0.22*sqrt(x^2 + y^2 + z^2)", h_near);           // gradient was 0.32
-Field[4]=MathEval; Field[4].F=Sprintf("%g + 0.22*sqrt(x^2 + (y-(%g))^2 + z^2)", h_near, SY); // gradient was 0.32
+Field[2].Thickness=1200;                                  // 200 -> 800
+Field[3]=MathEval; Field[3].F=Sprintf("%g + 0.15*sqrt(x^2 + y^2 + z^2)", h_near);          // 0.32 -> 0.22
+Field[4]=MathEval; Field[4].F=Sprintf("%g + 0.15*sqrt(x^2 + (y-(%g))^2 + z^2)", h_near, SY); // 0.32 -> 0.22
 Field[10]=Min; Field[10].FieldsList={1,2,3,4};
 Background Field=10;
 
@@ -73,6 +72,6 @@ Mesh.MeshSizeExtendFromBoundary=0;
 Mesh.MeshSizeFromPoints=0;
 Mesh.MeshSizeFromCurvature=0;
 Mesh.MeshSizeMax=h_far;
-Mesh.Algorithm3D=10;                                     // HXT: better worst-element quality (was 1=Delaunay)
+Mesh.Algorithm3D=10;                                     // Delaunay(1) -> HXT(10)
 Mesh.MshFileVersion=2.2;
 Mesh.Optimize=1;
