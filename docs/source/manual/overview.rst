@@ -106,11 +106,15 @@ Comparison against a reference is done by the per-case ``scripts/postprocess.py`
 
 Example cases
 *************
-Two cases ship under ``examples/``:
+Three cases ship under ``examples/``, all sharing the same layout
+(``geometry/``, ``survey/``, ``configs/``, ``scripts/``, ``reference/``):
 
-- ``examples/fm_model`` - a marine CSEM benchmark with a thin resistive
+- ``examples/fm`` - a marine CSEM benchmark with a thin resistive
   layer, with a precomputed reference for validation.
 - ``examples/unit_cube`` - a small homogeneous cube; the dataset the test suite
   is built around.
+- ``examples/im`` - the CSEM inversion benchmark: a buried conductive block
+  recovered from noisy synthetic observations.
 
-Both are forward cases. See :doc:`examples`.
+The first two are forward cases (see :doc:`examples`); ``examples/im`` covers
+the full inverse workflow (see :doc:`inverse_examples`).

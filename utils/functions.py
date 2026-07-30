@@ -491,26 +491,31 @@ def writePetgemInputFile(plex, conductivity, materials_id,
     v_model.destroy()
 
 
-# Solver block emitted per mode. fm.csem defaults to the BDDC-preconditioned
-# iterative solve (which requires the MATIS operator); im.csem re-solves the
-# system at every L-BFGS iteration and so defaults to a direct factorization.
-# This is an intrinsic difference between the two problems, not an interface
-# one - everything around it is shared.
+# Solver block emitted per mode. Both kernels support both solver families and
+# both read the SAME unprefixed option keys, so a preset file is portable
+# between them. The operator type is what selects the family: "-dm_mat_type is"
+# builds a MATIS operator and enables the PCBDDC iterative path, while an AIJ
+# operator enables a direct factorization (-ksp_type preonly -pc_type lu
+# -pc_factor_mat_solver_type mumps).
+#
+# The template emits the iterative path for both modes; users switch by editing
+# this block or by appending a solver preset with a second -options_file.
+#
+# The blocks differ only in the tolerance: im.csem's adjoint system A_f.nx = nB
+# uses the same operator - and so the same KSP - as its forward solve, and the
+# adjoint solution enters the objective gradient, so it is solved tightly.
+_ITERATIVE_SOLVER_BLOCK = (
+    "-dm_mat_type is\n"
+    "-ksp_type fgmres\n"
+    "-pc_type bddc\n"
+    "-pc_bddc_use_deluxe_scaling 1\n"
+    "-pc_bddc_coarse_pc_type lu\n"
+    "-pc_bddc_monolithic\n"
+)
+
 _SOLVER_BLOCK = {
-    "fm": (
-        "-dm_mat_type is\n"
-        "-ksp_type fgmres\n"
-        "-pc_type bddc\n"
-        "-pc_bddc_use_deluxe_scaling 1\n"
-        "-pc_bddc_coarse_pc_type lu\n"
-    ),
-    "im": (
-        "-ksp_type preonly\n"
-        "-pc_type                    lu\n"
-        "-pc_factor_mat_solver_type  mumps\n"
-        "-mat_mumps_icntl_14         80\n"
-        "-mat_mumps_icntl_28         1\n"
-    ),
+    "fm": _ITERATIVE_SOLVER_BLOCK,
+    "im": _ITERATIVE_SOLVER_BLOCK + "-ksp_rtol 1.0e-10\n",
 }
 
 # Inversion tuning block (im only). Every option is -im_*, matching the

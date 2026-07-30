@@ -1,0 +1,16 @@
+# Solver preset: MUMPS direct solver (LU factorization).
+# Usable by BOTH kernels - they read the same unprefixed option keys. Add it
+# after the case config, e.g.:
+#   build/im.csem -options_file configs/params_im.txt    -options_file configs/solver_mumps.txt
+#   build/fm.csem -input_filename outputs/input_fm_f1.h5 -options_file configs/solver_mumps.txt
+#
+# -dm_mat_type is set explicitly: MUMPS factorizes an AIJ operator and cannot
+# factorize the MATIS operator the PCBDDC path needs. im.csem falls back to
+# MATIS when the parameter file names no type, so omitting this line would hand
+# the direct solver an operator it cannot handle.
+-dm_mat_type                 aij
+-ksp_type                    preonly
+-pc_type                     lu
+-pc_factor_mat_solver_type   mumps
+-mat_mumps_icntl_14          80
+-mat_mumps_icntl_28          1

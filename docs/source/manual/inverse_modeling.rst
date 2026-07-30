@@ -114,11 +114,13 @@ Parameter file
 .. code-block::
 
    -input_filename <case_dir>/input.h5
-   -ksp_type preonly
-   -pc_type                    lu
-   -pc_factor_mat_solver_type  mumps
-   -mat_mumps_icntl_14         80
-   -mat_mumps_icntl_28         1
+   -dm_mat_type is
+   -ksp_type fgmres
+   -pc_type bddc
+   -pc_bddc_use_deluxe_scaling 1
+   -pc_bddc_coarse_pc_type lu
+   -pc_bddc_monolithic
+   -ksp_rtol 1.0e-10
    -im_max_iter               150
    -im_lbfgs_memory           2
    -im_lambda                 0.1
@@ -129,8 +131,21 @@ Parameter file
    -output_dir <case_dir>/
    -output_filename responses
 
-This template overrides several kernel defaults and selects a **direct** solve
-(MUMPS) instead of the iterative forward default; see :doc:`solver`.
+This template overrides several kernel defaults and selects the **iterative**
+PCBDDC solve. Both kernels support both solver families and read the same
+unprefixed option keys, so swapping in a direct solve is a matter of replacing
+that block (``-dm_mat_type aij -ksp_type preonly -pc_type lu
+-pc_factor_mat_solver_type mumps``) or appending a solver preset as a second
+``-options_file``; see :doc:`solver`.
+
+The operator type is what selects the family: ``-dm_mat_type is`` builds the
+MATIS operator PCBDDC requires, while a direct factorization needs AIJ.
+``im.csem`` falls back to MATIS when the parameter file names no type.
+
+``im.csem``'s adjoint system :math:`A_f \cdot nx = nB` uses the same operator as
+its forward solve and therefore the same KSP, so this one block governs both
+solves. ``-ksp_rtol`` is set tight because the adjoint solution enters the
+objective gradient.
 
 ``-im_error_level`` and ``-im_fixed_materials`` are accepted but absent from
 the template, since their values come from the bundle.

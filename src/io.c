@@ -595,13 +595,16 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
       PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of sources", sources->numSources));
       for (PetscInt i = 0; i < sources->numSources; i++) {
         const CsemSource *s = &sources->sourceArray[i];
+        /* Nested block: 5 + %-22s puts the '=' in the same column as the
+         * top-level 3 + %-24s, so the whole report shares one alignment. */
         PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   Source %" PetscInt_FMT ":\n", i + 1));
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = %g\n",            "Current",          (double)s->current));
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = %g\n",            "Length",           (double)s->length));
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = %g\n",            "Dip angle",        (double)s->dipAngle));
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = %g\n",            "Azimuth angle",    (double)s->azimuthAngle));
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = [%g, %g, %g]\n",  "Position (x, y, z)",
-                              (double)s->position[0], (double)s->position[1], (double)s->position[2]));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = %s\n", "Current (A)",          formatReal(s->current)));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = %s\n", "Length (m)",           formatReal(s->length)));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = %s\n", "Dip angle (deg)",      formatReal(s->dipAngle)));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = %s\n", "Azimuth angle (deg)",  formatReal(s->azimuthAngle)));
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD, "     %-22s = (%s, %s, %s)\n", "Position (m)",
+                              formatReal(s->position[0]), formatReal(s->position[1]),
+                              formatReal(s->position[2])));
       }
     }
 
@@ -846,14 +849,23 @@ PetscErrorCode setupInversionSources(const char *bundleFile,
   PetscCall(logKVStr(comm, "Bundle file", bundleFile));
   PetscCall(logKVInt(comm, "Number of entries", im_Params->numFreqs));
 
+  /* One row per transmitter rather than fm.csem's nested per-source block: with
+   * one entry per frequency a table is far easier to scan than seven blocks.
+   * Column headers carry the units so the rows stay numeric. */
+  PetscCall(PetscPrintf(comm, "     %-5s %10s  %-28s %8s %8s %8s %8s\n",
+                        "Entry", "Freq (Hz)", "Position (m)",
+                        "I (A)", "L (m)", "Dip", "Azimuth"));
   for (PetscInt i = 0; i < im_Params->numFreqs; i++) {
     ImCsemSource *s = &im_Params->imSources[i];
+    char pos[40];
+    PetscCall(PetscSNPrintf(pos, sizeof(pos), "(%s, %s, %s)",
+                            formatReal(s->position[0]), formatReal(s->position[1]),
+                            formatReal(s->position[2])));
     PetscCall(PetscPrintf(comm,
-      "   [%3" PetscInt_FMT "] freq = %g Hz, pos = (%g, %g, %g),"
-      " I = %g, L = %g, dip = %g, az = %g\n",
-      i + 1, s->freq,
-      s->position[0], s->position[1], s->position[2],
-      s->current, s->length, s->dipAngle, s->azimuthAngle));
+      "     %5" PetscInt_FMT " %10s  %-28s %8s %8s %8s %8s\n",
+      i + 1, formatReal(s->freq), pos,
+      formatReal(s->current), formatReal(s->length),
+      formatReal(s->dipAngle), formatReal(s->azimuthAngle)));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -955,12 +967,23 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
   PetscCall(PetscViewerDestroy(&viewer));
 
   /* Final-value banner (matches the style of readimParams) */
-  PetscCall(logKVf(comm, "Error level", "%g  (%s)", (double)im_Params->errorLevel, errLevelOrigin));
-  PetscCall(PetscPrintf(comm, "   %-24s = %" PetscInt_FMT " IDs (%s):", "Fixed materials", im_Params->numFixedMaterials, fixedMatsOrigin));
-  for (PetscInt i = 0; i < im_Params->numFixedMaterials; i++) {
-    PetscCall(PetscPrintf(comm, " %" PetscInt_FMT, im_Params->fixedMaterials[i]));
+  PetscCall(logKVf(comm, "Error level", "%s (from %s)", formatReal(im_Params->errorLevel), errLevelOrigin));
+
+  /* Value first, provenance after: "0 1 (2 IDs, from bundle)" reads as a value
+   * with a note, where the previous "2 IDs (bundle): 0 1" led with the count and
+   * buried the IDs past a colon. */
+  {
+    char ids[192] = "";
+    for (PetscInt i = 0; i < im_Params->numFixedMaterials; i++) {
+      char one[24];
+      PetscCall(PetscSNPrintf(one, sizeof(one), "%s%" PetscInt_FMT,
+                              (i == 0) ? "" : " ", im_Params->fixedMaterials[i]));
+      PetscCall(PetscStrlcat(ids, one, sizeof(ids)));
+    }
+    if (im_Params->numFixedMaterials == 0) PetscCall(PetscStrncpy(ids, "none", sizeof(ids)));
+    PetscCall(logKVf(comm, "Fixed materials", "%s  (%" PetscInt_FMT " IDs, from %s)",
+                     ids, im_Params->numFixedMaterials, fixedMatsOrigin));
   }
-  PetscCall(PetscPrintf(comm, "\n"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1199,17 +1222,22 @@ PetscErrorCode loadObservedDataset(const imParams *iparams,
  * The following datasets are written:
  *   - conductivity      : global conductivity model (3 components/cell)
  *   - log_perturbation  : inverted model parameter vector
- *   - rms_history       : RMS misfit per iteration (optional)
+ *   - rms_history       : RMS misfit per objective-gradient evaluation (optional)
  *
- * Additional attributes store provenance and inversion metadata,
- * including PETGEM version, number of iterations, and stopping reason.
+ * Additional attributes store provenance and inversion metadata, including
+ * PETGEM version, the stopping reason, and BOTH iteration counters: attribute
+ * num_iterations is the accepted-L-BFGS-step count, num_objgrad_evaluations is
+ * the number of objective-gradient evaluations, which is what rms_history is
+ * indexed by. They differ by the rejected line-search trials, so consumers must
+ * not use one where the other is meant.
  *
  * @param[in] im_Params        Inversion parameters and metadata.
  * @param[in] dmConductivity   DM describing conductivity field.
  * @param[in] conductivity     Local conductivity vector.
  * @param[in] X                Log-perturbation model vector.
- * @param[in] allRMS           RMS history over iterations.
- * @param[in] numIters         Number of inversion iterations.
+ * @param[in] allRMS           RMS history, one entry per evaluation.
+ * @param[in] numIters         Accepted L-BFGS steps.
+ * @param[in] numEvals         Objective-gradient evaluations (length of allRMS).
  * @param[in] reasonStr        Convergence/stopping reason string.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
@@ -1221,6 +1249,7 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
                                       Vec              X,
                                       const PetscReal *allRMS,
                                       PetscInt         numIters,
+                                      PetscInt         numEvals,
                                       const char      *reasonStr)
 {
   PetscFunctionBeginUser;
@@ -1271,23 +1300,24 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "lambda",             PETSC_REAL,   &im_Params->lambda));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "error_level",        PETSC_REAL,   &im_Params->errorLevel));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "num_iterations",     PETSC_INT,    &numIters));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "num_objgrad_evaluations", PETSC_INT, &numEvals));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "convergence_reason", PETSC_STRING, reasonStr));
 
-  /* Write RMS history as an MPI Vec so all ranks participate in the collective VecView.  Only rank 0 owns the data (size numIters);
-   * all other ranks contribute zero entries */
-  if (numIters > 0) {
+  /* Write RMS history as an MPI Vec so all ranks participate in the collective VecView.  Only rank 0 owns the data (size numEvals -
+   * allRMS carries one entry per objective-gradient evaluation, NOT per accepted step); all other ranks contribute zero entries */
+  if (numEvals > 0) {
     PetscMPIInt rank;
     PetscCallMPI(MPI_Comm_rank(comm, &rank));
-    PetscInt rmsLocalSize = (rank == 0) ? numIters : 0;
+    PetscInt rmsLocalSize = (rank == 0) ? numEvals : 0;
 
     Vec rmsVec;
-    PetscCall(VecCreateMPI(comm, rmsLocalSize, numIters, &rmsVec));
+    PetscCall(VecCreateMPI(comm, rmsLocalSize, numEvals, &rmsVec));
     PetscCall(PetscObjectSetName((PetscObject)rmsVec, "rms_history"));
 
     if (rank == 0) {
       PetscScalar *rArr;
       PetscCall(VecGetArray(rmsVec, &rArr));
-      for (PetscInt i = 0; i < numIters; i++) {
+      for (PetscInt i = 0; i < numEvals; i++) {
         rArr[i] = allRMS[i];
       }
       PetscCall(VecRestoreArray(rmsVec, &rArr));
@@ -1322,12 +1352,12 @@ PetscErrorCode writeInversionResults(const imParams *im_Params,
  * The snapshot carries a single cell-centered scalar field:
  *   - rho            : 1 / sigma_x (conductivity-derived resistivity, Ohm.m)
  *
- * Output structure:
- *   - {output_filename}_iterXXXXX.pvtu       (master file, rank 0)
- *   - {output_filename}_iterXXXXX_pRRRR.vtu  (one file per rank)
+ * Output structure, inside a snapshot directory under {output_dir}:
+ *   - snapshots/iterNNNN.pvtu       (master, rank 0)
+ *   - snapshots/iterNNNN_rRRRR.vtu  (one per rank)
  *
  * The .pvtu file aggregates all per-rank pieces into a single dataset
- * for visualization in ParaView.
+ * for visualization in ParaView, referencing them relatively.
  *
  * @param[in] ctx            Inversion execution context (DM, fields, grid).
  * @param[in] acceptedIter   Current accepted optimization iteration.
@@ -1346,23 +1376,46 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx, PetscInt a
   PetscCallMPI(MPI_Comm_rank(comm, &rank));
   PetscCallMPI(MPI_Comm_size(comm, &size));
 
-  /* Snapshot names derive from the run's output stem, exactly like the kernels' .h5 products, instead of a hardcoded "inv_model" prefix - so a
-   * snapshot is attributable to its run and two runs writing to the same directory do not overwrite each other. The parameters were already
-   * parsed by readPetgemParams; no re-read of the options database here.
+  /* Snapshots go into their own directory:
    *
-   *   {output_dir}/{output_filename}_iterNNNNN.pvtu        (master, rank 0)
-   *   {output_dir}/{output_filename}_iterNNNNN_pRRRR.vtu   (one per rank)
+   *   {output_dir}/snapshots/iterNNNN.pvtu       (master, rank 0)
+   *   {output_dir}/snapshots/iterNNNN_rRRRR.vtu  (one per rank)
    *
-   * The .pvtu references its pieces by base name (both live in output_dir). */
+   * At -im_snapshot_interval 1 a run emits (accepted steps x ranks) pieces - a
+   * 103-step, 112-rank inversion is ~11 600 files - so keeping them out of
+   * {output_dir} is what makes the results visible at all. The directory
+   * carries the grouping, leaving the file names to carry only what varies:
+   * iteration and rank.
+   *
+   * NOTE: the directory name is fixed rather than keyed on the output stem, so
+   * two runs writing to the SAME -output_dir share it and the later one
+   * overwrites matching iterations. Give concurrent runs distinct -output_dir.
+   *
+   * The parameters were already parsed by readPetgemParams; no re-read of the
+   * options database here. */
   const petgemParams *pg = &ctx->iparams->common;
-  char suffix[64];
+  char snapDir[PETSC_MAX_PATH_LEN];
   char pvtuFile[PETSC_MAX_PATH_LEN], pieceFile[PETSC_MAX_PATH_LEN];
 
-  PetscCall(PetscSNPrintf(suffix, sizeof(suffix), "_iter%05" PetscInt_FMT ".pvtu", acceptedIter));
-  PetscCall(buildOutputPath(pg, suffix, pvtuFile, sizeof(pvtuFile)));
+  PetscCall(PetscStrncpy(snapDir, pg->outputDirectory, sizeof(snapDir)));
+  {
+    size_t len = strlen(snapDir);
+    if (len > 0 && snapDir[len - 1] != '/') PetscCall(PetscStrlcat(snapDir, "/", sizeof(snapDir)));
+  }
+  PetscCall(PetscStrlcat(snapDir, "snapshots", sizeof(snapDir)));
+  if (rank == 0) {
+    PetscBool exists = PETSC_FALSE;
+    PetscCall(PetscTestDirectory(snapDir, 'w', &exists));
+    if (!exists) PetscCall(PetscMkdir(snapDir));
+  }
+  /* Every rank writes its own piece into snapDir, so none may race ahead of the
+   * rank-0 mkdir. */
+  PetscCallMPI(MPI_Barrier(comm));
 
-  PetscCall(PetscSNPrintf(suffix, sizeof(suffix), "_iter%05" PetscInt_FMT "_p%04d.vtu", acceptedIter, rank));
-  PetscCall(buildOutputPath(pg, suffix, pieceFile, sizeof(pieceFile)));
+  PetscCall(PetscSNPrintf(pvtuFile, sizeof(pvtuFile),
+                          "%s/iter%04" PetscInt_FMT ".pvtu", snapDir, acceptedIter));
+  PetscCall(PetscSNPrintf(pieceFile, sizeof(pieceFile),
+                          "%s/iter%04" PetscInt_FMT "_r%04d.vtu", snapDir, acceptedIter, rank));
 
   /* Per-owned-cell field values + exploded vertex coordinates.
    * The VTU snapshot carries only the recovered model rho = 1/sigma */
@@ -1422,11 +1475,13 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx, PetscInt a
       fprintf(fp, "      <PDataArray type=\"Float64\" Name=\"%s\"/>\n", imVtuFieldNames[f]);
     }
     fprintf(fp, "    </PCellData>\n");
-    /* Piece names must match the ones each rank writes above - same stem, same pattern - or ParaView cannot resolve the pieces. */
+    /* Piece names must match the ones each rank writes above - same pattern - or
+     * ParaView cannot resolve the pieces. They are plain base names: the .pvtu
+     * and its pieces share the snapshot directory, so the reference is relative. */
     for (PetscMPIInt r = 0; r < size; r++) {
       char rBase[PETSC_MAX_PATH_LEN];
       PetscCall(PetscSNPrintf(rBase, sizeof(rBase),
-        "%s_iter%05" PetscInt_FMT "_p%04d.vtu", pg->outputFilename, acceptedIter, r));
+        "iter%04" PetscInt_FMT "_r%04d.vtu", acceptedIter, r));
       fprintf(fp, "    <Piece Source=\"%s\"/>\n", rBase);
     }
     fprintf(fp, "  </PUnstructuredGrid>\n</VTKFile>\n");

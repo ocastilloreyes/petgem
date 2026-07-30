@@ -196,17 +196,37 @@ Layout::
     /                              root attrs (shared provenance block above)
     /conductivity                  recovered model, 3 components per cell
     /log_perturbation              model parameter vector
-    /rms_history                   RMS misfit per iteration
+    /rms_history                   RMS misfit, one entry per objgrad evaluation
 
 Additional root attributes: ``num_frequencies``, ``lambda``, ``error_level``,
-``num_iterations``, ``convergence_reason``.
+``num_iterations``, ``num_objgrad_evaluations``, ``convergence_reason``.
+
+The two counters are different and must not be substituted for one another:
+``num_iterations`` counts **accepted L-BFGS steps** (the rows of the optimizer
+table), while ``num_objgrad_evaluations`` counts **objective-gradient
+evaluations** and is the length of ``/rms_history``. The second exceeds the
+first by the line-search trials that were rejected, which is also why
+``/rms_history`` is not monotone. Files written before
+``num_objgrad_evaluations`` was added stored the evaluation count in
+``num_iterations``.
 
 With ``-im_snapshot_interval`` enabled, the kernel also writes a ParaView
-snapshot of the model every N accepted L-BFGS steps, named from the same output
-stem::
+snapshot of the model every N accepted L-BFGS steps, into a ``snapshots``
+directory under the output directory::
 
-    {output_dir}/{output_filename}_iter00001.pvtu          (master)
-    {output_dir}/{output_filename}_iter00001_p0000.vtu     (one piece per rank)
+    {output_dir}/snapshots/iter0001.pvtu       (master)
+    {output_dir}/snapshots/iter0001_r0000.vtu  (one piece per rank)
+
+The directory carries the grouping so the file names carry only what varies,
+iteration and rank. This matters at volume: one snapshot per step on many ranks
+emits thousands of pieces (103 steps on 112 ranks is roughly 11 600 files), and
+keeping them out of ``{output_dir}`` leaves the actual results visible. Open the
+``.pvtu`` in ParaView; it references its pieces relatively, so the directory
+moves as a unit.
+
+The name is fixed rather than derived from ``-output_filename``, so two runs
+sharing one ``-output_dir`` share the directory and the later one overwrites
+matching iterations. Give concurrent runs distinct output directories.
 
 Each snapshot carries a single cell field, ``rho`` (resistivity in Ohm.m).
 
@@ -217,5 +237,5 @@ Python readers:
 - ``petgem.readAllResponses(path)`` - ``{'provenance': ..., 'num_sources': N,
   'sources': {1: {...}, ...}}``, each entry shaped like ``readResponses``.
 
-``examples/fm_model/scripts/postprocess.py`` uses these readers to compare
+``examples/fm/scripts/postprocess.py`` uses these readers to compare
 against a reference.

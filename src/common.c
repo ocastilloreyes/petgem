@@ -255,6 +255,34 @@ const char *formatGroupedInt(PetscInt value) {
 }
 
 
+const char *formatReal(PetscReal value) {
+  enum { NUM_BUFS = 8, BUF_LEN = 32 };
+  static char bufs[NUM_BUFS][BUF_LEN];
+  static PetscInt which = 0;
+  char *out = bufs[which];
+  which = (which + 1) % NUM_BUFS;
+
+  /* snprintf, not PetscSNPrintf: PETSc's %g handling renders a whole value as
+   * "1." (bare trailing point), which is neither what we want to show nor a
+   * stable base to post-process. Naming the precision opts out of it and gives
+   * plain C behaviour, so 1.0 arrives here as "1". */
+  snprintf(out, BUF_LEN, "%.6g", (double)value);
+
+  /* Restore the float signal that %g drops. Anything already carrying a point,
+   * an exponent, or being nan/inf is left untouched. */
+  for (const char *p = out; *p; p++) {
+    if (*p == '.' || *p == 'e' || *p == 'E' || *p == 'n' || *p == 'i') return out;
+  }
+  size_t len = strlen(out);
+  if (len + 2 < BUF_LEN) {
+    out[len]     = '.';
+    out[len + 1] = '0';
+    out[len + 2] = '\0';
+  }
+  return out;
+}
+
+
 /**
  * @brief Prints a titled section header in the PETGEM run report.
  *
@@ -320,9 +348,10 @@ PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val) {
 /**
  * @brief Prints a floating-point key/value entry in the PETGEM run report.
  *
- * Renders the supplied value using PETSc's standard console output path
- * and the "%g" numeric format. Intended for tolerances, weights,
- * frequencies, physical parameters, and other scalar quantities.
+ * Renders the value through formatReal(), so it stays visibly a real: whole
+ * values print as "1.0" rather than "1", keeping them distinct from the counts
+ * logKVInt() prints. Intended for tolerances, weights, frequencies, physical
+ * parameters, and other scalar quantities.
  *
  * @param[in] comm  MPI communicator used by PetscPrintf().
  * @param[in] key   Entry label displayed in the left column.
@@ -332,7 +361,11 @@ PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val) {
  */
 PetscErrorCode logKVReal(MPI_Comm comm, const char *key, PetscReal val) {
   PetscFunctionBeginUser;
-  PetscCall(PetscPrintf(comm, "   %-24s = %g\n", key, (double)val));
+  /* formatReal, not %g: PETSc's %g renders whole values as "1." (bare trailing
+   * point), and a plain "%.6g" would render them as "1", which reads like a
+   * count. formatReal gives "1.0", keeping reals distinguishable from the
+   * integers that logKVInt prints. */
+  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", key, formatReal(val)));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -2,11 +2,13 @@
 Forward modeling examples
 =========================
 
-Two example cases ship under ``examples/``. Both are forward-modeling cases.
+Two of the three cases under ``examples/`` are forward-modeling cases and are
+covered here. The inversion benchmark, ``examples/im``, has its own page:
+:doc:`inverse_examples`.
 
 Marine CSEM model
 -----------------
-``examples/fm_model`` is a marine CSEM benchmark: a thin, resistive
+``examples/fm`` is a marine CSEM benchmark: a thin, resistive
 layer buried in conductive sediments beneath a seawater column. It exercises
 the full forward workflow (preprocess → ``fm.csem`` → postprocess) and is
 validated against a precomputed reference.
@@ -56,7 +58,7 @@ Running
 
    make
 
-   export MODEL_DIR=examples/fm_model
+   export MODEL_DIR=examples/fm
    export ORDER=1
 
    # 1. Mesh generation

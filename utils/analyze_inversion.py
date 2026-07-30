@@ -15,18 +15,18 @@ diagnostics:
 
 The tool is problem-independent: the true model, the anomaly search box and
 the acceptance tolerances are read from a reference JSON, so it works for any
-CSEM inversion example (see examples/im_model/reference/reference_metrics.json).
+CSEM inversion example (see examples/im/reference/reference_metrics.json).
 
 Inputs it reads from the run directory:
-    responses_im*.h5                     -> rms_history, convergence attributes
-    *_iter<NNNNN>_p<RRRR>.vtu            -> recovered model with geometry
+    the .h5 carrying /rms_history      -> convergence attributes (any name)
+    snapshots/iter*_r*.vtu             -> recovered model with geometry
                                             (rho cell field); the highest
                                             available iteration is used.
 
 Usage:
     python3 utils/analyze_inversion.py \\
-        -run_dir   examples/im_model/outputs \\
-        -reference examples/im_model/reference/reference_metrics.json
+        -run_dir   examples/im/outputs \\
+        -reference examples/im/reference/reference_metrics.json
 """
 import argparse
 import glob
@@ -51,12 +51,23 @@ def _txt(da):
 def parse_vtu_model(run_dir):
     """Combine all VTU pieces of the highest-iteration snapshot into
     (centroid_xyz, rho, volume) arrays over every cell."""
-    vtus = glob.glob(os.path.join(run_dir, "*_iter*_p*.vtu"))
+    # Current layout is run_dir/snapshots/iterNNNN_rRRRR.vtu. Two earlier ones
+    # exist in the wild - <stem>_snapshots/model_iterNNNN_rRRRR.vtu, and
+    # <stem>_iterNNNNN_pRRRR.vtu flat in run_dir - so accept all three and let
+    # an existing results directory still analyse.
+    vtus = (glob.glob(os.path.join(run_dir, "snapshots", "iter*_r*.vtu"))
+            + glob.glob(os.path.join(run_dir, "*_snapshots", "*iter*_r*.vtu"))
+            + glob.glob(os.path.join(run_dir, "*_iter*_p*.vtu")))
     if not vtus:
-        sys.exit(f"ERROR: no VTU snapshots (*_iter*_p*.vtu) found in {run_dir}")
-    iters = {int(re.search(r"_iter0*(\d+)_p", f).group(1)) for f in vtus}
+        sys.exit(f"ERROR: no VTU snapshots found under {run_dir} "
+                 f"(looked for snapshots/iter*_r*.vtu and the two older layouts)")
+    # No leading underscore in the pattern: it must match "iter0103_r0000.vtu"
+    # as well as "..._iter00096_p0110.vtu".
+    rank_re = re.compile(r"iter0*(\d+)_[pr]\d+\.vtu$")
+    iters = {int(rank_re.search(f).group(1)) for f in vtus}
     last = max(iters)
-    pieces = sorted(f for f in vtus if re.search(rf"_iter0*{last}_p", f))
+    pieces = sorted(f for f in vtus
+                    if int(rank_re.search(f).group(1)) == last)
     cx, cy, cz, rho, vol = [], [], [], [], []
     for fn in pieces:
         piece = ET.parse(fn).getroot().find(".//Piece")
@@ -84,28 +95,53 @@ def parse_vtu_model(run_dir):
 
 
 def read_convergence(run_dir):
-    """Return (rms0, rms_final, iterations, reason) from responses_im*.h5."""
+    """Return (rms0, rms_final, iterations, evaluations, reason).
+
+    Two distinct counters, and conflating them is the classic mistake here:
+    ``iterations`` is the accepted-L-BFGS-step count, ``evaluations`` is the
+    number of objective-gradient evaluations. The latter is larger by the
+    rejected line-search trials, and it is what ``rms_history`` is indexed by -
+    which is also why that series is not monotone.
+
+    Files written before ``num_objgrad_evaluations`` existed stored the
+    evaluation count in ``num_iterations``; there the step count is
+    unrecoverable, so it is reported as None rather than guessed.
+    """
     if h5py is None:
-        return (None, None, None, None)
-    h5s = sorted(glob.glob(os.path.join(run_dir, "responses_im*.h5")))
-    if not h5s:
-        return (None, None, None, None)
-    with h5py.File(h5s[0], "r") as h:
+        return (None, None, None, None, None)
+    # Identify the result by content, not by name: an inversion result is the
+    # HDF5 in run_dir that carries /rms_history. Matching on "responses_im*.h5"
+    # instead would silently tie -output_filename to a fixed prefix.
+    hit = None
+    for cand in sorted(glob.glob(os.path.join(run_dir, "*.h5"))):
+        try:
+            with h5py.File(cand, "r") as h:
+                if "rms_history" in h:
+                    hit = cand
+                    break
+        except OSError:
+            continue          # not readable HDF5, or busy: not our result file
+    if hit is None:
+        return (None, None, None, None, None)
+    with h5py.File(hit, "r") as h:
         rms = np.asarray(h["rms_history"])[:, 0] if "rms_history" in h else None
         it = h.attrs.get("num_iterations")
+        ev = h.attrs.get("num_objgrad_evaluations")
         reason = h.attrs.get("convergence_reason")
         if isinstance(reason, bytes):
             reason = reason.decode()
+    if ev is None:          # legacy file: num_iterations actually held evaluations
+        it, ev = None, it
     if rms is None:
-        return (None, None, it, reason)
-    return (float(rms[0]), float(rms[-1]), it, reason)
+        return (None, None, it, ev, reason)
+    return (float(rms[0]), float(rms[-1]), it, ev, reason)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-run_dir", required=True,
-                    help="Directory with responses_im*.h5 and VTU snapshots.")
+                    help="Run directory: the inversion .h5 plus its snapshots/ pieces.")
     ap.add_argument("-reference", required=True,
                     help="Reference metrics JSON.")
     args = ap.parse_args()
@@ -118,9 +154,11 @@ def main():
     true_c = np.array(tm["anomaly_centroid_m"], dtype=float)
 
     cx, cy, cz, rho, vol, it_used = parse_vtu_model(args.run_dir)
-    rms0, rmsf, iters, reason = read_convergence(args.run_dir)
+    rms0, rmsf, iters, evals, reason = read_convergence(args.run_dir)
 
-    earth = cz > 1.0
+    # Earth cells only, excluding a thin band around the interface. Depth is a
+    # NEGATIVE z (the convention both examples use), so the earth is z < 0.
+    earth = cz < -1.0
     inbox = ((cx >= box["x"][0]) & (cx <= box["x"][1]) &
              (cy >= box["y"][0]) & (cy <= box["y"][1]) &
              (cz >= box["z"][0]) & (cz <= box["z"][1]))
@@ -155,10 +193,14 @@ def main():
     if rmsf is not None:
         print(f"    initial RMS      = {rms0:.3f}")
         print(f"    final   RMS      = {rmsf:.4f}   (target {tol.get('final_rms_max','-')})")
-        print(f"    iterations       = {iters}")
+        if iters is not None:
+            print(f"    L-BFGS steps     = {iters}   (accepted)")
+        else:
+            print("    L-BFGS steps     = n/a  (legacy file: only the evaluation count was stored)")
+        print(f"    objgrad evals    = {evals}   (indexes rms_history)")
         print(f"    termination      = {reason}")
     else:
-        print("    (no responses_im*.h5 with rms_history found - skipped)")
+        print("    (no .h5 with rms_history found in run_dir - skipped)")
 
     print("\nRecovered model")
     print(f"    true model       : background {tm['background_ohm_m']} ohm.m,"
@@ -167,7 +209,10 @@ def main():
     print(f"    peak (min) rho    = {rho_min:.2f} ohm.m")
     print(f"    conductor centroid= ({rc[0]:.0f}, {rc[1]:.0f}, {rc[2]:.0f})")
     print(f"    lateral offset    = {lat_off:.1f} m")
-    print(f"    vertical offset   = {ver_off:.1f} m")
+    # z is negative down, so a positive offset means the recovered body sits
+    # shallower than the truth. Spelled out because the sign alone is ambiguous.
+    print(f"    vertical offset   = {ver_off:+.1f} m"
+          f"  ({'shallower' if ver_off > 0 else 'deeper'} than true)")
     print(f"    conductor volume  = {cond_vol:.3e} m^3  (rho < {thr:g} ohm.m)")
     print(f"    fraction in box   = {frac_box*100:.0f}%")
 

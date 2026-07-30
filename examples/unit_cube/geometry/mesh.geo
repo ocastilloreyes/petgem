@@ -1,10 +1,9 @@
 /*********************************************************************
 *
 * unit_cube - Gmsh geometry for the PETGEM FM-CSEM test dataset
-* (http://petgem.bsc.es/)
 *
 * Homogeneous unit cube [0,1]^3 with a single material, driven through the
-* same forward workflow as examples/fm_model (gmsh -> preprocess ->
+* same forward workflow as examples/fm (gmsh -> preprocess ->
 * fm.csem). It is the small, fast, canonical fixture the whole FM-CSEM test
 * suite is built around (see README.md and ../../tests/README.md).
 *
@@ -22,7 +21,7 @@
 * the mesh tiny (343 vertices, 1296 tets) yet still activates every DOF entity
 * class (edge / face / interior) at orders 1-3.
 *
-* by the PETGEM team (http://petgem.bsc.es/)
+* by the PETGEM team
 *********************************************************************/
 // #################################################################
 // #                        Parameters                             #

@@ -92,6 +92,28 @@ const char *formatGroupedInt(PetscInt value);
 
 
 /**
+ * @brief Formats a real for logs, keeping it visibly a real.
+ *
+ * Renders `value` with %g-like significant-digit behaviour, then guarantees the
+ * result still reads as floating point: a whole value gains a ".0" (1 -> "1.0",
+ * -4000 -> "-4000.0") so it cannot be mistaken for a count, while values that
+ * already carry a fractional part or an exponent are left as they are ("2.1",
+ * "0.01", "1e-08").
+ *
+ * Use this for physical quantities - frequencies, coordinates, tolerances - and
+ * formatGroupedInt() for cardinalities such as cell or receiver counts, so the
+ * two are distinguishable at a glance in the report.
+ *
+ * Uses rotating static buffers (not thread-safe), matching formatGroupedInt().
+ *
+ * @param[in] value  Real to format.
+ *
+ * @return Pointer to a NUL-terminated string (do not free).
+ */
+const char *formatReal(PetscReal value);
+
+
+/**
  * @brief Prints a section header in the PETGEM run-report layout.
  *
  * Emits:

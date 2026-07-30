@@ -75,8 +75,13 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
  * @param[in] dmConductivity  DM for the per-cell conductivity field.
  * @param[in] conductivity    Recovered conductivity Vec.
  * @param[in] X               Recovered log-perturbation / model Vec.
- * @param[in] allRMS          Array of per-iteration RMS values.
- * @param[in] numIters        Number of entries in allRMS.
+ * @param[in] allRMS          Array of per-evaluation RMS values.
+ * @param[in] numIters        Accepted L-BFGS steps (the "iteration" count a
+ *                            user sees in the optimizer table).
+ * @param[in] numEvals        Objective-gradient evaluations, i.e. the number of
+ *                            entries in @p allRMS. Exceeds @p numIters by the
+ *                            line-search trials that were rejected, so the RMS
+ *                            history it indexes is not monotone.
  * @param[in] reasonStr       Human-readable convergence/stop reason.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
@@ -88,6 +93,7 @@ PetscErrorCode writeInversionResults(const imParams *iparams,
                                       Vec              X,
                                       const PetscReal *allRMS,
                                       PetscInt         numIters,
+                                      PetscInt         numEvals,
                                       const char      *reasonStr);
 
 #endif /* INVERSION_INTERNAL_H */

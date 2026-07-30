@@ -2,7 +2,7 @@
 Quickstart
 ==========
 
-This page runs a first **PETGEM** forward simulation on the ``fm_model``
+This page runs a first **PETGEM** forward simulation on the ``fm``
 example: a marine CSEM benchmark with a thin resistive layer. For the concepts
 behind each step see :doc:`overview`; for the full walkthrough see
 :doc:`examples`.
@@ -24,7 +24,7 @@ Run the forward example
 -----------------------
 .. code-block:: bash
 
-   export MODEL_DIR=examples/fm_model
+   export MODEL_DIR=examples/fm
    export ORDER=1
 
    # 1. Mesh

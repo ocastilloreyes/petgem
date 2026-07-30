@@ -241,14 +241,13 @@ typedef struct {
 
   /** @{ Persistent per-frequency operators and solvers. The sparsity of
    *  A_f = K - iωμ·Ms is invariant across frequency and L-BFGS iteration, so the
-   *  forward MATIS operator Afwd_per_freq[f] and its AIJ image Aadj_per_freq[f]
-   *  are allocated once and refilled in place every objgrad evaluation, and the
-   *  forward and adjoint KSPs are created once bound to them. Created by
-   *  setupInversionWorkspace, freed by destroyInversionWorkspace. */
-  Mat                            *Afwd_per_freq;     /**< numFreqs, MATIS; forward solve. */
-  Mat                            *Aadj_per_freq;     /**< numFreqs, AIJ; adjoint solve. */
-  KSP                            *kspFwd_per_freq;   /**< numFreqs; forward solve. */
-  KSP                            *kspAdj_per_freq;   /**< numFreqs; adjoint solve. */
+   *  MATIS operator Afwd_per_freq[f] is allocated once and refilled in place
+   *  every objgrad evaluation, and its KSP is created once bound to it. The
+   *  adjoint system is A_f·nx = nB — the same operator as the forward solve —
+   *  so it reuses the very same KSP instead of a separate factorized copy.
+   *  Created by setupInversionWorkspace, freed by destroyInversionWorkspace. */
+  Mat                            *Afwd_per_freq;     /**< numFreqs, MATIS; forward and adjoint solves. */
+  KSP                            *kspFwd_per_freq;   /**< numFreqs; forward and adjoint solves. */
   /** @} */
 } InversionContext;
 

@@ -1,0 +1,36 @@
+# im.csem inversion config - im benchmark, order 2.
+# Consumes the bundle built by scripts/build_bundles.sh im.
+
+-input_filename   examples/im/outputs/input_im.h5
+-output_dir       examples/im/outputs/
+-output_filename  responses_im_p2
+
+# Solver: this file carries the CASE options only. Add a solver preset as a
+# second -options_file, exactly as the fm.csem configs do:
+#   build/im.csem -options_file configs/params_im.txt -options_file configs/solver_bddc.txt
+#   build/im.csem -options_file configs/params_im.txt -options_file configs/solver_mumps.txt
+#
+# The adjoint system A_f.nx = nB uses the SAME operator as the forward solve
+# and therefore the SAME KSP, so the preset governs both solves. The adjoint
+# solution enters the objective gradient, so when running iteratively keep the
+# tolerance tight - a loose solve degrades the L-BFGS search directions, not
+# just the field.
+-ksp_rtol                    1.0e-10
+
+# L-BFGS and regularization. Stops on the RMS = 1.05 noise level.
+-im_max_iter                 150
+-im_lbfgs_memory             2
+-im_lambda                   0.1
+-im_diag_weight              0.0
+-im_gtol                     1.0e-5
+-im_rms_tol                  1.05
+-im_snapshot_interval        1
+
+# Plateau exit, tightened from the 1e-3 kernel default. The plateau rule exists
+# to stop the run when -im_rms_tol is UNREACHABLE, but this case approaches 1.05
+# asymptotically: the last steps improve by ~0.085 % each while still descending
+# monotonically. At the default threshold three such steps look like a plateau
+# and the run exits about four iterations short of the target
+# (CONVERGED_RMS_STALL at RMS 1.0534 instead of CONVERGED_RMSTOL at 1.05).
+# 1e-4 still catches genuine stagnation without pre-empting the RMS criterion.
+-im_rms_rtol                 1.0e-4

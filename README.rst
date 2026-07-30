@@ -80,7 +80,7 @@ You can build and run PETGEM inside Docker for a consistent development and test
    make
 
    # Setup environment
-   export MODEL_DIR=examples/fm_model
+   export MODEL_DIR=examples/fm
    export ORDER=1
 
    # Mesh generation

@@ -19,33 +19,67 @@
 /* PETGEM functions */
 
 /**
- * @brief Configures a KSP's preconditioner as PCBDDC with the discrete-gradient
- *        hint, when the operator is distributed (MATIS) and a gradient is given.
+ * @brief Configures PCBDDC for H(curl) systems using PETGEM's discrete gradient.
  *
- * Shared helper that captures the single PCBDDC + Nédélec discrete-gradient
- * policy used by BOTH kernels: the forward solver (solveCsemSystem) and the
- * inverse solver (setupForwardKSP). When @p A is of type MATIS and @p G is
- * non-NULL, the preconditioner is set to PCBDDC and @p G is registered via
- * PCBDDCSetDiscreteGradient(pc, G, 1, 0, PETSC_TRUE, PETSC_TRUE). When those
- * conditions are not met the call is a no-op, so the caller's default PC stays.
+ * Shared helper used by both the forward and inverse solvers. When the operator
+ * matrix @p A is of type MATIS and a discrete-gradient matrix @p G is provided,
+ * the routine:
  *
- * @p G is the high-order discrete gradient G : Nédélec_order -->
- * P_order H1 produced by assembleCsemKandM (buildDiscreteGradientMatrix: each
- * H(curl) DOF's gradient is resolved against the full P_order H1 closure, so
- * grad(phi_k) = sum_i G_ik N_i exactly and K·G = 0). PCBDDC reads its
- * sparsity (GᵀG) to build the curl-kernel coarse space.
+ *   1. Forces the preconditioner type to PCBDDC.
+ *   2. Explicitly registers a single local field with
+ *      PCBDDCSetDofsSplittingLocal().
+ *   3. Registers the high-order discrete gradient through
+ *      PCBDDCSetDiscreteGradient().
  *
- * The discrete gradient is the high-order operator G : Nedelec_order ->
- * P_order H1, so it is registered at order = order (matching the column space of
- * G); the coarse-space collapse is driven by G's sparsity/values together with
- * that order argument.
+ * The explicit field split is required to avoid PCBDDC falling back to
+ * DMCreateFieldDecomposition() on the DM attached to the MATIS operator.
+ * For high-order Nédélec spaces, DMPlex may generate field index sets whose
+ * block size equals the number of DOFs associated with a mesh edge. PCBDDC
+ * can interpret that block size as multiple fields, which leads to an
+ * incorrect coarse-edge reconstruction in PCBDDCNedelecSupport() for
+ * order >= 2. By prescribing a single field containing all local DOFs,
+ * the decomposition becomes unambiguous and the discrete-gradient coarse
+ * space is built correctly.
  *
- * @param[in,out] ksp    KSP whose preconditioner is configured.
- * @param[in]     A      System matrix (probed for the MATIS type).
- * @param[in]     G      Discrete-gradient hint; may be NULL.
- * @param[in]     order   Nedelec basis order registered with the gradient.
+ * The matrix @p G is PETGEM's exact high-order discrete gradient
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ *    G : H1(P_order) -> H(curl)(Nedelec_order)
+ *
+ * assembled in assembleCsemKandM(). Its rows correspond to H(curl) DOFs and
+ * its columns to nodal H1 DOFs. PCBDDC uses the topology encoded in @p G,
+ * together with the supplied Nédélec order, to identify the gradient kernel
+ * and construct the associated coarse-space components.
+ *
+ * The routine is a no-op when either:
+ *
+ *   - @p A is not of type MATIS, or
+ *   - @p G is NULL.
+ *
+ * In those cases the caller's preconditioner configuration is left unchanged.
+ *
+ * @param[in,out] ksp
+ *     KSP whose preconditioner is configured.
+ *
+ * @param[in] A
+ *     System matrix. The PCBDDC setup is applied only when @p A is a MATIS
+ *     matrix.
+ *
+ * @param[in] G
+ *     High-order discrete-gradient operator mapping nodal H1 DOFs to
+ *     H(curl) DOFs. May be NULL.
+ *
+ * @param[in] order
+ *     Polynomial order of the Nédélec space associated with @p G.
+ *     Passed directly to PCBDDCSetDiscreteGradient().
+ *
+ * @return
+ *     PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ *
+ * @note
+ *     The local field supplied to PCBDDCSetDofsSplittingLocal() spans all
+ *     local DOFs of the MATIS local matrix. This intentionally disables the
+ *     automatic field decomposition obtained from DMPlex and avoids the
+ *     high-order field-identification issue described above.
  */
 PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order)
 {
@@ -59,10 +93,6 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order
     PetscInt nloc;
     PetscCall(KSPGetPC(ksp, &pc));
     PetscCall(PCSetType(pc, PCBDDC));
-    /* Prescribe a single field before registering the gradient. Without this, BDDC calls DMCreateFieldDecomposition on the DM that 
-     * DMCreateMatrix left attached to A, and DMPlex tags the field IS with block size = dofs per edge (= order for Nedelec). BDDC 
-     * reads that block size as a field count, so for order >= 2 PCBDDCNedelecSupport sees only one dof per geometric edge and aborts 
-     * with "SIZE OF EDGE > EXTCOL SECOND PASS". The splitting is local, so the index count must come from the MATIS local matrix. */
     PetscCall(MatISGetLocalMat(A, &lA));
     PetscCall(MatGetSize(lA, &nloc, NULL));
     PetscCall(ISCreateStride(PetscObjectComm((PetscObject)A), nloc, 0, 1, &allDofs));

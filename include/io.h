@@ -157,7 +157,7 @@ PetscErrorCode buildOutputPath(const petgemParams *params, const char *suffix,
  *
  * The caller adds its own product-specific attributes afterwards (fm.csem:
  * num_sources, frequency; im.csem: num_frequencies, lambda, error_level,
- * num_iterations, convergence_reason).
+ * num_iterations, num_objgrad_evaluations, convergence_reason).
  *
  * The solver keys are read back from the PETSc options database so the file
  * records the configuration the run actually used; they read "default" when
