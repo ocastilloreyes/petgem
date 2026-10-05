@@ -83,8 +83,8 @@ static PetscErrorCode setupForwardKSP(PetscInt order, const DM dm, const Mat A, 
  *   - Per-frequency observed-Ex row Vec dObsRow_per_freq[i];
  *   - Per-frequency data weights Vec Wf_per_freq[i].
  *
- * All produced values are byte-identical to what the previous per-iteration
- * code computed; only the allocation lifetime changes.
+ * None of these depend on the iterate, so hoisting them out of the callback
+ * changes only their allocation lifetime.
  *
  * @param[in,out] ctx  Inversion context whose workspace is populated.
  *
@@ -179,8 +179,8 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
     }
     PetscCall(MatDestroy(&Bmat));
 
-    /* Observed-Ex row: extract column i from the [numFreqs × numRec] dense Mat dObs (row-major in the underlying storage).  This was
-     * being repeated every callback for no reason. */
+    /* Observed-Ex row: extract column i from the [numFreqs x numRec] dense Mat
+     * dObs (row-major in the underlying storage). */
     PetscCall(VecCreateSeq(PETSC_COMM_SELF, numReceivers, &ctx->dObsRow_per_freq[i]));
     {
       const PetscScalar *arr;
@@ -372,7 +372,7 @@ static PetscErrorCode setupForwardKSP(PetscInt order, const DM dm, const Mat A, 
   PetscCall(KSPCreate(comm, ksp));
   PetscCall(KSPSetOperators(*ksp, A, A));
   PetscCall(KSPSetType(*ksp, KSPFGMRES));
-  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, G, order));
+  PetscCall(setupBDDCFromPetgemGradient(*ksp, A, G, order, NULL));
   PetscCall(KSPSetFromOptions(*ksp));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -385,10 +385,8 @@ static PetscErrorCode setupForwardKSP(PetscInt order, const DM dm, const Mat A, 
  *   idKdm = -2 · constFactor · Me_e,
  *   iG    = idKdm · x_e,
  *   DfDm[ie] += real( iG · nx_e )   (plain transpose, MATLAB iG.'*inx).
- * The 3D quadrature and Me/Ke buffers are provided by the caller (allocated
- * once on the InversionContext via setupInversionWorkspace); the hoist is a
- * pure lifetime change - the values produced by each cell evaluation are
- * byte-identical to the per-callback version.
+ * The 3D quadrature and Me/Ke buffers are provided by the caller, allocated
+ * once on the InversionContext via setupInversionWorkspace.
  *
  * @param[in]     dm             H(curl) DM.
  * @param[in]     grid           Finite-element grid descriptor.
@@ -622,8 +620,10 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
   PetscReal reduil_fi  = 0.0;
   PetscInt  numData    = numReceivers * numFreqs * 2; /* real+imag */
 
-  /* Pre-allocated workspace (lives on InversionContext, set up once before the L-BFGS loop). The five Vecs and the per-freq RHS / Wf /
-   * dObsRow arrays are all reused across iterations - identical numerical values to recomputing them each call, just without the allocations. */
+  /* Pre-allocated workspace, held on InversionContext and set up once before
+   * the L-BFGS loop. The five Vecs and the per-frequency RHS / Wf / dObsRow
+   * arrays are reused across iterations; their contents do not depend on the
+   * iterate. */
   Vec b       = c->bVec;
   Vec x       = c->xVec;
   Vec nB      = c->nBvec;
@@ -861,10 +861,12 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
   DM dmInversion;
   PetscCall(createInversionDM(dmConductivity, grid, &dmInversion));
 
-  /* Build the parallel block-Jacobi smoother graph (multi-rank only). No-op on a single rank; on >1 ranks, switches 
-   *  applyGaussSeidelSmoothing to a fully-parallel forward+reverse Gauss-Seidel path that uses one layer of ghost cells 
-   * (overlap=1) and exchanges them between sweeps - O(local cells) per call, no rank-0 bottleneck. Eliminates the partition-
-   * boundary seams that the original partition-local sweep produced. */
+  /* Build the parallel block-Jacobi smoother graph (multi-rank only). A no-op
+   * on a single rank; above one rank it switches applyGaussSeidelSmoothing to a
+   * fully-parallel forward+reverse Gauss-Seidel path that uses one layer of
+   * ghost cells (overlap=1) and exchanges them between sweeps, at O(local
+   * cells) per call and with no rank-0 bottleneck. The smoothed result is
+   * independent of the partition. */
   PetscCall(setupParallelSmoothingGraph(&graph, dm, grid));
 
   /* Initial model X0 = log(1/sigma_x)
@@ -950,6 +952,15 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
                           iparams->gtol,
                           &ctx.lastRMS, iparams->rmsTol,
                           &numIters, &reasonStr));
+
+  /* Recover sigma from the last accepted X (after a line-search failure, conductivity holds the rejected trial). */
+  PetscCall(applyLogToSigma(dmInversion, dmConductivity, X, X0, conductivity, grid, &graph, 0.0, NULL));
+
+  /* Final snapshot: last accepted step if off the interval, or iter0000 (initial model) if no step was accepted. */
+  if (iparams->snapshotInterval > 0 &&
+      (ctx.acceptedIter == 0 || ctx.acceptedIter % iparams->snapshotInterval != 0)) {
+    PetscCall(writeInversionSnapshotVTU(&ctx, ctx.acceptedIter));
+  }
 
   /* The per-evaluation RMS history is written to the /rms_history dataset in the output HDF5 (below) for analysis.
    * Both counters go out: numIters is the accepted-L-BFGS-step count, ctx.iterCount the objective-gradient evaluation

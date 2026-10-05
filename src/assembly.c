@@ -41,16 +41,42 @@
  */
 static PetscErrorCode checkGradientKernel(PetscReal *M, PetscReal *G, PetscInt m, PetscInt n, PetscInt w)
 {
+   PetscReal normM = 0, normG = 0, worst = 0;
+   PetscInt  wi = -1, wj = -1;
+
    PetscFunctionBeginUser;
+
+   for (PetscInt i = 0; i < m * m; i++) {
+    normM = PetscMax(normM, PetscAbsReal(M[i])); 
+   } 
+
+   for (PetscInt i = 0; i < m * n; i++) {
+    normG = PetscMax(normG, PetscAbsReal(G[i]));
+   }
+
    for (PetscInt i = 0; i < m; i++) {
      for (PetscInt j = 0; j < n; j++) {
        PetscReal v = 0;
        for (PetscInt k = 0; k < m; k++) {
-         // M is m x m, G is m x n
+         /* M is m x m, G is m x n */
          v += M[i*m + k] * G[k * n + j];
        }
-       if (!PetscIsCloseAtTol(v, 0, 0, PETSC_SMALL)) PetscCall(PetscPrintf(PETSC_COMM_SELF, "Error element %d (%d %d)\n", (int)w, (int)i, (int)j));
+       if (PetscAbsReal(v) > worst) { worst = PetscAbsReal(v); wi = i; wj = j; }
      }
+   }
+
+   /* One line per cell, reporting the worst entry of K_e G_e relative to the
+    * scale of the product. Round-off sits at m * PETSC_MACHINE_EPSILON,
+    * ~1e-15; an incorrect gradient gives O(1). */
+   {
+     PetscReal scale = normM * normG;
+     PetscReal rel   = (scale > 0) ? worst / scale : worst;
+     if (rel > 1e-10)
+       PetscCall(PetscPrintf(PETSC_COMM_SELF,
+                 "gradient kernel: cell %d  worst |K_e G_e| = %.3e at (%d %d)  "
+                 "||K_e|| = %.3e  ||G_e|| = %.3e  relative = %.3e\n",
+                 (int)w, (double)worst, (int)wi, (int)wj,
+                 (double)normM, (double)normG, (double)rel));
    }
    PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -83,6 +109,249 @@ static PetscErrorCode prepareCellForAssembly(const DM dm,
   PetscFunctionBeginUser;
   PetscCall(extractCellCoordinates(dm, cellID, cell));
   PetscCall(extractCellConductivity(dmConductivity, conductivity, cellID, cell));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
+ * @brief Collects the local DOFs supported on cells more conductive than a
+ *        threshold, for use as PCBDDC primal vertices.
+ *
+ * BDDC is robust to coefficient jumps as long as those jumps do not cut the
+ * subdomain interface. A high-conductivity filament threading the domain, such
+ * as the steel casing of the cased-well benchmark, is cut by every partition,
+ * and the iteration count then grows with the number of subdomains instead of
+ * staying flat.
+ *
+ * Making the DOFs of the channel primal keeps them continuous across the
+ * interface. PCBDDC discards the ones that are not on the interface, so every
+ * DOF of every conductive cell may be passed; the number that survives is
+ * reported by -ksp_view.
+ *
+ * Selection is by conductivity rather than by material id, so no knowledge of
+ * the tag numbering is required: the steel sits at 2.4e6 S/m and the next most
+ * conductive material at 1 S/m, so any threshold between the two picks out the
+ * channel exactly.
+ *
+ * The returned indices are global, as required by PCBDDCSetPrimalVerticesIS,
+ * which maps them to its own local space (PCBDDCGlobalToLocal). Local closure
+ * indices taken from the DMPlex section must not be used: that section is
+ * larger than the MATIS local matrix, so the indices either overflow it or
+ * name unrelated DOFs.
+ *
+ * @param[in]  dm            DMPlex mesh carrying the H(curl) section.
+ * @param[in]  conductivity  Per-cell conductivity Vec (its DM comes from VecGetDM).
+ * @param[in]  threshold     Cells whose largest sigma exceeds this are selected.
+ * @param[out] primal        IS of global DOF indices on the DM's communicator,
+ *                           empty on ranks that hold no qualifying cells. Always
+ *                           created when the threshold is positive, because the
+ *                           creation is collective. The caller destroys it.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+/* Cross-check a primal index set against the operator itself.
+ *
+ * buildHighSigmaPrimalIS emits indices taken from the DM's GLOBAL section, on
+ * the assumption that they coincide with the global row numbering of the MATIS
+ * operator handed to PCBDDC. If that assumption is wrong the set is not merely
+ * incomplete, it is a list of the WRONG dofs, and PCBDDC would dutifully make
+ * those primal - which looks like the fix under-performing rather than like a
+ * numbering bug.
+ *
+ * The conductivity enters the operator through the mass term, so a dof inside a
+ * conductor carries a diagonal larger than an ordinary one by roughly the
+ * conductivity contrast. Comparing |diag| on the selected rows against |diag|
+ * over all rows therefore tests the numbering with no reference to how the
+ * indices were built. If the selected rows are not dramatically larger, the
+ * indices are wrong.
+ */
+PetscErrorCode verifyPrimalISAgainstOperator(Mat A, IS primal)
+{
+  PetscFunctionBeginUser;
+  if (!primal) PetscFunctionReturn(PETSC_SUCCESS);
+
+  Vec                d;
+  const PetscInt    *ix;
+  const PetscScalar *da;
+  PetscInt           n, lo, hi, nloc, nin = 0;
+  PetscReal          selMin = PETSC_MAX_REAL, selMax = 0.0, allMin = PETSC_MAX_REAL, allMax = 0.0;
+
+  PetscCall(MatCreateVecs(A, NULL, &d));
+  PetscCall(MatGetDiagonal(A, d));
+  PetscCall(VecGetOwnershipRange(d, &lo, &hi));
+  PetscCall(VecGetLocalSize(d, &nloc));
+  PetscCall(VecGetArrayRead(d, &da));
+
+  for (PetscInt i = 0; i < nloc; ++i) {
+    const PetscReal a = PetscAbsScalar(da[i]);
+    allMin = PetscMin(allMin, a);
+    allMax = PetscMax(allMax, a);
+  }
+  PetscCall(ISGetLocalSize(primal, &n));
+  PetscCall(ISGetIndices(primal, &ix));
+  for (PetscInt k = 0; k < n; ++k) {
+    if (ix[k] < lo || ix[k] >= hi) continue;   /* listed by its owner elsewhere */
+    const PetscReal a = PetscAbsScalar(da[ix[k] - lo]);
+    selMin = PetscMin(selMin, a);
+    selMax = PetscMax(selMax, a);
+    ++nin;
+  }
+  PetscCall(ISRestoreIndices(primal, &ix));
+  PetscCall(VecRestoreArrayRead(d, &da));
+
+  PetscReal rmin[2] = {selMin, allMin}, rmax[2] = {selMax, allMax};
+  PetscInt  cnt[2]  = {nin, n};
+  PetscCall(MPIU_Allreduce(MPI_IN_PLACE, rmin, 2, MPIU_REAL, MPIU_MIN, PetscObjectComm((PetscObject)A)));
+  PetscCall(MPIU_Allreduce(MPI_IN_PLACE, rmax, 2, MPIU_REAL, MPIU_MAX, PetscObjectComm((PetscObject)A)));
+  PetscCall(MPIU_Allreduce(MPI_IN_PLACE, cnt, 2, MPIU_INT, MPI_SUM, PetscObjectComm((PetscObject)A)));
+
+  PetscCall(PetscPrintf(PetscObjectComm((PetscObject)A),
+                        "   BDDC primal check      = %" PetscInt_FMT " of %" PetscInt_FMT
+                        " indices fell in a local row range\n"
+                        "                            |diag| selected  [%.3e, %.3e]\n"
+                        "                            |diag| all rows  [%.3e, %.3e]\n",
+                        cnt[0], cnt[1], (double)rmin[0], (double)rmax[0], (double)rmin[1], (double)rmax[1]));
+  if (cnt[0] != cnt[1]) {
+    /* NOT an error. A shared dof gets a non-negative global index on every rank
+     * that sees it, so a rank legitimately lists dofs another rank owns; those
+     * indices simply fall outside its own row range and are checked by their
+     * owner instead. Reported because it is the same duplication that inflates
+     * the listed count above. */
+    PetscCall(PetscPrintf(PetscObjectComm((PetscObject)A),
+                          "                            %" PetscInt_FMT " listed by a rank that does not own"
+                          " the row (checked by its owner)\n", cnt[1] - cnt[0]));
+  }
+  if (cnt[0] > 0 && rmin[0] <= rmax[1] / 1.0e3) {
+    PetscCall(PetscPrintf(PetscObjectComm((PetscObject)A),
+                          "   WARNING: the smallest selected |diag| is not far above the general\n"
+                          "            range, so the selection is probably not the conductor.\n"));
+  }
+  PetscCall(VecDestroy(&d));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode buildHighSigmaPrimalIS(const DM dm, const Vec conductivity,
+                                      const PetscReal threshold, IS *primal)
+{
+  PetscFunctionBeginUser;
+  PetscAssertPointer(primal, 4);
+  *primal = NULL;
+  if (threshold <= 0.0) PetscFunctionReturn(PETSC_SUCCESS);
+
+  DM            dmConductivity;
+  PetscSection  section, gsection;
+  Cell          cell;
+  PetscInt      cStart, cEnd, nsel = 0, cap = 0;
+  PetscInt     *sel = NULL;
+  /* Interface dofs of a high-sigma cell that this rank does not own. They are
+   * skipped here on the assumption that the owning rank lists them - which
+   * holds only if that rank also has a high-sigma cell on this dof. Where the
+   * conductor BOUNDARY falls on the subdomain interface it does not, and the
+   * dof is then listed by nobody. Counted so the size of that hole is visible
+   * instead of assumed. */
+  PetscInt      nforeign = 0;
+
+  PetscCall(VecGetDM(conductivity, &dmConductivity));
+  PetscCall(DMGetLocalSection(dm, &section));
+  PetscCall(DMGetGlobalSection(dm, &gsection));
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
+
+  /* share[i] = how many ranks hold local dof i. Ones in the local vector,
+   * summed into the global one, scattered back: anything above 1 is shared,
+   * i.e. sits on a subdomain interface. */
+  Vec                gshare, lshare;
+  const PetscScalar *share;
+  PetscCall(DMCreateGlobalVector(dm, &gshare));
+  PetscCall(DMCreateLocalVector(dm, &lshare));
+  PetscCall(VecSet(lshare, 1.0));
+  PetscCall(VecZeroEntries(gshare));
+  PetscCall(DMLocalToGlobal(dm, lshare, ADD_VALUES, gshare));
+  PetscCall(DMGlobalToLocal(dm, gshare, INSERT_VALUES, lshare));
+  PetscCall(VecGetArrayRead(lshare, &share));
+
+  for (PetscInt c = cStart; c < cEnd; ++c) {
+    PetscCall(extractCellConductivity(dmConductivity, conductivity, c, &cell));
+    PetscReal smax = cell.conductivity[0];
+    for (PetscInt d = 1; d < NUM_DIMENSIONS; ++d) {
+      if (cell.conductivity[d] > smax) smax = cell.conductivity[d];
+    }
+    if (smax <= threshold) continue;
+
+    /* Both closures of the same cell, in the same order: the local one says
+     * whether a dof is shared, the global one is what PCBDDC is given. */
+    PetscInt  ndof, ndofl;
+    PetscInt *idx, *lidx;
+    PetscCall(DMPlexGetClosureIndices(dm, section, gsection, c, PETSC_TRUE, &ndof, &idx, NULL, NULL));
+    PetscCall(DMPlexGetClosureIndices(dm, section, section, c, PETSC_TRUE, &ndofl, &lidx, NULL, NULL));
+    if (nsel + ndof > cap) {
+      cap = PetscMax(2 * cap, nsel + ndof);
+      PetscCall(PetscRealloc(cap * sizeof(PetscInt), &sel));
+    }
+    for (PetscInt j = 0; j < ndof && j < ndofl; ++j) {
+      /* A global section gives negative indices for dofs this rank does not
+       * own. Skip them: the owning rank lists them, and PCBDDC accepts any
+       * process listing any global node. */
+      const PetscInt l = lidx[j] < 0 ? -(lidx[j] + 1) : lidx[j];
+      const PetscBool shared = (PetscBool)(PetscRealPart(share[l]) > 1.5);
+      if (idx[j] < 0) {
+        if (shared) ++nforeign;
+        continue;
+      }
+      if (shared) sel[nsel++] = idx[j];
+    }
+    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, c, PETSC_TRUE, &ndofl, &lidx, NULL, NULL));
+    PetscCall(DMPlexRestoreClosureIndices(dm, section, gsection, c, PETSC_TRUE, &ndof, &idx, NULL, NULL));
+  }
+
+  PetscCall(VecRestoreArrayRead(lshare, &share));
+  PetscCall(VecDestroy(&gshare));
+  PetscCall(VecDestroy(&lshare));
+
+  /* ISCreateGeneral on the DM's communicator is COLLECTIVE, so every rank must
+   * call it - including the ones that hold no steel at all, which is most of
+   * them once the selection is restricted to the interface. Guarding it with
+   * `if (nsel)` deadlocked 896 ranks for nine hours on 23 September 2026. An
+   * empty IS is legal and is what those ranks contribute. */
+  PetscCall(PetscSortRemoveDupsInt(&nsel, sel));
+  PetscCall(ISCreateGeneral(PetscObjectComm((PetscObject)dm), nsel, sel, PETSC_COPY_VALUES, primal));
+
+  {
+    /* COUNT DISTINCT DOFS, not listed ones. DMPlexGetClosureIndices with a
+     * global section returns a non-negative index for a shared dof on EVERY
+     * rank that sees it, not only on its owner, so the same global dof is
+     * listed several times and summing local sizes over-counts it - by a factor
+     * near two in practice. PCBDDC deduplicates internally, so the index set is
+     * correct either way; it is the reported number that was wrong, and it was
+     * wrong in a way that made the coarse space look as though it had absorbed
+     * only half of what it was given.
+     *
+     * Marking a global vector with INSERT_VALUES and summing it counts each dof
+     * once, whoever listed it, at the cost of one assembly. */
+    Vec       mark;
+    PetscInt  tot[2] = {nsel, nforeign};
+    PetscScalar ndistinct;
+
+    PetscCall(DMCreateGlobalVector(dm, &mark));
+    PetscCall(VecZeroEntries(mark));
+    for (PetscInt k = 0; k < nsel; ++k) {
+      const PetscScalar one = 1.0;
+      PetscCall(VecSetValues(mark, 1, &sel[k], &one, INSERT_VALUES));
+    }
+    PetscCall(VecAssemblyBegin(mark));
+    PetscCall(VecAssemblyEnd(mark));
+    PetscCall(VecSum(mark, &ndistinct));
+    PetscCall(VecDestroy(&mark));
+
+    PetscCall(MPIU_Allreduce(MPI_IN_PLACE, tot, 2, MPIU_INT, MPI_SUM, PetscObjectComm((PetscObject)dm)));
+    PetscCall(PetscPrintf(PetscObjectComm((PetscObject)dm),
+                          "   BDDC primal selection  = %" PetscInt_FMT " distinct dofs"
+                          "  (%" PetscInt_FMT " listed, so %.2fx duplicated across ranks;"
+                          " %" PetscInt_FMT " skipped as not owned)\n",
+                          (PetscInt)PetscRealPart(ndistinct), tot[0],
+                          tot[0] > 0 ? (double)tot[0] / PetscMax(PetscRealPart(ndistinct), 1.0) : 1.0,
+                          tot[1]));
+  }
+  PetscCall(PetscFree(sel));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -279,6 +548,7 @@ PetscErrorCode assembleCsemRHS(const petgemParams params,
  * @param[in]  dm            DMPlex mesh and H(curl) discretization.
  * @param[in]  grid          Finite-element grid descriptor.
  * @param[in]  conductivity  Per-cell conductivity Vec (diagonal sigma in f*).
+ * @param[in]  kind          Which right-hand side to build (see MMSRhsKind).
  * @param[out] B             One-column dense RHS matrix, created by this call.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
@@ -290,9 +560,13 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
                                   const DM dm,
                                   const Grid grid,
                                   const Vec conductivity,
-                                  const PetscBool useForcing,
+                                  const MMSRhsKind kind,
                                   Mat* B) {
   PetscFunctionBeginUser;
+
+  /* The negative control uses the same operator and only alters f*. */
+  const PetscBool useForcing = (PetscBool)(kind != MMS_RHS_PROJECTION);
+  const PetscBool dropMass   = (PetscBool)(kind == MMS_RHS_FORCING_NO_MASS);
 
   /* Variables declaration */
   Cell cell;
@@ -343,7 +617,10 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
 
   /* Print statistics (suppressed when params.quiet). */
   if (!params.quiet) {
-    PetscCall(PetscPrintf(comm, "\n MMS RHS assembly (%s):\n", useForcing ? "volumetric forcing f*" : "L2 moments of E*"));
+    const char *what = (kind == MMS_RHS_PROJECTION)      ? "L2 moments of E*"
+                     : (kind == MMS_RHS_FORCING_NO_MASS) ? "INCOMPLETE forcing f* (negative control)"
+                                                         : "volumetric forcing f*";
+    PetscCall(PetscPrintf(comm, "\n MMS RHS assembly (%s):\n", what));
     PetscCall(logKVInt(comm, "MPI tasks", params.numMPITasks));
     PetscCall(logKVInt(comm, "Vector size", M));
     PetscCall(logKVStr(comm, "Status", "Started"));
@@ -383,12 +660,18 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
       }
 
       /* useForcing: integrate f* (the MMS solve RHS). Otherwise integrate the
-       * exact field E* itself -> L2 moments for the E3 projection baseline. */
+       * SIGMA-WEIGHTED exact field -> the moments of the projection baseline.
+       * The operator paired with this RHS is Me = INT (sigma N_j) . N_k, so the
+       * sigma weight makes the solution the sigma-weighted L2 projection of E*.
+       * Without it the solve would converge to sigma^-1 E*. */
       PetscScalar F[NUM_DIMENSIONS];
       if (useForcing) {
-        mmsForcingF(xphys, omega, sigma, F);
+        mmsForcingF(xphys, omega, sigma, dropMass, F);
       } else {
         mmsExactE(xphys, F);
+        for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+          F[d] *= (PetscScalar)sigma[d];
+        }
       }
 
       /* Physical, oriented basis values at this reference point (no curls). */
@@ -650,9 +933,12 @@ static PetscErrorCode reportGradientBDDCStructure(MPI_Comm comm, Grid grid, Mat 
   PetscCallMPI(MPI_Allreduce(&localRows,   &grows, 1,  MPIU_INT, MPI_SUM, comm));
   PetscCallMPI(MPI_Allreduce(hist,          ghist, 16, MPIU_INT, MPI_SUM, comm));
 
-  /* PCBDDC's per-row Nedelec contract (ii[i+1]-ii[i] == order+1) applies to the EDGE dofs, which are the minimum-nnz rows: 2 endpoints + order-1 interior
-   * nodal dofs. Face and volume dof rows legitimately connect to more nodal dofs and are NOT what BDDC checks per row, so they are reported separately, not
-   * flagged. gedge is the count of order+1 rows (the edge-dof class). */
+  /* PCBDDC's per-row Nedelec contract (ii[i+1]-ii[i] == order+1) applies to the
+   * edge DOFs, which are the minimum-nnz rows: 2 endpoints + order-1 interior
+   * nodal DOFs. Face and volume DOF rows legitimately connect to more nodal
+   * DOFs and are not what BDDC checks per row, so they are reported separately
+   * rather than flagged. gedge is the count of order+1 rows (the edge-DOF
+   * class). */
   PetscInt gedge = ghist[PetscMin(expected, 15)];
   (void)gmax; (void)goff; (void)gedge;
   PetscCall(PetscPrintf(comm, "   bddc     edge-dof nnz/row=%" PetscInt_FMT " (order+1)  %s  [rows=%" PetscInt_FMT ", zero=%" PetscInt_FMT "]\n",
@@ -675,7 +961,7 @@ static PetscErrorCode reportGradientBDDCStructure(MPI_Comm comm, Grid grid, Mat 
  *            (curl of a gradient vanishes) → ~machine eps; plus ||G·1|| ~ 0;
  *   rank   : rank(G) = N-1 (only kernel is the constant field);
  *   eigen  : smallest nonzero / largest eigenvalue of GᵀG (gradientRankTestEig);
- *   bddc   : reportGradientBDDCStructure — the row structure PCBDDC consumes.
+ *   bddc   : reportGradientBDDCStructure - the row structure PCBDDC consumes.
  * Ported from KG_validation.c and adapted to the current Grid/petgemParams API.
  *
  * @param[in] comm   Communicator.
@@ -770,12 +1056,12 @@ static PetscErrorCode reportGradientValidation(MPI_Comm comm, DM dm, Grid grid, 
  * Single-pass element loop that assembles the frequency-INDEPENDENT
  * pieces of the CSEM operator and the discrete-gradient hint matrices:
  *
- *   K       - stiffness (curl–curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
+ *   K       - stiffness (curl-curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
  *   Ms      - mass × σ matrix, ∫ (ε_r ⊙ N_i)·N_j where ε_r encodes σ.
  *   G       - high-order discrete gradient (buildDiscreteGradientMatrix)
  *             Consumed by PCBDDCSetDiscreteGradient.
  *
- * The caller forms A_f = K − iωμ·Ms per frequency via
+ * The caller forms A_f = K - i*omega*mu*Ms per frequency via
  *     MatDuplicate(K, MAT_COPY_VALUES, &A);
  *     MatAXPY(A, -iωμ, Ms, SAME_NONZERO_PATTERN);
  * - the forward kernel does this once for the source frequency,
@@ -824,9 +1110,10 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
    *   forms A per frequency via MatDuplicate + MatAXPY. */
   const PetscBool fused = (Ms == NULL) ? PETSC_TRUE : PETSC_FALSE;
 
-  /* Optional De Rham / PCBDDC-structure diagnostics on the discrete gradient (reportGradientValidation). 
-   * Only meaningful when G is being built. Needs the PURE curl-curl matrix, so in fused mode (*KorA = K - constFactor·Ms) we
-   * accumulate a separate Acurl from Ke alone. */
+  /* Optional De Rham / PCBDDC-structure diagnostics on the discrete gradient
+   * (reportGradientValidation), only meaningful when G is being built. They
+   * need the pure curl-curl matrix, so in fused mode (*KorA = K - constFactor*Ms)
+   * a separate Acurl is accumulated from Ke alone. */
   PetscBool validate = PETSC_FALSE;
   Mat       Acurl    = NULL;
   if (G) {
@@ -888,9 +1175,10 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
   PetscCall(PetscCalloc1(quadrature_3d.numPoints, &quadrature_3d.weights));
   PetscCall(compute3DQuadraturePoints(&quadrature_3d));
 
-  /* Allocate memory. closureK is a square scratch buffer sized numDofInCell × numDofInCell; in fused mode it carries the fused
-   * A_e = K_e - constFactor·M_e block (still per-cell, no extra memory). closureM is only allocated in K/Ms mode. Canonical-G
-   * scratch is only allocated when G is requested. */
+  /* Allocate memory. closureK is a square scratch buffer sized
+   * numDofInCell x numDofInCell; in fused mode it carries the fused
+   * A_e = K_e - constFactor*M_e block. closureM is only allocated in K/Ms mode,
+   * and the canonical-G scratch only when G is requested. */
   PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureK));
   PetscCall(PetscCalloc1(grid.numDofInCell, &Me));
   PetscCall(PetscCalloc1(grid.numDofInCell, &Ke));
@@ -905,8 +1193,10 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
   if (!fused) {
     PetscCall(PetscMalloc1(grid.numDofInCell * grid.numDofInCell, &closureM));
   }
-  /* gradientMatrix is the OUTPUT of buildDiscreteGradientMatrix, sized numDofInCell × numH1DofInCell (all P_order H1 columns, in DMPlex
-   * closure order). closureGBDDC is the row-major INSERTION buffer of the same shape passed to MatSetValuesLocal. */
+  /* gradientMatrix is the output of buildDiscreteGradientMatrix, sized
+   * numDofInCell x numH1DofInCell (all P_order H1 columns, in DMPlex closure
+   * order). closureGBDDC is the row-major insertion buffer of the same shape
+   * passed to MatSetValuesLocal. */
   gradientMatrix = NULL;
   closureGBDDC   = NULL;
   if (G) {
@@ -939,9 +1229,12 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
     PetscCall(DMPlexGetClosureIndices(dm, section, section, i, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
     PetscCall(DMPlexGetClosureIndices(grid.H1dm, H1section, H1section, i, PETSC_TRUE, &numH1DofIndices, &H1dofIndices, NULL, NULL));
 
-    /* fused: closureK[jk] = K_e[jk] − constFactor·M_e[jk], single MatSetValuesLocal into A.
-     * K/Ms : closureK[jk] = K_e[jk]; closureM[jk] = M_e[jk], two MatSetValuesLocal into K and Ms.
-     * The (j,k) loop writes every entry of its scratch buffer, so no PetscArrayzero is needed. */
+    /* fused: closureK[jk] = K_e[jk] - constFactor*M_e[jk], single
+     *        MatSetValuesLocal into A.
+     * K/Ms : closureK[jk] = K_e[jk]; closureM[jk] = M_e[jk], two
+     *        MatSetValuesLocal into K and Ms.
+     * The (j,k) loop writes every entry of its scratch buffer, so no
+     * PetscArrayzero is needed. */
     if (fused) {
       for (PetscInt j = 0; j < grid.numDofInCell; j++) {
         for (PetscInt k = 0; k < grid.numDofInCell; k++) {
@@ -974,8 +1267,14 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
     if (G) {
       PetscCall(buildDiscreteGradientMatrix(&grid.fem, &cell, gradientMatrix));
       
-      /* Verify the per-cell discrete gradient lies in the kernel of the stiffness (K_e G_e = 0). */
-      PetscCall(checkGradientKernel(Ke[0], gradientMatrix[0], grid.numDofInCell, grid.numH1DofInCell, i));
+      /* Verify the per-cell discrete gradient lies in the kernel of the stiffness
+       * (K_e G_e = 0). Guarded by -petgem_validate_gradient, like every other
+       * gradient diagnostic in this file: it reports through PetscPrintf on
+       * PETSC_COMM_SELF, so every rank writes every offending entry, which on a
+       * high-order run amounts to millions of lines. */
+      if (validate) {
+        PetscCall(checkGradientKernel(Ke[0], gradientMatrix[0], grid.numDofInCell, grid.numH1DofInCell, i));
+      }
       
       /* Fill closure gradient matrix data */
       for (PetscInt j = 0; j < grid.numDofInCell; j++) {
@@ -1009,9 +1308,12 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
     PetscCall(MatViewFromOptions(*G, NULL, "-petgem_grad_view"));
   }
 
-  /* Optional discrete-gradient / PCBDDC-structure validation on the assembled, filtered G (the exact matrix PCBDDCSetDiscreteGradient consumes). 
-   * Runs at whatever order/rank the kernel is invoked with -petgem_validate_gradient. It shows whether PETGEM's G is a valid discrete gradient 
-   * and how its row structure matches what PCBDDCNedelecSupport expects. */
+  /* Optional discrete-gradient / PCBDDC-structure validation on the assembled,
+   * filtered G (the matrix PCBDDCSetDiscreteGradient consumes). Runs at
+   * whatever order and rank count the kernel is invoked with, under
+   * -petgem_validate_gradient. It reports whether G is a valid discrete
+   * gradient and how its row structure matches what PCBDDCNedelecSupport
+   * expects. */
   if (validate) {
     PetscCall(MatAssemblyBegin(Acurl, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(Acurl,   MAT_FINAL_ASSEMBLY));
@@ -1090,8 +1392,9 @@ PetscErrorCode assembleCsemMsRefill(const petgemParams params,
   /* order lives in grid->fem.ops via the quadrature */
   (void)params;
 
-  /* Zero stale values from the previous L-BFGS iteration; sparsity is preserved (no allocation churn).  
-  * MatSetValuesLocal with ADD_VALUES below would otherwise accumulate on top of the previous iter. */
+  /* Zero stale values from the previous L-BFGS iteration; the sparsity pattern
+   * is preserved. MatSetValuesLocal with ADD_VALUES below would otherwise
+   * accumulate on top of the previous iterate. */
   PetscCall(MatZeroEntries(Ms));
 
   PetscSection section;

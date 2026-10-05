@@ -8,7 +8,7 @@ observed-data HDF5 that the inverse kernel (im.csem) consumes.
 
 This tool is problem-independent: the model, mesh, survey and frequency list
 are supplied on the command line, so it can build the observed data for any
-CSEM inversion example. See examples/im for a complete benchmark.
+CSEM inversion example. See examples/im1 for a complete benchmark.
 
 NOISE MODEL
     For every datum, independently on the real and imaginary parts,
@@ -26,7 +26,7 @@ REPRODUCIBILITY
 
 Usage:
     python3 utils/make_observed.py \\
-        -case_dir examples/im \\
+        -case_dir examples/im1 \\
         -pattern  "outputs/responses_fm_f{freq}_p2.h5" \\
         -freqs    1,10,50,100,300,800,1500 \\
         -seed     20260720 \\

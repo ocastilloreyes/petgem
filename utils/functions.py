@@ -185,7 +185,10 @@ def createDM(numDimensions, cells, coords, dm_view=False):
     s.setFieldName(0, "conductivity")
     s.setFieldName(1, "materials_id")
     s.setUp()
-    plex.setSection(s)
+    # setLocalSection, not setSection: petsc4py carried `setSection` as a
+    # deprecated alias for DMSetLocalSection and PETSc main has now removed it,
+    # so the old name raises AttributeError and no bundle can be built.
+    plex.setLocalSection(s)
 
     return plex
 

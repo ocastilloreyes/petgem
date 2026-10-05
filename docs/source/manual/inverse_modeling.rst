@@ -89,7 +89,8 @@ option is absent from both the parameter file and the command line.
      - Comma-separated material ids excluded from the update and from smoothing.
    * - ``-im_snapshot_interval``
      - ``0`` (off)
-     - Write a VTU snapshot every N accepted L-BFGS steps, into ``-output_dir``.
+     - Write a VTU snapshot every N accepted L-BFGS steps, and of the last
+       accepted step, into ``-output_dir``.
        Each snapshot carries a single cell field, ``rho`` (Ohm.m).
    * - ``-im_observed_mode``
      - ``external``

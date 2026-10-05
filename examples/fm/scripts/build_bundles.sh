@@ -12,7 +12,7 @@
 #
 # Produces examples/fm/outputs/input.h5 (+ a throwaway preprocess params
 # file). The committed solver options live in configs/params.txt; run the solve
-# with scripts/run_forward.slurm (or -options_file configs/params.txt).
+# with scripts/run_fm.slurm (or -options_file configs/params.txt).
 # ===========================================================================
 set -euo pipefail
 C=examples/fm

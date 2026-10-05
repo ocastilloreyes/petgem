@@ -1,7 +1,7 @@
 """LEVEL 6 - MMS order-of-accuracy regression (self-contained; no paper/ dependence).
 
-Runs fm.csem in Method-of-Manufactured-Solutions mode (``-mms``) on the [0,1]^3
-unit cube at N=4 for a representative span of orders (p = 1, 3, 6), solved with a
+Runs fm.csem in Method-of-Manufactured-Solutions mode (``-mms``) on the [0,1000]^3
+cube at N=4 for a representative span of orders (p = 1, 3, 6), solved with a
 DIRECT LU factorization (MUMPS) - exact and deterministic, serially and under
 MPI. It checks the relative solution and L2-projection errors fm.csem reports
 against committed golden values (``reference/mms_golden.json``).
@@ -18,7 +18,9 @@ bracket the supported range 1..6 at N=4 (384 cells): seconds each, well under a
 node's memory, no over-decomposition.
 
 All inputs live under ``tests/mms/`` (mesh.geo + the sigma/source/receiver
-stubs); the N=4 bundle ``tests/mms/input.h5`` is produced by ``make_bundle.sh``
+stubs, kept at the design point of ``data/test1``: L = 1000 m, f = 10 Hz,
+anisotropic sigma = (0.5, 1.0, 2.0) S/m); the N=4 bundle ``tests/mms/input.h5``
+is produced by ``make_bundle.sh``
 (the CI job runs it before pytest; run it by hand for a local checkout).
 Nothing here reads ``paper/``.
 """
@@ -36,7 +38,7 @@ pytestmark = pytest.mark.slow
 MMS_DIR = REPO_ROOT / "tests" / "mms"
 GOLDEN_FILE = MMS_DIR / "reference" / "mms_golden.json"
 BUNDLE = MMS_DIR / "input.h5"
-METRICS = ("solve_L2", "solve_Hcurl", "proj_L2", "proj_Hcurl")
+METRICS = ("solve_L2", "solve_energy", "proj_L2", "proj_energy")
 
 # Direct LU via MUMPS: exact, deterministic, rank-independent (see level 5).
 SOLVER_OPTS = ["-dm_mat_type", "aij", "-ksp_type", "preonly", "-pc_type", "lu",

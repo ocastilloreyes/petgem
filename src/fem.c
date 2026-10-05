@@ -816,9 +816,9 @@ PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal di
     PetscReal base_vector[NUM_DIMENSIONS] = {1., 0., 0.};
 
     /* Convert degrees to radians for rotation */
-    PetscReal alpha = azimuth * PETSC_PI / 180.;    // x-y plane
-    PetscReal beta  = dip * PETSC_PI / 180.;        // x-z plane
-    PetscReal tetha = 0.0 * PETSC_PI / 180.;        // y-z plane
+    PetscReal alpha = azimuth * PETSC_PI / 180.;    /* x-y plane */
+    PetscReal beta  = dip * PETSC_PI / 180.;        /* x-z plane */
+    PetscReal tetha = 0.0 * PETSC_PI / 180.;        /* y-z plane */
 
     /* Define rotation matrices for each plane */
     PetscReal M1[NUM_DIMENSIONS][NUM_DIMENSIONS] = {{PetscCosReal(alpha), -PetscSinReal(alpha),   0.},
@@ -954,9 +954,9 @@ PetscErrorCode computeCellJacobian(Cell* cell) {
   }
 
   for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    cell->jacobian[0][i] = cell->coordinates[3 + i] - cell->coordinates[i]; // v1 - v0
-    cell->jacobian[1][i] = cell->coordinates[6 + i] - cell->coordinates[i]; // v2 - v0
-    cell->jacobian[2][i] = cell->coordinates[9 + i] - cell->coordinates[i]; // v3 - v0
+    cell->jacobian[0][i] = cell->coordinates[3 + i] - cell->coordinates[i]; /* v1 - v0 */
+    cell->jacobian[1][i] = cell->coordinates[6 + i] - cell->coordinates[i]; /* v2 - v0 */
+    cell->jacobian[2][i] = cell->coordinates[9 + i] - cell->coordinates[i]; /* v3 - v0 */
   }
 
   cell->detJacobian = cell->jacobian[0][0] * (cell->jacobian[1][1] * cell->jacobian[2][2] - cell->jacobian[1][2] * cell->jacobian[2][1]) -

@@ -79,10 +79,9 @@ typedef struct {
   PetscReal diagGradientWeight;                    /**< Self-weight in the smoother. */
 
   /** RMS-plateau early stop, consumed by the L-BFGS loop (src/lbfgs.c).
-   *  Parsed here with every other im.csem option (rather than read straight
-   *  from the options database at the point of use) so both appear under
-   *  -help and can be set from the params file like the rest. Values and
-   *  defaults are unchanged. */
+   *  Parsed here with every other im.csem option, rather than read from the
+   *  options database at the point of use, so both appear under -help and can
+   *  be set from the params file. */
   PetscReal rmsRelTol;                             /**< Relative RMS-improvement threshold (0 = off). */
   PetscInt  rmsStallWindow;                        /**< Consecutive stalled iterations before stopping. */
 
@@ -192,11 +191,10 @@ typedef struct {
    * Owned by setupInversionWorkspace; freed by destroyInversionWorkspace.
    * All fields below are populated once before the L-BFGS loop and reused
    * across every objgrad evaluation. Their contents do not depend on the
-   * iterate X, so precomputing yields byte-identical numerical results to
-   * recomputing on every callback. */
+   * iterate X. */
 
   /** @{ Per-cell elemental-matrix work buffers used by
-   *  computeGradientContribution (numDofInCell × numDofInCell each, zeroed
+   *  computeGradientContribution (numDofInCell x numDofInCell each, zeroed
    *  per cell inside the loop). */
   PetscReal                      *MeBuf;        /**< Contiguous backing (numDof²). */
   PetscReal                      *KeBuf;        /**< Contiguous backing (numDof²). */
@@ -208,10 +206,8 @@ typedef struct {
   Quadrature3D                    quad3d;       /**< 3D quadrature rule. */
   PetscBool                       quad3dInited; /**< PETSC_TRUE once quad3d is filled. */
 
-  /** @{ Per-iteration reusable Vecs (global, sized on dm). DMCreateGlobalVector
-   *  caches storage on the DM, but moving them out of the callback still saves
-   *  the 4× DMCreateGlobalVector + 2× VecCreate calls per iter and keeps the
-   *  same buffers warm across iterations. */
+  /** @{ Per-iteration reusable Vecs (global, sized on dm), held here so the
+   *  callback performs no Vec creation per iteration. */
   Vec                             bVec;        /**< RHS workspace (forward solve). */
   Vec                             xVec;        /**< Forward solution. */
   Vec                             nBvec;       /**< Adjoint RHS. */
@@ -243,7 +239,7 @@ typedef struct {
    *  A_f = K - iωμ·Ms is invariant across frequency and L-BFGS iteration, so the
    *  MATIS operator Afwd_per_freq[f] is allocated once and refilled in place
    *  every objgrad evaluation, and its KSP is created once bound to it. The
-   *  adjoint system is A_f·nx = nB — the same operator as the forward solve —
+   *  adjoint system is A_f*nx = nB, the same operator as the forward solve,
    *  so it reuses the very same KSP instead of a separate factorized copy.
    *  Created by setupInversionWorkspace, freed by destroyInversionWorkspace. */
   Mat                            *Afwd_per_freq;     /**< numFreqs, MATIS; forward and adjoint solves. */

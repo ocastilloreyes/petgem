@@ -37,14 +37,14 @@ for p in orders:
     with h5py.File(f"{work}/golden_o{p}.h5", "r") as f:
         a = f.attrs
         d[str(p)] = {"dofs": int(a["dofs"]),
-                     "solve_L2": float(a["solve_L2"]), "solve_Hcurl": float(a["solve_Hcurl"]),
-                     "proj_L2": float(a["proj_L2"]),   "proj_Hcurl": float(a["proj_Hcurl"]),
+                     "solve_L2": float(a["solve_L2"]), "solve_energy": float(a["solve_energy"]),
+                     "proj_L2": float(a["proj_L2"]),   "proj_energy": float(a["proj_energy"]),
                      "residual": float(a["residual"])}
 doc = {"_comment": "Golden MMS relative errors for fm.csem CI (tests/mms/test_level6_mms.py). "
                    "Regenerate with tests/mms/update_golden.sh only after an intentional "
                    "discretisation change.",
-       "mesh": f"unit cube [0,1]^3 at N={N} (6*{N}^3 tetrahedra)",
-       "frequency_hz": 2.0, "sigma_S_per_m": 1.0,
+       "mesh": f"cube [0,1000]^3 at N={N} (6*{N}^3 tetrahedra)",
+       "frequency_hz": 10.0, "sigma_S_per_m": [0.5, 1.0, 2.0],
        "solver": "MUMPS direct LU (ksp preonly, pc lu)",
        "rtol": 1e-3, "atol": 1e-8, "residual_max": 1e-10, "orders": d}
 open(out, "w").write(json.dumps(doc, indent=2) + "\n")

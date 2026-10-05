@@ -88,25 +88,44 @@ fixed are excluded from the update. Options are listed in
 Verification
 ------------
 The discretization is verified by a **method of manufactured solutions** (MMS)
-mode, enabled with ``fm.csem -mms``. On the unit cube :math:`[0,1]^3` the exact
-field
+mode, enabled with ``fm.csem -mms``. On the cube :math:`\Omega = [0,L]^3` with
+:math:`k = m\pi/L` the exact field is a Hodge split of a solenoidal and a
+gradient part,
 
 .. math::
 
-   E^*(x,y,z) = \big(\sin \pi y \sin \pi z,\;
-                     \sin \pi z \sin \pi x,\;
-                     \sin \pi x \sin \pi y\big)
+   E^*(x) = a\,S(x) + b\,G(x), \qquad
+   S = \begin{pmatrix}\sin ky \sin kz\\ \sin kz \sin kx\\ \sin kx \sin ky\end{pmatrix},
+   \qquad G = \frac{\nabla\!\left(\sin kx \sin ky \sin kz\right)}{k},
 
-satisfies :math:`\nabla\times\nabla\times E^* = 2\pi^2 E^*` and
-:math:`n \times E^* = 0` on the boundary, so the manufactured forcing consistent
-with the assembled operator is, per component,
+which satisfies :math:`\nabla\times\nabla\times S = 2k^2 S`,
+:math:`\nabla\times G = 0` and :math:`n \times E^* = 0` on
+:math:`\partial\Omega` for every integer :math:`m`.
+:math:`\nabla\times\nabla\times` annihilates :math:`G`, so the gradient part
+is controlled by the mass term alone. The manufactured forcing consistent with
+the assembled operator is, per component,
 
 .. math::
 
-   f^*_d = \left(2\pi^2 - i\,\omega\,\mu\,\sigma_d\right) E^*_d .
+   f^*_d = a\left(2k^2 - i\,\omega\,\mu_0\,\sigma_d\right) S_d
+           - i\,\omega\,\mu_0\,\sigma_d\,b\,G_d .
 
 In this mode the kernel assembles a volumetric right-hand side from
-:math:`f^*` instead of a dipole, and reports relative :math:`L^2` and
-:math:`H(\mathrm{curl})` errors against :math:`E^*`. The definitions live in
-``include/mms.h`` and are mirrored in ``tests/mms/mms_reference.py``. See
-:doc:`testing`.
+:math:`f^*` instead of a dipole, and reports relative :math:`L^2` and **energy**
+errors against :math:`E^*`, the energy norm being the one the operator induces,
+
+.. math::
+
+   |||v|||^2 = \|\nabla\times v\|_{L^2}^2
+               + \omega\mu_0\!\int_\Omega (\sigma v)\cdot\bar v .
+
+Both converge as :math:`O(h^p)` for the first-kind Nédélec family of degree
+:math:`p`, and as :math:`O(N_{\mathrm{dof}}^{-p/3})` against the unknown count.
+``-mms_diagnostics`` adds error norms recomputed under an over-integrated
+quadrature rule, and ``-mms_drop_mass`` runs a negative control in which the
+forcing is incomplete and the error does not converge.
+
+The definitions live in ``include/mms.h`` and are mirrored in
+``data/test1/mms_reference.py``; ``data/test1/verify_c_reference.sh`` checks the
+two against each other. See ``data/test1/README.md`` for the design and the
+verification protocol, and :doc:`testing`.

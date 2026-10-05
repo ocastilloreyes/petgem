@@ -10,11 +10,9 @@
 
 /*
  * Notes:
- * After splitting src/inversion.c into multiple translation units,
- * several functions that were previously file-static
- * (writeInversionResults, buildNotFixedMask) need linkage across the
- * new files but should not be advertised to im_csem.c or
- * postprocessing.c.
+ * writeInversionResults and buildNotFixedMask need linkage across the
+ * inverse-kernel translation units, but must not be advertised to
+ * im_csem.c or postprocessing.c.
  */
 
 #ifndef INVERSION_INTERNAL_H

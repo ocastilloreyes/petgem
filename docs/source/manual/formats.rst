@@ -212,7 +212,8 @@ first by the line-search trials that were rejected, which is also why
 
 With ``-im_snapshot_interval`` enabled, the kernel also writes a ParaView
 snapshot of the model every N accepted L-BFGS steps, into a ``snapshots``
-directory under the output directory::
+directory under the output directory. The last accepted step is always written;
+if no step is accepted, ``iter0000`` holds the initial model::
 
     {output_dir}/snapshots/iter0001.pvtu       (master)
     {output_dir}/snapshots/iter0001_r0000.vtu  (one piece per rank)

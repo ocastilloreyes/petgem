@@ -1,4 +1,17 @@
+# Transmitter file for the test4 MMS verification.
+#
+# Only the FREQUENCY is used by the MMS run: fm.csem -mms replaces the dipole
+# excitation by the volumetric manufactured forcing f*, so the dipole entry
+# below is inert and exists only because the input bundle requires one. The
+# frequency, though, enters both the operator (A = K - i w mu0 M) and f*, and
+# must stay at the design point.
+#
+# f = 10 Hz with sigma_ref = 1 S/m gives delta = 159.155 m = L/(m pi), hence
+#     rho = 2 k^2/(w mu0 sigma_ref) = 1 exactly and nu = w mu0 sigma_ref L^2 =
+#     8 pi^2. Changing f without changing L or m moves the design point and
+#     degrades the conditioning (see mesh.geo).
+#
 # Frequency in Hz
-2
+10
 # Sources: x_position y_position z_position current length dip azimuth
-0.5	0.5	0.5	 1.  1.	 0.	 0.
+500.0	500.0	500.0	 1.	 1.	 0.	 0.

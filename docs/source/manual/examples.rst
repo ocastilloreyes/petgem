@@ -3,7 +3,7 @@ Forward modeling examples
 =========================
 
 Two of the three cases under ``examples/`` are forward-modeling cases and are
-covered here. The inversion benchmark, ``examples/im``, has its own page:
+covered here. The inversion benchmark, ``examples/im1``, has its own page:
 :doc:`inverse_examples`.
 
 Marine CSEM model

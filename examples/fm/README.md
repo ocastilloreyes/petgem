@@ -44,7 +44,7 @@ fm/
 │   └── params.txt         forward solve (PCBDDC), order 1
 ├── scripts/           benchmark-specific drivers
 │   ├── build_bundles.sh   gmsh + preprocess --> outputs/input.h5
-│   ├── run_forward.slurm  run fm.csem
+│   ├── run_fm.slurm       run fm.csem
 │   └── postprocess.py     compare Ex to the reference, print metrics, plot
 └── reference/         provided data and expected result
     └── reference.h5       precomputed reference Ex (PETSc complex Vec, /reference)
@@ -81,7 +81,7 @@ python3 examples/fm/scripts/postprocess.py -tolerance 0.03
 
 `postprocess.py` reports the NRMSD, relative L2 and MAPE of `|Ex|` against
 `reference/reference.h5` and exits non-zero if the NRMSD exceeds the tolerance.
-On a cluster, submit the solve with `sbatch examples/fm/scripts/run_forward.slurm`.
+On a cluster, submit the solve with `sbatch examples/fm/scripts/run_fm.slurm`.
 
 ## Reference
 

@@ -35,7 +35,7 @@
  *         or a PETSc error code otherwise.
  */
 PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat G,
-                               const PetscInt order, Mat* X);
+                               const PetscInt order, IS primalVertices, Mat* X);
 
 /**
  * @brief Configures `ksp`'s PC as PCBDDC with the discrete-gradient hint, if
@@ -57,6 +57,7 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt order);
+PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt order,
+                                           IS primalVertices);
 
 #endif

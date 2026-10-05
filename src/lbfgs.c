@@ -228,8 +228,8 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
       ptr   = (ptr + 1) % M;
       bound = PetscMin(bound + 1, M);
     } else {
-      /* Curvature condition not met - skip storing this pair but keep existing history. Resetting to steepest descent was too
-       * aggressive: stale history is still better than no history. */
+      /* Curvature condition not met: skip storing this pair and keep the
+       * existing history rather than resetting to steepest descent. */
       PetscCall(PetscPrintf(comm, "   L-BFGS: skipping update (y^T s = %g); keeping history.\n", (double)ys));
     }
 
@@ -238,7 +238,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     PetscCall(VecCopy(Gnew, G));
     f = fnew;
 
-    /* VTU snapshot (accepted steps only) */
+    /* VTU snapshot (accepted steps only; the final one is written by runCsemInversion) */
     {
       InversionContext *ictx = (InversionContext *)ctx;
       ictx->acceptedIter++;

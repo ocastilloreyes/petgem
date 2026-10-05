@@ -1,4 +1,21 @@
-# Per-material conductivity for the unit_cube test case (single material).
-# Row index = 0-based material id (gmsh:physical - 1).
-# Columns: sigma_x sigma_y sigma_z
-1.0 1.0 1.0
+# Per-material conductivity table for the test4 MMS verification.
+# Row index = 0-based material id (gmsh:physical tag - 1); the mesh has one
+# material ("cube", tag 1).
+# Columns: sigma_x sigma_y sigma_z [S/m]
+#
+# ANISOTROPIC ON PURPOSE. The mass matrix fm.csem assembles is
+#     Me[j][k] = INT (sigma . N_j) . N_k
+# with sigma the diagonal per-cell tensor, so an isotropic conductivity leaves
+# the anisotropic path of the assembly untested. The manufactured forcing
+# carries the same per-component sigma_d, so the verification stays exact:
+#     f*_d = a (2 k^2 - i w mu0 sigma_d) S_d - i w mu0 sigma_d b G_d
+#
+# sigma is UNIFORM over the domain (one material). A piecewise-constant sigma
+# would make E* non-smooth across the material interfaces and would cap the
+# convergence rate below p regardless of the discretization: the smoothness of
+# the exact solution is what the order-of-accuracy claim rests on.
+#
+# sigma_ref = sigma_y = 1.0 S/m is the value the design groups use
+# (delta = 159.155 m, rho = 1, nu = 8 pi^2); the 4:1 spread is a realistic
+# marine-CSEM anisotropy.
+0.5 1.0 2.0

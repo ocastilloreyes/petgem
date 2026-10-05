@@ -263,9 +263,8 @@ const char *formatReal(PetscReal value) {
   which = (which + 1) % NUM_BUFS;
 
   /* snprintf, not PetscSNPrintf: PETSc's %g handling renders a whole value as
-   * "1." (bare trailing point), which is neither what we want to show nor a
-   * stable base to post-process. Naming the precision opts out of it and gives
-   * plain C behaviour, so 1.0 arrives here as "1". */
+   * "1." (bare trailing point). Naming the precision gives plain C behaviour,
+   * so 1.0 arrives here as "1". */
   snprintf(out, BUF_LEN, "%.6g", (double)value);
 
   /* Restore the float signal that %g drops. Anything already carrying a point,

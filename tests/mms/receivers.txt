@@ -1,4 +1,10 @@
 #       x               y               z
-0.2500000e+00 0.250000e+00 0.250000e+00
-0.500000e+00  0.250000e+00 0.250000e+00
-0.750000e+00  0.250000e+00 0.250000e+00
+# Receiver file for the test4 MMS verification.
+#
+# INERT. fm.csem -mms reports volumetric error norms computed at the quadrature
+# points of every cell, not point responses, so no receiver is interpolated.
+# The entries exist only because the input bundle requires a non-empty receiver
+# table; they sit well inside [0,L]^3 so the bundle's point location succeeds.
+250.0  250.0  250.0
+500.0  500.0  500.0
+750.0  750.0  750.0

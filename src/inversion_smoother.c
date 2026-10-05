@@ -389,7 +389,7 @@ PetscErrorCode applyGaussSeidelSmoothing(const NeighborGraph *graph,
  *
  * Used by the fully-parallel Jacobi path of applyGaussSeidelSmoothing.
  * Steps:
- *   1. DMPlexDistributeOverlap(dm, 1, …) -> permanent overlap=1 EM-DM kept
+ *   1. DMPlexDistributeOverlap(dm, 1, ...) -> permanent overlap=1 EM-DM kept
  *      alive for the lifetime of the inversion run.
  *   2. Clone the EM-DM-over and install a 1-DOF/cell PetscSection on it,
  *      identical in shape to the original dmInversion section. The owned

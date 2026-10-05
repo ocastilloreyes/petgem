@@ -5,7 +5,7 @@
  *
  * Description:
  * Prototypes for the common utility functions (printing helpers,
- * timers, …) used throughout PETGEM.
+ * timers, ...) used throughout PETGEM.
  */
 
 #ifndef COMMON_H

@@ -16,7 +16,7 @@ For the kernel options, inputs and stopping criteria used below, see
 
 CSEM inversion benchmark
 ------------------------
-``examples/im`` recovers a buried conductive block from noisy
+``examples/im1`` recovers a buried conductive block from noisy
 multi-frequency surface data. A known model is forward-modeled with
 ``fm.csem``, contaminated with 1 % Gaussian noise, and inverted with ``im.csem``
 from a homogeneous starting model. The inversion recovers the conductor and
@@ -87,8 +87,8 @@ bodies as geometric volumes would introduce new edges and faces. The step is
 scripted, with the mask read from the ``.geo`` itself so it cannot drift from
 the refinement fields::
 
-    python3 examples/im/scripts/build_meshes.py --verify   # check, no writes
-    python3 examples/im/scripts/build_meshes.py --force    # re-mesh (needs gmsh)
+    python3 examples/im1/scripts/build_meshes.py --verify   # check, no writes
+    python3 examples/im1/scripts/build_meshes.py --force    # re-mesh (needs gmsh)
 
 Under the ``petgem-env`` image this reproduces both shipped meshes
 byte-identically.
@@ -97,7 +97,7 @@ Directory layout
 ****************
 .. code-block::
 
-   examples/im/
+   examples/im1/
      README.md
      geometry/    mesh.geo, mesh.msh, mesh_true.msh
      survey/      receivers, sources (im + per-frequency fm), frequencies,
@@ -105,8 +105,10 @@ Directory layout
      configs/     params_im.txt,
                   solver_bddc.txt, solver_mumps.txt (solver presets, either kernel)
      scripts/     build_meshes.py, gen_survey.py, build_bundles.sh,
-                  make_observations.sh, run_forward.slurm, run_inversion.slurm
-     reference/   reference_metrics.json, reference_metrics.md
+                  make_observations.sh, run_fm.slurm, run_im.slurm,
+                  analyze_inversion.py
+     reference/   reference_metrics.json, reference_metrics.md,
+                  lbfgs_log.txt, rms_history.txt (convergence record)
 
 This is the layout every case under ``examples/`` follows. Everything generated
 lands in ``outputs/``, which is git-ignored and **not present in a fresh
@@ -118,9 +120,8 @@ can only be recovered by rerunning the simulation. Copy any run worth keeping
 outside ``outputs/`` first.
 
 General, reusable tools live in the ``utils/`` package, not in the example:
-``utils/preprocess.py`` (build a bundle), ``utils/make_observed.py`` (assemble
-forward responses and add noise), and ``utils/analyze_inversion.py`` (evaluate a
-recovered model against a reference).
+``utils/preprocess.py`` (build a bundle) and ``utils/make_observed.py`` (assemble
+forward responses and add noise).
 
 Running
 *******
@@ -140,20 +141,20 @@ chain. One driver per stage, all run from the repository root:
    make
 
    # 1-2. Forward modeling of the TRUE model: 7 bundles, then 7 solves
-   bash   examples/im/scripts/build_bundles.sh fm
-   sbatch examples/im/scripts/run_forward.slurm
+   bash   examples/im1/scripts/build_bundles.sh fm
+   sbatch examples/im1/scripts/run_fm.slurm
 
    # 3. Synthetic observations: stack the responses and add 1 % noise
-   bash examples/im/scripts/make_observations.sh
+   bash examples/im1/scripts/make_observations.sh
 
    # 4-5. Inversion from the homogeneous starting model
-   bash   examples/im/scripts/build_bundles.sh im
-   sbatch examples/im/scripts/run_inversion.slurm
+   bash   examples/im1/scripts/build_bundles.sh im
+   sbatch examples/im1/scripts/run_im.slurm
 
    # 6. Evaluate the recovered model
-   python3 utils/analyze_inversion.py \
-      -run_dir examples/im/outputs \
-      -reference examples/im/reference/reference_metrics.json
+   python3 examples/im1/scripts/analyze_inversion.py \
+      -run_dir examples/im1/outputs \
+      -reference examples/im1/reference/reference_metrics.json
 
 Each stage checks its inputs exist and names the stage that produces them, so
 running them out of order fails immediately instead of using stale data.
@@ -184,7 +185,10 @@ Expected results
 ****************
 The inversion converges to the noise floor and recovers the conductor. Full
 values and acceptance tolerances are in ``reference/reference_metrics.md`` and
-``reference/reference_metrics.json``.
+``reference/reference_metrics.json``; the optimisation history of the same run
+is in ``reference/lbfgs_log.txt`` (one row per accepted step) and
+``reference/rms_history.txt`` (one row per objective-gradient evaluation), so a
+new run can be compared iteration by iteration.
 
 .. list-table::
    :header-rows: 1
@@ -193,29 +197,40 @@ values and acceptance tolerances are in ``reference/reference_metrics.md`` and
    * - Quantity
      - Value
    * - RMS of the true model
-     - ≈ 1.0
+     - 0.994
    * - Initial RMS
-     - 11.35
+     - 11.795
    * - Final RMS
-     - 1.05 (``CONVERGED_RMSTOL``, ~90 iterations)
+     - 1.0482 (``CONVERGED_RMSTOL``, 94 accepted L-BFGS steps)
+   * - Objective-gradient evaluations
+     - 105 (94 accepted steps + 10 rejected line-search trials + the initial one)
    * - Background resistivity
      - 100 Ω·m
    * - Peak recovered resistivity
-     - ≈ 11 Ω·m (true 10)
+     - 9.05 Ω·m (true 10)
    * - Conductor lateral offset
-     - 6.9 m
+     - 1.6 m
+   * - Conductor vertical offset
+     - +34.1 m (shallower than true)
    * - Conductor volume (ρ < 30 Ω·m)
-     - 3.5e6 m³
+     - 4.27e6 m³ (true 8.0e6)
 
 ``analyze_inversion.py`` prints these and reports **PASS** when they fall within
-tolerance. The RMS decreases monotonically at every iteration. The recovered
+tolerance. The RMS decreases monotonically over the *accepted* steps; the
+``/rms_history`` dataset is indexed by objective-gradient evaluation and also
+records the rejected line-search trials, so it is not monotone. The recovered
 conductor is correctly located and correctly scaled; its shallow bias and
 reduced volume are the expected resolution limits of a single surface receiver
 plane with one source, not an error.
 
 Reproducibility
 ***************
-The noise seed is fixed (``20260720``) and recorded in ``observed.h5``, and the
-inversion uses a direct solver, so the recovered model is independent of the MPI
-rank count. The meshes are provided with their material tags; ``mesh.geo``
-documents how the base mesh is built (see :doc:`meshing`).
+The noise seed is fixed (``20260720``) and recorded in ``observed.h5``, so the
+observations are reproducible bit-for-bit from the same forward responses. The
+recovered model depends on the MPI rank count, because the L-BFGS path follows
+the preconditioned solves and those follow the domain decomposition. The metrics
+above come from 112 tasks (one node, 518 cells per subdomain, 01:40:06);
+reproduce them at that rank count.
+
+The meshes are provided with their material tags; ``mesh.geo`` documents how the
+base mesh is built (see :doc:`meshing`).

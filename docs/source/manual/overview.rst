@@ -113,8 +113,8 @@ Three cases ship under ``examples/``, all sharing the same layout
   layer, with a precomputed reference for validation.
 - ``examples/unit_cube`` - a small homogeneous cube; the dataset the test suite
   is built around.
-- ``examples/im`` - the CSEM inversion benchmark: a buried conductive block
+- ``examples/im1`` - the CSEM inversion benchmark: a buried conductive block
   recovered from noisy synthetic observations.
 
-The first two are forward cases (see :doc:`examples`); ``examples/im`` covers
+The first two are forward cases (see :doc:`examples`); ``examples/im1`` covers
 the full inverse workflow (see :doc:`inverse_examples`).

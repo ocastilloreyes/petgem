@@ -1,0 +1,26 @@
+# Solver preset: PCBDDC iterative solver (FGMRES on the MATIS operator with the
+# exact Nedelec discrete-gradient coarse space).
+# Usable by BOTH kernels - they read the same unprefixed option keys. Add it
+# after the case config, e.g.:
+#   build/im.csem -options_file configs/params_im.txt    -options_file configs/solver_bddc.txt
+#   build/fm.csem -input_filename outputs/input_fm_f1.h5 -options_file configs/solver_bddc.txt
+#
+# For im.csem this preset governs BOTH the forward and the adjoint solve: the
+# adjoint system A_f.nx = nB uses the same operator, so it reuses the same KSP.
+-dm_mat_type                 is
+-ksp_type                    fgmres
+-pc_type                     bddc
+-pc_bddc_use_deluxe_scaling  1
+-pc_bddc_coarse_pc_type      lu
+
+# Deluxe scaling factorizes local Schur complements with MUMPS *inside* BDDC
+# (PCBDDCSubSchursSetUp). That inner factorization takes the PC prefix plus
+# "sub_schurs_", and it is NOT covered by the -mat_mumps_* keys in
+# solver_mumps.txt. At the MUMPS default ICNTL(14)=20% it runs out of workspace
+# (INFOG(1)=-9) on im.csem, which holds one BDDC setup per frequency - seven
+# times the pressure of a single fm.csem solve.
+-sub_schurs_mat_mumps_icntl_14  80
+
+# If INFOG(1)=-9 persists, raise the value above (100, 200), or drop deluxe
+# scaling altogether with -pc_bddc_use_deluxe_scaling 0: that removes the
+# sub-Schur path entirely at some cost in preconditioner quality.

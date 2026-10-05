@@ -81,7 +81,7 @@
  *     automatic field decomposition obtained from DMPlex and avoids the
  *     high-order field-identification issue described above.
  */
-PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order)
+PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order, IS primalVertices)
 {
   PetscFunctionBeginUser;
   PetscBool ismatis = PETSC_FALSE;
@@ -99,6 +99,33 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order
     PetscCall(PCBDDCSetDofsSplittingLocal(pc, 1, &allDofs));
     PetscCall(ISDestroy(&allDofs));
     PetscCall(PCBDDCSetDiscreteGradient(pc, G, order, 0, PETSC_TRUE, PETSC_TRUE));
+    /* Pin a high-conductivity channel to the coarse space.
+     *
+     * DO NOT pass every DOF of the channel. An earlier version of this comment
+     * claimed PCBDDC discards whatever is not on the subdomain interface, so
+     * that passing the whole channel was free. It is not: handing it all 252947
+     * steel dofs of the test3 model, 39 % of the mesh, left PCSetUp still
+     * running after 52 minutes on a problem that solves in 118 s. The caller
+     * filters to the interface itself, in buildHighSigmaPrimalIS. */
+    if (primalVertices) {
+      /* The list is in GLOBAL numbering, so PCBDDC maps it to its own local
+       * space itself (PCBDDCGlobalToLocal). Passing local indices taken from
+       * the DMPlex section does not work: that section is larger than the MATIS
+       * local matrix, so the indices overflow it or name unrelated dofs. */
+      /* ISGetSize sums the local sizes, and a shared dof is listed by every
+       * rank that sees it, so np OVER-COUNTS the set by a factor near two.
+       * PCBDDC deduplicates; the honest figure is printed by
+       * buildHighSigmaPrimalIS as "distinct dofs". Labelled here as listed so
+       * the two numbers cannot be mistaken for each other again. */
+      PetscInt np, N;
+      PetscCall(ISGetSize(primalVertices, &np));
+      PetscCall(MatGetSize(A, &N, NULL));
+      PetscCall(PetscPrintf(PetscObjectComm((PetscObject)A),
+                            "  BDDC primal vertices   = %" PetscInt_FMT " listed (with cross-rank"
+                            " duplicates) of %" PetscInt_FMT " global dofs\n",
+                            np, N));
+      PetscCall(PCBDDCSetPrimalVerticesIS(pc, primalVertices));
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -139,7 +166,7 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order
  * @note @p B must have a size and ordering consistent with @p A, and @p G (when
  *       used) must match the DOF ordering of @p A.
  */
-PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat G, const PetscInt order, Mat* X) {
+PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat G, const PetscInt order, IS primalVertices, Mat* X) {
 
   PetscFunctionBeginUser;
 
@@ -156,7 +183,7 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
   PetscCall(KSPSetOperators(ksp, A, A));
 
   /* G is the high-order discrete gradient (assembleCsemKandM); BDDC reads its sparsity to build the curl-kernel coarse space. */
-  PetscCall(setupBDDCFromPetgemGradient(ksp, A, G, order));
+  PetscCall(setupBDDCFromPetgemGradient(ksp, A, G, order, primalVertices));
   PetscCall(KSPSetFromOptions(ksp));
 
   PetscCall(MatGetSize(B, &M, &N));

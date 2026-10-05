@@ -12,8 +12,9 @@
 
 #include "grid.h"
 #include "io.h"
+#include "mms.h"   /* MMSRhsKind, consumed by assembleCsemMMSRHS */
 #include "transmitter.h"
-#include "fem.h"  
+#include "fem.h"
 #include <petsc.h>
 
 /**
@@ -55,17 +56,18 @@ PetscErrorCode assembleCsemRHS(const petgemParams params,
  * eliminated via VEC_IGNORE_NEGATIVE_INDICES (E* already satisfies n x E* = 0).
  * No final iωμ scaling is applied - f* already carries it.
  *
- * With useForcing = PETSC_TRUE the integrand is the manufactured forcing f*
- * (the ordinary MMS solve RHS). With useForcing = PETSC_FALSE it is the exact
- * field E* itself, i.e. b_j = sum ∫ E*·N_j - the L2 moments used by the E3
- * projection/interpolation baseline (no iωμ, no sigma).
+ * The integrand is selected by `kind` (see MMSRhsKind in include/mms.h):
+ * MMS_RHS_FORCING integrates f*, MMS_RHS_PROJECTION integrates the exact field
+ * E* itself (the L2 moments of the best-approximation baseline, no iωμ and no
+ * sigma), and MMS_RHS_FORCING_NO_MASS integrates the incomplete forcing of the
+ * negative control.
  *
  * @param[in]  params        Forward-modeling parameters (order, MPI tasks).
  * @param[in]  sources       Transmitter set; only sources.freq (-> omega) is used.
  * @param[in]  dm            DMPlex mesh and H(curl) discretization.
  * @param[in]  grid          Finite-element grid descriptor.
  * @param[in]  conductivity  Per-cell conductivity Vec (diagonal sigma in f*).
- * @param[in]  useForcing    PETSC_TRUE: integrate f*; PETSC_FALSE: integrate E*.
+ * @param[in]  kind          Which right-hand side to build.
  * @param[out] B             One-column dense RHS matrix (created by this call).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
@@ -75,7 +77,7 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
                                   const DM dm,
                                   const Grid grid,
                                   const Vec conductivity,
-                                  const PetscBool useForcing,
+                                  const MMSRhsKind kind,
                                   Mat* B);
 
 /**
@@ -85,14 +87,14 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
  *
  *   Ms != NULL (K/Ms mode, used by the inverse kernel):
  *     *KorA receives the curl-curl stiffness K, *Ms receives the mass-σ
- *     matrix Ms. The frequency-dependent operator A_f = K − iωμ·Ms is
+ *     matrix Ms. The frequency-dependent operator A_f = K - i*omega*mu*Ms is
  *     formed by the caller per frequency via MatDuplicate + MatAXPY.
  *     `constFactor` is ignored in this mode.
  *
  *   Ms == NULL (fused mode, used by the forward kernel):
- *     *KorA receives the frequency-dependent operator A = K − constFactor·Ms
+ *     *KorA receives the frequency-dependent operator A = K - constFactor*Ms
  *     directly, formed by per-cell element-level fusion
- *     A_e = K_e − constFactor·M_e, so Ms is never built as a global matrix.
+ *     A_e = K_e - constFactor*M_e, so Ms is never built as a global matrix.
  *     Saves one full complex matrix from the assembly-phase peak memory,
  *     one MatDuplicate, and one global MatAXPY. The caller passes
  *     `constFactor = iωμ`.
@@ -118,6 +120,17 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
+/**
+ * @brief Local DOFs supported on cells more conductive than @p threshold,
+ *        for PCBDDC primal vertices. See src/assembly.c for the rationale.
+ *
+ * @param[in]  dm            DMPlex mesh carrying the H(curl) section.
+ * @param[in]  conductivity  Per-cell conductivity Vec.
+ * @param[in]  threshold     Selection threshold in S/m; <= 0 disables (NULL out).
+ * @param[out] primal        Local IS of DOF indices, or NULL. Caller destroys.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 PetscErrorCode assembleCsemKandM(const petgemParams params, const DM dm, const Grid grid,
                                  const Vec conductivity,
                                  const PetscScalar constFactor,
@@ -128,8 +141,9 @@ PetscErrorCode assembleCsemKandM(const petgemParams params, const DM dm, const G
  *
  * Used by the inverse kernel inside the L-BFGS loop: K and G_BDDC are
  * σ-independent and built once at setup via assembleCsemKandM, while Ms
- * must be re-computed every iteration when σ changes. fm.csem does NOT use
- * this - its fused single-pass call to assembleCsemKandM is unchanged.
+ * must be re-computed every iteration when σ changes. fm.csem does not use
+ * this routine; it assembles through the fused single-pass call to
+ * assembleCsemKandM.
  *
  * Preconditions:
  *   - `Ms` is already allocated with the same sparsity pattern as the K
@@ -161,5 +175,14 @@ PetscErrorCode assembleCsemMsRefill(const petgemParams params,
                                     const Quadrature3D *quadrature_3d,
                                     PetscReal **Me, PetscReal **Ke,
                                     Mat Ms);
+
+PetscErrorCode buildHighSigmaPrimalIS(const DM dm, const Vec conductivity,
+                                      const PetscReal threshold, IS *primal);
+
+/* Cross-check a primal index set against the assembled operator: the selected
+ * rows must carry far larger diagonals than the rest, because the conductivity
+ * enters through the mass term. Catches a wrong global numbering, which would
+ * otherwise look like the preconditioner under-performing. */
+PetscErrorCode verifyPrimalISAgainstOperator(Mat A, IS primal);
 
 #endif

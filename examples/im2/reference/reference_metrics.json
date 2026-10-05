@@ -1,0 +1,81 @@
+{
+  "name": "im2 - CSEM inversion benchmark, synthetic model 2",
+  "description": "Controlled 3-D CSEM inversion: a checkerboard of four 200 m cubes - two 10 ohm-m conductors and two 1000 ohm-m resistors - in a 100 ohm-m halfspace, recovered from noisy multi-frequency surface data.",
+  "_coordinates": "z NEGATIVE down (depth is a negative z), matching examples/fm; z = 0 is the air/earth interface.",
+  "_run": "112 MPI tasks, PCBDDC (configs/solver_bddc.txt), 00:57:28. Mesh 57276 cells, 355502 DOFs at order 2. The domain decomposition is part of the configuration: reproduce at 112 tasks.",
+  "true_model": {
+    "background_ohm_m": 100.0,
+    "bodies": [
+      {
+        "name": "C1",
+        "polarity": "conductor",
+        "resistivity_ohm_m": 10.0,
+        "box_m": {"x": [50.0, 250.0], "y": [-250.0, -50.0], "z": [-300.0, -100.0]},
+        "search_box_m": {"x": [0.0, 550.0], "y": [-550.0, 0.0], "z": [-600.0, -1.0]}
+      },
+      {
+        "name": "C2",
+        "polarity": "conductor",
+        "resistivity_ohm_m": 10.0,
+        "box_m": {"x": [-250.0, -50.0], "y": [50.0, 250.0], "z": [-300.0, -100.0]},
+        "search_box_m": {"x": [-550.0, 0.0], "y": [0.0, 550.0], "z": [-600.0, -1.0]}
+      },
+      {
+        "name": "R1",
+        "polarity": "resistor",
+        "resistivity_ohm_m": 1000.0,
+        "box_m": {"x": [50.0, 250.0], "y": [50.0, 250.0], "z": [-300.0, -100.0]},
+        "search_box_m": {"x": [0.0, 550.0], "y": [0.0, 550.0], "z": [-600.0, -1.0]}
+      },
+      {
+        "name": "R2",
+        "polarity": "resistor",
+        "resistivity_ohm_m": 1000.0,
+        "box_m": {"x": [-250.0, -50.0], "y": [-250.0, -50.0], "z": [-300.0, -100.0]},
+        "search_box_m": {"x": [-550.0, 0.0], "y": [-550.0, 0.0], "z": [-600.0, -1.0]}
+      }
+    ],
+    "body_volume_m3": 8.0e6,
+    "_search_boxes": "One quadrant of the INVERT footprint per body, so a smeared reconstruction is still attributed to the right target and no cell is counted twice."
+  },
+  "observations": {
+    "noise_error_level": 0.01,
+    "noise_seed": 20260922,
+    "rms_true_model": 0.9864
+  },
+  "convergence": {
+    "initial_rms": 7.0604,
+    "final_rms": 1.0491,
+    "iterations": 105,
+    "objgrad_evaluations": 112,
+    "termination": "CONVERGED_RMSTOL",
+    "_iterations_not_reproducible": "The step count is NOT reproducible to the unit. Two runs from the same bundle on 112 tasks agree to four decimals through iteration 20 and drift to ~1 % in RMS by iteration 70: round-off non-determinism in the MPI reductions of the iterative solver, amplified by L-BFGS. Expect 100-115 steps, not exactly 105."
+  },
+  "recovered_model": {
+    "background_ohm_m": 100.0,
+    "bodies": {
+      "C1": {"peak_ohm_m": 4.84,   "mean_ohm_m": 28.3,  "centroid_m": [146.5, -157.5, -156.9], "lateral_offset_m": 8.3,  "vertical_offset_m": 43.1, "volume_m3": 3.569e6, "fraction_in_true_box": 0.94, "log_contrast_recovered": 0.55},
+      "C2": {"peak_ohm_m": 2.96,   "mean_ohm_m": 25.7,  "centroid_m": [-156.4, 172.5, -163.5], "lateral_offset_m": 23.4, "vertical_offset_m": 36.5, "volume_m3": 4.502e6, "fraction_in_true_box": 0.84, "log_contrast_recovered": 0.59},
+      "R1": {"peak_ohm_m": 363.71, "mean_ohm_m": 178.5, "centroid_m": [174.2, 219.6, -172.6],  "lateral_offset_m": 73.7, "vertical_offset_m": 27.4, "volume_m3": 2.860e5, "fraction_in_true_box": 0.95, "log_contrast_recovered": 0.25},
+      "R2": {"peak_ohm_m": 360.59, "mean_ohm_m": 178.2, "centroid_m": [-144.9, -155.8, -149.4],"lateral_offset_m": 7.8,  "vertical_offset_m": 50.6, "volume_m3": 3.191e5, "fraction_in_true_box": 1.00, "log_contrast_recovered": 0.25}
+    },
+    "cross_contamination_cells": 0,
+    "_cross_contamination": "Wrong-sign cells among the 6330 inside the four true boxes. Outside them, 75 conductive and 1 resistive cell are anomalous, all 104-148 m from their own body centre (a cube corner is at 173 m), i.e. the smearing halo rather than artifacts.",
+    "_amplitude": "mean_ohm_m is the volume-weighted geometric mean inside box_m and is what describes the body; peak_ohm_m is a single-cell extremum and overshoots past the truth for the conductors. log_contrast_recovered is the fraction of |log10(rho_true/rho_background)| that the mean represents: the conductors recover about 2.3x more of their contrast than the resistors, which is the expected asymmetry - a CSEM field is far more sensitive to a conductor than to a resistor of equal contrast."
+  },
+  "conductor_threshold_ohm_m": 30.0,
+  "resistor_threshold_ohm_m": 300.0,
+  "tolerances": {
+    "_basis": "Bands around the measured run, wide enough for the run-to-run drift above and for a re-meshed discretisation; tight enough to fail if a body is lost, misplaced or comes back with the wrong sign.",
+    "final_rms_max": 1.05,
+    "background_ohm_m_pct": 2.0,
+    "lateral_offset_m_max": 100.0,
+    "bodies": {
+      "C1": {"mean_ohm_m_range": [15.0, 50.0], "peak_ohm_m_range": [2.0, 20.0], "volume_m3_range": [1.5e6, 8.0e6], "lateral_offset_m_max": 40.0},
+      "C2": {"mean_ohm_m_range": [15.0, 50.0], "peak_ohm_m_range": [2.0, 20.0], "volume_m3_range": [1.5e6, 8.0e6], "lateral_offset_m_max": 40.0},
+      "R1": {"mean_ohm_m_range": [130.0, 400.0], "peak_ohm_m_range": [250.0, 1200.0], "volume_m3_range": [8.0e4, 8.0e5]},
+      "R2": {"mean_ohm_m_range": [130.0, 400.0], "peak_ohm_m_range": [250.0, 1200.0], "volume_m3_range": [8.0e4, 8.0e5]}
+    },
+    "_resistor_offsets": "R1 and R2 fall back to the global 100 m bound: at the 300 ohm-m threshold they are 62 and 86 cells, so their centroid is correspondingly noisy (73.7 m against 7.8 m for the same true geometry)."
+  }
+}

@@ -70,7 +70,7 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
    *     face  :  (order-1)(order-2)/2
    *     cell  :  (order-1)(order-2)(order-3)/6
    * Total per cell = (order+1)(order+2)(order+3)/6. For order=1 this collapses
-   * to {1,0,0,0} (4 vertex DOFs), reproducing the previous P1 layout. */
+   * to {1,0,0,0} (4 vertex DOFs), i.e. the P1 layout. */
   PetscInt numCellsLocal = 0, numCellsGlobal = 0, numFacesLocal = 0, numFacesGlobal = 0;
   PetscInt numEdgesLocal = 0, numEdgesGlobal = 0, numVerticesLocal = 0, numVerticesGlobal = 0;
   PetscInt dim, pStart, cellStart, cellEnd, faceStart, faceEnd, edgeStart, edgeEnd, vertexStart, vertexEnd;

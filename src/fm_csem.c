@@ -246,7 +246,34 @@ int runForward(int argc, char** argv) {
 
   PetscCall(PetscLogStagePush(stage_solve));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(solveCsemSystem(dm, A, B, G, grid.fem.order, &X));
+  /* Optional: pin a high-conductivity channel (the steel casing) to the BDDC
+   * coarse space. Off unless -petgem_bddc_primal_sigma is given. */
+  IS        primalVertices = NULL;
+  PetscReal primalSigma    = 0.0;
+  PetscCall(PetscOptionsGetReal(NULL, NULL, "-petgem_bddc_primal_sigma", &primalSigma, NULL));
+  if (primalSigma > 0.0) {
+    PetscCall(buildHighSigmaPrimalIS(dm, conductivity, primalSigma, &primalVertices));
+    if (!params.quiet) {
+      /* The summed local sizes over-count: see the note in solver.c. The
+       * distinct figure is printed by buildHighSigmaPrimalIS; this line says
+       * plainly which of the two it is. */
+      PetscInt nlocal = 0, ntotal = 0;
+      if (primalVertices) PetscCall(ISGetLocalSize(primalVertices, &nlocal));
+      PetscCallMPI(MPI_Reduce(&nlocal, &ntotal, 1, MPIU_INT, MPI_SUM, 0, PETSC_COMM_WORLD));
+      PetscCall(logKVf(PETSC_COMM_WORLD, "BDDC primal candidates",
+                       "%s listed dofs on cells above %g S/m (see distinct count above)",
+                       formatGroupedInt(ntotal), (double)primalSigma));
+    }
+    /* Verify the index set against the operator before handing it to PCBDDC.
+     * A wrong global numbering would make PCBDDC pin the wrong dofs, which is
+     * indistinguishable from the fix simply not helping. */
+    PetscBool checkPrimal = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-petgem_bddc_primal_check", &checkPrimal, NULL));
+    if (checkPrimal) PetscCall(verifyPrimalISAgainstOperator(A, primalVertices));
+  }
+
+  PetscCall(solveCsemSystem(dm, A, B, G, grid.fem.order, primalVertices, &X));
+  PetscCall(ISDestroy(&primalVertices));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[4] = end_timer - start_timer;
