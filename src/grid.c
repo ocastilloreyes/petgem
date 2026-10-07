@@ -36,7 +36,6 @@
  *     for the high-order discrete-gradient (G) column space.
  *   - Computes local and global counts of vertices, edges, faces, and cells.
  *   - Stores DOF counts, element start/end indices, and dimension in the `grid` struct.
- *   - Prints mesh and HEFEM statistics for verification.
  *
  * @param[in]  params  Struct containing simulation parameters, especially the basis order `params.order` and mesh filename.
  * @param[inout] dm    Pointer to the DMPlex object to configure with H(curl) and H1 sections.
@@ -46,7 +45,7 @@
  *
  * @note The function uses PETSc parallel reductions (MPI_Allreduce) to compute global mesh statistics
  *       and relies on PETSc DMPlex utilities to handle boundary labeling, section creation,
- *       and point numbering. Output is printed collectively using PETSc routines.
+ *       and point numbering. The report lines are printed by logGridSummary().
  */
 PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
 
@@ -252,23 +251,6 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
       grid->fem.edgeDofOffset   = nVol + nFace;
     }
   }
-
-  /* Print mesh statistics (uniform key = value style; label width 24) */
-  PetscCall(logSection(PETSC_COMM_WORLD, "Mesh"));
-  PetscCall(logKVStr(PETSC_COMM_WORLD, "Input file", params.inputFile));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of vertices", grid->numVerticesGlobal));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of edges", grid->numEdgesGlobal));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of faces", grid->numFacesGlobal));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "Number of cells", grid->numCellsGlobal));
-
-  /* Print FEM-space statistics */
-  PetscCall(logSection(PETSC_COMM_WORLD, "FEM space"));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "Basis order", params.order));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per vertex", grid->numDofInVertex));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per edge", grid->numDofInEdge));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per face", grid->numDofInFace));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per volume", grid->numDofInVolume));
-  PetscCall(logKVInt(PETSC_COMM_WORLD, "DOFs per cell", grid->numDofInCell));
 
   /* Restore global numbering and free memory */
   PetscCall(ISRestoreIndices(globalPointNumbering, &gidxs));
@@ -747,5 +729,38 @@ PetscErrorCode computeCellCentroid(Cell* cell) {
 }
 
 
+/**
+ * @brief Prints the input file, mesh size and H(curl) space of a run.
+ *
+ * Emits the "Input", "Mesh", "FE space" and "DOFs/entity" lines of the run
+ * report. The global DOF count is the size of a global vector of @p dm.
+ *
+ * @param[in] params  Parameters (input file, basis order).
+ * @param[in] dm      DMPlex carrying the H(curl) section.
+ * @param[in] grid    Grid filled by setupCsemGrid().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode logGridSummary(const petgemParams params, const DM dm, const Grid *grid) {
+  PetscFunctionBeginUser;
 
+  /* Variables declaration */
+  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
+  Vec      v;
+  PetscInt numDofs;
 
+  PetscCall(DMGetGlobalVector(dm, &v));
+  PetscCall(VecGetSize(v, &numDofs));
+  PetscCall(DMRestoreGlobalVector(dm, &v));
+
+  PetscCall(logKVStr(comm, "Input", params.inputFile));
+  PetscCall(logKVf(comm, "Mesh", "%s cells, %s faces, %s edges, %s vertices",
+                   formatGroupedInt(grid->numCellsGlobal), formatGroupedInt(grid->numFacesGlobal),
+                   formatGroupedInt(grid->numEdgesGlobal), formatGroupedInt(grid->numVerticesGlobal)));
+  PetscCall(logKVf(comm, "FE space", "Nédélec p=%" PetscInt_FMT ", %s DOFs", params.order, formatGroupedInt(numDofs)));
+  PetscCall(logKVf(comm, "DOFs/entity", "vertex %" PetscInt_FMT ", edge %" PetscInt_FMT ", face %" PetscInt_FMT
+                   ", volume %" PetscInt_FMT " (%" PetscInt_FMT " per cell)",
+                   grid->numDofInVertex, grid->numDofInEdge, grid->numDofInFace, grid->numDofInVolume, grid->numDofInCell));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

@@ -113,8 +113,10 @@ int runInverse(int argc, char **argv) {
   Vec             conductivity, materials_id, receivers;
   imParams        iparams;   /* embeds the shared petgemParams base as iparams.common */
   Grid            grid;
-  PetscLogDouble  tAssembly = 0.0, tSolver = 0.0;
-  PetscLogDouble  timers[6];
+  InversionStats  stats;
+  PetscLogDouble  timers[3];
+  char            text[256];
+  MPI_Comm        comm;
   PetscLogDouble  start_timer, end_timer;
   PetscLogStage stage_parse, stage_load, stage_grid;
   PetscLogStage stage_assembly, stage_solve, stage_postproc;
@@ -129,6 +131,7 @@ int runInverse(int argc, char **argv) {
 #endif
 
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, imHelp));
+  comm = PETSC_COMM_WORLD;
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
 
@@ -159,7 +162,7 @@ int runInverse(int argc, char **argv) {
 #endif
 
   if (!helpRequested) {
-    PetscCall(printHeader());
+    PetscCall(printHeader("im.csem"));
   }
 
 #ifdef USE_EXTRAE
@@ -238,6 +241,9 @@ int runInverse(int argc, char **argv) {
   PetscCall(PetscLogStagePop());
   timers[2] = end_timer - start_timer;
 
+  PetscCall(logGridSummary(iparams.common, dm, &grid));
+  PetscCall(logInversionSummary(&iparams));
+
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
@@ -250,32 +256,47 @@ int runInverse(int argc, char **argv) {
 #endif
 
   PetscCall(PetscLogStagePush(stage_solve));
-  PetscCall(PetscTime(&start_timer));
-  PetscCall(runCsemInversion(&iparams, dm, &grid, conductivity, materials_id, receivers, &tAssembly, &tSolver));
-  PetscCall(PetscTime(&end_timer));
+  PetscCall(runCsemInversion(&iparams, dm, &grid, conductivity, materials_id, receivers, &stats));
   PetscCall(PetscLogStagePop());
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
 
-  /* Split the inversion wall time across the same six buckets fm.csem uses, so printTimers labels them consistently 
-   * for both kernels. tAssembly and tSolver are accumulated inside the L-BFGS loop (Ms refill + A build, and
-   * solver setup + forward/adjoint solves); the remainder (gradient, smoothing, line search, results I/O,
-   * L-BFGS overhead) lands in the last bucket. */
-  timers[3] = tAssembly;
-  timers[4] = tSolver;
-  timers[5] = (end_timer - start_timer) - tAssembly - tSolver;
-  if (timers[5] < 0.0) timers[5] = 0.0;
-
   /* ---------------------------------------------------------------- */
-  /* Print timers and footer                                          */
+  /* Print stage table, output and footer                            */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 9);
 #endif
 
-  PetscCall(printTimers(timers));
+  PetscCall(logStageHeader(comm));
+  PetscCall(logStage(comm, "Load + grid", NULL, timers[0] + timers[1] + timers[2]));
+  PetscCall(logStage(comm, "Setup", "operators, RHS, receivers, observed data", stats.tSetup));
+  PetscCall(logStage(comm, "Assembly", "Ms(σ), A_f = K - iωμMs", stats.tAssembly));
+  if (stats.kspItsMin == stats.kspItsMax) {
+    PetscCall(PetscSNPrintf(text, sizeof(text), "%s solves (fwd + adj), KSP its %" PetscInt_FMT,
+                            formatGroupedInt(stats.numSolves), stats.kspItsMax));
+  } else {
+    PetscCall(PetscSNPrintf(text, sizeof(text), "%s solves (fwd + adj), KSP its %" PetscInt_FMT "-%" PetscInt_FMT,
+                            formatGroupedInt(stats.numSolves), stats.kspItsMin, stats.kspItsMax));
+  }
+  PetscCall(logStage(comm, "Solve", text, stats.tSolver));
+  PetscCall(logStage(comm, "Gradient", "adjoint gradient, smoothing, L-BFGS", stats.tGradient));
+  if (stats.numSnapshots > 0) {
+    PetscCall(PetscSNPrintf(text, sizeof(text), "HDF5 + %s VTU snapshots", formatGroupedInt(stats.numSnapshots)));
+  } else {
+    PetscCall(PetscStrncpy(text, "HDF5", sizeof(text)));
+  }
+  PetscCall(logStage(comm, "Output", text, stats.tOutput));
+  PetscCall(logStage(comm, "Total", NULL, timers[0] + timers[1] + timers[2] + stats.tSetup + stats.tAssembly +
+                                          stats.tSolver + stats.tGradient + stats.tOutput));
+  {
+    char outFile[PETSC_MAX_PATH_LEN];
+    PetscCall(buildOutputPath(&iparams.common, ".h5", outFile, sizeof(outFile)));
+    PetscCall(PetscPrintf(comm, "\n"));
+    PetscCall(logKVStr(comm, "Output", outFile));
+  }
   PetscCall(printFooter());
 
 #ifdef USE_EXTRAE

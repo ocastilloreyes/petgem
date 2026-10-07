@@ -17,7 +17,6 @@ examples/*/outputs/
 
 # Local working directories, kept out of the distribution
 data/
-gaussian_beam_boundary_excitation/
 
 # Run-time artifacts dropped at the repo root
 petgem*.err

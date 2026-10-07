@@ -82,6 +82,9 @@ int runForward(int argc, char** argv) {
   PetscReal       omega;
   PetscScalar     constFactor;
   PetscLogDouble  timers[6];
+  SolveInfo       solveInfo;
+  char            text[256];
+  MPI_Comm        comm;
   PetscLogDouble  start_timer, end_timer;
   PetscLogStage stage_parse, stage_load, stage_grid;
   PetscLogStage stage_assembly, stage_solve, stage_postproc;
@@ -96,6 +99,7 @@ int runForward(int argc, char** argv) {
 #endif
 
   PetscCall(PetscInitialize(&argc, &argv, (char*)0, fmHelp));
+  comm = PETSC_COMM_WORLD;
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
 
@@ -125,7 +129,7 @@ int runForward(int argc, char** argv) {
   Extrae_event(1000, 2);
 #endif
 
-  if (!helpRequested) PetscCall(printHeader());
+  if (!helpRequested) PetscCall(printHeader("fm.csem"));
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -188,6 +192,9 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscLogStagePop());
   timers[2] = end_timer - start_timer;
 
+  PetscCall(logGridSummary(params, dm, &grid));
+  PetscCall(logForwardSources(&sources));
+
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
@@ -202,6 +209,7 @@ int runForward(int argc, char** argv) {
     PetscCall(runMMSVerification(params, dm, grid, conductivity, sources));
     PetscCall(PetscLogStagePop());
 
+    PetscCall(PetscPrintf(comm, "\n"));
     PetscCall(printFooter());
     PetscCall(DMDestroy(&grid.H1dm));
     PetscCall(DMDestroy(&dm));
@@ -212,6 +220,11 @@ int runForward(int argc, char** argv) {
     PetscCall(PetscFinalize());
     return 0;
   }
+
+  PetscCall(describeCsemSolver(dm, text, sizeof(text)));
+  PetscCall(logKVStr(comm, "Solver", text));
+  PetscCall(logStageHeader(comm));
+  PetscCall(logStage(comm, "Load + grid", NULL, timers[0] + timers[1] + timers[2]));
 
   /* ---------------------------------------------------------------- */
   /* Assembly linear system                                           */
@@ -232,6 +245,7 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[3] = end_timer - start_timer;
+  PetscCall(logStage(comm, "Assembly (b, A = K - iωμMs)", NULL, timers[3]));
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -272,11 +286,16 @@ int runForward(int argc, char** argv) {
     if (checkPrimal) PetscCall(verifyPrimalISAgainstOperator(A, primalVertices));
   }
 
-  PetscCall(solveCsemSystem(dm, A, B, G, grid.fem.order, primalVertices, &X));
+  PetscCall(solveCsemSystem(dm, A, B, G, grid.fem.order, primalVertices, &X, &solveInfo));
   PetscCall(ISDestroy(&primalVertices));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[4] = end_timer - start_timer;
+  PetscCall(PetscSNPrintf(text, sizeof(text), "%" PetscInt_FMT " its%s, %s, %s|r|/|b| = %.1e",
+                          solveInfo.its, sources.numSources > 1 ? " (last rhs)" : "",
+                          KSPConvergedReasons[solveInfo.reason], sources.numSources > 1 ? "max " : "",
+                          (double)solveInfo.relres));
+  PetscCall(logStage(comm, "Solve", text, timers[4]));
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -295,19 +314,31 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[5] = end_timer - start_timer;
+  {
+    PetscInt nrecv;
+    PetscCall(VecGetSize(receivers, &nrecv));
+    PetscCall(PetscSNPrintf(text, sizeof(text), "%s receivers", formatGroupedInt(nrecv / 3)));
+  }
+  PetscCall(logStage(comm, "Interp.", text, timers[5]));
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
 
   /* ---------------------------------------------------------------- */
-  /* Print timers and footer                                          */
+  /* Print stage table, output and footer                            */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 9);
 #endif
 
-  PetscCall(printTimers(timers));
+  PetscCall(logStage(comm, "Total", NULL, timers[0] + timers[1] + timers[2] + timers[3] + timers[4] + timers[5]));
+  {
+    char outFile[PETSC_MAX_PATH_LEN];
+    PetscCall(buildOutputPath(&params, ".h5", outFile, sizeof(outFile)));
+    PetscCall(PetscPrintf(comm, "\n"));
+    PetscCall(logKVStr(comm, "Output", outFile));
+  }
   PetscCall(printFooter());
 
 #ifdef USE_EXTRAE

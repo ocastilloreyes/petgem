@@ -42,11 +42,7 @@ typedef struct {
   PetscMPIInt numMPITasks; /**< Number of MPI tasks in the run. */
 
   /**
-   * Suppress per-call assembly headers ("Assembly RHS:", "Vector size",
-   * "Initiated", "Finished", "Assembly K + M(sigma)", etc.) emitted by
-   * src/assembly.c. Default PETSC_FALSE preserves current fm.csem output;
-   * the inversion kernel sets this to PETSC_TRUE to silence repeated
-   * per-frequency / per-iteration headers in the L-BFGS loop.
+   * Suppress the "MMS RHS" line printed by assembleCsemMMSRHS.
    */
   PetscBool quiet;
 
@@ -117,6 +113,16 @@ PetscErrorCode loadCsemInputs(petgemParams       *pg_params,
                               Vec            *materialsID,
                               CsemSourceSet  *sources,
                               Vec            *receivers);
+
+/**
+ * @brief Prints the "Source" line(s) of the forward run report.
+ *
+ * @param[in] sources  Transmitter set loaded by loadCsemInputs().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode logForwardSources(const CsemSourceSet *sources);
 
 /**
  * @brief Simulation-type tags stamped into every PETGEM output product.

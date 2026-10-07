@@ -211,14 +211,15 @@ be compared iteration by iteration and not only on its final metrics:
 | `lbfgs_log.txt`   | L-BFGS trace, one row per accepted step (iterations 0 to 94)    |
 | `rms_history.txt` | `/rms_history`, one row per objective-gradient evaluation (105) |
 
-Each row of `lbfgs_log.txt` gives RMS, objective `F`, regularization term, `‖g‖`
-and step length, and the file ends with the exit reason. `rms_history.txt`
+Each row of `lbfgs_log.txt` gives the cumulative objective-gradient evaluations,
+RMS, regularization term `λΦm`, relative gradient norm `|g|/|x|`, step length,
+KSP iteration range and wall time, and the file ends with the stopping line. `rms_history.txt`
 includes the 10 rejected line-search trials.
 
 Both are extracted from a finished run rather than written by the kernel:
 
 ```bash
-sed -n '/   Iter          RMS/,/L-BFGS exit reason/p' \
+sed -n '/^ Iter Evals/,/^ Stopped/p' \
     examples/im1/outputs/im_<jobid>.out > examples/im1/reference/lbfgs_log.txt
 
 python3 - <<'PY'

@@ -97,7 +97,7 @@ endif
 CFLAGS := $(BASE_CFLAGS) $(WARN_CFLAGS) $(EXTRA_CFLAGS)
 
 # Include directory for PETGEM headers
-I_CFLAGS := -Iinclude
+I_CFLAGS := -Iinclude -I$(OBJDIR)
 
 # -----------------------------------------------------------------------------
 # Console output styling
@@ -236,6 +236,16 @@ $(foreach _o,$(ALL_OBJS),\
 $(OBJDIR)/%.o: src/%.c | $(OBJDIR) _preamble
 	@echo "$(C_CC)[CC]$(C_RESET) $<"
 	$(Q)$(CC) $(CFLAGS) $(I_CFLAGS) -c $< -o $@
+
+# Git revision shown in the run header; rewritten only when it changes.
+GIT_REV_H := $(OBJDIR)/git_rev.h
+$(GIT_REV_H): FORCE | $(OBJDIR)
+	@rev=$$(git describe --always --dirty 2>/dev/null || echo unknown); \
+	new="#define PETGEM_GIT_REV \"$$rev\""; \
+	[ -f $@ ] && [ "$$(cat $@)" = "$$new" ] || echo "$$new" > $@
+$(OBJDIR)/common.o: $(GIT_REV_H)
+FORCE:
+.PHONY: FORCE
 
 # Ensure build directory exists for binaries
 build:

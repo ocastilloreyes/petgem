@@ -97,6 +97,8 @@ typedef struct {
    *  should NOT be overridden by the bundle reader). */
   PetscBool errorLevelFromCLI;                     /**< Error level came from CLI. */
   PetscBool fixedMaterialsFromCLI;                 /**< Fixed materials came from CLI. */
+  const char *errorLevelOrigin;                    /**< "CLI", "bundle" or "default". */
+  const char *fixedMaterialsOrigin;                /**< "CLI", "bundle" or "default". */
   /** @} */
 
   /** Source-frequency entries loaded from the unified bundle's /sources group
@@ -185,6 +187,17 @@ typedef struct {
    *  instead of lumping the whole inversion into one bucket. */
   PetscLogDouble                  tAssembly;   /**< Ms refill + A = K - iωμ·Ms. */
   PetscLogDouble                  tSolver;     /**< Solver setup + fwd/adjoint solves. */
+  PetscLogDouble                  tOutput;     /**< VTU snapshots + HDF5 results. */
+  /** @} */
+
+  /** @{ KSP statistics. The *Row fields cover the solves since the last
+   *  L-BFGS table row and are reset by lbfgsOptimize; the others cover the run. */
+  PetscInt                        numSolves;    /**< Forward + adjoint solves. */
+  PetscInt                        kspItsMin;    /**< Fewest KSP iterations of any solve. */
+  PetscInt                        kspItsMax;    /**< Most KSP iterations of any solve. */
+  PetscInt                        kspItsMinRow; /**< Fewest KSP iterations since the last row. */
+  PetscInt                        kspItsMaxRow; /**< Most KSP iterations since the last row. */
+  PetscInt                        numSnapshots; /**< VTU snapshots written. */
   /** @} */
 
   /* ---- Pre-allocated workspace ----
@@ -290,6 +303,18 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
  */
 PetscErrorCode setupInversionSources(const char *bundleFile,
                                      imParams  *iparams);
+
+/**
+ * @brief Prints the inversion part of the im.csem run report (sources,
+ *        frequencies, L-BFGS settings, stopping criteria, error level, fixed
+ *        materials, smoother weight, snapshot interval).
+ *
+ * @param[in] im_Params  Inversion parameters, after setupInversionSources()
+ *                       and loadInversionMetaFromBundle().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode logInversionSummary(const imParams *im_Params);
 
 /**
  * @brief Loads observed data from the unified bundle's /observed/Ex dataset.
@@ -541,6 +566,21 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx,
                                           PetscInt                acceptedIter);
 
 /**
+ * @brief Wall times and counters of an inversion run, for the run report.
+ */
+typedef struct {
+  PetscLogDouble tSetup;       /**< Operators, RHS, receivers, observed data, KSPs. */
+  PetscLogDouble tAssembly;    /**< Ms refill + A_f = K - iωμ·Ms. */
+  PetscLogDouble tSolver;      /**< Forward + adjoint solves. */
+  PetscLogDouble tGradient;    /**< Rest of the L-BFGS loop (gradient, smoothing, updates). */
+  PetscLogDouble tOutput;      /**< VTU snapshots + HDF5 results. */
+  PetscInt       numSolves;    /**< Forward + adjoint solves. */
+  PetscInt       kspItsMin;    /**< Fewest KSP iterations of any solve. */
+  PetscInt       kspItsMax;    /**< Most KSP iterations of any solve. */
+  PetscInt       numSnapshots; /**< VTU snapshots written. */
+} InversionStats;
+
+/**
  * @brief Top-level inversion driver.
  *
  * `receivers` is the serial Vec (PETSC_COMM_SELF, length 3·N_recv) loaded by
@@ -554,8 +594,7 @@ PetscErrorCode writeInversionSnapshotVTU(const InversionContext *ctx,
  * @param[in]  conductivity  Initial per-cell conductivity Vec.
  * @param[in]  materialsID   Per-cell material-id Vec.
  * @param[in]  receivers     Serial Vec of 3·N_recv receiver coordinates.
- * @param[out] tAssemblyOut  Accumulated assembly time (seconds) for reporting.
- * @param[out] tSolverOut    Accumulated solver time (seconds) for reporting.
+ * @param[out] stats         Wall times and counters for the run report.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */
@@ -565,8 +604,7 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
                                 Vec               conductivity,
                                 Vec               materialsID,
                                 Vec               receivers,
-                                PetscLogDouble   *tAssemblyOut,
-                                PetscLogDouble   *tSolverOut);
+                                InversionStats   *stats);
 
 /**
  * @brief Frees the NeighborGraph memory.

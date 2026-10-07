@@ -1,12 +1,11 @@
 # =============================================================================== #
 # Docker image builder                                                            #
 # =============================================================================== #
-# Tagged `AS builder` so docker/dockerfile.release (and any downstream
-# multi-stage build) can `COPY --from=builder ...` when the develop image
-# is referenced by tag.
+
 FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /workspace
 
 # ----------------------------
@@ -14,126 +13,230 @@ WORKDIR /workspace
 # ----------------------------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        build-essential gcc gfortran g++ make cmake vim clang-format \
-        flex bison libtool git wget autoconf automake autopoint pkg-config gettext libtool-bin \
-        python3 python3-pip python3-distutils \
-        libglu1 libxcursor1 libgl1-mesa-glx libxinerama1 tzdata \
-        texinfo doxygen latexmk \
-        texlive texlive-latex-base texlive-latex-extra texlive-fonts-recommended \
-        dvipng cm-super && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+        ca-certificates \
+        build-essential \
+        gcc \
+        g++ \
+        gfortran \
+        make \
+        cmake \
+        vim \
+        clang-format \
+        flex \
+        bison \
+        libtool \
+        libtool-bin \
+        git \
+        wget \
+        autoconf \
+        automake \
+        autopoint \
+        pkg-config \
+        gettext \
+        python3 \
+        python3-pip \
+        python3-setuptools \
+        python3-venv \
+        libglu1-mesa \
+        libxcursor1 \
+        libgl1 \
+        libxinerama1 \
+        tzdata \
+        texinfo \
+        doxygen \
+        latexmk \
+        texlive \
+        texlive-latex-base \
+        texlive-latex-extra \
+        texlive-fonts-recommended \
+        dvipng \
+        cm-super && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------
 # Install Python packages via apt where available
 # ------------------------------------------------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        python3-breathe python3-meshio python3-h5py python3-numpy python3-matplotlib \
-        python3-sphinx python3-sphinx-rtd-theme && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+        python3-breathe \
+        python3-meshio \
+        python3-h5py \
+        python3-numpy \
+        python3-matplotlib \
+        python3-sphinx \
+        python3-sphinx-rtd-theme && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# ----------------------------
+# Python virtual environment
+# ----------------------------
+RUN python3 -m venv /opt/venv
+
+ENV PATH="/opt/venv/bin:${PATH}"
 
 # --------------------------------
 # Install Python packages via pip
 # --------------------------------
-RUN pip3 install --no-cache-dir cython pytest
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir cython pytest
 
 # ---------------------------
 # PETSc
 # ---------------------------
 ENV PETSC_DIR=/usr/local/petsc
 ENV PETSC_ARCH=arch-linux-c-opt
-WORKDIR /usr/local/petsc
-# MAIN, PINNED - not release. PETGEM needs merge request 9628, "PCBDDC:
-# preserve user defined primal dofs for H(curl) problems", which was merged into
-# main on 23 Sep 2026 and is NOT in the 3.25 release branch. The commit below is
-# that merge; pinning it keeps rebuilds reproducible, since main moves daily.
-# Revert to `-b release` once the fix reaches a release.
-RUN git clone https://gitlab.com/petsc/petsc.git . \
-    && git checkout f9841b2ef6026d2dc26fa090453cd26ff5795584 \
-    && ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran \
-       --download-mpich --download-fblaslapack \
-       --with-scalar-type=complex --download-mumps --download-scalapack --download-ptscotch \
-       --download-cmake --with-debugging=0 --download-hdf5 --download-triangle \
-       --with-fortran-bindings=0 --with-64-bit-indices \
-    && make $PETSC_DIR $PETSC_ARCH all \
-    && make check \
-    && pip3 install src/binding/petsc4py
 
-ENV PATH="$PETSC_DIR/${PETSC_ARCH}/bin:${PATH}"
+WORKDIR ${PETSC_DIR}
+
+RUN git clone --branch v3.26.0 --depth 1 \
+    https://gitlab.com/petsc/petsc.git . && \
+    ./configure \
+        --with-cc=gcc \
+        --with-cxx=g++ \
+        --with-fc=gfortran \
+        --download-mpich \
+        --download-fblaslapack \
+        --with-scalar-type=complex \
+        --download-mumps \
+        --download-scalapack \
+        --download-ptscotch \
+        --download-cmake \
+        --with-debugging=0 \
+        --download-hdf5 \
+        --download-triangle \
+        --with-fortran-bindings=0 \
+        --with-64-bit-indices && \
+    make PETSC_DIR=${PETSC_DIR} PETSC_ARCH=${PETSC_ARCH} all && \
+    make check
+
+RUN cd ${PETSC_DIR}/src/binding/petsc4py && \
+    pip install .
+
+ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
 
 # ---------------------------
 # GMSH
 # ---------------------------
 ENV GMSH_DIR=/usr/local/gmsh
-RUN mkdir -p $GMSH_DIR
+
+RUN mkdir -p ${GMSH_DIR}
+
 WORKDIR /workspace
-RUN wget http://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz \
-    && tar -xf gmsh-stable-Linux64.tgz -C $GMSH_DIR --strip-components=1
-ENV PATH="$GMSH_DIR/bin:${PATH}"
+
+RUN wget https://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz && \
+    tar -xf gmsh-stable-Linux64.tgz \
+        -C ${GMSH_DIR} \
+        --strip-components=1 && \
+    rm gmsh-stable-Linux64.tgz
+
+ENV PATH="${GMSH_DIR}/bin:${PATH}"
 
 # ---------------------------
 # Extrae
 # ---------------------------
 ENV EXTRAE_HOME=/usr/local/extrae
-RUN mkdir -p $EXTRAE_HOME/libunwind $EXTRAE_HOME/papi $EXTRAE_HOME/libxml2 $EXTRAE_HOME/binutils
 
+RUN mkdir -p \
+    ${EXTRAE_HOME}/libunwind \
+    ${EXTRAE_HOME}/papi \
+    ${EXTRAE_HOME}/libxml2 \
+    ${EXTRAE_HOME}/binutils
+
+# ---------------------------
 # libunwind
+# ---------------------------
 WORKDIR /workspace
-RUN git clone -b v1.8.3 https://github.com/libunwind/libunwind.git \
-    && cd libunwind \
-    && autoreconf -i \
-    && ./configure --prefix=$EXTRAE_HOME/libunwind \
-    && make && make install
 
+RUN git clone -b v1.8.3 \
+    https://github.com/libunwind/libunwind.git && \
+    cd libunwind && \
+    autoreconf -i && \
+    ./configure --prefix=${EXTRAE_HOME}/libunwind && \
+    make -j$(nproc) && \
+    make install
+
+# ---------------------------
 # PAPI
+# ---------------------------
 WORKDIR /workspace
-RUN git clone -b papi-7-2-0-t https://github.com/icl-utk-edu/papi \
-    && cd papi/src \
-    && ./configure --prefix=$EXTRAE_HOME/papi CC=gcc F77=gfortran \
-    && make && make install
 
+RUN git clone -b papi-7-2-0-t \
+    https://github.com/icl-utk-edu/papi && \
+    cd papi/src && \
+    ./configure \
+        --prefix=${EXTRAE_HOME}/papi \
+        CC=gcc \
+        F77=gfortran && \
+    make -j$(nproc) && \
+    make install
+
+# ---------------------------
 # binutils
+# ---------------------------
 WORKDIR /workspace
-RUN wget http://ftpmirror.gnu.org/gnu/binutils/binutils-2.42.tar.gz \
-    && tar -xf binutils-2.42.tar.gz \
-    && cd binutils-2.42 \
-    && ./configure --prefix=$EXTRAE_HOME/binutils --enable-shared CFLAGS="-g -O2 -Wno-error" CXXFLAGS="-g -O2 -Wno-error" \
-    && make && make install && cp libiberty/pic/libiberty.a $EXTRAE_HOME/binutils/lib
 
+RUN wget https://ftpmirror.gnu.org/gnu/binutils/binutils-2.42.tar.gz && \
+    tar -xf binutils-2.42.tar.gz && \
+    cd binutils-2.42 && \
+    ./configure \
+        --prefix=${EXTRAE_HOME}/binutils \
+        --enable-shared \
+        CFLAGS="-g -O2 -Wno-error" \
+        CXXFLAGS="-g -O2 -Wno-error" && \
+    make -j$(nproc) && \
+    make install && \
+    cp libiberty/pic/libiberty.a ${EXTRAE_HOME}/binutils/lib
+
+# ---------------------------
 # libxml2
+# ---------------------------
 WORKDIR /workspace
-RUN git clone -b v2.13.0 https://gitlab.gnome.org/GNOME/libxml2.git \
-    && cd libxml2 \
-    && ./autogen.sh --prefix=$EXTRAE_HOME/libxml2 --without-python \
-    && make && make install
 
+RUN git clone -b v2.13.0 \
+    https://gitlab.gnome.org/GNOME/libxml2.git && \
+    cd libxml2 && \
+    ./autogen.sh \
+        --prefix=${EXTRAE_HOME}/libxml2 \
+        --without-python && \
+    make -j$(nproc) && \
+    make install
+
+# ---------------------------
 # Extrae
+# ---------------------------
 WORKDIR /workspace
-RUN git clone -b 5.0.3 https://github.com/bsc-performance-tools/extrae.git \
-    && cd extrae \
-    && git submodule update --init --recursive \
-    && autoreconf -f -i \
-    && ./configure --prefix=$EXTRAE_HOME \
-        --with-mpi=$PETSC_DIR/$PETSC_ARCH/ \
-        --with-papi=$EXTRAE_HOME/papi \
-        --with-xml-prefix=$EXTRAE_HOME/libxml2 \
-        --with-unwind=$EXTRAE_HOME/libunwind \
-        --with-binutils=$EXTRAE_HOME/binutils \
-        --without-dyninst \
-    && make -j1 && make install
 
-# Cleanup unnecessary files
+RUN git clone -b 5.0.3 \
+    https://github.com/bsc-performance-tools/extrae.git && \
+    cd extrae && \
+    git submodule update --init --recursive && \
+    autoreconf -f -i && \
+    ./configure \
+        --prefix=${EXTRAE_HOME} \
+        --with-mpi=${PETSC_DIR}/${PETSC_ARCH} \
+        --with-papi=${EXTRAE_HOME}/papi \
+        --with-xml-prefix=${EXTRAE_HOME}/libxml2 \
+        --with-unwind=${EXTRAE_HOME}/libunwind \
+        --with-binutils=${EXTRAE_HOME}/binutils \
+        --without-dyninst && \
+    make -j1 && \
+    make install
+
+# ---------------------------
+# Cleanup
+# ---------------------------
 RUN rm -rf /workspace/*
 
 # ---------------------------
 # PETGEM Python layer
 # ---------------------------
 WORKDIR /workspace
+
 COPY . /workspace
 
-# Upgrade pip and install package in editable mode
-RUN pip3 install --upgrade pip setuptools wheel \
-    && pip3 install -e . 
-# && pip3 install numpy meshio petsc4py
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -e .
 
 CMD ["bash"]

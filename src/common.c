@@ -14,15 +14,18 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 
 /* PETSc libraries */
 #include <petscsys.h>
 
 /* PETGEM funcions*/
 #include "common.h"
+#include "git_rev.h"
 #include "version.h"
 
-#define LINE_WIDTH 74
+#define KEY_WIDTH   12
+#define STAGE_WIDTH 56
 
 /**
  * @brief Computes the display width of a UTF-8 string in characters.
@@ -33,8 +36,7 @@
  * effectively providing the number of characters as they would
  * appear on the console.
  *
- * This function is used by formatting helpers (e.g., printCenteredText)
- * to correctly align text containing multi-byte characters.
+ * Used by logStage() to align rows containing multi-byte characters.
  *
  * @param[in]  s      Null-terminated UTF-8 string.
  * @param[out] width  Pointer to an integer where the computed display
@@ -60,149 +62,6 @@ static PetscErrorCode computeDisplayWidth(const char* s, PetscInt* width) {
   }
 
   *width = len;
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Prints a horizontal separator line.
- *
- * This function prints a line of length LINE_WIDTH consisting
- * of repeated occurrences of the specified character, followed
- * by a newline. It is typically used to visually separate
- * sections of formatted console output.
- *
- * Output is produced using PETSc parallel printing routines on
- * PETSC_COMM_WORLD.
- *
- * @param[in] c  Character used to fill the separator line.
- *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
- */
-static PetscErrorCode printSeparator(const char c) {
-
-  PetscFunctionBeginUser;
-
-  /* Variables declaration */
-  char line[LINE_WIDTH + 1]; /* +1 for Null terminator*/
-
-  for (PetscInt i = 0; i < LINE_WIDTH; i++) {
-    line[i] = c;
-  }
-  line[LINE_WIDTH] = '\0'; /* Null terminate */
-
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "%s\n", line));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Prints an empty framed line.
- *
- * This function prints a blank line enclosed by leading and
- * trailing '-' characters, with a total width of LINE_WIDTH.
- * It is intended for spacing within formatted PETGEM output
- * blocks while preserving the visual frame.
- *
- * Output is produced using PETSc parallel printing routines on
- * PETSC_COMM_WORLD.
- *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
- */
-static PetscErrorCode printEmptyLine(void) {
-
-  PetscFunctionBeginUser;
-
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-%*s-\n", LINE_WIDTH - 2, ""));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Prints a line of text centered within a fixed-width frame.
- *
- * This function prints the given text centered within a line of
- * width LINE_WIDTH, enclosed by leading and trailing '-' characters.
- * The centering is computed based on the display width of the text
- * (as returned by computeDisplayWidth()), allowing correct alignment
- * for multi-byte or wide characters.
- *
- * Output is produced using PETSc parallel printing routines on
- * PETSC_COMM_WORLD.
- *
- * @param[in] text  Null-terminated string to be printed centered
- *                  within the formatted line.
- *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
- */
-static PetscErrorCode printCenteredText(const char* text) {
-
-  PetscFunctionBeginUser;
-
-  /* Variables declaration */
-  PetscInt text_len;
-  
-  /* `*` width specifier requires `int` per C standard; PetscInt would
-   * be int64_t on 64-bit indices builds and trip strict format checks. */
-  int total_space, left_pad, right_pad;
-
-  /* Compute display width */
-  PetscCall(computeDisplayWidth(text, &text_len));
-
-  /* Compute paddings */
-  total_space = LINE_WIDTH - 2 - (int)text_len;
-  left_pad = total_space / 2;
-  right_pad = total_space - left_pad;
-
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "-%*s%s%*s-\n", left_pad, "", text, right_pad, ""));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Prints a formatted timer value in hh:mm:ss.sss format
- *        along with its percentage of the total runtime.
- *
- * This function converts a time interval given in seconds into
- * hours, minutes, and seconds, and prints it together with the
- * percentage that this interval represents relative to a total
- * execution time.
- *
- * The output is formatted as a single line containing a textual
- * label, the elapsed time in hh:mm:ss.sss format, and the
- * corresponding percentage. Printing is performed collectively
- * using PETSc parallel printing routines on PETSC_COMM_WORLD.
- *
- * If the total time is zero or negative, the reported percentage
- * is set to zero to avoid division by zero.
- *
- * @param[in] label  Descriptive label for the timed stage.
- * @param[in] t      Elapsed time for the stage, in seconds.
- * @param[in] total  Total elapsed time used to compute the
- *                   percentage, in seconds.
- *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
- */
-static PetscErrorCode PrintTimerHMSPercent(const char* label, PetscLogDouble t, PetscLogDouble total) {
-  PetscFunctionBeginUser;
-
-  /* Variables declaration */
-  /* `%02d` requires `int`; hours/minutes are bounded small (≤ runtime in
-   * hours), so plain int is the natural type. */
-  int hours, minutes;
-  PetscLogDouble seconds, percent;
-
-  hours = (int)(t / 3600.0);
-  minutes = (int)((t - hours * 3600.0) / 60.0);
-  seconds = t - hours * 3600.0 - minutes * 60.0;
-
-  percent = (total > 0.0) ? (100.0 * t / total) : 0.0;
-
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "   %-24s = %02d:%02d:%06.3f  | %6.2f %% |\n", label, hours, minutes, seconds, percent));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -283,22 +142,22 @@ const char *formatReal(PetscReal value) {
 
 
 /**
- * @brief Prints a titled section header in the PETGEM run report.
+ * @brief Formats a real with "%.6g" (whole values print without a point).
  *
- * Emits a blank line followed by a section title and trailing colon
- * (e.g. "Mesh:" or "Inversion parameters:") using PETSc collective
- * printing. Used as a visual separator between logical groups of
- * runtime information.
+ * Renders into one of a few rotating internal buffers. Not thread-safe.
  *
- * @param[in] comm   MPI communicator used by PetscPrintf().
- * @param[in] title  Section title to display.
+ * @param[in] value  Real to format.
  *
- * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return Pointer to a NUL-terminated string (do not free).
  */
-PetscErrorCode logSection(MPI_Comm comm, const char *title) {
-  PetscFunctionBeginUser;
-  PetscCall(PetscPrintf(comm, "\n %s:\n", title));
-  PetscFunctionReturn(PETSC_SUCCESS);
+const char *formatCompactReal(PetscReal value) {
+  enum { NUM_BUFS = 8, BUF_LEN = 32 };
+  static char bufs[NUM_BUFS][BUF_LEN];
+  static PetscInt which = 0;
+  char *out = bufs[which];
+  which = (which + 1) % NUM_BUFS;
+  snprintf(out, BUF_LEN, "%.6g", (double)value);
+  return out;
 }
 
 
@@ -306,7 +165,7 @@ PetscErrorCode logSection(MPI_Comm comm, const char *title) {
  * @brief Prints a string-valued key/value entry in the PETGEM run report.
  *
  * Formats a report line using the standard PETGEM layout
- * ("   %-24s = %s") so all modules produce aligned output.
+ * (" %-12s = %s") so all modules produce aligned output.
  * Intended for textual values such as filenames, modes, states,
  * or descriptive labels.
  *
@@ -318,7 +177,7 @@ PetscErrorCode logSection(MPI_Comm comm, const char *title) {
  */
 PetscErrorCode logKVStr(MPI_Comm comm, const char *key, const char *val) {
   PetscFunctionBeginUser;
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", key, val));
+  PetscCall(PetscPrintf(comm, " %-*s = %s\n", KEY_WIDTH, key, val));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -339,7 +198,7 @@ PetscErrorCode logKVStr(MPI_Comm comm, const char *key, const char *val) {
  */
 PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val) {
   PetscFunctionBeginUser;
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", key, formatGroupedInt(val)));
+  PetscCall(PetscPrintf(comm, " %-*s = %s\n", KEY_WIDTH, key, formatGroupedInt(val)));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -364,7 +223,7 @@ PetscErrorCode logKVReal(MPI_Comm comm, const char *key, PetscReal val) {
    * point), and a plain "%.6g" would render them as "1", which reads like a
    * count. formatReal gives "1.0", keeping reals distinguishable from the
    * integers that logKVInt prints. */
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", key, formatReal(val)));
+  PetscCall(PetscPrintf(comm, " %-*s = %s\n", KEY_WIDTH, key, formatReal(val)));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -395,76 +254,74 @@ PetscErrorCode logKVf(MPI_Comm comm, const char *key, const char *valfmt, ...) {
   va_start(ap, valfmt);
   vsnprintf(buf, sizeof(buf), valfmt, ap);
   va_end(ap);
-  PetscCall(PetscPrintf(comm, "   %-24s = %s\n", key, buf));
+  PetscCall(PetscPrintf(comm, " %-*s = %s\n", KEY_WIDTH, key, buf));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 
 /**
- * @brief Prints a formatted PETGEM header banner.
+ * @brief Formats the current local time as "YYYY-MM-DD hh:mm:ss".
  *
- * This function prints a formatted header to standard output
- * containing basic information about the PETGEM project,
- * including:
- *   - Project name and expanded acronym
- *   - GitHub repository URL
- *   - Developer name
- *   - Institutional affiliations
+ * @param[out] buf  Destination buffer.
+ * @param[in]  len  Size of @p buf in bytes.
+ */
+static void formatNow(char *buf, size_t len) {
+  time_t now = time(NULL);
+  strftime(buf, len, "%Y-%m-%d %H:%M:%S", localtime(&now));
+}
+
+/**
+ * @brief Prints the two-line PETGEM run header.
  *
- * The header is printed using PETSc-based printing utilities
- * and formatting helpers (separators, centered text), ensuring
- * consistent and collective output across all MPI processes
- * associated with PETSC_COMM_WORLD.
+ * Line 1: PETGEM version, git revision, kernel name and affiliation.
+ * Line 2: start time, MPI rank count and PETSc version.
+ *
+ * @param[in] kernel  Kernel name shown in the header (e.g. "fm.csem").
  *
  * @return PetscErrorCode PETSC_SUCCESS on successful
  *         completion, or a PETSc error code otherwise.
  */
-PetscErrorCode printHeader(void) {
+PetscErrorCode printHeader(const char *kernel) {
 
   PetscFunctionBeginUser;
 
-  PetscCall(printSeparator('-'));
-  PetscCall(printEmptyLine());
-  PetscCall(printEmptyLine());
-  PetscCall(printCenteredText("PETGEM"));
-  PetscCall(printCenteredText("Parallel Edge-element Toolkit for General Electromagnetic Modeling"));
-  PetscCall(printEmptyLine());
-  PetscCall(printCenteredText("GitHub repository: github.com/ocastilloreyes/petgem"));
-  PetscCall(printEmptyLine());
-  PetscCall(printSeparator('-'));
-  PetscCall(printEmptyLine());
-  PetscCall(printCenteredText("Octavio Castillo-Reyes"));
-  PetscCall(printCenteredText("Universitat Politècnica de Catalunya (UPC) - 2026"));
-  PetscCall(printCenteredText("Barcelona Supercomputing Center (BSC) - 2026"));
-  PetscCall(printEmptyLine());
-  PetscCall(printSeparator('-'));
+  /* Variables declaration */
+  char        date[32], rev[80] = "", petsc[80];
+  PetscMPIInt size;
+
+  formatNow(date, sizeof(date));
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
+  if (strcmp(PETGEM_GIT_REV, "unknown") != 0) {
+    PetscCall(PetscSNPrintf(rev, sizeof(rev), " (git %s)", PETGEM_GIT_REV));
+  }
+  if (strcmp(PETSC_VERSION_GIT, "unknown") != 0) {
+    PetscCall(PetscStrncpy(petsc, PETSC_VERSION_GIT, sizeof(petsc)));
+  } else {
+    PetscCall(PetscSNPrintf(petsc, sizeof(petsc), "%d.%d.%d", PETSC_VERSION_MAJOR, PETSC_VERSION_MINOR, PETSC_VERSION_SUBMINOR));
+  }
+
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, " PETGEM %d.%d.%d%s · %s · UPC / BSC\n",
+                        VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, rev, kernel));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, " Started %s · %d rank%s · PETSc %s\n\n", date, (int)size, size == 1 ? "" : "s", petsc));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /**
- * @brief Prints the PETGEM closing banner with run timestamp + author/affiliation.
- *
- * Called once at the end of every kernel run (fm.csem, im.csem, petgem) to
- * mark the end of stdout output.  Output goes to PETSC_COMM_WORLD via the
- * centered-text helpers, so it is collectively printed by rank 0 only.
+ * @brief Prints the closing line with the finish time.
  *
  * @return PetscErrorCode PETSC_SUCCESS on successful completion, or a
- *         PETSc error code if any of the underlying print helpers fail.
+ *         PETSc error code otherwise.
  */
 PetscErrorCode printFooter(void) {
 
   PetscFunctionBeginUser;
 
   /* Variables declaration */
-  char date[30];
+  char date[32];
 
-  /* Get date*/
-  PetscCall(PetscGetDate(date, 30));
-
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Finished: %s", date));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n PETGEM version: %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH));
-  PetscCall(printSeparator('-'));
+  formatNow(date, sizeof(date));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD, " Finished %s\n", date));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -512,65 +369,76 @@ PetscErrorCode createDirectory(const char* path) {
 }
 
 /**
- * @brief Prints execution time statistics for the main
- * computational stages of the PETGEM workflow.
+ * @brief Formats an elapsed time: "1.23 s" below one minute, "h:mm:ss" above.
  *
- * This function receives an array of timers containing the
- * elapsed execution times (in seconds) for the different
- * phases of the PETGEM execution. It computes the total
- * elapsed time as the sum of all stages and prints a
- * formatted timing report to standard output, including
- * the absolute time (hh:mm:ss.sss) and the percentage of
- * the total runtime for each stage.
+ * Renders into one of a few rotating internal buffers. Not thread-safe.
  *
- * The reported stages are:
- *   - Reading user parameters
- *   - Load input data
- *   - Grid setup
- *   - Assembly
- *   - Solver
- *   - Postprocessing
+ * @param[in] t  Elapsed time in seconds.
  *
- * Output is produced using PETSc parallel printing routines,
- * ensuring consistent and collective reporting across all
- * MPI processes associated with PETSC_COMM_WORLD.
- *
- * @param[in] timers Array of length 6 containing execution
- *                   times (in seconds) for each stage, in
- *                   the following order:
- *                   timers[0] = Read user parameters
- *                   timers[1] = Load input data
- *                   timers[2] = Grid setup
- *                   timers[3] = Assembly
- *                   timers[4] = Solver
- *                   timers[5] = Postprocessing
- *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
+ * @return Pointer to a NUL-terminated string (do not free).
  */
-PetscErrorCode printTimers(const PetscLogDouble timers[]) {
-  PetscFunctionBeginUser;
+const char *formatElapsed(PetscLogDouble t) {
+  enum { NUM_BUFS = 4, BUF_LEN = 32 };
+  static char bufs[NUM_BUFS][BUF_LEN];
+  static PetscInt which = 0;
+  char *out = bufs[which];
+  which = (which + 1) % NUM_BUFS;
 
-  /* Variables declaration */
-  PetscLogDouble elapsed_time = 0.0;
-
-  /* Compute elapsed time */
-  for (PetscInt i = 0; i < 6; i++) {
-    elapsed_time += timers[i];
+  if (t < 60.0) {
+    snprintf(out, BUF_LEN, "%.2f s", (double)t);
+  } else {
+    long s = (long)(t + 0.5);
+    snprintf(out, BUF_LEN, "%ld:%02ld:%02ld", s / 3600, (s / 60) % 60, s % 60);
   }
+  return out;
+}
 
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\n Timers (hh:mm:ss.sss |   %% |):\n"));
-  PetscCall(PrintTimerHMSPercent("Read parameters",     timers[0], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Load input bundle",   timers[1], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Setup grid",          timers[2], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Assembly",            timers[3], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Linear solve",        timers[4], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Field interpolation", timers[5], elapsed_time));
-  PetscCall(PrintTimerHMSPercent("Total",               elapsed_time, elapsed_time));
-
+/**
+ * @brief Prints the header row of the stage/time table.
+ *
+ * @param[in] comm  MPI communicator used by PetscPrintf().
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode logStageHeader(MPI_Comm comm) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscPrintf(comm, "\n %-*s %10s\n", STAGE_WIDTH, "Stage", "time"));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints one row of the stage/time table.
+ *
+ * The row reads "<label> <detail>" padded to the stage column, followed by the
+ * elapsed time right-aligned. A NULL @p detail prints the label alone.
+ *
+ * @param[in] comm    MPI communicator used by PetscPrintf().
+ * @param[in] label   Stage name.
+ * @param[in] detail  Optional free-text detail (may be NULL).
+ * @param[in] t       Elapsed time in seconds.
+ *
+ * @return PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode logStage(MPI_Comm comm, const char *label, const char *detail, PetscLogDouble t) {
+  PetscFunctionBeginUser;
+
+  /* Variables declaration */
+  char     text[256];
+  PetscInt width;
+  int      pad;
+
+  if (detail) {
+    PetscCall(PetscSNPrintf(text, sizeof(text), "%-10s %s", label, detail));
+  } else {
+    PetscCall(PetscStrncpy(text, label, sizeof(text)));
+  }
+  PetscCall(computeDisplayWidth(text, &width));
+  pad = STAGE_WIDTH - (int)width;
+  if (pad < 1) pad = 1;
+  PetscCall(PetscPrintf(comm, " %s%*s %10s\n", text, pad, "", formatElapsed(t)));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 
 /**

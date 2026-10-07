@@ -124,6 +124,17 @@ typedef struct {
 PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid);
 
 /**
+ * @brief Prints the "Input", "Mesh", "FE space" and "DOFs/entity" report lines.
+ *
+ * @param[in] params  Parameters (input file, basis order).
+ * @param[in] dm      DMPlex carrying the H(curl) section.
+ * @param[in] grid    Grid filled by setupCsemGrid().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode logGridSummary(const petgemParams params, const DM dm, const Grid *grid);
+
+/**
  * @brief Locates the mesh cell containing a given point.
  *
  * @param[in]  dm           DMPlex mesh.

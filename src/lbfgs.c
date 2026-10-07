@@ -19,11 +19,63 @@
  */
 
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 #include <petsc.h>
 
 #include "common.h"
 #include "inversion.h"
+
+/**
+ * @brief Prints one row of the L-BFGS table and resets the per-row counters.
+ *
+ * Columns: iteration, cumulative objective/gradient evaluations, RMS, the
+ * Tikhonov term λΦm, the relative gradient norm tested against gtol, the
+ * accepted step ("-" on row 0), the min-max KSP iterations of the solves
+ * since the previous row, and the wall time since the previous row.
+ *
+ * @param[in]     comm    Communicator to print on.
+ * @param[in,out] ictx    Inversion context (per-row KSP counters reset).
+ * @param[in]     iter    Iteration index (0 = initial model).
+ * @param[in]     grel    ||g|| / max(1, ||X||).
+ * @param[in]     stp     Accepted step length (ignored on row 0).
+ * @param[in,out] tRow    Time of the previous row; updated to now.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+static PetscErrorCode printIterationRow(MPI_Comm comm, InversionContext *ictx, PetscInt iter,
+                                        PetscReal grel, PetscReal stp, PetscLogDouble *tRow)
+{
+  PetscFunctionBeginUser;
+
+  PetscLogDouble now;
+  char           its[32], step[16];
+
+  PetscCall(PetscTime(&now));
+  if (ictx->kspItsMaxRow == 0 && ictx->kspItsMinRow == PETSC_INT_MAX) {
+    PetscCall(PetscStrncpy(its, "-", sizeof(its)));
+  } else if (ictx->kspItsMinRow == ictx->kspItsMaxRow) {
+    PetscCall(PetscSNPrintf(its, sizeof(its), "%" PetscInt_FMT, ictx->kspItsMaxRow));
+  } else {
+    PetscCall(PetscSNPrintf(its, sizeof(its), "%" PetscInt_FMT "-%" PetscInt_FMT, ictx->kspItsMinRow, ictx->kspItsMaxRow));
+  }
+  if (iter == 0) {
+    PetscCall(PetscStrncpy(step, "-", sizeof(step)));
+  } else {
+    snprintf(step, sizeof(step), "%.3g", (double)stp);
+  }
+
+  PetscCall(PetscPrintf(comm, " %4" PetscInt_FMT " %5" PetscInt_FMT " %8.4f %10.3e %10.3e %8s %9s %8.1f\n",
+                        iter, ictx->iterCount, (double)ictx->lastRMS, (double)ictx->lastRegTerm,
+                        (double)grel, step, its, (double)(now - *tRow)));
+
+  ictx->kspItsMinRow = PETSC_INT_MAX;
+  ictx->kspItsMaxRow = 0;
+  *tRow              = now;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 /**
  * @brief Limited-Memory BFGS optimizer (Nocedal 1980).
@@ -65,7 +117,11 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
 {
   PetscFunctionBeginUser;
 
-  MPI_Comm comm = PetscObjectComm((PetscObject)X);
+  MPI_Comm          comm  = PetscObjectComm((PetscObject)X);
+  InversionContext *ictx  = (InversionContext *)ctx;
+  const PetscInt    maxLs = 20;   /* max line search steps */
+  PetscLogDouble    tRow;
+  PetscCall(PetscTime(&tRow));
 
   /* Allocate work vectors */
   Vec G;          /* current gradient */
@@ -95,14 +151,13 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
   PetscCall(VecNorm(X, NORM_2, &xnorm));
   xnorm = PetscMax(1.0, xnorm);
 
-  {
-    InversionContext *ictx0 = (InversionContext *)ctx;
-    /* Tabular trace: header row printed once, then one row per iteration (including the initial iterate at iter 0 below).  Columns are
-     * iter, RMS, F (objective), reg (Tikhonov term), ||g||, step length. */
-    PetscCall(PetscPrintf(comm, "   %4s   %10s   %10s   %10s   %10s   %10s\n", "Iter", "RMS", "F", "Reg", "||g||", "Step"));
-    PetscCall(PetscPrintf(comm, "   %4d   %10.4f   %10.4e   %10.4e   %10.4e   %10s\n", 0, (double)ictx0->lastRMS, (double)f, 
-                         (double)ictx0->lastRegTerm, (double)gnorm, "-"));
-  }
+  /* Header row */
+  PetscCall(PetscPrintf(comm, "\n %4s %5s %8s %12s %10s %8s %9s %8s\n",
+                        "Iter", "Evals", "RMS", "λΦm", "|g|/|x|", "Step", "KSP its", "t (s)"));
+  PetscCall(printIterationRow(comm, ictx, 0, gnorm / xnorm, 0.0, &tRow));
+
+  const PetscReal rmsRelTol      = ictx->iparams->rmsRelTol;
+  const PetscInt  rmsStallWindow = ictx->iparams->rmsStallWindow;
 
   /* Convergence check before iteration */
   if (gnorm / xnorm <= gtol) {
@@ -118,8 +173,6 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
    *
    * Both knobs are parsed with every other im.csem option in readimParams (so they appear under -help and can be set from the params 
    * file); read them from iparams rather than re-querying the options database here. */
-  const PetscReal rmsRelTol      = ((InversionContext *)ctx)->iparams->rmsRelTol;
-  const PetscInt  rmsStallWindow = ((InversionContext *)ctx)->iparams->rmsStallWindow;
   PetscReal prevRms     = (rmsPtr) ? *rmsPtr : PETSC_INFINITY;
   PetscInt  rmsStallCnt = 0;
 
@@ -171,7 +224,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
 
     if (gTd >= 0.0) {
       /* Not a descent direction - fall back to steepest descent */
-      PetscCall(PetscPrintf(comm, "   L-BFGS: positive curvature detected; resetting to steepest descent.\n"));
+      PetscCall(PetscPrintf(comm, " L-BFGS: positive curvature detected; resetting to steepest descent.\n"));
       PetscCall(VecCopy(G, d));
       PetscCall(VecScale(d, -1.0));
       PetscCall(VecDot(G, d, &gTd_scalar));
@@ -188,7 +241,6 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
 
     PetscReal fnew;
     PetscReal c1 = 1e-4;       /* Armijo sufficient decrease parameter */
-    PetscInt  maxLs = 20;      /* max line search steps */
     PetscBool lsOk = PETSC_FALSE;
 
     for (PetscInt ls = 0; ls < maxLs; ls++) {
@@ -206,7 +258,6 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     }
 
     if (!lsOk) {
-      PetscCall(PetscPrintf(comm, "   L-BFGS: line search failed at iter %" PetscInt_FMT ".\n", iter + 1));
       *reasonStr = "DIVERGED_LS_FAILURE";
       *numIters  = iter + 1;
       goto cleanup;
@@ -230,7 +281,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     } else {
       /* Curvature condition not met: skip storing this pair and keep the
        * existing history rather than resetting to steepest descent. */
-      PetscCall(PetscPrintf(comm, "   L-BFGS: skipping update (y^T s = %g); keeping history.\n", (double)ys));
+      PetscCall(PetscPrintf(comm, " L-BFGS: skipping update (y^T s = %g); keeping history.\n", (double)ys));
     }
 
     /* Accept step */
@@ -239,12 +290,14 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     f = fnew;
 
     /* VTU snapshot (accepted steps only; the final one is written by runCsemInversion) */
-    {
-      InversionContext *ictx = (InversionContext *)ctx;
-      ictx->acceptedIter++;
-      if (ictx->iparams->snapshotInterval > 0 && ictx->acceptedIter % ictx->iparams->snapshotInterval == 0) {
-        PetscCall(writeInversionSnapshotVTU(ictx, ictx->acceptedIter));
-      }
+    ictx->acceptedIter++;
+    if (ictx->iparams->snapshotInterval > 0 && ictx->acceptedIter % ictx->iparams->snapshotInterval == 0) {
+      PetscLogDouble ts0, ts1;
+      PetscCall(PetscTime(&ts0));
+      PetscCall(writeInversionSnapshotVTU(ictx, ictx->acceptedIter));
+      PetscCall(PetscTime(&ts1));
+      ictx->tOutput += ts1 - ts0;
+      ictx->numSnapshots++;
     }
 
     /* Convergence check */
@@ -252,15 +305,9 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     PetscCall(VecNorm(X, NORM_2, &xnorm));
     xnorm = PetscMax(1.0, xnorm);
 
-    {
-      InversionContext *ictxIter = (InversionContext *)ctx;
-      PetscCall(PetscPrintf(comm,  "   %4" PetscInt_FMT "   %10.4f   %10.4e   %10.4e   %10.4e   %10.4e\n",
-        iter + 1, (double)ictxIter->lastRMS, (double)f,
-        (double)ictxIter->lastRegTerm, (double)gnorm, (double)stp));
-    }
+    PetscCall(printIterationRow(comm, ictx, iter + 1, gnorm / xnorm, stp, &tRow));
 
     if (PetscIsNanReal(gnorm) || PetscIsNanReal(f)) {
-      PetscCall(PetscPrintf(comm, "   L-BFGS: NaN detected at iter %" PetscInt_FMT ".\n", iter + 1));
       *reasonStr = "DIVERGED_NAN";
       *numIters  = iter + 1;
       goto cleanup;
@@ -304,7 +351,26 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
   *numIters = maxIter;
 
 cleanup:
-  PetscCall(PetscPrintf(comm, "\n   %-24s = %s (%s iterations)\n", "L-BFGS exit reason", *reasonStr, formatGroupedInt(*numIters)));
+  {
+    char detail[128];
+    if (!strcmp(*reasonStr, "CONVERGED_RMSTOL")) {
+      PetscCall(PetscSNPrintf(detail, sizeof(detail), "RMS %.4f <= %s", (double)*rmsPtr, formatCompactReal(rmsTol)));
+    } else if (!strcmp(*reasonStr, "CONVERGED_GRTOL")) {
+      PetscCall(PetscSNPrintf(detail, sizeof(detail), "|g|/|x| %.3e <= %s", (double)(gnorm / xnorm), formatCompactReal(gtol)));
+    } else if (!strcmp(*reasonStr, "CONVERGED_RMS_STALL")) {
+      PetscCall(PetscSNPrintf(detail, sizeof(detail), "RMS drop < %s for %" PetscInt_FMT " iterations, RMS %.4f",
+                              formatCompactReal(rmsRelTol), rmsStallWindow, (double)*rmsPtr));
+    } else if (!strcmp(*reasonStr, "DIVERGED_LS_FAILURE")) {
+      PetscCall(PetscSNPrintf(detail, sizeof(detail), "no sufficient decrease after %" PetscInt_FMT " trial steps", maxLs));
+    } else if (!strcmp(*reasonStr, "DIVERGED_NAN")) {
+      PetscCall(PetscStrncpy(detail, "NaN in objective or gradient", sizeof(detail)));
+    } else {
+      PetscCall(PetscSNPrintf(detail, sizeof(detail), "max iterations reached"));
+    }
+    PetscCall(PetscPrintf(comm, "\n"));
+    PetscCall(logKVf(comm, "Stopped", "%s: %s; %s iterations, %s evaluations", *reasonStr, detail,
+                     formatGroupedInt(*numIters), formatGroupedInt(ictx->iterCount)));
+  }
   PetscCall(VecDestroyVecs(M, &S));
   PetscCall(VecDestroyVecs(M, &Y));
   PetscCall(PetscFree(rho));

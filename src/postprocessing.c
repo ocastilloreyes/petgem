@@ -103,13 +103,6 @@ PetscErrorCode computeFields(const petgemParams params,
   /* Build the single output file name: {output_dir}/{output_filename}.h5 (shared with im.csem, so both kernels name their products alike). */
   PetscCall(buildOutputPath(&params, ".h5", outFileName, sizeof(outFileName)));
 
-  /* Print message */
-  PetscCall(logSection(comm, "Field interpolation"));
-  PetscCall(logKVStr(comm, "Input file", params.inputFile));
-  PetscCall(logKVInt(comm, "Number of receivers", Q.numReceivers));
-  PetscCall(logKVStr(comm, "Output file", outFileName));
-  PetscCall(logKVStr(comm, "Status", "Started"));
-
   /* Open the single HDF5 output file on the kernel communicator. PETSc's HDF5 viewer routes the collective VecView calls below through MPI-IO
    * when PETSc is linked against a parallel HDF5 build. */
   PetscCall(PetscViewerHDF5Open(comm, outFileName, FILE_MODE_WRITE, &viewerOutput));
@@ -128,8 +121,6 @@ PetscErrorCode computeFields(const petgemParams params,
 
     /* Get the solution column for this source */
     PetscCall(MatDenseGetColumnVecRead(X, i, &x));
-
-    PetscCall(logKVf(comm, "Processing source", "%s of %s", formatGroupedInt(i + 1), formatGroupedInt(sources.numSources)));
 
     /* Apply Q to the H(curl) solution: Ex = QEx*x, Ey = QEy*x, ... */
     PetscCall(MatMult(Q.QEx, x, Ex));
@@ -181,8 +172,6 @@ PetscErrorCode computeFields(const petgemParams params,
 
   /* Close the single output file. */
   PetscCall(PetscViewerDestroy(&viewerOutput));
-
-  PetscCall(logKVStr(comm, "Status", "Finished"));
 
   /* Free memory */
   PetscCall(VecDestroy(&Ex));

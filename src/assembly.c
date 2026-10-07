@@ -391,6 +391,7 @@ PetscErrorCode assembleCsemRHS(const petgemParams params,
                                const PetscScalar constFactor,
                                Mat* B) {
   PetscFunctionBeginUser;
+  (void)params;
 
   /* Variables declaration */
   Cell cell;
@@ -427,14 +428,6 @@ PetscErrorCode assembleCsemRHS(const petgemParams params,
   PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Ni));
   for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
     PetscCall(PetscCalloc1(grid.numDofInCell, &Ni[i]));
-  }
-
-  /* Print linear system statistics (suppressed when params.quiet) */
-  if (!params.quiet) {
-    PetscCall(logSection(comm, "RHS assembly"));
-    PetscCall(logKVInt(comm, "MPI tasks", params.numMPITasks));
-    PetscCall(logKVInt(comm, "Vector size", M));
-    PetscCall(logKVStr(comm, "Status", "Started"));
   }
 
   /* Perform finite element assembly for RHS (one vector per source) */
@@ -511,10 +504,6 @@ PetscErrorCode assembleCsemRHS(const petgemParams params,
 
   /* Apply constant factor */
   PetscCall(MatScale(*B, constFactor));
-
-  /* Print message */
-  if (!params.quiet)
-    PetscCall(logKVStr(comm, "Status", "Finished"));
 
   /* Free memory */
   for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
@@ -620,10 +609,7 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
     const char *what = (kind == MMS_RHS_PROJECTION)      ? "L2 moments of E*"
                      : (kind == MMS_RHS_FORCING_NO_MASS) ? "INCOMPLETE forcing f* (negative control)"
                                                          : "volumetric forcing f*";
-    PetscCall(PetscPrintf(comm, "\n MMS RHS assembly (%s):\n", what));
-    PetscCall(logKVInt(comm, "MPI tasks", params.numMPITasks));
-    PetscCall(logKVInt(comm, "Vector size", M));
-    PetscCall(logKVStr(comm, "Status", "Started"));
+    PetscCall(logKVStr(comm, "MMS RHS", what));
   }
 
   PetscCall(VecZeroEntries(b));
@@ -702,9 +688,6 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
 
   PetscCall(VecDestroy(&b));
 
-  if (!params.quiet) {
-    PetscCall(logKVStr(comm, "Status", "Finished"));
-  }
 
   /* Free memory */
   PetscCall(PetscFree(quadrature_3d.weights));
@@ -1208,14 +1191,6 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
     PetscCall(PetscCalloc1(grid.numDofInCell * grid.numH1DofInCell, &closureGBDDC));
   }
 
-  /* Print linear system statistics (suppressed when params.quiet) */
-  if (!params.quiet) {
-    PetscCall(logSection(comm, "LHS assembly (K and Ms)"));
-    PetscCall(logKVInt(comm, "MPI tasks", params.numMPITasks));
-    PetscCall(logKVf(comm, "Matrix size", "%s x %s", formatGroupedInt(M), formatGroupedInt(M)));
-    PetscCall(logKVStr(comm, "Status", "Started"));
-  }
-
   /* Perform finite element assembly for LHS */
   for (PetscInt i = grid.cellStart; i < grid.cellEnd; ++i) {
 
@@ -1320,10 +1295,6 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
     PetscCall(reportGradientValidation(comm, dm, grid, Acurl, *G));
     PetscCall(MatDestroy(&Acurl));
   }
-
-  /* End of assembly */
-  if (!params.quiet)
-    PetscCall(logKVStr(comm, "Status", "Finished"));
 
   /* Free memory */
   PetscCall(PetscFree(quadrature_3d.weights));

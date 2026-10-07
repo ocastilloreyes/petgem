@@ -14,20 +14,23 @@
 #include <petsc.h>
 
 /**
- * @brief Prints the formatted PETGEM header banner.
+ * @brief Prints the two-line PETGEM run header (version, git revision,
+ *        kernel, start time, ranks, PETSc version).
+ *
+ * @param[in] kernel  Kernel name shown in the header (e.g. "fm.csem").
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode printHeader();
+PetscErrorCode printHeader(const char *kernel);
 
 /**
- * @brief Prints the PETGEM closing banner with run timestamp and author.
+ * @brief Prints the closing line with the finish time.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode printFooter();
+PetscErrorCode printFooter(void);
 
 /**
  * @brief Ensures that a directory exists, creating it if necessary.
@@ -40,19 +43,36 @@ PetscErrorCode printFooter();
 PetscErrorCode createDirectory(const char* path);
 
 /**
- * @brief Prints execution-time statistics for the main PETGEM stages.
+ * @brief Formats an elapsed time: "1.23 s" below one minute, "h:mm:ss" above.
  *
- * Reports per-stage absolute time (hh:mm:ss.sss) and percentage of the
- * total runtime, collectively across PETSC_COMM_WORLD.
+ * @param[in] t  Elapsed time in seconds.
  *
- * @param[in] timers  Array of length 6 of per-stage elapsed times (s):
- *                     [0] read params, [1] load input, [2] grid setup,
- *                     [3] assembly, [4] solver, [5] postprocessing.
+ * @return Pointer to a NUL-terminated string (rotating static buffer).
+ */
+const char *formatElapsed(PetscLogDouble t);
+
+/**
+ * @brief Prints the header row of the stage/time table.
+ *
+ * @param[in] comm  Communicator to print on (rank 0 emits).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode printTimers(const PetscLogDouble timers[]);
+PetscErrorCode logStageHeader(MPI_Comm comm);
+
+/**
+ * @brief Prints one row of the stage/time table: "<label> <detail>  <time>".
+ *
+ * @param[in] comm    Communicator to print on (rank 0 emits).
+ * @param[in] label   Stage name.
+ * @param[in] detail  Optional detail text (may be NULL).
+ * @param[in] t       Elapsed time in seconds.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode logStage(MPI_Comm comm, const char *label, const char *detail, PetscLogDouble t);
 
 /**
  * @brief Parses the dispatcher mode argument into a numeric code.
@@ -114,35 +134,26 @@ const char *formatReal(PetscReal value);
 
 
 /**
- * @brief Prints a section header in the PETGEM run-report layout.
+ * @brief Formats a real with "%.6g" (whole values print without a point).
  *
- * Emits:
+ * @param[in] value  Real to format.
  *
- *     "\n<title>:\n"
- *
- * Only rank 0 of the communicator produces output.
- *
- * @param[in] comm   Communicator to print on (rank 0 emits).
- * @param[in] title  Section title.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success,
- *         or a PETSc error code otherwise.
+ * @return Pointer to a NUL-terminated string (rotating static buffer).
  */
-PetscErrorCode logSection(MPI_Comm comm, const char *title);
-
+const char *formatCompactReal(PetscReal value);
 
 /**
  * @brief Prints a string key-value line in the PETGEM run-report layout.
  *
  * Emits:
  *
- *     "   %-24s = <value>\n"
+ *     " %-12s = <value>\n"
  *
  * where the value is a string. Only rank 0 of the communicator produces
  * output.
  *
  * @param[in] comm  Communicator to print on (rank 0 emits).
- * @param[in] key   Left-hand label (padded to 24 columns).
+ * @param[in] key   Left-hand label (padded to 12 columns).
  * @param[in] val   String value.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
@@ -156,13 +167,13 @@ PetscErrorCode logKVStr(MPI_Comm comm, const char *key, const char *val);
  *
  * Emits:
  *
- *     "   %-24s = <value>\n"
+ *     " %-12s = <value>\n"
  *
  * where the value is printed as a space-grouped integer. Only rank 0 of the
  * communicator produces output.
  *
  * @param[in] comm  Communicator to print on (rank 0 emits).
- * @param[in] key   Left-hand label (padded to 24 columns).
+ * @param[in] key   Left-hand label (padded to 12 columns).
  * @param[in] val   Integer value.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
@@ -176,13 +187,13 @@ PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val);
  *
  * Emits:
  *
- *     "   %-24s = <value>\n"
+ *     " %-12s = <value>\n"
  *
  * where the value is printed using %g. Only rank 0 of the communicator
  * produces output.
  *
  * @param[in] comm  Communicator to print on (rank 0 emits).
- * @param[in] key   Left-hand label (padded to 24 columns).
+ * @param[in] key   Left-hand label (padded to 12 columns).
  * @param[in] val   Real value.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
@@ -197,13 +208,13 @@ PetscErrorCode logKVReal(MPI_Comm comm, const char *key, PetscReal val);
  *
  * Emits:
  *
- *     "   %-24s = <value>\n"
+ *     " %-12s = <value>\n"
  *
  * where the value is generated from a printf-style format string. Only rank 0
  * of the communicator produces output.
  *
  * @param[in] comm    Communicator to print on (rank 0 emits).
- * @param[in] key     Left-hand label (padded to 24 columns).
+ * @param[in] key     Left-hand label (padded to 12 columns).
  * @param[in] valfmt  printf-style format string for the value.
  * @param[in] ...     Arguments consumed by valfmt.
  *

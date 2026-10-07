@@ -555,6 +555,28 @@ PetscErrorCode solveInvSystem(const KSP ksp, const Vec rhs, Vec sol)
 
 
 /**
+ * @brief Adds the iteration count of the last solve of @p ksp to the context statistics.
+ *
+ * @param[in,out] c    Inversion context.
+ * @param[in]     ksp  KSP that has just solved.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+static PetscErrorCode recordSolve(InversionContext *c, KSP ksp)
+{
+  PetscFunctionBeginUser;
+  PetscInt its;
+  PetscCall(KSPGetIterationNumber(ksp, &its));
+  c->numSolves++;
+  c->kspItsMin    = PetscMin(c->kspItsMin, its);
+  c->kspItsMax    = PetscMax(c->kspItsMax, its);
+  c->kspItsMinRow = PetscMin(c->kspItsMinRow, its);
+  c->kspItsMaxRow = PetscMax(c->kspItsMaxRow, its);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
  * @brief Objective + gradient callback for the L-BFGS optimizer.
  *
  * Per call:
@@ -660,6 +682,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
     PetscCall(solveInvSystem(kspFwd, b, x));
     PetscCall(PetscTime(&tA1));
     c->tSolver += tA1 - tA0;
+    PetscCall(recordSolve(c, kspFwd));
 
     /* Convert global x to local for field interpolation & gradient */
     Vec xLocal;
@@ -711,6 +734,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
     PetscCall(solveInvSystem(kspFwd, nB, nx));
     PetscCall(PetscTime(&tA1));
     c->tSolver += tA1 - tA0;
+    PetscCall(recordSolve(c, kspFwd));
 
     /* Local adjoint solution for gradient accumulation */
     Vec nxLocal;
@@ -814,8 +838,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
  * @param[in]  conductivity  Initial per-cell conductivity Vec.
  * @param[in]  materialsID   Per-cell material-id Vec.
  * @param[in]  receivers     Serial Vec of 3·N_recv receiver coordinates.
- * @param[out] tAssemblyOut  Accumulated assembly time (seconds).
- * @param[out] tSolverOut    Accumulated solver time (seconds).
+ * @param[out] stats         Wall times and counters for the run report.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
@@ -826,12 +849,15 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
                                 Vec               conductivity,
                                 Vec               materialsID,
                                 Vec               receivers,
-                                PetscLogDouble   *tAssemblyOut,
-                                PetscLogDouble   *tSolverOut)
+                                InversionStats   *stats)
 {
   PetscFunctionBeginUser;
 
-  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
+  MPI_Comm       comm = PetscObjectComm((PetscObject)dm);
+  PetscLogDouble t0, t1, t2, t3;
+  char           text[256];
+
+  PetscCall(PetscTime(&t0));
 
   /* Validate preconditions: loadCsemInputs returns NULL for conductivity and materialsID only if it was called with an empty inputFile, which
    * readCsemParams already errors out on. Re-check here for safety. */
@@ -933,6 +959,8 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
     .lastRegTerm        = 0.0,
     .iterCount          = 0,
     .acceptedIter       = 0,
+    .kspItsMin          = PETSC_INT_MAX,
+    .kspItsMinRow       = PETSC_INT_MAX,
     /* Workspace fields (quad3d, MeRows, KeRows, b/x/nB/nx/Ex_recv, Bvec_per_freq, Wf_per_freq, dObsRow_per_freq) are
      * zero-initialized by C designated-init and populated by setupInversionWorkspace next. */
   };
@@ -940,11 +968,11 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
   /* Precompute everything that doesn't depend on the L-BFGS iterate X. */
   PetscCall(setupInversionWorkspace(&ctx));
 
-  /* Run L-BFGS optimization */
-  PetscCall(logSection(comm, "L-BFGS optimization"));
-  /* M and Max iterations are listed once in the "Inversion parameters" block. */
-  PetscCall(logKVStr(comm, "Status", "Started"));
+  PetscCall(formatSolverConfig(ctx.kspFwd_per_freq[0], text, sizeof(text)));
+  PetscCall(logKVStr(comm, "Solver", text));
 
+  /* Run L-BFGS optimization */
+  PetscCall(PetscTime(&t1));
   PetscInt    numIters;
   const char *reasonStr;
   PetscCall(lbfgsOptimize(inversionObjGrad, &ctx,
@@ -952,6 +980,8 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
                           iparams->gtol,
                           &ctx.lastRMS, iparams->rmsTol,
                           &numIters, &reasonStr));
+  PetscCall(PetscTime(&t2));
+  PetscLogDouble tOutputLoop = ctx.tOutput;
 
   /* Recover sigma from the last accepted X (after a line-search failure, conductivity holds the rejected trial). */
   PetscCall(applyLogToSigma(dmInversion, dmConductivity, X, X0, conductivity, grid, &graph, 0.0, NULL));
@@ -960,12 +990,14 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
   if (iparams->snapshotInterval > 0 &&
       (ctx.acceptedIter == 0 || ctx.acceptedIter % iparams->snapshotInterval != 0)) {
     PetscCall(writeInversionSnapshotVTU(&ctx, ctx.acceptedIter));
+    ctx.numSnapshots++;
   }
 
   /* The per-evaluation RMS history is written to the /rms_history dataset in the output HDF5 (below) for analysis.
    * Both counters go out: numIters is the accepted-L-BFGS-step count, ctx.iterCount the objective-gradient evaluation
    * count that indexes allRMS. They differ by the rejected line-search trials. */
   PetscCall(writeInversionResults(iparams, dmConductivity, conductivity, X, allRMS, numIters, ctx.iterCount, reasonStr));
+  PetscCall(PetscTime(&t3));
 
   /* Cleanup */
   PetscCall(destroyInversionWorkspace(&ctx));
@@ -980,15 +1012,15 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
   PetscCall(destroyNeighborGraph(&graph));
   PetscCall(destroyReceiverInterpolationMatrices(&Q));
 
-  /* Hand the accumulated phase timers back to the caller (im.csem) so it
-   * can report an Assembly/Solver breakdown consistent with fm.csem. */
-  if (tAssemblyOut) {
-    *tAssemblyOut = ctx.tAssembly;
-  }
-
-  if (tSolverOut) {
-    *tSolverOut   = ctx.tSolver;
-  }
+  stats->tSetup       = t1 - t0;
+  stats->tAssembly    = ctx.tAssembly;
+  stats->tSolver      = ctx.tSolver;
+  stats->tGradient    = PetscMax(0.0, (t2 - t1) - ctx.tAssembly - ctx.tSolver - tOutputLoop);
+  stats->tOutput      = tOutputLoop + (t3 - t2);
+  stats->numSolves    = ctx.numSolves;
+  stats->kspItsMin    = ctx.numSolves ? ctx.kspItsMin : 0;
+  stats->kspItsMax    = ctx.kspItsMax;
+  stats->numSnapshots = ctx.numSnapshots;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -400,7 +400,8 @@ static PetscErrorCode mmsAssembleSolve(const petgemParams params, const CsemSour
   } else {
     PetscCall(assembleCsemKandM(params, dm, grid, conductivity, constFactor, A, NULL, NULL));
   }
-  PetscCall(solveCsemSystem(dm, *A, *B, NULL, grid.fem.order, NULL, X));
+  SolveInfo info;
+  PetscCall(solveCsemSystem(dm, *A, *B, NULL, grid.fem.order, NULL, X, &info));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
