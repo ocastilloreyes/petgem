@@ -120,17 +120,6 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-/**
- * @brief Local DOFs supported on cells more conductive than @p threshold,
- *        for PCBDDC primal vertices. See src/assembly.c for the rationale.
- *
- * @param[in]  dm            DMPlex mesh carrying the H(curl) section.
- * @param[in]  conductivity  Per-cell conductivity Vec.
- * @param[in]  threshold     Selection threshold in S/m; <= 0 disables (NULL out).
- * @param[out] primal        Local IS of DOF indices, or NULL. Caller destroys.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
- */
 PetscErrorCode assembleCsemKandM(const petgemParams params, const DM dm, const Grid grid,
                                  const Vec conductivity,
                                  const PetscScalar constFactor,
@@ -176,6 +165,8 @@ PetscErrorCode assembleCsemMsRefill(const petgemParams params,
                                     PetscReal **Me, PetscReal **Ke,
                                     Mat Ms);
 
+/* DOFs on cells more conductive than threshold, for PCBDDC primal vertices.
+ * Documented in src/assembly.c. */
 PetscErrorCode buildHighSigmaPrimalIS(const DM dm, const Vec conductivity,
                                       const PetscReal threshold, IS *primal);
 

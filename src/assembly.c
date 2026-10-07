@@ -113,42 +113,6 @@ static PetscErrorCode prepareCellForAssembly(const DM dm,
 }
 
 
-/**
- * @brief Collects the local DOFs supported on cells more conductive than a
- *        threshold, for use as PCBDDC primal vertices.
- *
- * BDDC is robust to coefficient jumps as long as those jumps do not cut the
- * subdomain interface. A high-conductivity filament threading the domain, such
- * as the steel casing of the cased-well benchmark, is cut by every partition,
- * and the iteration count then grows with the number of subdomains instead of
- * staying flat.
- *
- * Making the DOFs of the channel primal keeps them continuous across the
- * interface. PCBDDC discards the ones that are not on the interface, so every
- * DOF of every conductive cell may be passed; the number that survives is
- * reported by -ksp_view.
- *
- * Selection is by conductivity rather than by material id, so no knowledge of
- * the tag numbering is required: the steel sits at 2.4e6 S/m and the next most
- * conductive material at 1 S/m, so any threshold between the two picks out the
- * channel exactly.
- *
- * The returned indices are global, as required by PCBDDCSetPrimalVerticesIS,
- * which maps them to its own local space (PCBDDCGlobalToLocal). Local closure
- * indices taken from the DMPlex section must not be used: that section is
- * larger than the MATIS local matrix, so the indices either overflow it or
- * name unrelated DOFs.
- *
- * @param[in]  dm            DMPlex mesh carrying the H(curl) section.
- * @param[in]  conductivity  Per-cell conductivity Vec (its DM comes from VecGetDM).
- * @param[in]  threshold     Cells whose largest sigma exceeds this are selected.
- * @param[out] primal        IS of global DOF indices on the DM's communicator,
- *                           empty on ranks that hold no qualifying cells. Always
- *                           created when the threshold is positive, because the
- *                           creation is collective. The caller destroys it.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
- */
 /* Cross-check a primal index set against the operator itself.
  *
  * buildHighSigmaPrimalIS emits indices taken from the DM's GLOBAL section, on
@@ -230,6 +194,42 @@ PetscErrorCode verifyPrimalISAgainstOperator(Mat A, IS primal)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Collects the local DOFs supported on cells more conductive than a
+ *        threshold, for use as PCBDDC primal vertices.
+ *
+ * BDDC is robust to coefficient jumps as long as those jumps do not cut the
+ * subdomain interface. A high-conductivity filament threading the domain, such
+ * as the steel casing of the cased-well benchmark, is cut by every partition,
+ * and the iteration count then grows with the number of subdomains instead of
+ * staying flat.
+ *
+ * Making the DOFs of the channel primal keeps them continuous across the
+ * interface. PCBDDC discards the ones that are not on the interface, so every
+ * DOF of every conductive cell may be passed; the number that survives is
+ * reported by -ksp_view.
+ *
+ * Selection is by conductivity rather than by material id, so no knowledge of
+ * the tag numbering is required: the steel sits at 2.4e6 S/m and the next most
+ * conductive material at 1 S/m, so any threshold between the two picks out the
+ * channel exactly.
+ *
+ * The returned indices are global, as required by PCBDDCSetPrimalVerticesIS,
+ * which maps them to its own local space (PCBDDCGlobalToLocal). Local closure
+ * indices taken from the DMPlex section must not be used: that section is
+ * larger than the MATIS local matrix, so the indices either overflow it or
+ * name unrelated DOFs.
+ *
+ * @param[in]  dm            DMPlex mesh carrying the H(curl) section.
+ * @param[in]  conductivity  Per-cell conductivity Vec (its DM comes from VecGetDM).
+ * @param[in]  threshold     Cells whose largest sigma exceeds this are selected.
+ * @param[out] primal        IS of global DOF indices on the DM's communicator,
+ *                           empty on ranks that hold no qualifying cells. Always
+ *                           created when the threshold is positive, because the
+ *                           creation is collective. The caller destroys it.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 PetscErrorCode buildHighSigmaPrimalIS(const DM dm, const Vec conductivity,
                                       const PetscReal threshold, IS *primal)
 {
