@@ -149,21 +149,22 @@ package is installed. Stages 2 and 5 are MPI solves, normally on a cluster.
 
 ## Execution instructions
 
-Run all commands **from the repository root**.
+Run the commands from the repository root; the SLURM jobs are submitted from
+`examples/im2`.
 
 ```bash
 make
 
 # 1-2. Forward modelling of the true model: 7 bundles, then 7 solves
-bash   examples/im2/scripts/build_bundles.sh fm
-sbatch examples/im2/scripts/run_fm.slurm
+bash examples/im2/scripts/build_bundles.sh fm
+(cd examples/im2 && sbatch scripts/run_fm.slurm)
 
 # 3. Synthetic observations: assemble the responses and add 1 % noise
 bash examples/im2/scripts/make_observations.sh
 
 # 4-5. Inversion from the homogeneous starting model
-bash   examples/im2/scripts/build_bundles.sh im
-sbatch examples/im2/scripts/run_im.slurm
+bash examples/im2/scripts/build_bundles.sh im
+(cd examples/im2 && sbatch scripts/run_im.slurm)
 
 # 6. Evaluate the recovered model
 python3 examples/im2/scripts/analyze_inversion.py \
@@ -238,13 +239,14 @@ be compared iteration by iteration and not only on its final metrics:
 
 Each row of `lbfgs_log.txt` gives the cumulative objective-gradient evaluations,
 RMS, regularization term `λΦm`, relative gradient norm `|g|/|x|`, step length,
-KSP iteration range and wall time, and the file ends with the stopping line. `rms_history.txt`
+KSP iteration range and wall time, and the file ends with the exit reason, the
+stopping test and the iteration and evaluation counts. `rms_history.txt`
 includes the 6 rejected line-search trials.
 
 Both are extracted from a finished run rather than written by the kernel:
 
 ```bash
-sed -n '/^ Iter Evals/,/^ Stopped/p' \
+sed -n '/^   Iter Evals/,/^   Evaluations/p' \
     examples/im2/outputs/im_<jobid>.out > examples/im2/reference/lbfgs_log.txt
 
 python3 - <<'PY'
@@ -260,12 +262,6 @@ PY
 Regenerate both whenever the reference metrics are regenerated: the step count
 in `lbfgs_log.txt` must match `iterations` in `reference_metrics.json`, and the
 row count in `rms_history.txt` must match `objgrad_evaluations`.
-
-> **The iteration count is not reproducible to the unit.** Two runs from the
-> same bundle on 112 tasks agree to four decimals through iteration 20 and drift
-> to about 1 % in RMS by iteration 70 - round-off non-determinism in the MPI
-> reductions of the iterative solver, amplified by L-BFGS. Expect 100-115 steps,
-> not exactly 105.
 
 ## Outputs
 
@@ -308,8 +304,8 @@ convergence record, which is extracted from it and committed under `reference/`.
   - `configs/solver_mumps.txt` - MUMPS direct (LU).
 
   ```bash
-  build/fm.csem -input_filename outputs/input_fm_f1.h5 -options_file configs/solver_bddc.txt
-  build/im.csem -options_file configs/params_im.txt    -options_file configs/solver_mumps.txt
+  ../../build/fm.csem -input_filename outputs/input_fm_f1.h5 -options_file configs/solver_bddc.txt
+  ../../build/im.csem -options_file configs/params_im.txt    -options_file configs/solver_mumps.txt
   ```
 
   What actually selects the family is the operator type, which each preset sets:

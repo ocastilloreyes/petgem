@@ -1,21 +1,7 @@
-# im.csem inversion config - im1 benchmark, order 2.
-# Consumes the bundle built by scripts/build_bundles.sh im.
-
--input_filename   examples/im1/outputs/input_im.h5
--output_dir       examples/im1/outputs/
+-input_filename   outputs/input_im.h5
+-output_dir       outputs/
 -output_filename  responses_im_p2
-
-# Solver: this file carries the CASE options only. Add a solver preset as a
-# second -options_file, exactly as the fm.csem configs do:
-#   build/im.csem -options_file configs/params_im.txt -options_file configs/solver_bddc.txt
-#   build/im.csem -options_file configs/params_im.txt -options_file configs/solver_mumps.txt
-#
-# The adjoint system A_f.nx = nB uses the SAME operator as the forward solve
-# and therefore the SAME KSP, so the preset governs both solves. The adjoint
-# solution enters the objective gradient, so when running iteratively keep the
-# tolerance tight - a loose solve degrades the L-BFGS search directions, not
-# just the field.
--ksp_rtol                    1.0e-10
+-ksp_rtol         1.0e-10
 
 # L-BFGS and regularization. Stops on the RMS = 1.05 noise level.
 -im_max_iter                 150
@@ -26,8 +12,5 @@
 -im_rms_tol                  1.05
 -im_snapshot_interval        1
 
-# Plateau exit. The rule stops the run when -im_rms_tol is UNREACHABLE, and this
-# case approaches 1.05 asymptotically: the last steps improve by ~0.085 % each
-# while still descending monotonically. At 1e-4 genuine stagnation is still
-# caught without those steps pre-empting the RMS criterion.
+# Plateau exit. The rule stops the run when -im_rms_tol is UNREACHABLE
 -im_rms_rtol                 1.0e-4

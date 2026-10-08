@@ -83,7 +83,6 @@ int runForward(int argc, char** argv) {
   PetscScalar     constFactor;
   PetscLogDouble  timers[6];
   SolveInfo       solveInfo;
-  char            text[256];
   MPI_Comm        comm;
   PetscLogDouble  start_timer, end_timer;
   PetscLogStage stage_parse, stage_load, stage_grid;
@@ -209,7 +208,6 @@ int runForward(int argc, char** argv) {
     PetscCall(runMMSVerification(params, dm, grid, conductivity, sources));
     PetscCall(PetscLogStagePop());
 
-    PetscCall(PetscPrintf(comm, "\n"));
     PetscCall(printFooter());
     PetscCall(DMDestroy(&grid.H1dm));
     PetscCall(DMDestroy(&dm));
@@ -220,11 +218,6 @@ int runForward(int argc, char** argv) {
     PetscCall(PetscFinalize());
     return 0;
   }
-
-  PetscCall(describeCsemSolver(dm, text, sizeof(text)));
-  PetscCall(logKVStr(comm, "Solver", text));
-  PetscCall(logStageHeader(comm));
-  PetscCall(logStage(comm, "Load + grid", NULL, timers[0] + timers[1] + timers[2]));
 
   /* ---------------------------------------------------------------- */
   /* Assembly linear system                                           */
@@ -245,7 +238,13 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[3] = end_timer - start_timer;
-  PetscCall(logStage(comm, "Assembly (b, A = K - iωμMs)", NULL, timers[3]));
+  {
+    MatType mtype;
+    PetscCall(MatGetType(A, &mtype));
+    PetscCall(logSection(comm, "Assembly"));
+    PetscCall(logKVStr(comm, "Matrix type", mtype));
+    PetscCall(logKVInt(comm, "Right-hand sides", sources.numSources));
+  }
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -291,11 +290,9 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[4] = end_timer - start_timer;
-  PetscCall(PetscSNPrintf(text, sizeof(text), "%" PetscInt_FMT " its%s, %s, %s|r|/|b| = %.1e",
-                          solveInfo.its, sources.numSources > 1 ? " (last rhs)" : "",
-                          KSPConvergedReasons[solveInfo.reason], sources.numSources > 1 ? "max " : "",
-                          (double)solveInfo.relres));
-  PetscCall(logStage(comm, "Solve", text, timers[4]));
+  PetscCall(logSection(comm, "Solve"));
+  PetscCall(logKVStr(comm, "Solver", solveInfo.solver));
+  PetscCall(logKVStr(comm, "Status", solveInfo.reason > 0 ? "converged" : KSPConvergedReasons[solveInfo.reason]));
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
@@ -316,28 +313,29 @@ int runForward(int argc, char** argv) {
   timers[5] = end_timer - start_timer;
   {
     PetscInt nrecv;
+    char     outFile[PETSC_MAX_PATH_LEN];
     PetscCall(VecGetSize(receivers, &nrecv));
-    PetscCall(PetscSNPrintf(text, sizeof(text), "%s receivers", formatGroupedInt(nrecv / 3)));
+    PetscCall(buildOutputPath(&params, ".h5", outFile, sizeof(outFile)));
+    PetscCall(logSection(comm, "Field interpolation"));
+    PetscCall(logKVInt(comm, "Number of receivers", nrecv / 3));
+    PetscCall(logKVStr(comm, "Output file", outFile));
   }
-  PetscCall(logStage(comm, "Interp.", text, timers[5]));
 
 #ifdef USE_EXTRAE
   Extrae_event(1000, 0);
 #endif
 
   /* ---------------------------------------------------------------- */
-  /* Print stage table, output and footer                            */
+  /* Print timers and footer                                          */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 9);
 #endif
 
-  PetscCall(logStage(comm, "Total", NULL, timers[0] + timers[1] + timers[2] + timers[3] + timers[4] + timers[5]));
   {
-    char outFile[PETSC_MAX_PATH_LEN];
-    PetscCall(buildOutputPath(&params, ".h5", outFile, sizeof(outFile)));
-    PetscCall(PetscPrintf(comm, "\n"));
-    PetscCall(logKVStr(comm, "Output", outFile));
+    const char *const   labels[] = {"Load + grid", "Assembly", "Linear solve", "Field interpolation"};
+    const PetscLogDouble times[]  = {timers[0] + timers[1] + timers[2], timers[3], timers[4], timers[5]};
+    PetscCall(printTimers(labels, times, 4));
   }
   PetscCall(printFooter());
 

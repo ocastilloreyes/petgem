@@ -730,10 +730,9 @@ PetscErrorCode computeCellCentroid(Cell* cell) {
 
 
 /**
- * @brief Prints the input file, mesh size and H(curl) space of a run.
+ * @brief Prints the "Mesh" and "FEM space" sections of the run report.
  *
- * Emits the "Input", "Mesh", "FE space" and "DOFs/entity" lines of the run
- * report. The global DOF count is the size of a global vector of @p dm.
+ * The global DOF count is the size of a global vector of @p dm.
  *
  * @param[in] params  Parameters (input file, basis order).
  * @param[in] dm      DMPlex carrying the H(curl) section.
@@ -753,14 +752,21 @@ PetscErrorCode logGridSummary(const petgemParams params, const DM dm, const Grid
   PetscCall(VecGetSize(v, &numDofs));
   PetscCall(DMRestoreGlobalVector(dm, &v));
 
-  PetscCall(logKVStr(comm, "Input", params.inputFile));
-  PetscCall(logKVf(comm, "Mesh", "%s cells, %s faces, %s edges, %s vertices",
-                   formatGroupedInt(grid->numCellsGlobal), formatGroupedInt(grid->numFacesGlobal),
-                   formatGroupedInt(grid->numEdgesGlobal), formatGroupedInt(grid->numVerticesGlobal)));
-  PetscCall(logKVf(comm, "FE space", "Nédélec p=%" PetscInt_FMT ", %s DOFs", params.order, formatGroupedInt(numDofs)));
-  PetscCall(logKVf(comm, "DOFs/entity", "vertex %" PetscInt_FMT ", edge %" PetscInt_FMT ", face %" PetscInt_FMT
-                   ", volume %" PetscInt_FMT " (%" PetscInt_FMT " per cell)",
-                   grid->numDofInVertex, grid->numDofInEdge, grid->numDofInFace, grid->numDofInVolume, grid->numDofInCell));
+  PetscCall(logSection(comm, "Mesh"));
+  PetscCall(logKVStr(comm, "Input file", params.inputFile));
+  PetscCall(logKVInt(comm, "Number of vertices", grid->numVerticesGlobal));
+  PetscCall(logKVInt(comm, "Number of edges", grid->numEdgesGlobal));
+  PetscCall(logKVInt(comm, "Number of faces", grid->numFacesGlobal));
+  PetscCall(logKVInt(comm, "Number of cells", grid->numCellsGlobal));
+
+  PetscCall(logSection(comm, "FEM space"));
+  PetscCall(logKVInt(comm, "Basis order", params.order));
+  PetscCall(logKVInt(comm, "DOFs per vertex", grid->numDofInVertex));
+  PetscCall(logKVInt(comm, "DOFs per edge", grid->numDofInEdge));
+  PetscCall(logKVInt(comm, "DOFs per face", grid->numDofInFace));
+  PetscCall(logKVInt(comm, "DOFs per volume", grid->numDofInVolume));
+  PetscCall(logKVInt(comm, "DOFs per cell", grid->numDofInCell));
+  PetscCall(logKVInt(comm, "Global DOFs", numDofs));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

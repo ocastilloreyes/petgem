@@ -78,8 +78,8 @@ Running
       -output_vtk outputs/model.vtu
 
    # 3. Forward modeling (committed solver options in configs/)
-   mpirun -n 4 build/fm.csem \
-      -options_file ${MODEL_DIR}/configs/params.txt -order ${ORDER}
+   (cd ${MODEL_DIR} && mpirun -n 4 ../../build/fm.csem \
+      -options_file configs/params.txt -order ${ORDER})
 
    # 4. Compare against the reference
    python3 ${MODEL_DIR}/scripts/postprocess.py -tolerance 0.03
@@ -108,9 +108,9 @@ which bypasses the bundle's stored value:
 
 .. code-block:: bash
 
-   mpirun -n 4 build/fm.csem \
-      -options_file ${MODEL_DIR}/configs/params.txt -order 2 \
-      -output_filename responses_p2
+   (cd ${MODEL_DIR} && mpirun -n 4 ../../build/fm.csem \
+      -options_file configs/params.txt -order 2 \
+      -output_filename responses_p2)
 
 .. figure:: /_static/images/csem_test_p2.png
    :alt: Comparison of the Ex component between PETGEM and the reference

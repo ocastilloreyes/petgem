@@ -193,8 +193,7 @@ typedef struct {
   /** @{ KSP statistics. The *Row fields cover the solves since the last
    *  L-BFGS table row and are reset by lbfgsOptimize; the others cover the run. */
   PetscInt                        numSolves;    /**< Forward + adjoint solves. */
-  PetscInt                        kspItsMin;    /**< Fewest KSP iterations of any solve. */
-  PetscInt                        kspItsMax;    /**< Most KSP iterations of any solve. */
+  KSPConvergedReason              failReason;   /**< First negative converged reason, 0 if none. */
   PetscInt                        kspItsMinRow; /**< Fewest KSP iterations since the last row. */
   PetscInt                        kspItsMaxRow; /**< Most KSP iterations since the last row. */
   PetscInt                        numSnapshots; /**< VTU snapshots written. */
@@ -305,9 +304,8 @@ PetscErrorCode setupInversionSources(const char *bundleFile,
                                      imParams  *iparams);
 
 /**
- * @brief Prints the inversion part of the im.csem run report (sources,
- *        frequencies, L-BFGS settings, stopping criteria, error level, fixed
- *        materials, smoother weight, snapshot interval).
+ * @brief Prints the "Inversion sources" and "Inversion parameters" sections
+ *        of the im.csem run report.
  *
  * @param[in] im_Params  Inversion parameters, after setupInversionSources()
  *                       and loadInversionMetaFromBundle().
@@ -575,8 +573,10 @@ typedef struct {
   PetscLogDouble tGradient;    /**< Rest of the L-BFGS loop (gradient, smoothing, updates). */
   PetscLogDouble tOutput;      /**< VTU snapshots + HDF5 results. */
   PetscInt       numSolves;    /**< Forward + adjoint solves. */
-  PetscInt       kspItsMin;    /**< Fewest KSP iterations of any solve. */
-  PetscInt       kspItsMax;    /**< Most KSP iterations of any solve. */
+  KSPConvergedReason failReason; /**< First negative converged reason, 0 if none. */
+  PetscInt       numRHS;       /**< Right-hand sides (inversion entries). */
+  char           matType[32];  /**< System matrix type. */
+  char           solver[32];   /**< Solver name (getSolverName). */
   PetscInt       numSnapshots; /**< VTU snapshots written. */
 } InversionStats;
 

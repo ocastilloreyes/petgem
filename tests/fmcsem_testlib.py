@@ -97,39 +97,29 @@ def load_fields(h5py, path):
 
 
 def parse_grid_stats(stdout):
-    """Extract mesh and FE-space counts from the fm.csem run report.
+    """Extract the '<label> = <int>' rows fm.csem prints (grouped thousands ok).
 
-    Parses the 'Mesh', 'FE space' and 'DOFs/entity' lines (grouped thousands
-    ok). Missing keys are simply absent so callers can assert on what they need.
+    Returns a dict of the numeric fields relevant to assembly verification
+    (vertices, edges, faces, cells, DOFs-per-entity, global DOFs). Missing keys
+    are simply absent so callers can assert on what they need.
     """
     import re
-
-    def num(txt):
-        return int(re.sub(r"[ ,]", "", txt))
-
-    grp = r"(\d+(?:[ ,]\d{3})*)"
+    labels = {
+        "Number of vertices": "vertices", "Number of edges": "edges",
+        "Number of faces": "faces", "Number of cells": "cells",
+        "DOFs per vertex": "dof_vertex", "DOFs per edge": "dof_edge",
+        "DOFs per face": "dof_face", "DOFs per volume": "dof_volume",
+        "DOFs per cell": "dof_cell", "Basis order": "order",
+        "Global DOFs": "dofs",
+    }
     stats = {}
     for line in stdout.splitlines():
         if "=" not in line:
             continue
         lhs, rhs = line.split("=", 1)
         label = lhs.strip()
-        if label == "Mesh":
-            for key in ("cells", "faces", "edges", "vertices"):
-                m = re.search(grp + r" " + key, rhs)
-                if m:
-                    stats[key] = num(m.group(1))
-        elif label == "FE space":
-            m = re.search(r"p=(\d+), " + grp + r" DOFs", rhs)
-            if m:
-                stats["order"] = int(m.group(1))
-                stats["dofs"] = num(m.group(2))
-        elif label == "DOFs/entity":
-            for key in ("vertex", "edge", "face", "volume"):
-                m = re.search(key + r" (\d+)", rhs)
-                if m:
-                    stats["dof_" + key] = int(m.group(1))
-            m = re.search(r"\((\d+) per cell\)", rhs)
-            if m:
-                stats["dof_cell"] = int(m.group(1))
+        if label in labels:
+            digits = re.sub(r"[^\d-]", "", rhs)   # strip thousands spaces/commas
+            if digits:
+                stats[labels[label]] = int(digits)
     return stats

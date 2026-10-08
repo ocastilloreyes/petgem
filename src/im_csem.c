@@ -115,7 +115,6 @@ int runInverse(int argc, char **argv) {
   Grid            grid;
   InversionStats  stats;
   PetscLogDouble  timers[3];
-  char            text[256];
   MPI_Comm        comm;
   PetscLogDouble  start_timer, end_timer;
   PetscLogStage stage_parse, stage_load, stage_grid;
@@ -264,38 +263,32 @@ int runInverse(int argc, char **argv) {
 #endif
 
   /* ---------------------------------------------------------------- */
-  /* Print stage table, output and footer                            */
+  /* Print output, timers and footer                                  */
   /* ---------------------------------------------------------------- */
 #ifdef USE_EXTRAE
   Extrae_event(1000, 9);
 #endif
 
-  PetscCall(logStageHeader(comm));
-  PetscCall(logStage(comm, "Load + grid", NULL, timers[0] + timers[1] + timers[2]));
-  PetscCall(logStage(comm, "Setup", "operators, RHS, receivers, observed data", stats.tSetup));
-  PetscCall(logStage(comm, "Assembly", "Ms(σ), A_f = K - iωμMs", stats.tAssembly));
-  if (stats.kspItsMin == stats.kspItsMax) {
-    PetscCall(PetscSNPrintf(text, sizeof(text), "%s solves (fwd + adj), KSP its %" PetscInt_FMT,
-                            formatGroupedInt(stats.numSolves), stats.kspItsMax));
-  } else {
-    PetscCall(PetscSNPrintf(text, sizeof(text), "%s solves (fwd + adj), KSP its %" PetscInt_FMT "-%" PetscInt_FMT,
-                            formatGroupedInt(stats.numSolves), stats.kspItsMin, stats.kspItsMax));
-  }
-  PetscCall(logStage(comm, "Solve", text, stats.tSolver));
-  PetscCall(logStage(comm, "Gradient", "adjoint gradient, smoothing, L-BFGS", stats.tGradient));
-  if (stats.numSnapshots > 0) {
-    PetscCall(PetscSNPrintf(text, sizeof(text), "HDF5 + %s VTU snapshots", formatGroupedInt(stats.numSnapshots)));
-  } else {
-    PetscCall(PetscStrncpy(text, "HDF5", sizeof(text)));
-  }
-  PetscCall(logStage(comm, "Output", text, stats.tOutput));
-  PetscCall(logStage(comm, "Total", NULL, timers[0] + timers[1] + timers[2] + stats.tSetup + stats.tAssembly +
-                                          stats.tSolver + stats.tGradient + stats.tOutput));
   {
     char outFile[PETSC_MAX_PATH_LEN];
     PetscCall(buildOutputPath(&iparams.common, ".h5", outFile, sizeof(outFile)));
-    PetscCall(PetscPrintf(comm, "\n"));
-    PetscCall(logKVStr(comm, "Output", outFile));
+    PetscCall(logSection(comm, "Assembly"));
+    PetscCall(logKVStr(comm, "Matrix type", stats.matType));
+    PetscCall(logKVInt(comm, "Right-hand sides", stats.numRHS));
+    PetscCall(logSection(comm, "Solve"));
+    PetscCall(logKVStr(comm, "Solver", stats.solver));
+    PetscCall(logKVf(comm, "Linear solves", "%s (forward + adjoint)", formatGroupedInt(stats.numSolves)));
+    PetscCall(logKVStr(comm, "Status", stats.failReason == 0 ? "converged" : KSPConvergedReasons[stats.failReason]));
+    PetscCall(logSection(comm, "Inversion output"));
+    PetscCall(logKVStr(comm, "Output file", outFile));
+    PetscCall(logKVStr(comm, "Datasets written", "conductivity, log_perturbation, rms_history"));
+    PetscCall(logKVInt(comm, "VTU snapshots", stats.numSnapshots));
+  }
+  {
+    const char *const   labels[] = {"Load + grid", "Setup", "Assembly", "Linear solve", "Gradient + L-BFGS", "Output"};
+    const PetscLogDouble times[]  = {timers[0] + timers[1] + timers[2], stats.tSetup, stats.tAssembly,
+                                     stats.tSolver, stats.tGradient, stats.tOutput};
+    PetscCall(printTimers(labels, times, 6));
   }
   PetscCall(printFooter());
 

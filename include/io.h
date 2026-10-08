@@ -115,7 +115,7 @@ PetscErrorCode loadCsemInputs(petgemParams       *pg_params,
                               Vec            *receivers);
 
 /**
- * @brief Prints the "Source" line(s) of the forward run report.
+ * @brief Prints the "CSEM source(s)" section of the forward run report.
  *
  * @param[in] sources  Transmitter set loaded by loadCsemInputs().
  *

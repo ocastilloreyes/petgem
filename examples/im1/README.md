@@ -115,21 +115,22 @@ package is installed. Stages 2 and 5 are MPI solves, normally on a cluster.
 
 ## Execution instructions
 
-Run all commands **from the repository root**.
+Run the commands from the repository root; the SLURM jobs are submitted from
+`examples/im1`.
 
 ```bash
 make
 
 # 1-2. Forward modelling of the true model: 7 bundles, then 7 solves
-bash   examples/im1/scripts/build_bundles.sh fm
-sbatch examples/im1/scripts/run_fm.slurm
+bash examples/im1/scripts/build_bundles.sh fm
+(cd examples/im1 && sbatch scripts/run_fm.slurm)
 
 # 3. Synthetic observations: assemble the responses and add 1 % noise
 bash examples/im1/scripts/make_observations.sh
 
 # 4-5. Inversion from the homogeneous starting model
-bash   examples/im1/scripts/build_bundles.sh im
-sbatch examples/im1/scripts/run_im.slurm
+bash examples/im1/scripts/build_bundles.sh im
+(cd examples/im1 && sbatch scripts/run_im.slurm)
 
 # 6. Evaluate the recovered model
 python3 examples/im1/scripts/analyze_inversion.py \
@@ -213,13 +214,14 @@ be compared iteration by iteration and not only on its final metrics:
 
 Each row of `lbfgs_log.txt` gives the cumulative objective-gradient evaluations,
 RMS, regularization term `λΦm`, relative gradient norm `|g|/|x|`, step length,
-KSP iteration range and wall time, and the file ends with the stopping line. `rms_history.txt`
+KSP iteration range and wall time, and the file ends with the exit reason, the
+stopping test and the iteration and evaluation counts. `rms_history.txt`
 includes the 10 rejected line-search trials.
 
 Both are extracted from a finished run rather than written by the kernel:
 
 ```bash
-sed -n '/^ Iter Evals/,/^ Stopped/p' \
+sed -n '/^   Iter Evals/,/^   Evaluations/p' \
     examples/im1/outputs/im_<jobid>.out > examples/im1/reference/lbfgs_log.txt
 
 python3 - <<'PY'
@@ -276,8 +278,8 @@ convergence record in `reference/`, which is extracted from it and committed.
   - `configs/solver_mumps.txt` - MUMPS direct (LU).
 
   ```bash
-  build/fm.csem -input_filename outputs/input_fm_f1.h5 -options_file configs/solver_bddc.txt
-  build/im.csem -options_file configs/params_im.txt    -options_file configs/solver_mumps.txt
+  ../../build/fm.csem -input_filename outputs/input_fm_f1.h5 -options_file configs/solver_bddc.txt
+  ../../build/im.csem -options_file configs/params_im.txt    -options_file configs/solver_mumps.txt
   ```
 
   What actually selects the family is the operator type, which each preset sets:

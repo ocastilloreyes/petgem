@@ -555,7 +555,7 @@ PetscErrorCode solveInvSystem(const KSP ksp, const Vec rhs, Vec sol)
 
 
 /**
- * @brief Adds the iteration count of the last solve of @p ksp to the context statistics.
+ * @brief Adds the last solve of @p ksp to the context statistics.
  *
  * @param[in,out] c    Inversion context.
  * @param[in]     ksp  KSP that has just solved.
@@ -565,11 +565,12 @@ PetscErrorCode solveInvSystem(const KSP ksp, const Vec rhs, Vec sol)
 static PetscErrorCode recordSolve(InversionContext *c, KSP ksp)
 {
   PetscFunctionBeginUser;
-  PetscInt its;
+  PetscInt           its;
+  KSPConvergedReason reason;
   PetscCall(KSPGetIterationNumber(ksp, &its));
+  PetscCall(KSPGetConvergedReason(ksp, &reason));
   c->numSolves++;
-  c->kspItsMin    = PetscMin(c->kspItsMin, its);
-  c->kspItsMax    = PetscMax(c->kspItsMax, its);
+  if (reason < 0 && c->failReason == 0) c->failReason = reason;
   c->kspItsMinRow = PetscMin(c->kspItsMinRow, its);
   c->kspItsMaxRow = PetscMax(c->kspItsMaxRow, its);
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -855,7 +856,6 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
 
   MPI_Comm       comm = PetscObjectComm((PetscObject)dm);
   PetscLogDouble t0, t1, t2, t3;
-  char           text[256];
 
   PetscCall(PetscTime(&t0));
 
@@ -959,7 +959,6 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
     .lastRegTerm        = 0.0,
     .iterCount          = 0,
     .acceptedIter       = 0,
-    .kspItsMin          = PETSC_INT_MAX,
     .kspItsMinRow       = PETSC_INT_MAX,
     /* Workspace fields (quad3d, MeRows, KeRows, b/x/nB/nx/Ex_recv, Bvec_per_freq, Wf_per_freq, dObsRow_per_freq) are
      * zero-initialized by C designated-init and populated by setupInversionWorkspace next. */
@@ -968,10 +967,17 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
   /* Precompute everything that doesn't depend on the L-BFGS iterate X. */
   PetscCall(setupInversionWorkspace(&ctx));
 
-  PetscCall(formatSolverConfig(ctx.kspFwd_per_freq[0], text, sizeof(text)));
-  PetscCall(logKVStr(comm, "Solver", text));
+  {
+    Mat     A;
+    MatType mtype;
+    PetscCall(KSPGetOperators(ctx.kspFwd_per_freq[0], &A, NULL));
+    PetscCall(MatGetType(A, &mtype));
+    PetscCall(PetscStrncpy(stats->matType, mtype, sizeof(stats->matType)));
+    PetscCall(getSolverName(ctx.kspFwd_per_freq[0], stats->solver, sizeof(stats->solver)));
+  }
 
   /* Run L-BFGS optimization */
+  PetscCall(logSection(comm, "L-BFGS optimization"));
   PetscCall(PetscTime(&t1));
   PetscInt    numIters;
   const char *reasonStr;
@@ -1018,8 +1024,8 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
   stats->tGradient    = PetscMax(0.0, (t2 - t1) - ctx.tAssembly - ctx.tSolver - tOutputLoop);
   stats->tOutput      = tOutputLoop + (t3 - t2);
   stats->numSolves    = ctx.numSolves;
-  stats->kspItsMin    = ctx.numSolves ? ctx.kspItsMin : 0;
-  stats->kspItsMax    = ctx.kspItsMax;
+  stats->failReason   = ctx.failReason;
+  stats->numRHS       = iparams->numFreqs;
   stats->numSnapshots = ctx.numSnapshots;
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -50,7 +50,7 @@ fm/
     └── reference.h5       precomputed reference Ex (PETSc complex Vec, /reference)
 ```
 
-Everything generated lands in `outputs/`, which is git-ignored and **not present
+All generated files lands in `outputs/`, which is git-ignored and **not present
 in a fresh clone** - `build_bundles.sh` creates it on demand. Re-running the
 forward stage overwrites `outputs/responses_p<order>.h5`, so copy any run worth
 keeping elsewhere first.
@@ -60,7 +60,7 @@ General, reusable tools live in the PETGEM `utils/` package, not here
 
 ## Running
 
-Run all commands **from the repository root**.
+Run the commands from the repository root; the solve runs from `examples/fm`.
 
 ```bash
 make
@@ -72,8 +72,7 @@ make
 bash examples/fm/scripts/build_bundles.sh 1
 
 # 2. Forward solve with fm.csem (N MPI tasks; committed options in configs/).
-mpirun -n 4 build/fm.csem \
-    -options_file examples/fm/configs/params.txt -order 1
+(cd examples/fm && mpirun -n 4 ../../build/fm.csem -options_file configs/params.txt)
 
 # 3. Validate + plot (writes outputs/figure_p<order>.png).
 python3 examples/fm/scripts/postprocess.py -tolerance 0.03
@@ -81,7 +80,7 @@ python3 examples/fm/scripts/postprocess.py -tolerance 0.03
 
 `postprocess.py` reports the NRMSD, relative L2 and MAPE of `|Ex|` against
 `reference/reference.h5` and exits non-zero if the NRMSD exceeds the tolerance.
-On a cluster, submit the solve with `sbatch examples/fm/scripts/run_fm.slurm`.
+On a cluster, submit the solve from `examples/fm` with `sbatch scripts/run_fm.slurm`.
 
 ## Reference
 

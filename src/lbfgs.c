@@ -66,7 +66,7 @@ static PetscErrorCode printIterationRow(MPI_Comm comm, InversionContext *ictx, P
     snprintf(step, sizeof(step), "%.3g", (double)stp);
   }
 
-  PetscCall(PetscPrintf(comm, " %4" PetscInt_FMT " %5" PetscInt_FMT " %8.4f %10.3e %10.3e %8s %9s %8.1f\n",
+  PetscCall(PetscPrintf(comm, "   %4" PetscInt_FMT " %5" PetscInt_FMT " %9.4f %10.3e %10.3e %8s %9s %8.1f\n",
                         iter, ictx->iterCount, (double)ictx->lastRMS, (double)ictx->lastRegTerm,
                         (double)grel, step, its, (double)(now - *tRow)));
 
@@ -152,7 +152,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
   xnorm = PetscMax(1.0, xnorm);
 
   /* Header row */
-  PetscCall(PetscPrintf(comm, "\n %4s %5s %8s %12s %10s %8s %9s %8s\n",
+  PetscCall(PetscPrintf(comm, "   %4s %5s %9s %12s %10s %8s %9s %8s\n",
                         "Iter", "Evals", "RMS", "λΦm", "|g|/|x|", "Step", "KSP its", "t (s)"));
   PetscCall(printIterationRow(comm, ictx, 0, gnorm / xnorm, 0.0, &tRow));
 
@@ -224,7 +224,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
 
     if (gTd >= 0.0) {
       /* Not a descent direction - fall back to steepest descent */
-      PetscCall(PetscPrintf(comm, " L-BFGS: positive curvature detected; resetting to steepest descent.\n"));
+      PetscCall(PetscPrintf(comm, "   L-BFGS: positive curvature detected; resetting to steepest descent.\n"));
       PetscCall(VecCopy(G, d));
       PetscCall(VecScale(d, -1.0));
       PetscCall(VecDot(G, d, &gTd_scalar));
@@ -281,7 +281,7 @@ PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
     } else {
       /* Curvature condition not met: skip storing this pair and keep the
        * existing history rather than resetting to steepest descent. */
-      PetscCall(PetscPrintf(comm, " L-BFGS: skipping update (y^T s = %g); keeping history.\n", (double)ys));
+      PetscCall(PetscPrintf(comm, "   L-BFGS: skipping update (y^T s = %g); keeping history.\n", (double)ys));
     }
 
     /* Accept step */
@@ -368,8 +368,10 @@ cleanup:
       PetscCall(PetscSNPrintf(detail, sizeof(detail), "max iterations reached"));
     }
     PetscCall(PetscPrintf(comm, "\n"));
-    PetscCall(logKVf(comm, "Stopped", "%s: %s; %s iterations, %s evaluations", *reasonStr, detail,
-                     formatGroupedInt(*numIters), formatGroupedInt(ictx->iterCount)));
+    PetscCall(logKVStr(comm, "Exit reason", *reasonStr));
+    PetscCall(logKVStr(comm, "Stopping test", detail));
+    PetscCall(logKVInt(comm, "Iterations", *numIters));
+    PetscCall(logKVInt(comm, "Evaluations", ictx->iterCount));
   }
   PetscCall(VecDestroyVecs(M, &S));
   PetscCall(VecDestroyVecs(M, &Y));

@@ -37,6 +37,7 @@ RUN apt-get update && \
         python3-pip \
         python3-setuptools \
         python3-venv \
+        python3-dev \
         libglu1-mesa \
         libxcursor1 \
         libgl1 \
@@ -54,21 +55,6 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# ------------------------------------------------
-# Install Python packages via apt where available
-# ------------------------------------------------
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3-breathe \
-        python3-meshio \
-        python3-h5py \
-        python3-numpy \
-        python3-matplotlib \
-        python3-sphinx \
-        python3-sphinx-rtd-theme && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 # ----------------------------
 # Python virtual environment
 # ----------------------------
@@ -80,7 +66,8 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # Install Python packages via pip
 # --------------------------------
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir cython pytest
+    pip install --no-cache-dir cython pytest h5py matplotlib meshio \
+        sphinx sphinx-rtd-theme breathe
 
 # ---------------------------
 # PETSc
@@ -238,5 +225,12 @@ COPY . /workspace
 
 RUN pip install --upgrade pip setuptools wheel && \
     pip install -e .
+
+
+# ----------------------------
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libxft2
+
 
 CMD ["bash"]

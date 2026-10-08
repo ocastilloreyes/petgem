@@ -1,30 +1,9 @@
-# im.csem inversion config - im2 benchmark (synthetic model 2), order 2.
-# Consumes the bundle built by scripts/build_bundles.sh im.
-
--input_filename   examples/im2/outputs/input_im.h5
--output_dir       examples/im2/outputs/
+-input_filename   outputs/input_im.h5
+-output_dir       outputs/
 -output_filename  responses_im_p2
-
-# Solver: this file carries the CASE options only. Add a solver preset as a
-# second -options_file, exactly as the fm.csem configs do:
-#   build/im.csem -options_file configs/params_im.txt -options_file configs/solver_bddc.txt
-#   build/im.csem -options_file configs/params_im.txt -options_file configs/solver_mumps.txt
-#
-# The adjoint system A_f.nx = nB uses the SAME operator as the forward solve
-# and therefore the SAME KSP, so the preset governs both solves. The adjoint
-# solution enters the objective gradient, so when running iteratively keep the
-# tolerance tight - a loose solve degrades the L-BFGS search directions, not
-# just the field.
 -ksp_rtol                    1.0e-10
 
-# L-BFGS and regularization. Regularization factor 0.1 and target RMS 1.05 are
-# Table 2 of the paper. The iteration cap is NOT: Table 2 says 80, but this case
-# needs 108 accepted steps to reach RMS 1.05 with this kernel, so a cap of 80
-# exits on DIVERGED_MAXITS at RMS 1.11 with the misfit still descending. 150
-# leaves margin; the reference run used it and stopped on CONVERGED_RMSTOL.
-# The gap against the paper's reported 38 iterations is unexplained - it is not
-# the regularization (the Section 2 gradient smoother is active, see
-# src/inversion_smoother.c), so it lies in the optimisation path.
+# L-BFGS and regularization. Regularization factor 0.1 and target RMS 1.05
 -im_max_iter                 150
 -im_lbfgs_memory             2
 -im_lambda                   0.1
@@ -33,9 +12,5 @@
 -im_rms_tol                  1.05
 -im_snapshot_interval        1
 
-# Plateau exit: stop when -im_rms_tol turns out to be UNREACHABLE, rather than
-# spending the whole iteration budget on steps that no longer move the misfit.
-# 1e-4 is the value examples/im1 settled on, and the reference run confirms it
-# here: it never fired, because there was no stagnation to catch - the last
-# accepted steps still improve ~0.4 % each.
+# Plateau exit: stop when -im_rms_tol turns out to be UNREACHABLE
 -im_rms_rtol                 1.0e-4

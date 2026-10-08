@@ -124,7 +124,7 @@ typedef struct {
 PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid);
 
 /**
- * @brief Prints the "Input", "Mesh", "FE space" and "DOFs/entity" report lines.
+ * @brief Prints the "Mesh" and "FEM space" sections of the run report.
  *
  * @param[in] params  Parameters (input file, basis order).
  * @param[in] dm      DMPlex carrying the H(curl) section.

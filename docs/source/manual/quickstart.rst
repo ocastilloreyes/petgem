@@ -44,8 +44,8 @@ Run the forward example
       -params_filename outputs/_pp_p${ORDER}.txt
 
    # 3. Forward modeling (committed solver options in configs/)
-   mpirun -n 4 build/fm.csem \
-      -options_file ${MODEL_DIR}/configs/params.txt -order ${ORDER}
+   (cd ${MODEL_DIR} && mpirun -n 4 ../../build/fm.csem \
+      -options_file configs/params.txt -order ${ORDER})
 
    # 4. Compare against the shipped reference
    python3 ${MODEL_DIR}/scripts/postprocess.py -tolerance 0.03
@@ -60,7 +60,7 @@ also be overridden at run time with ``-order``:
 
 .. code-block:: bash
 
-   mpirun -n 4 build/fm.csem -options_file ${MODEL_DIR}/configs/params.txt -order 2
+   (cd ${MODEL_DIR} && mpirun -n 4 ../../build/fm.csem -options_file configs/params.txt -order 2)
 
 Because the override bypasses the bundle's value, one bundle can be reused for
 any order in ``1..6``.
@@ -72,8 +72,8 @@ to:
 
 .. code-block:: bash
 
-   mpirun -n 4 build/petgem fm \
-      -options_file ${MODEL_DIR}/configs/params.txt -order ${ORDER}
+   (cd ${MODEL_DIR} && mpirun -n 4 ../../build/petgem fm \
+      -options_file configs/params.txt -order ${ORDER})
 
 Next steps
 ----------

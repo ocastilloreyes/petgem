@@ -602,36 +602,10 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
 
 
 /**
- * @brief Writes a one-line dipole description into @p buf.
+ * @brief Prints the "CSEM source(s)" section of the forward run report.
  *
- * Format: "dipole (x, y, z) m, I=<I> A, L=<L> m, dip <d>°, az <a>°".
- *
- * @param[in]  pos   Dipole position (m).
- * @param[in]  current  Current (A).
- * @param[in]  length   Length (m).
- * @param[in]  dip   Dip angle (deg).
- * @param[in]  az    Azimuth angle (deg).
- * @param[out] buf   Destination buffer.
- * @param[in]  len   Size of @p buf in bytes.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
- */
-static PetscErrorCode formatDipole(const PetscReal pos[3], PetscReal current, PetscReal length,
-                                   PetscReal dip, PetscReal az, char *buf, size_t len)
-{
-  PetscFunctionBeginUser;
-  PetscCall(PetscSNPrintf(buf, len, "dipole (%s, %s, %s) m, I=%s A, L=%s m, dip %s°, az %s°",
-                          formatCompactReal(pos[0]), formatCompactReal(pos[1]), formatCompactReal(pos[2]),
-                          formatCompactReal(current), formatCompactReal(length), formatCompactReal(dip), formatCompactReal(az)));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-
-/**
- * @brief Prints the "Source" line(s) of the forward run report.
- *
- * One source: "Source = <f> Hz, dipole ...". Several sources: a "Frequency"
- * line followed by one "Source k" line per transmitter.
+ * One source: frequency, position, current, length, dip and azimuth. Several
+ * sources: the frequency followed by one sub-block per transmitter.
  *
  * @param[in] sources  Transmitter set loaded by loadCsemInputs().
  *
@@ -642,20 +616,29 @@ PetscErrorCode logForwardSources(const CsemSourceSet *sources)
   PetscFunctionBeginUser;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
-  char     dip[160];
 
   if (sources->numSources == 1) {
     const CsemSource *s = &sources->sourceArray[0];
-    PetscCall(formatDipole(s->position, s->current, s->length, s->dipAngle, s->azimuthAngle, dip, sizeof(dip)));
-    PetscCall(logKVf(comm, "Source", "%s Hz, %s", formatCompactReal(sources->freq), dip));
+    PetscCall(logSection(comm, "CSEM source"));
+    PetscCall(logKVReal(comm, "Frequency (Hz)", sources->freq));
+    PetscCall(logKVf(comm, "Position (m)", "(%s, %s, %s)",
+                     formatReal(s->position[0]), formatReal(s->position[1]), formatReal(s->position[2])));
+    PetscCall(logKVReal(comm, "Current (A)", s->current));
+    PetscCall(logKVReal(comm, "Length (m)", s->length));
+    PetscCall(logKVf(comm, "Dip / azimuth (deg)", "%s / %s", formatReal(s->dipAngle), formatReal(s->azimuthAngle)));
   } else {
-    PetscCall(logKVf(comm, "Frequency", "%s Hz", formatCompactReal(sources->freq)));
+    PetscCall(logSection(comm, "CSEM sources"));
+    PetscCall(logKVReal(comm, "Frequency (Hz)", sources->freq));
+    PetscCall(logKVInt(comm, "Number of sources", sources->numSources));
     for (PetscInt i = 0; i < sources->numSources; i++) {
       const CsemSource *s = &sources->sourceArray[i];
-      char key[16];
-      PetscCall(formatDipole(s->position, s->current, s->length, s->dipAngle, s->azimuthAngle, dip, sizeof(dip)));
-      PetscCall(PetscSNPrintf(key, sizeof(key), "Source %" PetscInt_FMT, i + 1));
-      PetscCall(logKVStr(comm, key, dip));
+      PetscCall(PetscPrintf(comm, "   Source %" PetscInt_FMT ":\n", i + 1));
+      PetscCall(PetscPrintf(comm, "     %-22s = (%s, %s, %s)\n", "Position (m)",
+                            formatReal(s->position[0]), formatReal(s->position[1]), formatReal(s->position[2])));
+      PetscCall(PetscPrintf(comm, "     %-22s = %s\n", "Current (A)", formatReal(s->current)));
+      PetscCall(PetscPrintf(comm, "     %-22s = %s\n", "Length (m)", formatReal(s->length)));
+      PetscCall(PetscPrintf(comm, "     %-22s = %s / %s\n", "Dip / azimuth (deg)",
+                            formatReal(s->dipAngle), formatReal(s->azimuthAngle)));
     }
   }
 
@@ -871,12 +854,13 @@ PetscErrorCode setupInversionSources(const char *bundleFile,
 }
 
 /**
- * @brief Prints the inversion part of the im.csem run report.
+ * @brief Prints the "Inversion sources" and "Inversion parameters" sections.
  *
- * Emits the source/frequency lines, the L-BFGS settings, the active stopping
- * criteria, the data error level, the fixed materials, the smoother weight and
- * the snapshot interval. When every entry shares one dipole only the
- * frequencies are listed; otherwise one line per entry is printed.
+ * When every entry shares one dipole the dipole is printed once followed by
+ * the list of frequencies; otherwise one table row is printed per entry. The
+ * parameters section lists the L-BFGS settings, the active stopping criteria,
+ * the data error level, the fixed materials, the smoother self-weight and the
+ * snapshot interval.
  *
  * @param[in] im_Params  Inversion parameters, after setupInversionSources()
  *                       and loadInversionMetaFromBundle().
@@ -891,7 +875,7 @@ PetscErrorCode logInversionSummary(const imParams *im_Params)
   MPI_Comm            comm   = PETSC_COMM_WORLD;
   const ImCsemSource *s0     = &im_Params->imSources[0];
   PetscBool           shared = PETSC_TRUE;
-  char                line[1024], dip[160];
+  char                line[1024];
 
   for (PetscInt i = 1; i < im_Params->numFreqs; i++) {
     const ImCsemSource *s = &im_Params->imSources[i];
@@ -902,47 +886,51 @@ PetscErrorCode logInversionSummary(const imParams *im_Params)
     }
   }
 
+  PetscCall(logSection(comm, "Inversion sources"));
+  PetscCall(logKVInt(comm, "Number of entries", im_Params->numFreqs));
   if (shared) {
-    PetscCall(formatDipole(s0->position, s0->current, s0->length, s0->dipAngle, s0->azimuthAngle, dip, sizeof(dip)));
-    PetscCall(logKVStr(comm, "Source", dip));
-    PetscCall(PetscSNPrintf(line, sizeof(line), "%s:", formatGroupedInt(im_Params->numFreqs)));
+    line[0] = '\0';
     for (PetscInt i = 0; i < im_Params->numFreqs; i++) {
-      PetscCall(PetscStrlcat(line, (i == 0) ? " " : ", ", sizeof(line)));
-      PetscCall(PetscStrlcat(line, formatCompactReal(im_Params->imSources[i].freq), sizeof(line)));
+      if (i > 0) PetscCall(PetscStrlcat(line, ", ", sizeof(line)));
+      PetscCall(PetscStrlcat(line, formatReal(im_Params->imSources[i].freq), sizeof(line)));
     }
-    PetscCall(PetscStrlcat(line, " Hz", sizeof(line)));
-    PetscCall(logKVStr(comm, "Frequencies", line));
+    PetscCall(logKVStr(comm, "Frequencies (Hz)", line));
+    PetscCall(logKVf(comm, "Position (m)", "(%s, %s, %s)",
+                     formatReal(s0->position[0]), formatReal(s0->position[1]), formatReal(s0->position[2])));
+    PetscCall(logKVReal(comm, "Current (A)", s0->current));
+    PetscCall(logKVReal(comm, "Length (m)", s0->length));
+    PetscCall(logKVf(comm, "Dip / azimuth (deg)", "%s / %s", formatReal(s0->dipAngle), formatReal(s0->azimuthAngle)));
   } else {
+    PetscCall(PetscPrintf(comm, "     %-5s %10s  %-28s %8s %8s %8s %8s\n",
+                          "Entry", "Freq (Hz)", "Position (m)", "I (A)", "L (m)", "Dip", "Azimuth"));
     for (PetscInt i = 0; i < im_Params->numFreqs; i++) {
       const ImCsemSource *s = &im_Params->imSources[i];
-      char key[16];
-      PetscCall(formatDipole(s->position, s->current, s->length, s->dipAngle, s->azimuthAngle, dip, sizeof(dip)));
-      PetscCall(PetscSNPrintf(key, sizeof(key), "Entry %" PetscInt_FMT, i + 1));
-      PetscCall(logKVf(comm, key, "%s Hz, %s", formatCompactReal(s->freq), dip));
+      char pos[40];
+      PetscCall(PetscSNPrintf(pos, sizeof(pos), "(%s, %s, %s)",
+                              formatReal(s->position[0]), formatReal(s->position[1]), formatReal(s->position[2])));
+      PetscCall(PetscPrintf(comm, "     %5" PetscInt_FMT " %10s  %-28s %8s %8s %8s %8s\n",
+                            i + 1, formatReal(s->freq), pos, formatReal(s->current), formatReal(s->length),
+                            formatReal(s->dipAngle), formatReal(s->azimuthAngle)));
     }
   }
 
-  PetscCall(logKVf(comm, "L-BFGS", "M=%" PetscInt_FMT ", max %s iterations, lambda %s",
-                   im_Params->lbfgsMemory, formatGroupedInt(im_Params->maxIter), formatCompactReal(im_Params->lambda)));
-
-  line[0] = '\0';
+  PetscCall(logSection(comm, "Inversion parameters"));
+  PetscCall(logKVInt(comm, "Max iterations", im_Params->maxIter));
+  PetscCall(logKVInt(comm, "L-BFGS memory (M)", im_Params->lbfgsMemory));
+  PetscCall(logKVReal(comm, "Tikhonov lambda", im_Params->lambda));
   if (im_Params->rmsTol > 0.0) {
-    PetscCall(PetscSNPrintf(line, sizeof(line), "RMS <= %s | ", formatCompactReal(im_Params->rmsTol)));
+    PetscCall(logKVf(comm, "Stop: RMS target", "RMS <= %s", formatCompactReal(im_Params->rmsTol)));
+  } else {
+    PetscCall(logKVStr(comm, "Stop: RMS target", "disabled"));
   }
   if (im_Params->rmsRelTol > 0.0) {
-    char one[96];
-    PetscCall(PetscSNPrintf(one, sizeof(one), "RMS drop < %s for %" PetscInt_FMT " iterations | ",
-                            formatCompactReal(im_Params->rmsRelTol), im_Params->rmsStallWindow));
-    PetscCall(PetscStrlcat(line, one, sizeof(line)));
+    PetscCall(logKVf(comm, "Stop: RMS plateau", "drop < %s for %" PetscInt_FMT " iterations",
+                     formatCompactReal(im_Params->rmsRelTol), im_Params->rmsStallWindow));
+  } else {
+    PetscCall(logKVStr(comm, "Stop: RMS plateau", "disabled"));
   }
-  {
-    char one[64];
-    PetscCall(PetscSNPrintf(one, sizeof(one), "|g|/|x| <= %s", formatCompactReal(im_Params->gtol)));
-    PetscCall(PetscStrlcat(line, one, sizeof(line)));
-  }
-  PetscCall(logKVStr(comm, "Stop when", line));
-
-  PetscCall(logKVf(comm, "Error level", "%s (%s)", formatCompactReal(im_Params->errorLevel), im_Params->errorLevelOrigin));
+  PetscCall(logKVf(comm, "Stop: gradient", "|g|/|x| <= %s", formatCompactReal(im_Params->gtol)));
+  PetscCall(logKVf(comm, "Error level", "%s (from %s)", formatReal(im_Params->errorLevel), im_Params->errorLevelOrigin));
 
   line[0] = '\0';
   for (PetscInt i = 0; i < im_Params->numFixedMaterials; i++) {
@@ -951,14 +939,12 @@ PetscErrorCode logInversionSummary(const imParams *im_Params)
     PetscCall(PetscStrlcat(line, one, sizeof(line)));
   }
   if (im_Params->numFixedMaterials == 0) PetscCall(PetscStrncpy(line, "none", sizeof(line)));
-  PetscCall(logKVf(comm, "Fixed IDs", "%s (%s)", line, im_Params->fixedMaterialsOrigin));
-
-  PetscCall(logKVf(comm, "Smoothing", "Gauss-Seidel, self-weight %s", formatCompactReal(im_Params->diagGradientWeight)));
-
+  PetscCall(logKVf(comm, "Fixed materials", "%s (from %s)", line, im_Params->fixedMaterialsOrigin));
+  PetscCall(logKVReal(comm, "Smoother self-weight", im_Params->diagGradientWeight));
   if (im_Params->snapshotInterval > 0) {
-    PetscCall(logKVf(comm, "Snapshots", "every %s accepted step(s)", formatGroupedInt(im_Params->snapshotInterval)));
+    PetscCall(logKVf(comm, "VTU snapshot", "every %s accepted L-BFGS step(s)", formatGroupedInt(im_Params->snapshotInterval)));
   } else {
-    PetscCall(logKVStr(comm, "Snapshots", "disabled"));
+    PetscCall(logKVStr(comm, "VTU snapshot", "disabled"));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1271,9 +1257,11 @@ PetscErrorCode loadObservedDataset(const imParams *iparams,
   } else {
     PetscCall(loadObservedData(file, iparams->numFreqs, numReceivers, dObs));
   }
-  PetscCall(logKVf(PETSC_COMM_WORLD, "Observed", "%s in %s, %s frequencies x %s receivers",
-                   iparams->observedMode == OBS_FM_NATIVE ? "/sources/src*/fields/Ex" : "/observed/Ex", where,
-                   formatGroupedInt(iparams->numFreqs), formatGroupedInt(numReceivers)));
+  PetscCall(logSection(PETSC_COMM_WORLD, "Observed data"));
+  PetscCall(logKVStr(PETSC_COMM_WORLD, "Dataset", iparams->observedMode == OBS_FM_NATIVE ? "/sources/src*/fields/Ex" : "/observed/Ex"));
+  PetscCall(logKVStr(PETSC_COMM_WORLD, "File", where));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "Frequencies", iparams->numFreqs));
+  PetscCall(logKVInt(PETSC_COMM_WORLD, "Receivers", numReceivers));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

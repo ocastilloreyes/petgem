@@ -134,7 +134,8 @@ edits.
 
 No observed dataset is shipped: the observations the inversion targets are the
 ones your own forward run produces, so the benchmark always exercises the whole
-chain. One driver per stage, all run from the repository root:
+chain. One driver per stage, run from the repository root; the SLURM jobs are
+submitted from ``examples/im1``:
 
 .. code-block:: bash
 
@@ -142,14 +143,14 @@ chain. One driver per stage, all run from the repository root:
 
    # 1-2. Forward modeling of the TRUE model: 7 bundles, then 7 solves
    bash   examples/im1/scripts/build_bundles.sh fm
-   sbatch examples/im1/scripts/run_fm.slurm
+   (cd examples/im1 && sbatch scripts/run_fm.slurm)
 
    # 3. Synthetic observations: stack the responses and add 1 % noise
    bash examples/im1/scripts/make_observations.sh
 
    # 4-5. Inversion from the homogeneous starting model
    bash   examples/im1/scripts/build_bundles.sh im
-   sbatch examples/im1/scripts/run_im.slurm
+   (cd examples/im1 && sbatch scripts/run_im.slurm)
 
    # 6. Evaluate the recovered model
    python3 examples/im1/scripts/analyze_inversion.py \

@@ -152,7 +152,7 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order
  *   4. Allocate the dense solution matrix @p X, matched to @p B's layout and
  *      @p A's vector type.
  *   5. Solve all right-hand sides with KSPMatSolve.
- *   6. Record iterations, converged reason and the true relative residual.
+ *   6. Record iterations, converged reason and solver name.
  *   7. Destroy the KSP.
  *
  * @param[in]  dm    DMPlex mesh; its communicator drives the parallel solve.
@@ -163,7 +163,7 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order
  * @param[in]  order  Nedelec basis order (registered with the gradient in PCBDDC).
  * @param[in]  primalVertices  Optional PCBDDC primal vertices (may be NULL).
  * @param[out] X     Solution matrix, created internally (the caller destroys it).
- * @param[out] info  Iterations, converged reason and true relative residual.
+ * @param[out] info  Iterations, converged reason and solver name.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  *
@@ -198,24 +198,7 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
 
   PetscCall(KSPGetIterationNumber(ksp, &info->its));
   PetscCall(KSPGetConvergedReason(ksp, &info->reason));
-  info->relres = 0.0;
-  {
-    Vec r, bj, xj;
-    PetscReal nr, nb;
-    PetscCall(MatCreateVecs(A, NULL, &r));
-    for (PetscInt j = 0; j < N; j++) {
-      PetscCall(MatDenseGetColumnVecRead(B, j, &bj));
-      PetscCall(MatDenseGetColumnVecRead(*X, j, &xj));
-      PetscCall(MatMult(A, xj, r));
-      PetscCall(VecAYPX(r, -1.0, bj));
-      PetscCall(VecNorm(r, NORM_2, &nr));
-      PetscCall(VecNorm(bj, NORM_2, &nb));
-      PetscCall(MatDenseRestoreColumnVecRead(*X, j, &xj));
-      PetscCall(MatDenseRestoreColumnVecRead(B, j, &bj));
-      if (nb > 0.0) info->relres = PetscMax(info->relres, nr / nb);
-    }
-    PetscCall(VecDestroy(&r));
-  }
+  PetscCall(getSolverName(ksp, info->solver, sizeof(info->solver)));
   PetscCall(KSPDestroy(&ksp));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -223,111 +206,29 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
 
 
 /**
- * @brief Writes a one-line description of a configured KSP into @p buf.
+ * @brief Returns the solver name of a configured KSP: the PC type, or the
+ *        factorization package for LU/Cholesky.
  *
- * Format: "<ksp>[(restart)] + <pc> [(details)], rtol <rtol>"; the rtol is
- * omitted for preonly. For PCBDDC the deluxe scaling, monolithic and coarse
- * PC options are read from the options database under the PC prefix; for
- * LU/Cholesky the factorization package is reported.
- *
- * @param[in]  ksp  KSP after KSPSetFromOptions().
- * @param[out] buf  Destination buffer.
- * @param[in]  len  Size of @p buf in bytes.
+ * @param[in]  ksp   KSP after KSPSetFromOptions().
+ * @param[out] name  Solver name.
+ * @param[in]  len   Size of @p name.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
-PetscErrorCode formatSolverConfig(KSP ksp, char *buf, size_t len)
+PetscErrorCode getSolverName(KSP ksp, char name[], size_t len)
 {
   PetscFunctionBeginUser;
 
-  KSPType     ktype;
-  PC          pc;
-  PCType      ptype;
-  PetscReal   rtol;
-  PetscBool   isgmres, ispreonly, isbddc, isfactor;
-  char        kdesc[64], pdesc[160];
-  const char *prefix;
+  PC            pc;
+  PCType        ptype;
+  MatSolverType pkg = NULL;
+  PetscBool     isfactor;
 
-  PetscCall(KSPGetType(ksp, &ktype));
   PetscCall(KSPGetPC(ksp, &pc));
   PetscCall(PCGetType(pc, &ptype));
-  PetscCall(KSPGetTolerances(ksp, &rtol, NULL, NULL, NULL));
-  PetscCall(PCGetOptionsPrefix(pc, &prefix));
-
-  PetscCall(PetscObjectTypeCompareAny((PetscObject)ksp, &isgmres, KSPGMRES, KSPFGMRES, ""));
-  PetscCall(PetscObjectTypeCompare((PetscObject)ksp, KSPPREONLY, &ispreonly));
-  PetscCall(PetscObjectTypeCompare((PetscObject)pc, PCBDDC, &isbddc));
   PetscCall(PetscObjectTypeCompareAny((PetscObject)pc, &isfactor, PCLU, PCCHOLESKY, ""));
-
-  if (isgmres) {
-    PetscInt restart;
-    PetscCall(KSPGMRESGetRestart(ksp, &restart));
-    PetscCall(PetscSNPrintf(kdesc, sizeof(kdesc), "%s(%" PetscInt_FMT ")", ktype, restart));
-  } else {
-    PetscCall(PetscStrncpy(kdesc, ktype, sizeof(kdesc)));
-  }
-
-  PetscCall(PetscStrncpy(pdesc, ptype ? ptype : "none", sizeof(pdesc)));
-  if (isbddc) {
-    PetscBool deluxe = PETSC_FALSE, mono = PETSC_FALSE, set;
-    char      coarse[64], opts[128] = "";
-    PetscCall(PetscOptionsGetBool(NULL, prefix, "-pc_bddc_use_deluxe_scaling", &deluxe, NULL));
-    PetscCall(PetscOptionsGetBool(NULL, prefix, "-pc_bddc_monolithic", &mono, NULL));
-    PetscCall(PetscOptionsGetString(NULL, prefix, "-pc_bddc_coarse_pc_type", coarse, sizeof(coarse), &set));
-    if (deluxe) PetscCall(PetscStrlcat(opts, ", deluxe", sizeof(opts)));
-    if (mono) PetscCall(PetscStrlcat(opts, ", monolithic", sizeof(opts)));
-    if (set) {
-      PetscCall(PetscStrlcat(opts, ", coarse ", sizeof(opts)));
-      PetscCall(PetscStrlcat(opts, coarse, sizeof(opts)));
-    }
-    if (opts[0]) PetscCall(PetscSNPrintf(pdesc, sizeof(pdesc), "%s (%s)", ptype, opts + 2));
-  } else if (isfactor) {
-    MatSolverType pkg = NULL;
-    PetscCall(PCFactorGetMatSolverType(pc, &pkg));
-    if (pkg) PetscCall(PetscSNPrintf(pdesc, sizeof(pdesc), "%s (%s)", ptype, pkg));
-  }
-
-  if (ispreonly) {
-    PetscCall(PetscSNPrintf(buf, len, "%s + %s", kdesc, pdesc));
-  } else {
-    PetscCall(PetscSNPrintf(buf, len, "%s + %s, rtol %s", kdesc, pdesc, formatCompactReal(rtol)));
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-
-/**
- * @brief Describes the solver that solveCsemSystem() will build for @p dm.
- *
- * Configures a temporary KSP the same way (PCBDDC when the DM matrix type is
- * MATIS, then KSPSetFromOptions) and formats it with formatSolverConfig().
- *
- * @param[in]  dm   DMPlex whose matrix type selects the default PC.
- * @param[out] buf  Destination buffer.
- * @param[in]  len  Size of @p buf in bytes.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
- */
-PetscErrorCode describeCsemSolver(const DM dm, char *buf, size_t len)
-{
-  PetscFunctionBeginUser;
-
-  KSP       ksp;
-  PC        pc;
-  MatType   mtype;
-  PetscBool ismatis;
-
-  PetscCall(KSPCreate(PetscObjectComm((PetscObject)dm), &ksp));
-  PetscCall(DMGetMatType(dm, &mtype));
-  PetscCall(PetscStrcmp(mtype, MATIS, &ismatis));
-  if (ismatis) {
-    PetscCall(KSPGetPC(ksp, &pc));
-    PetscCall(PCSetType(pc, PCBDDC));
-  }
-  PetscCall(KSPSetFromOptions(ksp));
-  PetscCall(formatSolverConfig(ksp, buf, len));
-  PetscCall(KSPDestroy(&ksp));
+  if (isfactor) PetscCall(PCFactorGetMatSolverType(pc, &pkg));
+  PetscCall(PetscStrncpy(name, pkg ? pkg : (ptype ? ptype : "none"), len));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

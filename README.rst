@@ -83,28 +83,14 @@ You can build and run PETGEM inside Docker for a consistent development and test
    export MODEL_DIR=examples/fm
    export ORDER=1
 
-   # Mesh generation
-   gmsh -3 ${MODEL_DIR}/geometry/mesh.geo -o ${MODEL_DIR}/outputs/mesh.msh
-
-   # Generate input bundle
-   # (or wrap the two steps above with: bash ${MODEL_DIR}/scripts/build_bundles.sh ${ORDER})
-   python3 utils/preprocess.py \
-        -mode fm \
-        -order ${ORDER} \
-        -case_dir  ${MODEL_DIR} \
-        -mesh_filename outputs/mesh.msh \
-        -source_filename survey/sources.txt \
-        -receiver_filename survey/receivers.txt \
-        -sigma_file survey/sigmas.txt \
-        -input_filename outputs/input.h5 \
-        -params_filename outputs/_pp_p${ORDER}.txt \
-        -output_vtk outputs/model.vtu
+   # Mesh generation and input bundle
+   bash ${MODEL_DIR}/scripts/build_bundles.sh ${ORDER}
 
    # Forward modeling (committed solver options in configs/)
-   mpirun -n 14 build/petgem fm -options_file ${MODEL_DIR}/configs/params.txt -order ${ORDER}
+   (cd ${MODEL_DIR} && mpirun -n 14 ../../build/petgem fm -options_file configs/params.txt)
 
    # Postprocess output
-   python3 ${MODEL_DIR}/scripts/postprocess.py -tolerance 0.03
+   python3 ${MODEL_DIR}/scripts/postprocess.py
 
 
 Documentation

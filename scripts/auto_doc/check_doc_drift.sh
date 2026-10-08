@@ -1,32 +1,31 @@
 #!/usr/bin/env bash
+
+# ============================================================================
+# Documentation drift check
 #
-# check_doc_drift.sh - guard against documentation / inline-comment drift in
-# the PETGEM C sources. Two independent, fast, PETSc-free checks:
+# This script checks that the documentation and comments in the PETGEM C
+# sources still match the code. It runs two quick checks that do not need
+# PETSc:
 #
-#   1. Removed-symbol guard. Fails if a retired CODE token reappears. These
-#      tokens are never legitimate (current baseline is zero), so any hit is
-#      real drift:
-#        - <imParams>->nord       must be ->fm.nord (nord lives in embedded fm)
-#        - <params>->bundleFile   removed struct field (use ->fm.inputFile)
-#        - /inv_sources           removed HDF5 group (unified into /sources)
-#        - -fm_grad_check         removed diagnostic option
-#      Regexes match the CODE form only (a member access, an HDF5 group, an
-#      option token), so legitimate prose that merely mentions a retired name
-#      does NOT trip the guard.
+#   1. Retired names. It fails if a removed symbol, HDF5 group or option
+#      comes back into src/ or include/ (the list is in GUARDS below). Only
+#      the code form is matched, so prose that mentions an old name passes.
 #
-#   2. Doxygen @param consistency. If doxygen is installed, parses the
-#      sources and fails on "is not found in the argument list" warnings,
-#      i.e. a docstring @param that no longer matches its function signature
-#      (the inversion.h:198 / createInvKSP class of drift). Pre-existing
-#      "undocumented" warnings are intentionally ignored so the gate stays
-#      focused on drift, not coverage.
+#   2. Doxygen @param names. When doxygen is installed, it fails if a
+#      documented @param no longer matches the function signature. Warnings
+#      about undocumented items are ignored on purpose.
 #
-# Prose drift (a comment that mis-describes behaviour without using a retired
-# token, e.g. "five cell-centered fields" when only one is written) is NOT
-# machine-detectable here and still relies on code review.
+# Comments that describe the behaviour wrongly without using a retired name
+# cannot be detected here and still need code review.
 #
-# Usage:   bash scripts/auto_doc/check_doc_drift.sh
-# Exit:    0 = clean, 1 = drift detected.
+# Usage:
+#   bash scripts/auto_doc/check_doc_drift.sh
+#
+# Exit status:
+#   0  no drift found
+#   1  drift found
+# ============================================================================
+
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -37,8 +36,8 @@ fail=0
 # ---------------------------------------------------------------------------
 # Check 1 - removed-symbol guard
 # ---------------------------------------------------------------------------
-# Entries are "<extended-regex>|<human description>". The regexes contain no
-# literal '|', so the field split below is unambiguous.
+# Each entry is "<extended regex>|<description>". The regexes contain no
+# literal '|', so splitting on it is safe.
 GUARDS=(
   '[iI]m?_?[Pp]arams->nord\b|imParams->nord - use ->fm.nord (nord is in the embedded fmParams)'
   '[Pp]arams->bundleFile\b|removed struct field bundleFile - use ->fm.inputFile'
@@ -58,9 +57,8 @@ echo "== check_doc_drift: removed-symbol guard =="
 for g in "${GUARDS[@]}"; do
   regex="${g%%|*}"
   desc="${g##*|}"
-  # DRIFT_GUARD_ALLOW marks the one legitimate mention of a retired token:
-  # the rejection list that exists precisely to catch it (readimParams).
-  # Without the exemption the guard would flag its own enforcement code.
+  # Lines tagged DRIFT_GUARD_ALLOW are skipped: they belong to the code that
+  # rejects the retired names (readimParams).
   hits="$(grep -rInE "$regex" src/ include/ 2>/dev/null \
             | grep -v 'DRIFT_GUARD_ALLOW' || true)"
   if [ -n "$hits" ]; then
@@ -77,8 +75,8 @@ done
 echo "== check_doc_drift: Doxygen @param consistency =="
 if command -v doxygen >/dev/null 2>&1; then
   warn_log="$(mktemp)"
-  # Layer output-suppressing overrides on top of the repo Doxyfile and feed
-  # the result to doxygen via stdin ('-'). We only want the warning stream.
+  # Run doxygen on the repository Doxyfile with all output disabled; only
+  # the warnings are needed.
   {
     cat Doxyfile
     printf '%s\n' \

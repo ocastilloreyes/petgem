@@ -2,8 +2,8 @@
 # PCBDDC on the MATIS operator with the exact Nedelec discrete-gradient coarse
 # space. Consumes the bundle built by scripts/build_bundles.sh.
 
--input_filename   examples/fm/outputs/input.h5
--output_dir       examples/fm/outputs/
+-input_filename   outputs/input.h5
+-output_dir       outputs/
 -output_filename  responses_p1
 
 -dm_mat_type                 is
