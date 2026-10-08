@@ -972,8 +972,10 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
     MatType mtype;
     PetscCall(KSPGetOperators(ctx.kspFwd_per_freq[0], &A, NULL));
     PetscCall(MatGetType(A, &mtype));
-    PetscCall(PetscStrncpy(stats->matType, mtype, sizeof(stats->matType)));
     PetscCall(getSolverName(ctx.kspFwd_per_freq[0], stats->solver, sizeof(stats->solver)));
+    PetscCall(logSection(comm, "Assembly"));
+    PetscCall(logKVStr(comm, "Matrix type", mtype));
+    PetscCall(logKVInt(comm, "Right-hand sides", iparams->numFreqs));
   }
 
   /* Run L-BFGS optimization */
@@ -1025,7 +1027,6 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
   stats->tOutput      = tOutputLoop + (t3 - t2);
   stats->numSolves    = ctx.numSolves;
   stats->failReason   = ctx.failReason;
-  stats->numRHS       = iparams->numFreqs;
   stats->numSnapshots = ctx.numSnapshots;
 
   PetscFunctionReturn(PETSC_SUCCESS);

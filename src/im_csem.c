@@ -272,9 +272,6 @@ int runInverse(int argc, char **argv) {
   {
     char outFile[PETSC_MAX_PATH_LEN];
     PetscCall(buildOutputPath(&iparams.common, ".h5", outFile, sizeof(outFile)));
-    PetscCall(logSection(comm, "Assembly"));
-    PetscCall(logKVStr(comm, "Matrix type", stats.matType));
-    PetscCall(logKVInt(comm, "Right-hand sides", stats.numRHS));
     PetscCall(logSection(comm, "Solve"));
     PetscCall(logKVStr(comm, "Solver", stats.solver));
     PetscCall(logKVf(comm, "Linear solves", "%s (forward + adjoint)", formatGroupedInt(stats.numSolves)));

@@ -574,8 +574,6 @@ typedef struct {
   PetscLogDouble tOutput;      /**< VTU snapshots + HDF5 results. */
   PetscInt       numSolves;    /**< Forward + adjoint solves. */
   KSPConvergedReason failReason; /**< First negative converged reason, 0 if none. */
-  PetscInt       numRHS;       /**< Right-hand sides (inversion entries). */
-  char           matType[32];  /**< System matrix type. */
   char           solver[32];   /**< Solver name (getSolverName). */
   PetscInt       numSnapshots; /**< VTU snapshots written. */
 } InversionStats;
