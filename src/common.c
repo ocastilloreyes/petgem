@@ -604,19 +604,19 @@ PetscErrorCode printUsage(const char *progname) {
    * --version path, which prints the same way. */
   printf(
     "Usage:\n"
-    "  %s fm [petsc options...]      # run forward kernel (fm.csem)\n"
-    "  %s im [petsc options...]      # run inverse kernel (im.csem)\n"
+    "  %s fm [petsc options...]      # run CSEM forward kernel (fm.csem)\n"
+    "  %s im [petsc options...]      # run CSEM inverse kernel (im.csem)\n"
+    "  %s mt [petsc options...]      # run MT forward kernel (fm.mt)\n"
     "  %s -mode fm [petsc options]   # equivalent (PETSc-option form)\n"
     "  %s -mode im [petsc options]\n"
+    "  %s -mode mt [petsc options]\n"
     "  %s --version\n"
     "\n"
-    "'fm' and 'im' are the canonical simulation tags, used consistently across\n"
-    "the interface (binaries, -mode, the -im_* options, and the simulation_type\n"
-    "attribute of every output file). 'forward'/'modeling' and 'inverse' are\n"
-    "accepted as aliases.\n"
+    "'fm', 'im' and 'mt' are the canonical mode tags. 'forward'/'modeling' and\n"
+    "'inverse' are accepted as aliases of 'fm' and 'im'.\n"
     "\n"
     "Pass -options_file <file.txt> for the usual params input.\n",
-    progname, progname, progname, progname, progname);
+    progname, progname, progname, progname, progname, progname, progname);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -627,6 +627,7 @@ PetscErrorCode printUsage(const char *progname) {
  * Accepts the user-friendly synonyms for each kernel:
  *   - "modeling", "forward", "fm"  : *mode = 0 (forward)
  *   - "inverse", "im"              : *mode = 1 (inverse)
+ *   - "mt"                         : *mode = 2 (MT forward)
  *   - anything else                : *mode = -1 (unknown; caller can
  *                                    then call printUsage())
  *
@@ -645,6 +646,8 @@ PetscErrorCode parseModeArg(const char *s, PetscInt *mode)
     *mode = 0;  /* Forward modeling */
   } else if (strcmp(s, "inverse") == 0 || strcmp(s, "im") == 0) { 
     *mode = 1;  /* Inverse modeling */
+  } else if (strcmp(s, "mt") == 0) {
+    *mode = 2;  /* MT forward modeling */
   } else {
     *mode = -1; /* Unknown */
   }

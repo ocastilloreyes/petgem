@@ -58,11 +58,12 @@ PetscErrorCode printTimers(const char *const labels[], const PetscLogDouble time
 /**
  * @brief Parses the dispatcher mode argument into a numeric code.
  *
- * Accepts the synonyms "modeling"/"forward"/"fm" (mode 0) and
- * "inverse"/"im" (mode 1); anything else yields mode -1 (unknown).
+ * Accepts the synonyms "modeling"/"forward"/"fm" (mode 0),
+ * "inverse"/"im" (mode 1) and "mt" (mode 2); anything else yields
+ * mode -1 (unknown).
  *
  * @param[in]  s     Mode string from argv (must be non-NULL).
- * @param[out] mode  Receives the numeric mode code (0, 1, or -1).
+ * @param[out] mode  Receives the numeric mode code (0, 1, 2, or -1).
  *
  * @return PetscErrorCode PETSC_SUCCESS, or PETSC_ERR_ARG_NULL when `s` is NULL.
  */

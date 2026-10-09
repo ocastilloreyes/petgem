@@ -4,22 +4,24 @@
  * Date: 2026-05-20
  *
  * Description:
- * Unified PETGEM entry point. Dispatches to the forward or inverse
- * kernel based on a positional subcommand or the -mode PETSc option.
+ * Unified PETGEM entry point. Dispatches to the CSEM forward, CSEM inverse or
+ * MT forward kernel based on a positional subcommand or the -mode PETSc option.
  */
 
 /*
  * Usage:
  *   - positional subcommand:   ./petgem fm -options_file ...
  *                              ./petgem im -options_file ...
+ *                              ./petgem mt -options_file ...
  *   - PETSc option:            ./petgem -mode fm -options_file ...
  *                              ./petgem -mode im -options_file ...
+ *                              ./petgem -mode mt -options_file ...
  * Both forms are accepted; positional takes precedence if present.
- * 'fm'/'im' are canonical; 'forward'/'modeling' and 'inverse' are aliases
- * (parseModeArg), matching the -mode values utils/preprocess.py accepts.
+ * 'fm'/'im'/'mt' are canonical; 'forward'/'modeling' and 'inverse' are
+ * aliases (parseModeArg), matching the -mode values utils/preprocess.py accepts.
  *
- * The legacy single-purpose binaries (fm.csem, im.csem) keep working
- * unchanged and call the same runForward / runInverse functions.
+ * The single-purpose binaries (fm.csem, im.csem, fm.mt) call the same
+ * runForward / runInverse / runMtForward functions.
  */
 
 #include <stdio.h>
@@ -35,7 +37,7 @@
  * @brief Unified PETGEM dispatcher entry point.
  *
  * Parses --version / --help / positional-subcommand / -mode and forwards
- * argv (with the mode token stripped) to runForward or runInverse.
+ * argv (with the mode token stripped) to runForward, runInverse or runMtForward.
  *
  * @param[in] argc  Argument count.
  * @param[in] argv  Argument vector.
@@ -54,13 +56,13 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  /* 1. positional subcommand: argv[1] is "modeling"/"inverse"/aliases. We splice it out of argv before forwarding so that the kernel
+  /* 1. positional subcommand: argv[1] is "fm"/"im"/"mt"/aliases. We splice it out of argv before forwarding so that the kernel
    *     doesn't see an unrecognized first token.                       */
   PetscInt mode = -1;
   if (argc > 1 && argv[1][0] != '-') {
-    mode = parseModeArg(argv[1], &mode);
+    if (parseModeArg(argv[1], &mode) != PETSC_SUCCESS) mode = -1;
     if (mode < 0) {
-      fprintf(stderr, "PETGEM: unknown subcommand '%s' (expected 'modeling' or 'inverse')\n", argv[1]);
+      fprintf(stderr, "PETGEM: unknown subcommand '%s' (expected 'fm', 'im' or 'mt')\n", argv[1]);
       printUsage(argv[0]);
       return 2;
     }
@@ -77,9 +79,9 @@ int main(int argc, char **argv) {
   if (mode < 0) {
     for (PetscInt i = 1; i < argc - 1; i++) {
       if (strcmp(argv[i], "-mode") == 0) {
-        mode = parseModeArg(argv[i + 1], &mode);
+        if (parseModeArg(argv[i + 1], &mode) != PETSC_SUCCESS) mode = -1;
         if (mode < 0) {
-          fprintf(stderr, "PETGEM: -mode value '%s' is invalid (expected 'modeling' or 'inverse')\n", argv[i + 1]);
+          fprintf(stderr, "PETGEM: -mode value '%s' is invalid (expected 'fm', 'im' or 'mt')\n", argv[i + 1]);
           return 2;
         }
         /* Strip "-mode <value>" from argv so the kernel doesn't see it. Both kernels' options-file readers tolerate unknown options
@@ -101,6 +103,9 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  return (mode == 0) ? runForward(argc, argv)
-                     : runInverse(argc, argv);
+  switch (mode) {
+    case 0:  return runForward(argc, argv);
+    case 1:  return runInverse(argc, argv);
+    default: return runMtForward(argc, argv);
+  }
 }
