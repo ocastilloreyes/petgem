@@ -56,12 +56,15 @@ tests/
 │   ├── test_dofs.c               #   level 2
 │   ├── test_elements.c           #   level 3
 │   ├── test_boundary.c           #   boundary tools (2D quadrature, boundary faces)
+│   ├── test_mt1d.c               #   MT 1D boundary field and lateral profile
+│   ├── box_mesh.h                #   distributed Kuhn box mesh shared by the harnesses
 │   └── git_rev.h                 #   fixed revision for harnesses linking common.c
 ├── unit/                         # pytest wrappers for the C harnesses (levels 1-3)
 │   ├── test_level1_basis.py
 │   ├── test_level2_dofs.py
 │   ├── test_level3_elements.py
-│   └── test_boundary_tools.py    #   test_boundary.c on 1 and 3 ranks
+│   ├── test_boundary_tools.py    #   test_boundary.c on 1 and 3 ranks
+│   └── test_mt_1d.py             #   test_mt1d.c on 1 and 3 ranks
 ├── e2e/                          # end-to-end fm.csem tests (levels 4-5)
 │   ├── test_level4_assembly.py
 │   └── test_level5_physics.py

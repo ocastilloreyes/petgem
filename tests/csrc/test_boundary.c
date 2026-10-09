@@ -18,6 +18,7 @@
 #include "grid.h"
 #include "constants.h"
 #include "petgem_test.h"
+#include "box_mesh.h"
 #include <petsc.h>
 
 static const PetscInt  boxFaces[3] = {2, 3, 2};
@@ -68,51 +69,9 @@ static void check_quadrature_2d(PetscInt order, PetscMPIInt rank)
   (void)rank;
 }
 
-/* Box of boxFaces hexahedra, each split into 6 Kuhn tetrahedra, built on rank 0 and distributed. */
 static void create_box(DM *dm)
 {
-  DM          dmDist = NULL;
-  PetscMPIInt rank;
-  PetscInt    numCells = 0, numVertices = 0, *cells = NULL;
-  PetscReal  *coords = NULL;
-
-  PetscCallMPIAbort(PETSC_COMM_WORLD, MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
-  if (rank == 0) {
-    const PetscInt nx = boxFaces[0], ny = boxFaces[1], nz = boxFaces[2];
-    const PetscInt perm[6][3] = {{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}};
-    numVertices = (nx + 1) * (ny + 1) * (nz + 1);
-    numCells    = 6 * nx * ny * nz;
-    PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(3 * numVertices, &coords));
-    PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(4 * numCells, &cells));
-    for (PetscInt k = 0; k <= nz; k++)
-      for (PetscInt j = 0; j <= ny; j++)
-        for (PetscInt i = 0; i <= nx; i++) {
-          const PetscInt v = (k * (ny + 1) + j) * (nx + 1) + i;
-          coords[3 * v + 0] = boxLower[0] + (boxUpper[0] - boxLower[0]) * i / nx;
-          coords[3 * v + 1] = boxLower[1] + (boxUpper[1] - boxLower[1]) * j / ny;
-          coords[3 * v + 2] = boxLower[2] + (boxUpper[2] - boxLower[2]) * k / nz;
-        }
-    PetscInt c = 0;
-    for (PetscInt k = 0; k < nz; k++)
-      for (PetscInt j = 0; j < ny; j++)
-        for (PetscInt i = 0; i < nx; i++)
-          for (PetscInt t = 0; t < 6; t++) {
-            PetscInt ijk[3] = {i, j, k};
-            for (PetscInt s = 0; s < 4; s++) {
-              if (s > 0) ijk[perm[t][s - 1]]++;
-              cells[4 * c + s] = (ijk[2] * (ny + 1) + ijk[1]) * (nx + 1) + ijk[0];
-            }
-            c++;
-          }
-  }
-  PetscCallAbort(PETSC_COMM_WORLD, DMPlexCreateFromCellListPetsc(PETSC_COMM_WORLD, 3, numCells, numVertices, 4, PETSC_TRUE, cells, 3, coords, dm));
-  PetscCallAbort(PETSC_COMM_WORLD, PetscFree(cells));
-  PetscCallAbort(PETSC_COMM_WORLD, PetscFree(coords));
-  PetscCallAbort(PETSC_COMM_WORLD, DMPlexDistribute(*dm, 0, NULL, &dmDist));
-  if (dmDist) {
-    PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(dm));
-    *dm = dmDist;
-  }
+  create_box_mesh(boxFaces, boxLower, boxUpper, 0.0, dm);
 }
 
 /* Global counts of edges / faces / cells, total and on the "Boundary" label. */

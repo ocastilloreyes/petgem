@@ -34,6 +34,7 @@ HARNESS_SOURCES = {
     "test_dofs":     ["fe_nedelec.c", "fe_nodal.c"],
     "test_elements": ["fem.c", "fe_nedelec.c", "fe_nodal.c"],
     "test_boundary": ["grid.c", "common.c", "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
+    "test_mt1d":     ["mt.c", "grid.c", "common.c", "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
 }
 
 #: Field components in a responses file.
