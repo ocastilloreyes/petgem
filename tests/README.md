@@ -57,6 +57,7 @@ tests/
 │   ├── test_elements.c           #   level 3
 │   ├── test_boundary.c           #   boundary tools (2D quadrature, boundary faces)
 │   ├── test_mt1d.c               #   MT 1D boundary field and lateral profile
+│   ├── test_mt_rhs.c             #   MT boundary right-hand side (Eq. 10)
 │   ├── box_mesh.h                #   distributed Kuhn box mesh shared by the harnesses
 │   └── git_rev.h                 #   fixed revision for harnesses linking common.c
 ├── unit/                         # pytest wrappers for the C harnesses (levels 1-3)
@@ -64,7 +65,8 @@ tests/
 │   ├── test_level2_dofs.py
 │   ├── test_level3_elements.py
 │   ├── test_boundary_tools.py    #   test_boundary.c on 1 and 3 ranks
-│   └── test_mt_1d.py             #   test_mt1d.c on 1 and 3 ranks
+│   ├── test_mt_1d.py             #   test_mt1d.c on 1 and 3 ranks
+│   └── test_mt_rhs.py            #   test_mt_rhs.c, orders 1..6 on 1 and 3 ranks
 ├── e2e/                          # end-to-end fm.csem tests (levels 4-5)
 │   ├── test_level4_assembly.py
 │   └── test_level5_physics.py
@@ -77,6 +79,11 @@ tests/
 │   ├── mms_reference.py          #   sympy self-test of E*/curl E*/f* + exact norms
 │   └── reference/
 │       └── mms_golden.json       #   committed golden errors (p=1,3,6 @ N=4)
+├── mt/                           # MT half-space end-to-end check (fm.mt)
+│   ├── test_mt_halfspace.py      #   rho = 100 ohm-m, |phi| = 45 deg, 1 and 3 ranks
+│   ├── mesh.geo                  #   half-space under air (the MT mesh)
+│   ├── sigmas.txt / receivers.txt / mt_frequency.txt   #   preprocess inputs
+│   └── make_bundle.sh            #   mesh.geo -> input.h5 (gmsh + preprocess -mode mt)
 └── extrae/                       # Extrae trace config for the CI extrae-smoke job
     ├── extrae.xml
     ├── petgem_functions.cfg

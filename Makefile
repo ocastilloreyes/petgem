@@ -15,14 +15,16 @@ endif
 # Target names
 FM_TARGET := build/fm.csem
 IM_TARGET := build/im.csem
+MT_TARGET := build/fm.mt
 PT_TARGET := build/petgem
 ifeq ($(USE_EXTRAE),1)
     FM_TARGET := build/fm.csem.extrae
     IM_TARGET := build/im.csem.extrae
+    MT_TARGET := build/fm.mt.extrae
     PT_TARGET := build/petgem.extrae
 endif
 
-TARGET := $(FM_TARGET) $(IM_TARGET) $(PT_TARGET)
+TARGET := $(FM_TARGET) $(IM_TARGET) $(MT_TARGET) $(PT_TARGET)
 
 # -----------------------------------------------------------------------------
 # Build all targets by default
@@ -152,8 +154,8 @@ SHARED_SRCS := src/common.c \
                src/mms.c
 
 # Kernel-specific sources
-# fm_csem.c and im_csem.c expose runForward / runInverse; the *_main.c
-# files are 3-line wrappers providing main() for the legacy binaries.
+# fm_csem.c, im_csem.c and fm_mt.c expose runForward / runInverse / runMtForward; the *_main.c
+# files are 3-line wrappers providing main() for the single-purpose binaries.
 # inversion.c was split into 3 inversion-only TUs (inversion + smoother +
 # lbfgs); the I/O half lives in shared src/io.c (merged with inputs.c).
 # They share private prototypes via include/inversion_internal.h.
@@ -161,12 +163,14 @@ INV_SRCS := src/inversion.c src/inversion_smoother.c src/lbfgs.c
 
 FM_SRCS := src/fm_csem.c src/fm_csem_main.c $(SHARED_SRCS)
 IM_SRCS := src/im_csem.c src/im_csem_main.c $(INV_SRCS) $(SHARED_SRCS)
-# Unified petgem binary: dispatcher main + both kernel cores + inversion + shared.
-PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c $(INV_SRCS) $(SHARED_SRCS)
+MT_SRCS := src/fm_mt.c src/fm_mt_main.c src/mt.c $(SHARED_SRCS)
+# Unified petgem binary: dispatcher main + all kernel cores + inversion + MT + shared.
+PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c src/fm_mt.c src/mt.c $(INV_SRCS) $(SHARED_SRCS)
 
 # Object files
 FM_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(FM_SRCS))
 IM_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(IM_SRCS))
+MT_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(MT_SRCS))
 PT_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(PT_SRCS))
 
 # Ordered-unique list of every object compiled in a full build, used to
@@ -174,7 +178,7 @@ PT_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(PT_SRCS))
 # reorder alphabetically; this recursive uniq preserves first-occurrence
 # order so the indices are monotonic for a serial `make`.
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
-ALL_OBJS := $(call uniq,$(FM_OBJS) $(IM_OBJS) $(PT_OBJS))
+ALL_OBJS := $(call uniq,$(FM_OBJS) $(IM_OBJS) $(MT_OBJS) $(PT_OBJS))
 NOBJS := $(words $(ALL_OBJS))
 
 # -----------------------------------------------------------------------------
@@ -202,8 +206,12 @@ $(IM_TARGET): $(IM_OBJS) | build
 	@echo "$(C_LD)[LD]$(C_RESET) $@"
 	$(Q)$(CLINKER) $(INTEL_DIAG) $^ -o $@ $(EXTRA_LDFLAGS) $(HDF5_LIB) $(PETSC_LIB)
 
-# Unified binary: dispatches to runForward / runInverse based on
-#   ./petgem modeling | inverse  (positional)  OR  -mode <modeling|inverse>
+$(MT_TARGET): $(MT_OBJS) | build
+	@echo "$(C_LD)[LD]$(C_RESET) $@"
+	$(Q)$(CLINKER) $(INTEL_DIAG) $^ -o $@ $(EXTRA_LDFLAGS) $(HDF5_LIB) $(PETSC_LIB)
+
+# Unified binary: dispatches to runForward / runInverse / runMtForward based on
+#   ./petgem fm | im | mt  (positional)  OR  -mode <fm|im|mt>
 $(PT_TARGET): $(PT_OBJS) | build
 	@echo "$(C_LD)[LD]$(C_RESET) $@"
 	$(Q)$(CLINKER) $(INTEL_DIAG) $^ -o $@ $(EXTRA_LDFLAGS) $(HDF5_LIB) $(PETSC_LIB)
@@ -296,7 +304,8 @@ help:              ## Show this help message
 	@echo "$(C_BOLD)Binaries built by 'all'$(C_RESET) (suffixed .extrae when USE_EXTRAE=1):"
 	@echo "  $(C_DIM)build/fm.csem$(C_RESET)   legacy forward kernel (single-purpose)"
 	@echo "  $(C_DIM)build/im.csem$(C_RESET)   legacy inverse kernel (single-purpose)"
-	@echo "  $(C_DIM)build/petgem$(C_RESET)    unified dispatcher: ./petgem modeling | inverse"
+	@echo "  $(C_DIM)build/fm.mt$(C_RESET)     MT forward kernel (single-purpose)"
+	@echo "  $(C_DIM)build/petgem$(C_RESET)    unified dispatcher: ./petgem fm | im | mt"
 	@echo ""
 	@echo "$(C_BOLD)Build options$(C_RESET) (set with 'make <target> OPTION=1'):"
 	@echo "  USE_INTEL=1     force Intel MPI compiler flags (auto-detected from \$$(PCC))"

@@ -34,7 +34,10 @@ HARNESS_SOURCES = {
     "test_dofs":     ["fe_nedelec.c", "fe_nodal.c"],
     "test_elements": ["fem.c", "fe_nedelec.c", "fe_nodal.c"],
     "test_boundary": ["grid.c", "common.c", "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
-    "test_mt1d":     ["mt.c", "grid.c", "common.c", "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
+    "test_mt1d":     ["mt.c", "io.c", "receiver_interp.c", "grid.c", "common.c", "constants.c",
+                      "fem.c", "fe_nedelec.c", "fe_nodal.c"],
+    "test_mt_rhs":   ["mt.c", "io.c", "receiver_interp.c", "assembly.c", "grid.c", "common.c",
+                      "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
 }
 
 #: Field components in a responses file.
@@ -69,7 +72,7 @@ def build_harness(name, outdir):
     inc = ["-I", str(REPO_ROOT / "include"), "-I", str(CSRC),
            "-I", f"{petsc_dir}/include", "-I", f"{petsc_dir}/{petsc_arch}/include"]
     lib = [f"-L{petsc_dir}/{petsc_arch}/lib",
-           f"-Wl,-rpath,{petsc_dir}/{petsc_arch}/lib", "-lpetsc", "-lm"]
+           f"-Wl,-rpath,{petsc_dir}/{petsc_arch}/lib", "-lpetsc", "-lhdf5", "-lm"]
     cmd = [cc, "-Wall", "-O2", *inc, str(CSRC / f"{name}.c"),
            *[str(REPO_ROOT / "src" / s) for s in HARNESS_SOURCES[name]], *lib, "-o", str(exe)]
     proc = subprocess.run(cmd, capture_output=True, text=True)

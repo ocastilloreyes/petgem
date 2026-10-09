@@ -17,8 +17,11 @@ Mode-specific arguments (validated by runPreprocessing):
                      MATLAB-style invEx.dat text file (parsed inline, so no
                      separate convert-to-HDF5 step is needed); -error_level
                      optionally records the noise level.
+    -mode mt    requires -mt_frequency_filename
+                     forbids  -source_filename, -im_source_filename,
+                              -observed_filename
 
-Shared arguments (both modes):
+Shared arguments (all modes):
     -order, -case_dir, -mesh_filename, -receiver_filename, -sigma_file
     -input_filename, -params_filename, -output_vtk        (all optional with defaults)
 
@@ -43,6 +46,17 @@ Usage examples:
         -receiver_filename receivers.txt \\
         -im_source_filename sources.txt \\
         -observed_filename observed_data.h5 \\
+        -sigma_file sigmas.txt \\
+        [-output_vtk model.vtu]
+
+    # MT forward modeling
+    python3 utils/preprocess.py \\
+        -mode mt \\
+        -order 1 \\
+        -case_dir examples/<case> \\
+        -mesh_filename mesh_p1.msh \\
+        -receiver_filename receivers.txt \\
+        -mt_frequency_filename mt_frequency.txt \\
         -sigma_file sigmas.txt \\
         [-output_vtk model.vtu]
 """
@@ -80,6 +94,7 @@ def main():
         im_source_filename=args.im_source_filename,
         observed_filename=args.observed_filename,
         error_level=args.error_level,
+        mt_frequency_filename=args.mt_frequency_filename,
         output_vtk=args.output_vtk,
         dm_view=args.dm_view is not None,
     )

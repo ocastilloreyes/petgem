@@ -12,17 +12,19 @@ from petsc4py import PETSc
 # here and `petgem X` there take the same words:
 #     fm  <- fm, forward, modeling
 #     im  <- im, inverse
+#     mt  <- mt
 MODE_ALIASES = {
     "fm":       "fm",
     "forward":  "fm",
     "modeling": "fm",
     "im":       "im",
     "inverse":  "im",
+    "mt":       "mt",
 }
 
 
 def normalizeMode(mode):
-    """Map a mode alias onto its canonical tag (``'fm'`` or ``'im'``).
+    """Map a mode alias onto its canonical tag (``'fm'``, ``'im'`` or ``'mt'``).
 
     Raises ValueError on an unknown mode.
     """
@@ -50,10 +52,10 @@ def parsePreprocessingArgs():
     )
     parser.add_argument("-mode",              choices=sorted(MODE_ALIASES),
                         default="fm",
-                        help="Simulation type: 'fm' (forward) or 'im' (inverse). "
-                             "The aliases accepted by the petgem dispatcher "
-                             "(forward/modeling, inverse) also work. "
-                             "Default: fm")
+                        help="Simulation type: 'fm' (CSEM forward), 'im' (CSEM "
+                             "inverse) or 'mt' (MT forward). The aliases accepted "
+                             "by the petgem dispatcher (forward/modeling, inverse) "
+                             "also work. Default: fm")
     parser.add_argument("-order",              type=int, required=True, dest="order",
                         help="Polynomial order (1..6) - written into the params file only")
     parser.add_argument("-case_dir",          type=str, required=True,
@@ -86,6 +88,11 @@ def parsePreprocessingArgs():
                              "OR a raw MATLAB-style invEx.dat text file (parsed "
                              "inline - no separate conversion step). Embedded "
                              "into the bundle under /observed/Ex.")
+    parser.add_argument("-mt_frequency_filename", type=str, default=None,
+                        help="MT frequency text file inside case_dir, required "
+                             "when -mode mt. Format: one frequency (Hz); '#' "
+                             "comments allowed. Embedded into the bundle under "
+                             "/mt/freq.")
     parser.add_argument("-error_level", type=float, default=None,
                         help="Amplitude-relative noise level written to the "
                              "bundle's /observed @error_level (inverse mode). "
@@ -366,6 +373,28 @@ def writeInversionPayload(filename, observed_Ex,
             meta.create_dataset("fixed_materials", data=fixed_arr)
 
 
+def readMtFrequencyText(path):
+    """Read the MT frequency (Hz) from a text file: one value, '#' comments allowed."""
+    values = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.split('#', 1)[0].strip()
+            if line:
+                values.extend(float(tok) for tok in line.replace(',', ' ').split())
+    if len(values) != 1 or values[0] <= 0.0:
+        raise ValueError(f"{path}: expected one positive frequency (Hz), got {values}")
+    return values[0]
+
+
+def writeMtPayload(filename, frequency):
+    """Append the MT payload (/mt/freq) to an existing PETGEM input bundle."""
+    viewer = PETSc.ViewerHDF5().create(filename, "a")
+    viewer.pushGroup("/mt")
+    _writeArrayAsVec(viewer, np.array([frequency], dtype=float), "freq")
+    viewer.popGroup()
+    viewer.destroy()
+
+
 def _writeArrayAsVec(viewer, arr, name):
     """View a 1-D float64 ndarray as a named PETSc Vec into the given viewer."""
     arr = np.ascontiguousarray(arr, dtype=float).reshape(-1)
@@ -501,8 +530,9 @@ def writePetgemInputFile(plex, conductivity, materials_id,
 # operator enables a direct factorization (-ksp_type preonly -pc_type lu
 # -pc_factor_mat_solver_type mumps).
 #
-# The template emits the iterative path for both modes; users switch by editing
-# this block or by appending a solver preset with a second -options_file.
+# The template emits the iterative path for fm and im and the direct path for
+# mt; users switch by editing this block or by appending a solver preset with
+# a second -options_file.
 #
 # The blocks differ only in the tolerance: im.csem's adjoint system A_f.nx = nB
 # uses the same operator - and so the same KSP - as its forward solve, and the
@@ -516,9 +546,17 @@ _ITERATIVE_SOLVER_BLOCK = (
     "-pc_bddc_monolithic\n"
 )
 
+_DIRECT_SOLVER_BLOCK = (
+    "-dm_mat_type aij\n"
+    "-ksp_type preonly\n"
+    "-pc_type lu\n"
+    "-pc_factor_mat_solver_type mumps\n"
+)
+
 _SOLVER_BLOCK = {
     "fm": _ITERATIVE_SOLVER_BLOCK,
     "im": _ITERATIVE_SOLVER_BLOCK + "-ksp_rtol 1.0e-10\n",
+    "mt": _DIRECT_SOLVER_BLOCK,
 }
 
 # Inversion tuning block (im only). Every option is -im_*, matching the
@@ -539,7 +577,7 @@ _IM_TUNING_BLOCK = (
 
 def writeParamsFile(mode, output_dir, output_filename, input_filename,
                     params_filename):
-    """Emit the PETSc options file for either kernel.
+    """Emit the PETSc options file for any kernel.
 
     One writer for both modes: the input/output keys are identical, and the
     mode only selects the solver block (plus the inversion tuning block for
@@ -551,7 +589,7 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
 
     Parameters
     ----------
-    mode : {'fm', 'im'}
+    mode : {'fm', 'im', 'mt'}
         Canonical mode tag (see MODE_ALIASES).
     output_dir : str
         Case/output directory; also where the params file is written.
@@ -564,7 +602,7 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
     """
     if mode not in _SOLVER_BLOCK:
         raise ValueError(f"writeParamsFile: unknown mode {mode!r} "
-                         f"(expected 'fm' or 'im')")
+                         f"(expected 'fm', 'im' or 'mt')")
 
     content = (
         f"-input_filename {output_dir}/{input_filename}\n"
@@ -652,8 +690,9 @@ def runPreprocessing(*, mode, order, case_dir,
                      im_source_filename=None,
                      observed_filename=None,
                      error_level=None,
+                     mt_frequency_filename=None,
                      output_vtk=None, dm_view=False):
-    """Shared preprocessing pipeline for the PETGEM forward / inverse kernels.
+    """Shared preprocessing pipeline for the PETGEM kernels (fm, im, mt).
 
     Pure library function - no CLI parsing.  Builds the DMPlex, assigns the
     per-cell conductivity from `sigma_{x,y,z}` indexed by the gmsh:physical
@@ -663,14 +702,16 @@ def runPreprocessing(*, mode, order, case_dir,
 
     Parameters
     ----------
-    mode : {'forward', 'inverse'}
-        Selects which params-file template to emit.
+    mode : {'fm', 'im', 'mt'} or an alias
+        Selects the payload and the params-file template.
     order : int
         Polynomial order, written into the params file.
     case_dir : str
         Directory containing the input data and where the bundle is written.
     mesh_filename, receiver_filename, source_filename : str
         Filenames relative to `case_dir`.
+    mt_frequency_filename : str or None
+        MT frequency text file relative to `case_dir` (mode 'mt' only).
     sigma_x, sigma_y, sigma_z : array_like
         Per-material conductivity. Index = 0-based material id
         (gmsh:physical - 1). Lengths must match.
@@ -693,6 +734,18 @@ def runPreprocessing(*, mode, order, case_dir,
             raise ValueError(
                 "runPreprocessing: -im_source_filename and -observed_filename "
                 "are valid only with mode='im'.")
+    if mode != "mt" and mt_frequency_filename is not None:
+        raise ValueError("runPreprocessing: -mt_frequency_filename is valid "
+                         "only with mode='mt'.")
+    if mode == "mt":
+        if (source_filename is not None or im_source_filename is not None
+                or observed_filename is not None):
+            raise ValueError(
+                "runPreprocessing: -source_filename, -im_source_filename and "
+                "-observed_filename are not valid with mode='mt'.")
+        if mt_frequency_filename is None:
+            raise ValueError("runPreprocessing: -mt_frequency_filename is "
+                             "required when mode='mt'")
     if mode == "im":
         if source_filename is not None:
             raise ValueError(
@@ -727,6 +780,8 @@ def runPreprocessing(*, mode, order, case_dir,
                                   if im_source_filename is not None else None)
     input_observed_filename    = (os.path.join(case_dir, observed_filename)
                                   if observed_filename is not None else None)
+    input_mt_frequency_filename = (os.path.join(case_dir, mt_frequency_filename)
+                                   if mt_frequency_filename is not None else None)
 
     print("====================================================")
     print(f" PETGEM INPUT PREPROCESSING ({mode})")
@@ -735,8 +790,10 @@ def runPreprocessing(*, mode, order, case_dir,
     print(f"  Case directory         : {case_dir}")
     print(f"  Mesh file              : {input_mesh_filename}")
     print(f"  Receivers file         : {input_receivers_filename}")
-    print(f"  Sources file           : "
-          f"{input_sources_filename if input_sources_filename else '(skipped - inverse mode)'}")
+    if mode == "fm":
+        print(f"  Sources file           : {input_sources_filename}")
+    if mode == "mt":
+        print(f"  MT frequency file      : {input_mt_frequency_filename}")
     if mode == "im":
         print(f"  IM sources file        : {input_im_sources_filename}")
         print(f"  Observed data file     : {input_observed_filename}")
@@ -752,9 +809,11 @@ def runPreprocessing(*, mode, order, case_dir,
     _require_input_file(input_receivers_filename, "Receivers file")
     if mode == "fm":
         _require_input_file(input_sources_filename, "Sources file")
-    else:
+    elif mode == "im":
         _require_input_file(input_im_sources_filename, "Inverse sources file")
         _require_input_file(input_observed_filename, "Observed-data file")
+    else:
+        _require_input_file(input_mt_frequency_filename, "MT frequency file")
 
     # 1. Import mesh (Gmsh .msh or VTK .vtk/.vtu - meshio auto-detects the
     #    format from the extension/header). PETGEM is tetrahedral-only, so
@@ -811,27 +870,35 @@ def runPreprocessing(*, mode, order, case_dir,
     print(f"  Number of receivers     : {receivers_arr.shape[0]}")
 
     # 4. Sources (text → unified (N, 8) [freq x y z current length dip az]).
-    # The same /sources group is written for both modes; forward repeats a
+    # The same /sources group is written for fm and im; forward repeats a
     # single frequency across its transmitters, inverse carries one row per
-    # (frequency, dipole).
-    src_path = input_sources_filename if mode == "fm" else input_im_sources_filename
-    print("\nReading sources")
-    sources8 = readSourcesText(src_path)
-    uniq_freqs = np.unique(sources8[:, 0])
-    print(f"  Transmitters            : {sources8.shape[0]}")
-    print(f"  Frequencies (Hz)        : {uniq_freqs.tolist()}")
+    # (frequency, dipole). mt has no /sources group, only /mt/freq.
+    sources8 = None
+    if mode == "mt":
+        print("\nReading MT frequency")
+        mt_frequency = readMtFrequencyText(input_mt_frequency_filename)
+        print(f"  Frequency (Hz)          : {mt_frequency}")
+    else:
+        src_path = input_sources_filename if mode == "fm" else input_im_sources_filename
+        print("\nReading sources")
+        sources8 = readSourcesText(src_path)
+        uniq_freqs = np.unique(sources8[:, 0])
+        print(f"  Transmitters            : {sources8.shape[0]}")
+        print(f"  Frequencies (Hz)        : {uniq_freqs.tolist()}")
 
     # 5. Build the DMPlex
     print("\nCreating PETSc DM (DMPlex)")
     plex = createDM(NUM_DIMENSIONS, cells, coords, dm_view=dm_view)
 
-    # 6. Write the unified bundle (mesh + model + receivers + /sources)
+    # 6. Write the unified bundle (mesh + model + receivers + /sources or /mt)
     print("\nWriting unified PETGEM input HDF5")
     writePetgemInputFile(plex, conductivity, materials_id,
                          receivers_arr, sources8, order,
                          output_filename,
                          cells=cells, coords=coords,
                          output_vtk=output_vtk_filename)
+    if mode == "mt":
+        writeMtPayload(output_filename, mt_frequency)
     print(f"  Output file: {output_filename}")
     if output_vtk_filename:
         print(f"  VTU view  : {output_vtk_filename}")
@@ -879,7 +946,7 @@ def runPreprocessing(*, mode, order, case_dir,
         print(f"  Wrote /observed/Ex, /im_meta/fixed_materials "
               f"into {output_filename}")
 
-    # 7. Params file (one writer for both modes; mode selects the solver block)
+    # 7. Params file (one writer for every mode; mode selects the solver block)
     print("\nGenerating PETGEM parameter file")
     writeParamsFile(mode, case_dir, output_petgem_filename,
                     input_filename, params_filename)

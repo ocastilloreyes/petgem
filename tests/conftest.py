@@ -77,6 +77,23 @@ def fm_csem_binary() -> Path:
     pytest.skip("fm.csem binary not found (set PETGEM_FM_CSEM or build build/fm.csem)")
 
 
+@pytest.fixture(scope="session")
+def fm_mt_binary() -> Path:
+    """Resolve the fm.mt binary; skip MT e2e tests when it is not built."""
+    import os
+    import shutil
+    env = os.environ.get("PETGEM_FM_MT")
+    candidates = ([Path(env)] if env else []) + [
+        lib.REPO_ROOT / "build" / "fm.mt", lib.REPO_ROOT / "fm.mt"]
+    which = shutil.which("fm.mt")
+    if which:
+        candidates.append(Path(which))
+    for c in candidates:
+        if c.exists():
+            return c
+    pytest.skip("fm.mt binary not found (set PETGEM_FM_MT or build build/fm.mt)")
+
+
 class FmRun:
     """Captured result of one fm.csem run on the unit cube."""
     def __init__(self, order, returncode, stdout, responses):

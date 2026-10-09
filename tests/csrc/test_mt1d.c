@@ -135,39 +135,17 @@ static void check_equations_differ(void)
   PetscCallAbort(PETSC_COMM_SELF, destroyMt1DField(&fh));
 }
 
-/* Per-cell conductivity Vec laid out as loadModelInputs builds it. */
-static void create_conductivity(DM dm, PetscBool anomaly, Vec *sigma)
+static PetscReal layered_sigma(const PetscReal c[3])
 {
-  DM           dmS;
-  PetscSection sec;
-  PetscInt     pStart, pEnd, cStart, cEnd;
-  PetscScalar *arr;
+  PetscInt layer = 0;
+  while (layer < 2 && c[2] > boxLayerZ[layer + 1]) layer++;
+  return boxSigma[layer];
+}
 
-  PetscCallAbort(PETSC_COMM_WORLD, DMPlexGetChart(dm, &pStart, &pEnd));
-  PetscCallAbort(PETSC_COMM_WORLD, DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
-  PetscCallAbort(PETSC_COMM_WORLD, DMClone(dm, &dmS));
-  PetscCallAbort(PETSC_COMM_WORLD, PetscSectionCreate(PETSC_COMM_WORLD, &sec));
-  PetscCallAbort(PETSC_COMM_WORLD, PetscSectionSetChart(sec, pStart, pEnd));
-  for (PetscInt c = cStart; c < cEnd; c++) PetscCallAbort(PETSC_COMM_WORLD, PetscSectionSetDof(sec, c, NUM_CONDUCTIVITY_COMPONENTS));
-  PetscCallAbort(PETSC_COMM_WORLD, PetscSectionSetUp(sec));
-  PetscCallAbort(PETSC_COMM_WORLD, DMSetLocalSection(dmS, sec));
-  PetscCallAbort(PETSC_COMM_WORLD, PetscSectionDestroy(&sec));
-  PetscCallAbort(PETSC_COMM_WORLD, DMCreateLocalVector(dmS, sigma));
-  PetscCallAbort(PETSC_COMM_WORLD, DMGetLocalSection(dmS, &sec));
-  PetscCallAbort(PETSC_COMM_WORLD, VecGetArray(*sigma, &arr));
-  for (PetscInt c = cStart; c < cEnd; c++) {
-    Cell     cell;
-    PetscInt off, layer = 0;
-    PetscCallAbort(PETSC_COMM_WORLD, extractCellCoordinates(dm, c, &cell));
-    PetscCallAbort(PETSC_COMM_WORLD, computeCellCentroid(&cell));
-    while (layer < 2 && cell.centroid[2] > boxLayerZ[layer + 1]) layer++;
-    PetscReal s = boxSigma[layer];
-    if (anomaly && layer == 1 && cell.centroid[0] < 1.0 && cell.centroid[1] < 1.0) s = 5.0;
-    PetscCallAbort(PETSC_COMM_WORLD, PetscSectionGetOffset(sec, c, &off));
-    for (PetscInt d = 0; d < NUM_CONDUCTIVITY_COMPONENTS; d++) arr[off + d] = s;
-  }
-  PetscCallAbort(PETSC_COMM_WORLD, VecRestoreArray(*sigma, &arr));
-  PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dmS));
+static PetscReal anomaly_sigma(const PetscReal c[3])
+{
+  const PetscReal s = layered_sigma(c);
+  return (s == boxSigma[1] && c[0] < 1.0 && c[1] < 1.0) ? 5.0 : s;
 }
 
 static void setup_box(PetscReal topShift, DM *dm, Grid *grid, IS *faces)
@@ -219,7 +197,7 @@ static void check_box(void)
   /* Profile of the layered box */
   Vec         sigma;
   Mt1DProfile p;
-  create_conductivity(dm, PETSC_FALSE, &sigma);
+  create_cell_conductivity(dm, layered_sigma, &sigma);
   PetscCallAbort(PETSC_COMM_WORLD, buildMt1DProfile(dm, sigma, faces, tags, &p));
   PT_CHECK(p.numLayers == 3, "%d layers, expected 3", (int)p.numLayers);
   if (p.numLayers == 3) {
@@ -234,7 +212,7 @@ static void check_box(void)
 
   /* Lateral anomaly: rejected */
   PetscErrorCode ierr;
-  create_conductivity(dm, PETSC_TRUE, &sigma);
+  create_cell_conductivity(dm, anomaly_sigma, &sigma);
   PetscCallAbort(PETSC_COMM_WORLD, PetscPushErrorHandler(PetscReturnErrorHandler, NULL));
   ierr = buildMt1DProfile(dm, sigma, faces, tags, &p);
   PetscCallAbort(PETSC_COMM_WORLD, PetscPopErrorHandler());
