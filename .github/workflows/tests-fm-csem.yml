@@ -31,7 +31,7 @@ on:
         description: Artifact holding build/fm.csem.
         required: false
         type: string
-        default: fm-csem-binary
+        default: kernel-binaries
   workflow_dispatch:
     inputs:
       docker_image:
