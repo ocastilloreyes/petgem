@@ -760,10 +760,10 @@ static PetscErrorCode femDiscreteGradient(PetscInt order, const PetscReal *verte
 /**
  * @brief Maps a global point into reference-tetrahedron coordinates.
  *
- * This function applies the reference-consistent affine inverse of the cell's
- * geometric map, returning the (xi, eta, zeta) coordinates of a global point on
- * the reference tetrahedron whose vertex labelling matches the Nedelec / H1
- * reference bases. The four cell vertices are given row-major (4x3).
+ * This function inverts the affine map x = v0 + J^T (xi, eta, zeta) built by
+ * femComputeJacobian (rows of J are v1-v0, v2-v0, v3-v0), the frame in which
+ * evaluateNedelecBasis evaluates the reference bases. The four cell vertices
+ * are given row-major (4x3).
  *
  * @param[in]  coordinates  Cell vertex coordinates (4x3, row-major).
  * @param[in]  point        Global point to map.
@@ -775,64 +775,17 @@ PetscErrorCode tetrahedronXYZToReference(const PetscReal coordinates[NUM_VERTICE
                                          const PetscReal point[NUM_DIMENSIONS], PetscReal XiEtaZeta[NUM_DIMENSIONS]) {
     PetscFunctionBeginUser;
 
-    const PetscReal *c = coordinates;
-    PetscReal J, xi, eta, zeta;
+    PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS];
 
-    J = c[5] * ( c[0] * (c[10] - c[7])
-        + c[6] * (c[1] - c[10])
-        + c[9] * (c[7] - c[1]) )
-        + c[2] * ( c[3] * (c[7] - c[10])
-        + c[6] * (c[10] - c[4])
-        + c[9] * (c[4] - c[7]) )
-        + c[8] * ( c[3] * (c[10] - c[1])
-        + c[0] * (c[4] - c[10])
-        + c[9] * (c[1] - c[4]) )
-        + c[11] * ( c[3] * (c[1] - c[7])
-        + c[0] * (c[7] - c[4])
-        + c[6] * (c[4] - c[1]) );
+    PetscCall(femComputeJacobian(coordinates, jacobian, invJacobian));
 
-    /* Compute affine transformation for xi */
-    xi = ( c[11] * (c[7] - c[4]) + c[5] * (c[10] - c[7])
-         + c[8] * (c[4] - c[10]) ) / J * point[0] +
-         ( c[5] * (c[6] - c[9]) + c[11] * (c[3] - c[6])
-         + c[8] * (c[9] - c[3]) ) / J * point[1] +
-         ( c[3] * (c[7] - c[10]) + c[9] * (c[4] - c[7])
-         + c[6] * (c[10] - c[4]) ) / J * point[2] +
-         ( c[8] * (c[3] * c[10] - c[9] * c[4])
-         + c[5] * (c[9] * c[7] - c[6] * c[10])
-         + c[11] * (c[6] * c[4] - c[3] * c[7]) ) / J;
-
-    /* Compute affine transformation for eta */
-    eta = ( c[2] * (c[10] - c[4]) + c[11] * (c[4] - c[1])
-          + c[5] * (c[1] - c[10]) ) / J * point[0] +
-          ( c[2] * (c[3] - c[9]) + c[5] * (c[9] - c[0])
-          + c[11] * (c[0] - c[3]) ) / J * point[1] +
-          ( c[0] * (c[4] - c[10]) + c[3] * (c[10] - c[1])
-          + c[9] * (c[1] - c[4]) ) / J * point[2] +
-          ( c[2] * (c[9] * c[4] - c[3] * c[10])
-          + c[5] * (c[0] * c[10] - c[9] * c[1])
-          + c[11] * (c[3] * c[1] - c[0] * c[4]) ) / J;
-
-    /* Compute affine transformation for zeta */
-    zeta = ( c[5] * (c[7] - c[1]) + c[8] * (c[1] - c[4])
-           + c[2] * (c[4] - c[7]) ) / J * point[0] +
-           ( c[8] * (c[3] - c[0]) + c[5] * (c[0] - c[6])
-           + c[2] * (c[6] - c[3]) ) / J * point[1] +
-           ( c[3] * (c[1] - c[7]) + c[0] * (c[7] - c[4])
-           + c[6] * (c[4] - c[1]) ) / J * point[2] +
-           ( c[5] * ( c[9] * (c[1] - c[7])
-           + c[10] * (c[6] - c[0]) )
-           + c[8] * ( c[9] * (c[4] - c[1])
-           + c[10] * (c[0] - c[3]) )
-           + c[2] * ( c[9] * (c[7] - c[4])
-           + c[10] * (c[3] - c[6]) )
-           + c[11] * ( c[0] * (c[4] - c[7])
-           + c[3] * (c[7] - c[1])
-           + c[6] * (c[1] - c[4]) ) + J ) / J;
-
-    XiEtaZeta[0] = xi;
-    XiEtaZeta[1] = eta;
-    XiEtaZeta[2] = zeta;
+    /* (xi, eta, zeta) = J^{-T} (x - v0) */
+    for (PetscInt k = 0; k < NUM_DIMENSIONS; k++) {
+        XiEtaZeta[k] = 0.0;
+        for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+            XiEtaZeta[k] += invJacobian[d][k] * (point[d] - coordinates[d]);
+        }
+    }
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }

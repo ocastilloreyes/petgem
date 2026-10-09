@@ -15,7 +15,9 @@
  *     of Ke (x^T Ke x >= 0);
  *   - the De Rham identity Ke . G == 0 (the discrete gradient lies in the
  *     kernel of the curl-curl stiffness);
- *   - a positively oriented, non-degenerate cell Jacobian.
+ *   - a positively oriented, non-degenerate cell Jacobian;
+ *   - tetrahedronXYZToReference inverts x = v0 + J^T r, the frame of
+ *     evaluateNedelecBasis.
  *
  * Usage: test_elements <order>   (order in 1..6).  Exit 0 iff all checks pass.
  */
@@ -114,6 +116,19 @@ static void check_cell(PetscInt order, const PetscReal coords[12], const char *t
     }
   PT_CHECK(kgMax < 1e-8 * (keMax + 1.0), "[%s] order=%d: ||Ke.G||_max = %.3e (expected ~0, keMax=%.3e)",
            tag, (int)order, kgMax, keMax);
+
+  /* tetrahedronXYZToReference(v0 + J^T r) == r */
+  const PetscReal refPoints[4][3] = {{0.25, 0.25, 0.25}, {0.1, 0.2, 0.3}, {0.6, 0.1, 0.05}, {0.0, 0.3, 0.3}};
+  for (int k = 0; k < 4; k++) {
+    PetscReal x[3], r[3];
+    for (int d = 0; d < 3; d++)
+      x[d] = coords[d] + refPoints[k][0] * (coords[3 + d] - coords[d]) + refPoints[k][1] * (coords[6 + d] - coords[d]) +
+             refPoints[k][2] * (coords[9 + d] - coords[d]);
+    PetscCallAbort(PETSC_COMM_SELF, tetrahedronXYZToReference(coords, x, r));
+    for (int d = 0; d < 3; d++)
+      PT_CLOSE(r[d], refPoints[k][d], 1e-12, "[%s] order=%d: tetrahedronXYZToReference point %d component %d = %.15g, expected %.15g",
+               tag, (int)order, k, d, r[d], refPoints[k][d]);
+  }
 
   free2d(Me); free2d(Ke); free2d(G);
   for (PetscInt q = 0; q < quad.numPoints; q++) PetscCallAbort(PETSC_COMM_SELF, PetscFree(quad.points[q]));

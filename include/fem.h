@@ -55,8 +55,8 @@ PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal di
 /**
  * @brief Maps global Cartesian coordinates to reference-tetrahedron coordinates.
  *
- * Produces the reference point in the same frame the Nedelec/H1 reference bases
- * are defined on, so the result feeds evaluateNedelecBasis directly.
+ * Inverts x = v0 + J^T (xi, eta, zeta), with J the cell Jacobian (rows v1-v0,
+ * v2-v0, v3-v0), the frame evaluateNedelecBasis evaluates the bases in.
  *
  * @param[in]  coordinates  Cell vertex coordinates (4 vertices x 3 dims).
  * @param[in]  point        Global point to map.
