@@ -30,7 +30,7 @@ typedef struct {
  * When A is a MATIS matrix and G is provided, the preconditioner is set to
  * PCBDDC and G is registered via PCBDDCSetDiscreteGradient at order = order to
  * capture the curl kernel for H(curl) problems. G is the high-order discrete
- * gradient G: Nédélec_order -> P_order H1 from assembleCsemKandM.
+ * gradient G: Nédélec_order -> P_order H1 from assembleMaxwellOperator.
  *
  * @param[in]  dm    DMPlex mesh; its communicator drives the parallel solve.
  * @param[in]  A     System matrix (H(curl) FEM operator).
@@ -45,8 +45,8 @@ typedef struct {
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat G,
-                               const PetscInt order, IS primalVertices, Mat* X, SolveInfo *info);
+PetscErrorCode solveMaxwellSystem(const DM dm, const Mat A, const Mat B, const Mat G,
+                                  const PetscInt order, IS primalVertices, Mat* X, SolveInfo *info);
 
 /**
  * @brief Returns the solver name of a configured KSP: the PC type, or the
@@ -66,7 +66,7 @@ PetscErrorCode getSolverName(KSP ksp, char name[], size_t len);
  *        the operator is MATIS and a gradient was supplied.
  *
  * Shared helper that captures the single BDDC policy used by both the
- * forward solver (solveCsemSystem) and the inverse solver (setupForwardKSP):
+ * forward solver (solveMaxwellSystem) and the inverse solver (setupForwardKSP):
  * when A is of type MATIS and Gbddc is non-NULL, set PC to PCBDDC and
  * register Gbddc (the high-order discrete gradient) via
  * PCBDDCSetDiscreteGradient(..., order, 0, PETSC_TRUE, PETSC_TRUE). When the

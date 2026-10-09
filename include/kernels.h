@@ -4,15 +4,15 @@
  * Date: 2026-05-20
  *
  * Description:
- * Public entry points for the CSEM kernels (runForward, runInverse).
+ * Public entry points for the PETGEM kernels (runForward, runInverse, runMtForward).
  */
 
 /*
  * Notes:
- * The forward kernel (runForward) and inverse kernel (runInverse) are
- * exposed as functions so they can be called either from the legacy
- * single-purpose binaries (fm.csem, im.csem) or from the unified
- * dispatcher (petgem).
+ * The CSEM forward kernel (runForward), the CSEM inverse kernel (runInverse)
+ * and the MT forward kernel (runMtForward) are exposed as functions so they
+ * can be called either from the single-purpose binaries (fm.csem, im.csem,
+ * fm.mt) or from the unified dispatcher (petgem).
  *
  * Each function owns its complete PETSc lifecycle: it calls
  * PetscInitialize at entry and PetscFinalize at exit, and returns the
@@ -53,5 +53,18 @@ int runForward(int argc, char **argv);
  * @return int the PetscErrorCode (cast to int) as the process exit status.
  */
 int runInverse(int argc, char **argv);
+
+/**
+ * @brief Runs the MT forward-modeling kernel (fm.mt).
+ *
+ * Owns the complete PETSc lifecycle: calls PetscInitialize at entry and
+ * PetscFinalize at exit.
+ *
+ * @param[in] argc  Argument count from main().
+ * @param[in] argv  Argument vector from main().
+ *
+ * @return int the PetscErrorCode (cast to int) as the process exit status.
+ */
+int runMtForward(int argc, char **argv);
 
 #endif /* KERNELS_H */

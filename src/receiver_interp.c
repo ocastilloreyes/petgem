@@ -67,7 +67,7 @@ static inline PetscInt decodeGlobalDOF(PetscInt rawIdx)
  * @param[in]  order       Nédélec basis order (dispatched via fem->ops, 1..6).
  * @param[in]  receivers  Serial Vec of 3·N_recv reals (caller-owned).
  * @param[in]  dm         H(curl) DM the solution lives on.
- * @param[in]  grid       Grid struct produced by setupCsemGrid.
+ * @param[in]  grid       Grid struct produced by setupNedelecGrid.
  * @param[out] Q          Output struct holding QEx..QHz.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
@@ -87,7 +87,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
    * order = 1..6. */
   PetscCheck(order >= 1 && order <= 6, comm, PETSC_ERR_SUP, "buildReceiverInterpolationMatrices: order must be in 1..6  (got %" PetscInt_FMT ")", order);
 
-  /* `receivers` is owned by the caller (produced by loadCsemInputs from the /receivers Vec inside the unified input HDF5). This routine only
+  /* `receivers` is owned by the caller (produced by loadModelInputs from the /receivers Vec inside the unified input HDF5). This routine only
    * reads it: locates the points in the mesh and assembles the Q matrices. */
   PetscInt globalSizeReceivers, numGlobalReceivers;
   PetscCall(VecGetSize(receivers, &globalSizeReceivers));

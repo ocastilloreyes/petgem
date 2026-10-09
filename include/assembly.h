@@ -21,7 +21,7 @@
  * @brief Assembles the CSEM right-hand side matrix.
  *
  * Produces B with one column per transmitter, with Dirichlet boundary DOFs
- * eliminated, ready for solveCsemSystem.
+ * eliminated, ready for solveMaxwellSystem.
  *
  * @param[in]  params   Forward-modeling parameters (order, MPI tasks).
  * @param[in]  sources  Transmitter set (one column of B per source).
@@ -81,7 +81,7 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
                                   Mat* B);
 
 /**
- * @brief Assembles the CSEM left-hand side operator (unified K/Ms or fused).
+ * @brief Assembles the Maxwell operator A = K - iωμ·Ms (unified K/Ms or fused).
  *
  * Two output modes, selected by the `Ms` pointer:
  *
@@ -120,26 +120,26 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemKandM(const petgemParams params, const DM dm, const Grid grid,
-                                 const Vec conductivity,
-                                 const PetscScalar constFactor,
-                                 Mat *KorA, Mat *Ms,
-                                 Mat *G_BDDC);
+PetscErrorCode assembleMaxwellOperator(const petgemParams params, const DM dm, const Grid grid,
+                                       const Vec conductivity,
+                                       const PetscScalar constFactor,
+                                       Mat *KorA, Mat *Ms,
+                                       Mat *G_BDDC);
 /**
  * @brief Refills an existing Ms matrix for the current conductivity field.
  *
  * Used by the inverse kernel inside the L-BFGS loop: K and G_BDDC are
- * σ-independent and built once at setup via assembleCsemKandM, while Ms
+ * σ-independent and built once at setup via assembleMaxwellOperator, while Ms
  * must be re-computed every iteration when σ changes. fm.csem does not use
  * this routine; it assembles through the fused single-pass call to
- * assembleCsemKandM.
+ * assembleMaxwellOperator.
  *
  * Preconditions:
  *   - `Ms` is already allocated with the same sparsity pattern as the K
- *     produced by assembleCsemKandM for the same mesh / order (typically
+ *     produced by assembleMaxwellOperator for the same mesh / order (typically
  *     `MatDuplicate(K, MAT_DO_NOT_COPY_VALUES, &Ms)`).
  *   - `quadrature_3d`, `Me`, `Ke` are caller-owned workspace buffers of the
- *     same shape used inside assembleCsemKandM (numDofInCell² for Me / Ke),
+ *     same shape used inside assembleMaxwellOperator (numDofInCell² for Me / Ke),
  *     passed in so a single allocation can serve all iterations.
  *
  * On return Ms holds the σ-dependent mass-matrix entries with its sparsity

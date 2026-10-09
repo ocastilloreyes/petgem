@@ -58,7 +58,15 @@ typedef struct {
 } FEMSpace;
 
 /**
- * @brief Mesh statistics and DOF counts for a CSEM grid.
+ * @brief Boundary condition applied to the H(curl) space on the outer boundary.
+ */
+typedef enum {
+  PETGEM_BC_PEC,     /**< n x E = 0: boundary DOFs constrained (homogeneous Dirichlet). */
+  PETGEM_BC_NATURAL  /**< No constraint: boundary data enter through the right-hand side. */
+} PetgemBoundaryCondition;
+
+/**
+ * @brief Mesh statistics and DOF counts for a Nedelec grid.
  */
 typedef struct {
   PetscInt numCellsLocal;     /**< Number of local cells. */
@@ -87,7 +95,7 @@ typedef struct {
   PetscInt numH1DofInCell;    /**< P_order H1 DOFs per cell
                                   *   (= (order+1)(order+2)(order+3)/6); the column
                                   *   count of the G discrete gradient
-                                  *   produced by assembleCsemKandM. */
+                                  *   produced by assembleMaxwellOperator. */
   DM H1dm;                       /**< P_order H1 DM: column space of the exact
                                   *   G discrete gradient. For order = 1 it
                                   *   is the P1 vertex space; for order >= 2 it
@@ -95,6 +103,8 @@ typedef struct {
                                   *   De Rham complex. */
 
   FEMSpace fem; /**< Finite-element space descriptor (mirrors order + DOF counts). */
+
+  PetgemBoundaryCondition bc; /**< Boundary condition of the H(curl) section. */
 } Grid;
 
 /**
@@ -113,9 +123,24 @@ typedef struct {
 } Cell;
 
 /**
- * @brief Configures a DMPlex object with H(curl) and H1 sections for CSEM.
+ * @brief Configures a DMPlex object with H(curl) and H1 sections.
  *
- * @param[in]     params  Forward-modeling parameters (order).
+ * Marks the outer boundary faces in the "Boundary" label (value 100) for every
+ * boundary condition; only PETGEM_BC_PEC constrains their DOFs.
+ *
+ * @param[in]     params  Parameters (order).
+ * @param[in]     bc      Boundary condition of the H(curl) section.
+ * @param[in,out] dm      DMPlex mesh configured with the FE sections.
+ * @param[out]    grid    Grid struct filled with mesh statistics and FEMSpace.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode setupNedelecGrid(const petgemParams params, const PetgemBoundaryCondition bc, DM* dm, Grid* grid);
+
+/**
+ * @brief CSEM grid: setupNedelecGrid with PETGEM_BC_PEC.
+ *
+ * @param[in]     params  Parameters (order).
  * @param[in,out] dm      DMPlex mesh configured with the FE sections.
  * @param[out]    grid    Grid struct filled with mesh statistics and FEMSpace.
  *
@@ -128,7 +153,7 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid);
  *
  * @param[in] params  Parameters (input file, basis order).
  * @param[in] dm      DMPlex carrying the H(curl) section.
- * @param[in] grid    Grid filled by setupCsemGrid().
+ * @param[in] grid    Grid filled by setupNedelecGrid().
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */

@@ -5,8 +5,8 @@
  *
  * Description:
  * Public surface for PETGEM input handling: the parsed user-input
- * parameters (petgemParams / readPetgemParams) and the unified input loader
- * (loadCsemInputs).
+ * parameters (petgemParams / readPetgemParams) and the unified input loaders
+ * (loadModelInputs, loadCsemSources, loadCsemInputs).
  */
 
 /*
@@ -58,15 +58,15 @@ typedef struct {
 } petgemParams;
 
 /**
- * @brief Reads and validates CSEM CLI parameters from PETSc options.
+ * @brief Reads and validates the common PETGEM CLI parameters from PETSc options.
  *
  * Extracts the required runtime parameters (input/output paths) from the
  * PETSc options database. The finite-element basis order -order is optional:
- * when omitted, params->order is set to 0 so loadCsemInputs takes the order
+ * when omitted, params->order is set to 0 so loadModelInputs takes the order
  * from the input bundle.
  *
  * @param[in]  size    Number of MPI tasks.
- * @param[out] pg_Params  Struct receiving the parsed CSEM parameters.
+ * @param[out] pg_Params  Struct receiving the parsed parameters.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
@@ -74,45 +74,73 @@ typedef struct {
 PetscErrorCode readPetgemParams(const PetscMPIInt size, petgemParams* params);
 
 /**
- * @brief Loads all CSEM inputs from the unified PETGEM HDF5 bundle.
+ * @brief Loads the mesh, model, order and receivers from the unified PETGEM HDF5 bundle.
  *
  * Opens pg_params->inputFile on PETSC_COMM_WORLD to load the DMPlex
  * topology, sections, and the combined model-data vector (split into the
  * per-cell conductivity and materials_id local Vecs). Opens the same file
  * again on PETSC_COMM_SELF (each rank reads independently) to load:
- *   - /order                 single-element Vec, written into pg_params->order
- *   - /receivers            Vec of 3·N_recv reals
- *   - /sources/frequency    single-frequency scalar
+ *   - /order      single-element Vec, written into pg_params->order
+ *   - /receivers  Vec of 3·N_recv reals
+ *
+ * @param[in,out] pg_params     Parameters; inputFile is read, order is
+ *                              written from the bundle's /order dataset.
+ * @param[out]    dm            Loaded DMPlex mesh.
+ * @param[out]    conductivity  Per-cell conductivity Vec.
+ * @param[out]    materialsID   Per-cell material-id Vec.
+ * @param[out]    receivers     Serial Vec of 3·N_recv receiver reals; pass
+ *                              NULL to skip.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode loadModelInputs(petgemParams *pg_params,
+                               DM           *dm,
+                               Vec          *conductivity,
+                               Vec          *materialsID,
+                               Vec          *receivers);
+
+/**
+ * @brief Loads the CSEM transmitter set from the bundle's /sources group.
+ *
+ * Reads on PETSC_COMM_SELF (each rank reads independently):
+ *   - /sources/freq         per-entry frequency; freq[0] applies to the set
  *   - /sources/position     Vec of 3·N_src reals
  *   - /sources/current      Vec of N_src reals
  *   - /sources/length       Vec of N_src reals
  *   - /sources/dipAngle     Vec of N_src reals
  *   - /sources/azimuthAngle Vec of N_src reals
  *
- * Replaces the legacy importGrid + setupCsemSource + per-call
- * receivers-file open path with a single open of the bundle produced by
- * the Python preprocessor (utils/functions.py::writeBundle).
- *
- * @param[in,out] pg_Params           Parameters; inputFile is read, order is
- *                                    written from the bundle's /order dataset.
- * @param[out]    odm                 Loaded DMPlex mesh.
- * @param[out]    conductivity_output Per-cell conductivity Vec.
- * @param[out]    materials_id_output Per-cell material-id Vec.
- * @param[out]    sources             Forward transmitter set; pass NULL to skip
- *                                    (im.csem pulls multi-frequency sources via
- *                                    setupInversionSources instead).
- * @param[out]    receivers_output    Serial Vec of 3·N_recv receiver reals; pass
- *                                    NULL to skip.
+ * @param[in]  pg_params  Parameters; inputFile is read.
+ * @param[out] sources    Transmitter set; sourceArray is allocated here.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode loadCsemInputs(petgemParams       *pg_params,
-                              DM             *dm,
-                              Vec            *conductivity,
-                              Vec            *materialsID,
-                              CsemSourceSet  *sources,
-                              Vec            *receivers);
+PetscErrorCode loadCsemSources(const petgemParams *pg_params, CsemSourceSet *sources);
+
+/**
+ * @brief Loads all CSEM inputs: loadModelInputs followed by loadCsemSources.
+ *
+ * @param[in,out] pg_params     Parameters; see loadModelInputs.
+ * @param[out]    dm            Loaded DMPlex mesh.
+ * @param[out]    conductivity  Per-cell conductivity Vec.
+ * @param[out]    materialsID   Per-cell material-id Vec.
+ * @param[out]    sources       Forward transmitter set; pass NULL to skip
+ *                              (im.csem pulls multi-frequency sources via
+ *                              setupInversionSources instead).
+ * @param[out]    receivers     Serial Vec of 3·N_recv receiver reals; pass
+ *                              NULL to skip.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode loadCsemInputs(petgemParams  *pg_params,
+                              DM            *dm,
+                              Vec           *conductivity,
+                              Vec           *materialsID,
+                              CsemSourceSet *sources,
+                              Vec           *receivers);
 
 /**
  * @brief Prints the "CSEM source(s)" section of the forward run report.
@@ -131,8 +159,9 @@ PetscErrorCode logForwardSources(const CsemSourceSet *sources);
  * result file identifies which kernel produced it without inspecting its
  * datasets.
  */
-#define PETGEM_SIM_FM "fm" /**< Forward modeling (fm.csem). */
-#define PETGEM_SIM_IM "im" /**< Inverse modeling (im.csem). */
+#define PETGEM_SIM_FM "fm" /**< CSEM forward modeling (fm.csem). */
+#define PETGEM_SIM_IM "im" /**< CSEM inverse modeling (im.csem). */
+#define PETGEM_SIM_MT "fm.mt" /**< MT forward modeling (fm.mt). */
 
 /**
  * @brief Builds the canonical output path `{output_dir}/{output_filename}{suffix}`.
@@ -171,7 +200,7 @@ PetscErrorCode buildOutputPath(const petgemParams *params, const char *suffix,
  *
  * @param[in] viewer          Open HDF5 viewer positioned at the file root.
  * @param[in] params          Shared base parameters (input path, order, tasks).
- * @param[in] simulationType  PETGEM_SIM_FM or PETGEM_SIM_IM.
+ * @param[in] simulationType  PETGEM_SIM_FM, PETGEM_SIM_IM or PETGEM_SIM_MT.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.

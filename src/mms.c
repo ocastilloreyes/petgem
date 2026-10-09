@@ -395,13 +395,13 @@ static PetscErrorCode mmsAssembleSolve(const petgemParams params, const CsemSour
   PetscCall(assembleCsemMMSRHS(params, sources, dm, grid, conductivity, kind, B));
   if (kind == MMS_RHS_PROJECTION) {
     Mat Kthrow;
-    PetscCall(assembleCsemKandM(params, dm, grid, conductivity, constFactor, &Kthrow, A, NULL));
+    PetscCall(assembleMaxwellOperator(params, dm, grid, conductivity, constFactor, &Kthrow, A, NULL));
     PetscCall(MatDestroy(&Kthrow));
   } else {
-    PetscCall(assembleCsemKandM(params, dm, grid, conductivity, constFactor, A, NULL, NULL));
+    PetscCall(assembleMaxwellOperator(params, dm, grid, conductivity, constFactor, A, NULL, NULL));
   }
   SolveInfo info;
-  PetscCall(solveCsemSystem(dm, *A, *B, NULL, grid.fem.order, NULL, X, &info));
+  PetscCall(solveMaxwellSystem(dm, *A, *B, NULL, grid.fem.order, NULL, X, &info));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

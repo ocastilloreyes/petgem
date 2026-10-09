@@ -20,24 +20,25 @@
 #include "io.h"
 
 /**
- * @brief Configures a DMPlex object with H(curl) and H1 sections for CSEM simulations.
+ * @brief Configures a DMPlex object with H(curl) and H1 sections.
  *
- * This function sets up the primary DMPlex object for CSEM modeling
- * using high-order edge (H(curl)) elements of order `params.order`
- * and a corresponding H1 conforming space. The following steps are performed:
+ * This function sets up the primary DMPlex object using high-order edge
+ * (H(curl)) elements of order `params.order` and a corresponding H1
+ * conforming space. The following steps are performed:
  *
  *   - Sets the number of fields in the DM to 1.
  *   - Creates a "Boundary" label and marks boundary faces with ID 100.
  *   - Computes degrees of freedom (DOFs) per vertex, edge, face, and volume
  *     according to the PETGEM basis order (`params.order`).
- *   - Creates and attaches a PetscSection for H(curl) elements,
- *     applying boundary conditions on the marked faces.
+ *   - Creates and attaches a PetscSection for H(curl) elements; with
+ *     PETGEM_BC_PEC the DOFs on the marked faces are constrained.
  *   - Clones the DM to create the H1 DM (`grid->H1dm`) used
  *     for the high-order discrete-gradient (G) column space.
  *   - Computes local and global counts of vertices, edges, faces, and cells.
  *   - Stores DOF counts, element start/end indices, and dimension in the `grid` struct.
  *
  * @param[in]  params  Struct containing simulation parameters, especially the basis order `params.order` and mesh filename.
+ * @param[in]  bc      Boundary condition of the H(curl) section.
  * @param[inout] dm    Pointer to the DMPlex object to configure with H(curl) and H1 sections.
  * @param[out] grid    Pointer to the Grid struct to be populated with mesh statistics, DOF counts, and the H1 DM.
  *
@@ -47,7 +48,7 @@
  *       and relies on PETSc DMPlex utilities to handle boundary labeling, section creation,
  *       and point numbering. The report lines are printed by logGridSummary().
  */
-PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
+PetscErrorCode setupNedelecGrid(const petgemParams params, const PetgemBoundaryCondition bc, DM* dm, Grid* grid) {
 
   PetscFunctionBeginUser;
 
@@ -55,7 +56,7 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
   DMLabel labelBoundary;
   PetscSection section;
   PetscInt numComp[] = {1};
-  PetscInt numBC = 1;
+  PetscInt numBC = (bc == PETGEM_BC_PEC) ? 1 : 0;
   PetscInt bcField[1] = {0};
   PetscInt numDofInVertex, numDofInEdge, numDofInFace, numDofInVolume, numDofInCell;
   
@@ -80,7 +81,7 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
   PetscCall(DMSetNumFields(*dm, 1));
   PetscCall(DMViewFromOptions(*dm, NULL, "-dm_view"));
 
-  /*  Create label for dirichlet boundary conditions (boundaries = 100)  */
+  /* Label outer boundary faces (boundaries = 100) */
   PetscCall(DMCreateLabel(*dm, "Boundary"));
   PetscCall(DMGetLabel(*dm, "Boundary", &labelBoundary));
   PetscCall(DMPlexMarkBoundaryFaces(*dm, 100, labelBoundary));
@@ -103,7 +104,7 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
      points at different depths (or different heights, depending from where we start looking at the 
      DAG) are numbered contiguously, this is why we can get start and end. Also, note that this 
      numbering is purely local, because it is used to perform local mesh traversals */
-  PetscCall(DMPlexCreateSection(*dm, NULL, numComp, numDof, numBC, bcField, NULL, &boundaryIS, NULL, &section));
+  PetscCall(DMPlexCreateSection(*dm, NULL, numComp, numDof, numBC, numBC ? bcField : NULL, NULL, numBC ? &boundaryIS : NULL, NULL, &section));
   PetscCall(DMSetLocalSection(*dm, section));
   PetscCall(PetscSectionDestroy(&section));
 
@@ -198,6 +199,7 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
   grid->dim               = dim;
   grid->numH1DofInCell    = numH1DofInCell;
   grid->H1dm              = H1dm;
+  grid->bc                = bc;
 
   /* Mirror the FEM space descriptor used by fem/assembly/postprocessing.
    *
@@ -257,6 +259,21 @@ PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
   PetscCall(ISDestroy(&globalPointNumbering));
   PetscCall(ISDestroy(&boundaryIS));
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Configures the CSEM grid: H(curl) and H1 sections with PETGEM_BC_PEC.
+ *
+ * @param[in]    params  Struct containing simulation parameters (basis order).
+ * @param[inout] dm      DMPlex object to configure.
+ * @param[out]   grid    Grid struct to be populated.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode setupCsemGrid(const petgemParams params, DM* dm, Grid* grid) {
+  PetscFunctionBeginUser;
+  PetscCall(setupNedelecGrid(params, PETGEM_BC_PEC, dm, grid));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -767,6 +784,7 @@ PetscErrorCode logGridSummary(const petgemParams params, const DM dm, const Grid
   PetscCall(logKVInt(comm, "DOFs per volume", grid->numDofInVolume));
   PetscCall(logKVInt(comm, "DOFs per cell", grid->numDofInCell));
   PetscCall(logKVInt(comm, "Global DOFs", numDofs));
+  PetscCall(logKVStr(comm, "Boundary condition", grid->bc == PETGEM_BC_PEC ? "PEC (n x E = 0)" : "natural"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

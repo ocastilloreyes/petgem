@@ -527,7 +527,7 @@ PetscErrorCode assembleCsemRHS(const petgemParams params,
  *
  * reusing the SAME quadrature rule and (weights, detJ) measure as
  * computeElementalMatrices, so the RHS is consistent with the operator
- * A = K - i omega mu Ms that assembleCsemKandM builds. Contributions from cells
+ * A = K - i omega mu Ms that assembleMaxwellOperator builds. Contributions from cells
  * sharing an edge/face DOF accumulate (ADD_VALUES); boundary DOFs are skipped
  * (negative closure indices + VEC_IGNORE_NEGATIVE_INDICES), which is exact since
  * n x E* = 0. The single manufactured RHS is written into a one-column dense B.
@@ -800,7 +800,7 @@ static PetscErrorCode gradientRankTestEig(MPI_Comm comm, Mat G)
  * every vertex/edge/face nodal dof is a column of G. The gradient of a boundary
  * H1 dof is therefore truncated and pollutes the raw K·G product. Scaling G's
  * columns by this mask isolates the BC-consistent interior residual. Ported from
- * KG_validation.c; the "Boundary" stratum id (100) matches setupCsemGrid.
+ * KG_validation.c; the "Boundary" stratum id (100) matches setupNedelecGrid.
  *
  * @param[in]  dm               H(curl) DMPlex (source of the "Boundary" label).
  * @param[in]  grid             Grid descriptor (grid.H1dm supplies the section).
@@ -1034,10 +1034,10 @@ static PetscErrorCode reportGradientValidation(MPI_Comm comm, DM dm, Grid grid, 
 }
 
 /**
- * @brief CSEM LHS assembly.
+ * @brief Maxwell operator assembly.
  *
  * Single-pass element loop that assembles the frequency-INDEPENDENT
- * pieces of the CSEM operator and the discrete-gradient hint matrices:
+ * pieces of the Maxwell operator and the discrete-gradient hint matrices:
  *
  *   K       - stiffness (curl-curl) matrix, ∫ (μ⁻¹ curl N_i)·curl N_j.
  *   Ms      - mass × σ matrix, ∫ (ε_r ⊙ N_i)·N_j where ε_r encodes σ.
@@ -1064,13 +1064,13 @@ static PetscErrorCode reportGradientValidation(MPI_Comm comm, DM dm, Grid grid, 
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemKandM(const petgemParams params,
-                                 const DM dm, 
-                                 const Grid grid,
-                                 const Vec conductivity,
-                                 const PetscScalar constFactor,
-                                 Mat *KorA, Mat *Ms,
-                                 Mat *G) {
+PetscErrorCode assembleMaxwellOperator(const petgemParams params,
+                                       const DM dm, 
+                                       const Grid grid,
+                                       const Vec conductivity,
+                                       const PetscScalar constFactor,
+                                       Mat *KorA, Mat *Ms,
+                                       Mat *G) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
@@ -1327,12 +1327,12 @@ PetscErrorCode assembleCsemKandM(const petgemParams params,
 /**
  * @brief Refills an existing Ms matrix for the current conductivity field.
  *
- * Inverse-kernel companion to assembleCsemKandM: walks the local cells,
+ * Inverse-kernel companion to assembleMaxwellOperator: walks the local cells,
  * computes only the mass-matrix entries for the current sigma, and writes them
  * into the supplied Ms matrix. K and G are NOT touched - those are
  * sigma-independent, built once at setup, and reused for every L-BFGS iteration.
  *
- * The per-cell setup is shared with assembleCsemKandM via
+ * The per-cell setup is shared with assembleMaxwellOperator via
  * prepareCellForAssembly (single source of truth for cell geometry,
  * conductivity slice, closure, and orientation). Ke is computed by
  * computeElementalMatrices (it shares basis evaluations with Me) but is
@@ -1379,7 +1379,7 @@ PetscErrorCode assembleCsemMsRefill(const petgemParams params,
   for (PetscInt i = grid.cellStart; i < grid.cellEnd; ++i) {
     Cell cell;
 
-    /* Shared per-cell setup: same call as in assembleCsemKandM. */
+    /* Shared per-cell setup: same call as in assembleMaxwellOperator. */
     PetscCall(prepareCellForAssembly(dm, dmConductivity, conductivity, i, &cell));
 
     /* Compute mass and stifness matrices; only Me is consumed here. */

@@ -46,7 +46,7 @@
  *
  *    G : H1(P_order) -> H(curl)(Nedelec_order)
  *
- * assembled in assembleCsemKandM(). Its rows correspond to H(curl) DOFs and
+ * assembled in assembleMaxwellOperator(). Its rows correspond to H(curl) DOFs and
  * its columns to nodal H1 DOFs. PCBDDC uses the topology encoded in @p G,
  * together with the supplied Nédélec order, to identify the gradient kernel
  * and construct the associated coarse-space components.
@@ -136,7 +136,7 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order
  *        at once.
  *
  * Drives a single KSP over every column of @p B via KSPMatSolve, which is how
- * the forward kernel solves for all CSEM sources simultaneously. The
+ * the forward kernels solve for all right-hand sides simultaneously. The
  * preconditioner is set up through setupBDDCFromPetgemGradient: when @p A is
  * of type MATIS and @p G is supplied, PCBDDC is configured with the exact
  * order-p discrete gradient to capture the curl kernel of the H(curl)
@@ -170,7 +170,7 @@ PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order
  * @note @p B must have a size and ordering consistent with @p A, and @p G (when
  *       used) must match the DOF ordering of @p A.
  */
-PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat G, const PetscInt order, IS primalVertices, Mat* X, SolveInfo *info) {
+PetscErrorCode solveMaxwellSystem(const DM dm, const Mat A, const Mat B, const Mat G, const PetscInt order, IS primalVertices, Mat* X, SolveInfo *info) {
 
   PetscFunctionBeginUser;
 
@@ -186,7 +186,7 @@ PetscErrorCode solveCsemSystem(const DM dm, const Mat A, const Mat B, const Mat 
   PetscCall(KSPCreate(comm, &ksp));
   PetscCall(KSPSetOperators(ksp, A, A));
 
-  /* G is the high-order discrete gradient (assembleCsemKandM); BDDC reads its sparsity to build the curl-kernel coarse space. */
+  /* G is the high-order discrete gradient (assembleMaxwellOperator); BDDC reads its sparsity to build the curl-kernel coarse space. */
   PetscCall(setupBDDCFromPetgemGradient(ksp, A, G, order, primalVertices));
   PetscCall(KSPSetFromOptions(ksp));
 

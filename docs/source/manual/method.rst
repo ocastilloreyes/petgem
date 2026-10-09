@@ -37,7 +37,7 @@ with
    (M_\sigma)_{ij} = \int_\Omega N_i\cdot \sigma\, N_j\,d\Omega,
 
 where :math:`N_i` are the vector basis functions. This is the operator
-assembled by ``assembleCsemKandM`` (``src/assembly.c``). Because :math:`A` is
+assembled by ``assembleMaxwellOperator`` (``src/assembly.c``). Because :math:`A` is
 complex, **PETGEM** must be built against a PETSc configured with complex
 scalars (see :doc:`install`).
 

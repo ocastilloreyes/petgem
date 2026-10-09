@@ -64,9 +64,9 @@ typedef struct {
  * @param[in]  order       Nédélec basis order (dispatched via fem->ops, 1..6).
  * @param[in]  receivers  Serial Vec (PETSC_COMM_SELF) of 3·N_recv reals,
  *                        laid out [x0 y0 z0 x1 y1 z1 ...]; produced by
- *                        loadCsemInputs from /receivers in the input bundle.
+ *                        loadModelInputs from /receivers in the input bundle.
  * @param[in]  dm         H(curl) DM the solution lives on.
- * @param[in]  grid       Grid struct produced by setupCsemGrid.
+ * @param[in]  grid       Grid struct produced by setupNedelecGrid.
  * @param[out] Q          Output struct; free with
  *                        destroyReceiverInterpolationMatrices.
  *

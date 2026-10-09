@@ -204,7 +204,7 @@ PetscErrorCode buildOutputPath(const petgemParams *params, const char *suffix,
  *
  * @param[in] viewer          Open HDF5 viewer positioned at the file root.
  * @param[in] params          Shared base parameters (input path, order, tasks).
- * @param[in] simulationType  PETGEM_SIM_FM or PETGEM_SIM_IM.
+ * @param[in] simulationType  PETGEM_SIM_FM, PETGEM_SIM_IM or PETGEM_SIM_MT.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
@@ -246,7 +246,7 @@ PetscErrorCode writeRunProvenance(PetscViewer viewer, const petgemParams *params
 }
 
 /**
- * @brief Reads and validates CSEM CLI parameters from PETSc options.
+ * @brief Reads and validates the common PETGEM CLI parameters from PETSc options.
  *
  * This function extracts required runtime parameters from the PETSc
  * options database, including input/output paths and the finite-element
@@ -255,10 +255,10 @@ PetscErrorCode writeRunProvenance(PetscViewer viewer, const petgemParams *params
  *
  * The -order option is mainly intended for debugging runs. If not
  * provided, pg_Params->order is set to 0, meaning the value will be
- * taken from the input bundle by loadCsemInputs.
+ * taken from the input bundle by loadModelInputs.
  *
  * @param[in]  size    Number of MPI tasks.
- * @param[out] pg_Params  Struct containing parsed CSEM parameters.
+ * @param[out] pg_Params  Struct containing the parsed parameters.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
@@ -313,9 +313,9 @@ PetscErrorCode readPetgemParams(const PetscMPIInt size, petgemParams* pg_Params)
     PetscFunctionReturn(PETSC_SUCCESS);
   }
 
-  PetscCheck(inputIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Missing required -input_filename. Run ./fm.csem -help intro for usage.");
-  PetscCheck(outputDirIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Missing required -output_dir. Run  ./fm.csem -help intro  for usage.");
-  PetscCheck(outputFilenameIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Missing required -output_filename. Run  ./fm.csem -help intro  for usage.");
+  PetscCheck(inputIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Missing required -input_filename. Run with -help intro for usage.");
+  PetscCheck(outputDirIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Missing required -output_dir. Run with -help intro for usage.");
+  PetscCheck(outputFilenameIsPresent, PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "Missing required -output_filename. Run with -help intro for usage.");
 
   PetscCall(PetscStrncpy(pg_Params->inputFile,        inputFilename,  sizeof(pg_Params->inputFile)));
   PetscCall(PetscStrncpy(pg_Params->outputDirectory,  outputDir,      sizeof(pg_Params->outputDirectory)));
@@ -325,7 +325,7 @@ PetscErrorCode readPetgemParams(const PetscMPIInt size, petgemParams* pg_Params)
     PetscCheck(order >= 1 && order <= 6, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE, "Exiting: -order override out of valid range (must be 1..6).");
     pg_Params->order = order;
   } else {
-    /* sentinel: loadCsemInputs will fill from /order */
+    /* sentinel: loadModelInputs will fill from /order */
     pg_Params->order = 0;
   }
 
@@ -339,10 +339,10 @@ PetscErrorCode readPetgemParams(const PetscMPIInt size, petgemParams* pg_Params)
 }
 
 /**
- * @brief Loads all CSEM inputs from a unified PETGEM HDF5 bundle.
+ * @brief Loads the mesh, model, order and receivers from a unified PETGEM HDF5 bundle.
  *
- * This routine reads the full simulation input file (mesh, model fields,
- * sources, receivers, and auxiliary parameters) and reconstructs the
+ * This routine reads the method-independent part of the simulation input
+ * file (mesh, model fields, order and receivers) and reconstructs the
  * runtime PETSc objects required by the solver.
  *
  * Loading is split into two stages:
@@ -352,8 +352,7 @@ PetscErrorCode readPetgemParams(const PetscMPIInt size, petgemParams* pg_Params)
  *   model vector. This vector is then split into conductivity and
  *   material-ID fields using local sections.
  *
- * - Phase 2 (serial I/O on PETSC_COMM_SELF): reads scalar or small
- *   datasets such as /order, receivers, and source definitions.
+ * - Phase 2 (serial I/O on PETSC_COMM_SELF): reads /order and /receivers.
  *
  * The function enforces consistency between the bundled data layout
  * and the internal DM structure, and applies CLI overrides when present
@@ -363,22 +362,20 @@ PetscErrorCode readPetgemParams(const PetscMPIInt size, petgemParams* pg_Params)
  * @param[out]    odm                 Output distributed mesh (DMPlex).
  * @param[out]    conductivity_output Cell-wise conductivity field.
  * @param[out]    materials_id_output Cell-wise material ID field.
- * @param[out]    sources             Source set (optional, allocated if non-NULL).
  * @param[out]    receivers_output    Receiver vector (optional, allocated if non-NULL).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
-                              DM            *odm,
-                              Vec           *conductivity_output,
-                              Vec           *materials_id_output,
-                              CsemSourceSet *sources,
-                              Vec           *receivers_output) {
+PetscErrorCode loadModelInputs(petgemParams *pg_Params,
+                               DM           *odm,
+                               Vec          *conductivity_output,
+                               Vec          *materials_id_output,
+                               Vec          *receivers_output) {
   PetscFunctionBeginUser;
 
   PetscCheck(pg_Params->inputFile[0] != '\0', PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL,
-             "loadCsemInputs: pg_Params->inputFile is empty (set -input_filename).");
+             "loadModelInputs: pg_Params->inputFile is empty (set -input_filename).");
 
   /* Phase 1: read mesh + sections + combined model vector (parallel I/O). Replicates the legacy importGrid behavior so downstream code          
    * sees the same DMPlex / sub-DM / local-Vec configuration. */
@@ -512,7 +509,7 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
     }
   }
 
-  /* Phase 2: /order, receivers, and sources (rank-local serial I/O) /order is always read so the caller does not need -order in the   
+  /* Phase 2: /order and receivers (rank-local serial I/O) /order is always read so the caller does not need -order in the   
    * pg_Params file. CLI -order (if set) overrides the bundle value, but normally readPetgemParams leaves it at zero and the bundle wins */
   {
     PetscViewer viewer;
@@ -531,7 +528,7 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
     }
     PetscCheck(pg_Params->order >= 1 && pg_Params->order <= 6, PETSC_COMM_WORLD,
                PETSC_ERR_ARG_OUTOFRANGE,
-               "loadCsemInputs: order %" PetscInt_FMT " not in 1..6 (bundle %s)",
+               "loadModelInputs: order %" PetscInt_FMT " not in 1..6 (bundle %s)",
                pg_Params->order, pg_Params->inputFile);
 
     if (receivers_output) {
@@ -541,62 +538,106 @@ PetscErrorCode loadCsemInputs(petgemParams      *pg_Params,
       *receivers_output = recv;
     }
 
-    if (sources) {
-      Vec freqV, posV, curV, lenV, dipV, azV;
-      PetscCall(PetscViewerHDF5PushGroup(viewer, "/sources"));
-      /* Unified /sources schema: per-entry frequency (one row per
-       * transmitter). Forward modeling is monochromatic, so all entries share
-       * the same frequency and freq[0] applies to the whole set. */
-      PetscCall(loadSelfVecByName(viewer, "freq",         &freqV));
-      PetscCall(loadSelfVecByName(viewer, "position",     &posV));
-      PetscCall(loadSelfVecByName(viewer, "current",      &curV));
-      PetscCall(loadSelfVecByName(viewer, "length",       &lenV));
-      PetscCall(loadSelfVecByName(viewer, "dipAngle",     &dipV));
-      PetscCall(loadSelfVecByName(viewer, "azimuthAngle", &azV));
-      PetscCall(PetscViewerHDF5PopGroup(viewer));
-
-      const PetscScalar *fArr;
-      PetscCall(VecGetArrayRead(freqV, &fArr));
-      sources->freq = PetscRealPart(fArr[0]);
-      PetscCall(VecRestoreArrayRead(freqV, &fArr));
-
-      PetscInt n;
-      PetscCall(VecGetSize(curV, &n));
-      sources->numSources = n;
-      PetscCall(PetscMalloc1(n, &sources->sourceArray));
-
-      const PetscScalar *posArr, *curArr, *lenArr, *dipArr, *azArr;
-      PetscCall(VecGetArrayRead(posV, &posArr));
-      PetscCall(VecGetArrayRead(curV, &curArr));
-      PetscCall(VecGetArrayRead(lenV, &lenArr));
-      PetscCall(VecGetArrayRead(dipV, &dipArr));
-      PetscCall(VecGetArrayRead(azV,  &azArr));
-      for (PetscInt i = 0; i < n; i++) {
-        sources->sourceArray[i].position[0] = PetscRealPart(posArr[i * 3 + 0]);
-        sources->sourceArray[i].position[1] = PetscRealPart(posArr[i * 3 + 1]);
-        sources->sourceArray[i].position[2] = PetscRealPart(posArr[i * 3 + 2]);
-        sources->sourceArray[i].current      = PetscRealPart(curArr[i]);
-        sources->sourceArray[i].length       = PetscRealPart(lenArr[i]);
-        sources->sourceArray[i].dipAngle     = PetscRealPart(dipArr[i]);
-        sources->sourceArray[i].azimuthAngle = PetscRealPart(azArr[i]);
-      }
-      PetscCall(VecRestoreArrayRead(posV, &posArr));
-      PetscCall(VecRestoreArrayRead(curV, &curArr));
-      PetscCall(VecRestoreArrayRead(lenV, &lenArr));
-      PetscCall(VecRestoreArrayRead(dipV, &dipArr));
-      PetscCall(VecRestoreArrayRead(azV,  &azArr));
-
-      PetscCall(VecDestroy(&freqV));
-      PetscCall(VecDestroy(&posV));
-      PetscCall(VecDestroy(&curV));
-      PetscCall(VecDestroy(&lenV));
-      PetscCall(VecDestroy(&dipV));
-      PetscCall(VecDestroy(&azV));
-    }
-
     PetscCall(PetscViewerDestroy(&viewer));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Loads the CSEM transmitter set from the /sources group of a unified PETGEM HDF5 bundle.
+ *
+ * @param[in]  pg_Params  Runtime parameters (input file).
+ * @param[out] sources    Transmitter set; sourceArray is allocated here.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode loadCsemSources(const petgemParams *pg_Params, CsemSourceSet *sources) {
+  PetscFunctionBeginUser;
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, pg_Params->inputFile, FILE_MODE_READ, &viewer));
+
+
+  Vec freqV, posV, curV, lenV, dipV, azV;
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "/sources"));
+  /* Unified /sources schema: per-entry frequency (one row per
+   * transmitter). Forward modeling is monochromatic, so all entries share
+   * the same frequency and freq[0] applies to the whole set. */
+  PetscCall(loadSelfVecByName(viewer, "freq",         &freqV));
+  PetscCall(loadSelfVecByName(viewer, "position",     &posV));
+  PetscCall(loadSelfVecByName(viewer, "current",      &curV));
+  PetscCall(loadSelfVecByName(viewer, "length",       &lenV));
+  PetscCall(loadSelfVecByName(viewer, "dipAngle",     &dipV));
+  PetscCall(loadSelfVecByName(viewer, "azimuthAngle", &azV));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+
+  const PetscScalar *fArr;
+  PetscCall(VecGetArrayRead(freqV, &fArr));
+  sources->freq = PetscRealPart(fArr[0]);
+  PetscCall(VecRestoreArrayRead(freqV, &fArr));
+
+  PetscInt n;
+  PetscCall(VecGetSize(curV, &n));
+  sources->numSources = n;
+  PetscCall(PetscMalloc1(n, &sources->sourceArray));
+
+  const PetscScalar *posArr, *curArr, *lenArr, *dipArr, *azArr;
+  PetscCall(VecGetArrayRead(posV, &posArr));
+  PetscCall(VecGetArrayRead(curV, &curArr));
+  PetscCall(VecGetArrayRead(lenV, &lenArr));
+  PetscCall(VecGetArrayRead(dipV, &dipArr));
+  PetscCall(VecGetArrayRead(azV,  &azArr));
+  for (PetscInt i = 0; i < n; i++) {
+    sources->sourceArray[i].position[0] = PetscRealPart(posArr[i * 3 + 0]);
+    sources->sourceArray[i].position[1] = PetscRealPart(posArr[i * 3 + 1]);
+    sources->sourceArray[i].position[2] = PetscRealPart(posArr[i * 3 + 2]);
+    sources->sourceArray[i].current      = PetscRealPart(curArr[i]);
+    sources->sourceArray[i].length       = PetscRealPart(lenArr[i]);
+    sources->sourceArray[i].dipAngle     = PetscRealPart(dipArr[i]);
+    sources->sourceArray[i].azimuthAngle = PetscRealPart(azArr[i]);
+  }
+  PetscCall(VecRestoreArrayRead(posV, &posArr));
+  PetscCall(VecRestoreArrayRead(curV, &curArr));
+  PetscCall(VecRestoreArrayRead(lenV, &lenArr));
+  PetscCall(VecRestoreArrayRead(dipV, &dipArr));
+  PetscCall(VecRestoreArrayRead(azV,  &azArr));
+
+  PetscCall(VecDestroy(&freqV));
+  PetscCall(VecDestroy(&posV));
+  PetscCall(VecDestroy(&curV));
+  PetscCall(VecDestroy(&lenV));
+  PetscCall(VecDestroy(&dipV));
+  PetscCall(VecDestroy(&azV));
+
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Loads all CSEM forward inputs: loadModelInputs followed by loadCsemSources.
+ *
+ * @param[in,out] pg_Params           Runtime parameters (input file, order, etc.).
+ * @param[out]    odm                 Output distributed mesh (DMPlex).
+ * @param[out]    conductivity_output Cell-wise conductivity field.
+ * @param[out]    materials_id_output Cell-wise material ID field.
+ * @param[out]    sources             Source set (optional, allocated if non-NULL).
+ * @param[out]    receivers_output    Receiver vector (optional, allocated if non-NULL).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode loadCsemInputs(petgemParams  *pg_Params,
+                              DM            *odm,
+                              Vec           *conductivity_output,
+                              Vec           *materials_id_output,
+                              CsemSourceSet *sources,
+                              Vec           *receivers_output) {
+  PetscFunctionBeginUser;
+  PetscCall(loadModelInputs(pg_Params, odm, conductivity_output, materials_id_output, receivers_output));
+  if (sources) PetscCall(loadCsemSources(pg_Params, sources));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -214,9 +214,7 @@ int runInverse(int argc, char **argv) {
 
   PetscCall(PetscLogStagePush(stage_load));
   PetscCall(PetscTime(&start_timer));
-  PetscCall(loadCsemInputs(&iparams.common, &dm, &conductivity, &materials_id,
-                           NULL,           /* no forward CsemSourceSet; setupInversionSources reads /sources */
-                           &receivers));
+  PetscCall(loadModelInputs(&iparams.common, &dm, &conductivity, &materials_id, &receivers));
   PetscCall(setupInversionSources(iparams.common.inputFile, &iparams));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());

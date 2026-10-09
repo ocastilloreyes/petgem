@@ -234,7 +234,7 @@ int runForward(int argc, char** argv) {
   PetscCall(PetscLogStagePush(stage_assembly));
   PetscCall(PetscTime(&start_timer));
   PetscCall(assembleCsemRHS(params, sources, dm, grid, constFactor, &B));
-  PetscCall(assembleCsemKandM(params, dm, grid, conductivity, constFactor, &A, NULL, &G));
+  PetscCall(assembleMaxwellOperator(params, dm, grid, conductivity, constFactor, &A, NULL, &G));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());
   timers[3] = end_timer - start_timer;
@@ -285,7 +285,7 @@ int runForward(int argc, char** argv) {
     if (checkPrimal) PetscCall(verifyPrimalISAgainstOperator(A, primalVertices));
   }
 
-  PetscCall(solveCsemSystem(dm, A, B, G, grid.fem.order, primalVertices, &X, &solveInfo));
+  PetscCall(solveMaxwellSystem(dm, A, B, G, grid.fem.order, primalVertices, &X, &solveInfo));
   PetscCall(ISDestroy(&primalVertices));
   PetscCall(PetscTime(&end_timer));
   PetscCall(PetscLogStagePop());

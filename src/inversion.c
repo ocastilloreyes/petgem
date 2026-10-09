@@ -227,7 +227,7 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
    * needs a matrix that already carries K's sparsity pattern and K's
    * local-to-global mapping, and it refills the values in place from the
    * current σ on every L-BFGS iteration. Duplicating K only after
-   * assembleCsemKandM has assembled it is what gives Ms a real (populated)
+   * assembleMaxwellOperator has assembled it is what gives Ms a real (populated)
    * nonzero structure; that shared pattern is also what makes the
    * MatCopy(K) + MatAXPY(-Const·Ms) with SAME_NONZERO_PATTERN in
    * inversionObjGrad valid. Ms needs no initial values here - the first
@@ -249,11 +249,11 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx)
                                     sizeof(matType), &matTypeSet));
     if (!matTypeSet) PetscCall(DMSetMatType(ctx->dm, MATIS));
   }
-  PetscCall(assembleCsemKandM(kandmStub, ctx->dm, ctx->grid,
-                              ctx->conductivity,
-                              0.0,             /* fused, constFactor = 0 -> A = K */
-                              &ctx->Kmat, NULL,
-                              &ctx->Gmat_BDDC));
+  PetscCall(assembleMaxwellOperator(kandmStub, ctx->dm, ctx->grid,
+                                    ctx->conductivity,
+                                    0.0,             /* fused, constFactor = 0 -> A = K */
+                                    &ctx->Kmat, NULL,
+                                    &ctx->Gmat_BDDC));
   PetscCall(MatDuplicate(ctx->Kmat, MAT_DO_NOT_COPY_VALUES, &ctx->Msmat));
 
   /* Persistent per-frequency operators and solvers (built once, reused). Afwd
@@ -447,7 +447,7 @@ PetscErrorCode computeGradientContribution(const DM          dm,
     PetscCall(computeElementalMatrices(&grid->fem, &cell, quadrature_3d, Me, Ke));
 
     /* Extract local solution values for forward (x_e) and adjoint (nx_e). DMPlexVecGetClosure traverses the closure in the SAME order that
-     * assembleCsemKandM / assembleCsemMsRefill use to insert Me through DMPlexGetClosureIndices, and Me comes out of computeElementalMatrices
+     * assembleMaxwellOperator / assembleCsemMsRefill use to insert Me through DMPlexGetClosureIndices, and Me comes out of computeElementalMatrices
      * already oriented - orientation is folded into the element routines and there are NO external per-DOF sign multipliers (include/fem.h). The
      * quadratic form below is therefore ordering- and orientation-consistent with fm.csem without any separate closure-index lookup. */
     PetscInt      closureSize = grid->numDofInCell;
@@ -618,7 +618,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
    * setupInversionWorkspace and live on the context - they are reused for every L-BFGS iteration.
    * Only Ms needs to be recomputed when σ changes.
    *
-   * assembleCsemMsRefill walks the local cells, shares the per-cell setup helper (prepareCellForAssembly) with assembleCsemKandM, 
+   * assembleCsemMsRefill walks the local cells, shares the per-cell setup helper (prepareCellForAssembly) with assembleMaxwellOperator, 
    * and overwrites Ms in-place using the cached sparsity pattern. */
   petgemParams fwdParams;
   PetscCall(PetscMemzero(&fwdParams, sizeof(fwdParams)));
@@ -830,7 +830,7 @@ PetscErrorCode inversionObjGrad(Vec X, PetscReal *F, Vec Gvec, void *ctx)
  * runs the custom L-BFGS optimizer over the per-frequency objective/gradient
  * callback; writes the final HDF5 results; and returns accumulated assembly
  * and solver wall-clock times for the kernel timer report. `receivers` is
- * the serial Vec produced by loadCsemInputs; it is consumed by
+ * the serial Vec produced by loadModelInputs; it is consumed by
  * buildReceiverInterpolationMatrices and the caller retains ownership.
  *
  * @param[in]  iparams       Inversion parameters.
@@ -859,12 +859,12 @@ PetscErrorCode runCsemInversion(const imParams  *iparams,
 
   PetscCall(PetscTime(&t0));
 
-  /* Validate preconditions: loadCsemInputs returns NULL for conductivity and materialsID only if it was called with an empty inputFile, which
+  /* Validate preconditions: loadModelInputs returns NULL for conductivity and materialsID only if it was called with an empty inputFile, which
    * readCsemParams already errors out on. Re-check here for safety. */
-  PetscCheck(conductivity, comm, PETSC_ERR_ARG_NULL, "conductivity Vec is NULL - loadCsemInputs did not populate the model. Check that -input_filename is valid.");
+  PetscCheck(conductivity, comm, PETSC_ERR_ARG_NULL, "conductivity Vec is NULL - loadModelInputs did not populate the model. Check that -input_filename is valid.");
   PetscCheck(materialsID, comm, PETSC_ERR_ARG_NULL,
-             "materialsID Vec is NULL - loadCsemInputs did not populate the model. Check that -input_filename is valid.");
-  PetscCheck(receivers, comm, PETSC_ERR_ARG_NULL, "receivers Vec is NULL - loadCsemInputs did not return /receivers.");
+             "materialsID Vec is NULL - loadModelInputs did not populate the model. Check that -input_filename is valid.");
+  PetscCheck(receivers, comm, PETSC_ERR_ARG_NULL, "receivers Vec is NULL - loadModelInputs did not return /receivers.");
 
   /* Build neighbor smoothing graph */
   NeighborGraph graph;

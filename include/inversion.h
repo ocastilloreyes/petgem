@@ -239,7 +239,7 @@ typedef struct {
 
   /** @{ Cached LHS matrices. K (stiffness, σ-independent) and G_BDDC
    *  (high-order discrete gradient, σ-independent) are built ONCE at setup
-   *  via assembleCsemKandM and reused across all L-BFGS iters. Ms keeps the
+   *  via assembleMaxwellOperator and reused across all L-BFGS iters. Ms keeps the
    *  sparsity from that build but its values are refilled every callback via
    *  assembleCsemMsRefill against the current σ. */
   Mat                             Kmat;        /**< Curl-curl stiffness (σ-independent). */
@@ -293,7 +293,7 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile,
  *
  * Reads the bundle's /sources group (replacing the legacy text-file format)
  * and populates iparams->numFreqs and imSources[]. `bundleFile` is the same
- * HDF5 path consumed by loadCsemInputs.
+ * HDF5 path consumed by loadModelInputs.
  *
  * @param[in]     bundleFile  Path to the unified PETGEM HDF5 bundle.
  * @param[in,out] im_Params   Inversion parameters whose sources are filled.
@@ -582,7 +582,7 @@ typedef struct {
  * @brief Top-level inversion driver.
  *
  * `receivers` is the serial Vec (PETSC_COMM_SELF, length 3·N_recv) loaded by
- * loadCsemInputs from /receivers in the unified PETGEM input HDF5. It is
+ * loadModelInputs from /receivers in the unified PETGEM input HDF5. It is
  * consumed once by buildReceiverInterpolationMatrices; the caller retains
  * ownership for cleanup.
  *

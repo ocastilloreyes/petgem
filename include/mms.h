@@ -16,7 +16,7 @@
  * THIS header and diffs the result against the Python reference.
  *
  * PROBLEM VERIFIED. The operator fm.csem assembles
- * (src/fem.c::femElementalMatrix, src/assembly.c::assembleCsemKandM) is:
+ * (src/fem.c::femElementalMatrix, src/assembly.c::assembleMaxwellOperator) is:
  *
  *     Ke = INT curl N_j . curl N_k          (mu_r = 1)
  *     Me = INT (sigma . N_j) . N_k          (sigma diagonal, per cell)
