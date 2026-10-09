@@ -16,8 +16,9 @@ field :math:`E`, with a constant magnetic permeability :math:`\mu = \mu_0`
 
    \nabla \times \nabla \times E \;-\; i\,\omega\,\mu\,\sigma\, E \;=\; f,
 
-where :math:`\omega = 2\pi f` is the angular frequency. Homogeneous Dirichlet
-boundary conditions :math:`n \times E = 0` are imposed on the domain boundary.
+where :math:`\omega = 2\pi f` is the angular frequency. For CSEM, homogeneous
+Dirichlet boundary conditions :math:`n \times E = 0` are imposed on the domain
+boundary (``PETGEM_BC_PEC`` in ``setupNedelecGrid``).
 
 The field is discretized with **Nédélec (edge) vector finite elements** of
 polynomial order 1 to 6 on an unstructured tetrahedral mesh. These
@@ -67,6 +68,69 @@ space into the order-:math:`p` Nédélec space, so that
 matrix spans the curl-kernel of the Nédélec space; it is handed to the BDDC
 preconditioner (see :doc:`solver`) and is checked by the test suite (the de
 Rham identity :math:`K_e G_e = 0` per cell).
+
+MT forward problem
+------------------
+``fm.mt`` follows Castillo-Reyes et al. (2022). There is no source in the
+domain; the excitation enters through a natural boundary condition. With the
+bilinear form of the operator above,
+
+.. math::
+
+   a(E, v) = \int_\Omega (\nabla\times v)\cdot(\nabla\times E)
+             - i\,\omega\,\mu\,\sigma\, v\cdot E \, d\Omega,
+   \qquad
+   l(v) = -i\,\omega\,\mu \int_\Gamma v\cdot\left(n\times\hat{H}\right) d\Gamma,
+
+the total field solves :math:`a(E, v) = l(v)` for all test functions, with no
+constrained boundary DOFs (``PETGEM_BC_NATURAL``). The matrix is the same
+:math:`A` assembled by ``assembleMaxwellOperator``; the right-hand side is the
+boundary integral, assembled by ``assembleMtBoundaryRHS`` (``src/mt.c``) with a
+triangle quadrature on every boundary face.
+
+The domain is an axis-aligned box with faces :math:`\Gamma_1` (top) to
+:math:`\Gamma_6` (bottom). The imposed field is
+:math:`\hat{H} = (0, H(z), 0)` for the x-polarization and
+:math:`\hat{H} = (H(z), 0, 0)` for the y-polarization; both are solved together
+as two right-hand sides. :math:`H(z)` is the solution of a 1D problem on the
+conductivity profile :math:`\sigma(z)` of the lateral faces, with
+:math:`H(z_{\max}) = 1` and :math:`H(z_{\min}) = 0`:
+
+.. math::
+
+   H'' + i\,\omega\,\mu\,\sigma(z)\, H = 0
+   \quad\text{(default, Eq. 11 of the paper)}, \qquad
+   (\rho H')' + i\,\omega\,\mu\, H = 0, \;\; \rho = 1/\sigma
+   \quad (\texttt{-mt\_1d\_equation h}).
+
+Both are solved with linear finite elements, with nodes at every interface of
+the profile. Within a layer the two equations coincide; they differ in the
+interface condition (:math:`H'` continuous, or :math:`\rho H'` continuous) and
+therefore in the air, where the second gives the nearly constant magnetic field
+of a plane wave. For a 1D model the second equation makes the boundary data
+exact on the lateral and top faces, so the response does not depend on the
+lateral extent of the box (the bottom must still be deep enough for
+:math:`H(z_{\min}) = 0`); the first needs boundaries several skin depths away
+from the survey, as studied in the paper.
+
+At each receiver, :math:`E` and :math:`H = \nabla\times E/(i\omega\mu)` of
+both polarizations give the impedance tensor and the tipper,
+
+.. math::
+
+   Z = \begin{pmatrix} E_x^{(1)} & E_x^{(2)} \\ E_y^{(1)} & E_y^{(2)} \end{pmatrix}
+       \begin{pmatrix} H_x^{(1)} & H_x^{(2)} \\ H_y^{(1)} & H_y^{(2)} \end{pmatrix}^{-1},
+   \qquad
+   T = \begin{pmatrix} H_z^{(1)} & H_z^{(2)} \end{pmatrix}
+       \begin{pmatrix} H_x^{(1)} & H_x^{(2)} \\ H_y^{(1)} & H_y^{(2)} \end{pmatrix}^{-1},
+
+and the apparent resistivity and phase
+:math:`\rho_{ij} = |Z_{ij}|^2/(\omega\mu)`,
+:math:`\phi_{ij} = \mathrm{atan2}(\mathrm{Im}\,Z_{ij}, \mathrm{Re}\,Z_{ij})`
+in degrees. With the :math:`e^{-i\omega t}` convention and :math:`z` up, a
+half-space gives :math:`\phi_{xy} = 135^\circ` and :math:`\phi_{yx} = -45^\circ`;
+references in the first-quadrant convention use
+:math:`\mathrm{mod}(-\phi, 180^\circ)`.
 
 Inverse problem
 ---------------

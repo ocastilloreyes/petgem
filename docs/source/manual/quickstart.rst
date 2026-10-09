@@ -18,7 +18,7 @@ Build
 
    make
 
-This builds ``build/fm.csem``, ``build/im.csem``, and ``build/petgem``.
+This builds ``build/fm.csem``, ``build/im.csem``, ``build/fm.mt``, and ``build/petgem``.
 
 Run the forward example
 -----------------------

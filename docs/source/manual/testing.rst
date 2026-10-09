@@ -3,8 +3,9 @@ Testing
 =======
 
 **PETGEM** ships a `pytest <https://docs.pytest.org/>`_ suite under ``tests/``,
-covering the **forward** kernel (``fm.csem``). The inverse kernel is out of
-scope for the suite. The full rationale is in ``tests/README.md``.
+covering the **forward** kernels (``fm.csem`` and ``fm.mt``). The inverse
+kernel is out of scope for the suite. The full rationale is in
+``tests/README.md``.
 
 The tests never modify the production sources: the C harnesses link against the
 unchanged ``src/`` translation units, and the end-to-end tests drive the built
@@ -63,6 +64,30 @@ Level 6 (``tests/mms/``) is the order-of-accuracy check. It runs ``fm.csem
 ``tests/mms/reference/mms_golden.json``. Its bundle is self-contained and built
 on demand by ``tests/mms/make_bundle.sh``.
 
+MT tests
+--------
+The MT layer is covered by three C harnesses in ``tests/unit/``, run on 1 and 3
+MPI tasks, and by an end-to-end check in ``tests/mt/``:
+
+- ``test_boundary_tools.py`` - triangle quadrature (exact up to degree
+  :math:`2p+1`), DOF counts of ``setupNedelecGrid`` for ``PETGEM_BC_NATURAL``
+  and ``PETGEM_BC_PEC``, and the boundary faces of a box (count, area,
+  :math:`\sum n\,|F| = 0`, outward axis-aligned normals).
+- ``test_mt_1d.py`` - the 1D boundary field against the exact layered solution
+  for both 1D equations (second-order convergence), the box-face classification,
+  and the lateral conductivity profile (identical on every rank; non-1D lateral
+  boundaries and non-box domains are rejected).
+- ``test_mt_rhs.py`` - the boundary right-hand side, orders 1-6: for a field
+  :math:`F` in the Nédélec space with coefficients :math:`c` from its
+  :math:`L^2` projection, :math:`c^T b = -i\omega\mu \oint F\cdot(n\times\hat{H})`
+  in closed form.
+- ``tests/mt/test_mt_halfspace.py`` - ``fm.mt`` on a 100 Ω·m half-space at
+  order 2 with ``-mt_1d_equation h``: :math:`\rho = 100` Ω·m within 1 %,
+  :math:`\phi_{xy} = 135^\circ` and :math:`\phi_{yx} = -45^\circ` within
+  0.5°, vanishing :math:`Z_{xx}`, :math:`Z_{yy}` and tipper, and the same
+  impedance on 1 and 3 MPI tasks. Its bundle is built by
+  ``tests/mt/make_bundle.sh``.
+
 Markers, declared in ``pytest.ini``:
 
 - ``e2e`` - needs the built binary and the ``unit_cube`` dataset; skipped
@@ -89,11 +114,16 @@ Running
    bash tests/mms/make_bundle.sh 4
    PETGEM_FM_CSEM=build/fm.csem FM_CSEM_NP=2 pytest tests/mms
 
+   # MT half-space (needs the fm.mt binary + gmsh; build the bundle first)
+   bash tests/mt/make_bundle.sh
+   PETGEM_FM_MT=build/fm.mt pytest tests/mt
+
 Environment variables:
 
 - ``PETGEM_FM_CSEM`` - path to the ``fm.csem`` binary. Without it, the tests
   that need a binary skip.
 - ``FM_CSEM_NP`` - number of MPI ranks for the kernel runs.
+- ``PETGEM_FM_MT`` - path to the ``fm.mt`` binary, for ``tests/mt``.
 
 Fixtures skip cleanly when the PETSc toolchain (levels 1-3) or the binary
 (levels 4-6) is unavailable, so a partial environment still runs whatever it
@@ -119,8 +149,9 @@ them only after an intentional change to the forward result. The commands are in
 
 Continuous integration
 ----------------------
-``.github/workflows/ci-develop.yml`` compiles ``fm.csem`` and calls the reusable
-``tests-fm-csem.yml`` workflow, which runs the suite (levels 1-3; levels 4-5 and
-6 against the compiled binary) plus an Extrae smoke run, inside the project's CI
-image. Code and documentation jobs are gated independently, so a docs-only
+``.github/workflows/ci-develop.yml`` compiles ``fm.csem`` and ``fm.mt`` and
+calls the reusable ``tests-fm-csem.yml`` workflow, which runs the suite (levels
+1-3 and the MT harnesses; levels 4-5 and 6 against the compiled binary) plus an
+Extrae smoke run, and the reusable ``tests-fm-mt.yml`` workflow, which runs
+``tests/mt`` against ``fm.mt``, inside the project's CI image. Code and documentation jobs are gated independently, so a docs-only
 change skips the kernel build.

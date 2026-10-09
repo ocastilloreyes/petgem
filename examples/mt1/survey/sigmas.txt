@@ -1,0 +1,3 @@
+# sigma_x sigma_y sigma_z (S/m); row 0 = air (physical 1), row 1 = earth (physical 2)
+1.0e-8 1.0e-8 1.0e-8
+0.01 0.01 0.01

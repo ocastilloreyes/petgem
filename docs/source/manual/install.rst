@@ -50,10 +50,11 @@ See :doc:`quickstart` for a first run.
 
 Building
 --------
-``make`` builds all three binaries into ``build/``:
+``make`` builds all four binaries into ``build/``:
 
-- ``build/fm.csem`` - forward kernel
-- ``build/im.csem`` - inverse kernel
+- ``build/fm.csem`` - CSEM forward kernel
+- ``build/im.csem`` - CSEM inverse kernel
+- ``build/fm.mt`` - MT forward kernel
 - ``build/petgem`` - dispatcher
 
 With ``USE_EXTRAE=1`` the binaries are suffixed ``.extrae``
@@ -69,7 +70,7 @@ Makefile targets
    * - Target
      - Description
    * - ``all`` (default)
-     - Build ``fm.csem``, ``im.csem``, and ``petgem``
+     - Build ``fm.csem``, ``im.csem``, ``fm.mt``, and ``petgem``
    * - ``clean``
      - Remove ``build/`` and object files
    * - ``docs``

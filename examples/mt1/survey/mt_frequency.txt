@@ -1,0 +1,2 @@
+# Frequency (Hz)
+2.0

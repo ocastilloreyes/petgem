@@ -1,0 +1,55 @@
+# =============================================================================
+# FM-MT test suite. See tests/README.md.
+#
+# Reusable workflow: called by ci-develop.yml after the fm.mt binary is
+# compiled, so it never rebuilds the image or the kernel - it consumes them.
+#
+#   mt-tests : MT half-space end-to-end check - fm.mt on a 100 ohm-m half-space
+#              under air at 10 Hz (tests/mt), order 2, direct LU (MUMPS), on 1
+#              and 3 MPI tasks: rho = 100 ohm-m, |phi| = 45 deg, rank-invariant
+#              impedance. Needs the binary + gmsh (in the image).
+# =============================================================================
+name: FM-MT tests
+
+on:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: CI image (PETSc + mpicc + gmsh + python + h5py).
+        required: true
+        type: string
+      binary_artifact:
+        description: Artifact holding build/fm.mt.
+        required: false
+        type: string
+        default: kernel-binaries
+
+env:
+  PETSC_DIR: /usr/local/petsc
+  PETSC_ARCH: arch-linux-c-opt
+
+jobs:
+  mt-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download fm.mt
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.binary_artifact }}
+          path: build
+      - name: Make binary executable
+        run: chmod +x build/fm.mt
+      - name: Pull CI image
+        run: docker pull ${{ inputs.docker_image }}
+      - name: Build the MT half-space bundle (gmsh -> preprocess -mode mt -> tests/mt/input.h5)
+        run: |
+          docker run --rm -e PETSC_DIR -e PETSC_ARCH \
+            -v ${{ github.workspace }}:/workspace -w /workspace \
+            ${{ inputs.docker_image }} bash -c "bash tests/mt/make_bundle.sh"
+      - name: MT half-space (order 2, 1 and 3 MPI tasks)
+        run: |
+          docker run --rm \
+            -e PETGEM_FM_MT=/workspace/build/fm.mt \
+            -v ${{ github.workspace }}:/workspace -w /workspace \
+            ${{ inputs.docker_image }} bash -c "pytest tests/mt -ra"

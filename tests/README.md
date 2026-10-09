@@ -1,11 +1,14 @@
-# PETGEM FM-CSEM test suite
+# PETGEM forward-kernel test suite
 
 Numerical-correctness and implementation-verification tests for the **forward
-CSEM kernel (`fm.csem`)**. Levels 1–5 are built around the
-[`examples/unit_cube`](../examples/unit_cube) dataset (a homogeneous unit cube,
-one 2 Hz electric dipole at the centre, three receivers); level 6 adds a
-self-contained **Method of Manufactured Solutions** order-of-accuracy check on
-the `[0,1]³` unit cube ([`tests/mms/`](mms/)).
+CSEM kernel (`fm.csem`)** and the **forward MT kernel (`fm.mt`)**. Levels 1–5
+are built around the [`examples/unit_cube`](../examples/unit_cube) dataset (a
+homogeneous unit cube, one 2 Hz electric dipole at the centre, three
+receivers); level 6 adds a self-contained **Method of Manufactured Solutions**
+order-of-accuracy check on the `[0,1]³` unit cube ([`tests/mms/`](mms/)). The
+MT layer is covered by C harnesses in `tests/unit` (boundary tools, 1D field,
+boundary right-hand side) and by a half-space end-to-end check
+([`tests/mt/`](mt/)).
 
 The production C implementation is treated as correct and is **never modified**
 by the suite; the tests link against, or drive, the unchanged sources and
@@ -167,13 +170,17 @@ PETGEM_FM_CSEM=build/fm.csem FM_CSEM_NP=4 pytest tests/e2e
 bash tests/mms/make_bundle.sh 4
 PETGEM_FM_CSEM=build/fm.csem FM_CSEM_NP=2 pytest tests/mms
 
+# MT half-space (needs the fm.mt binary + gmsh; build the bundle first):
+bash tests/mt/make_bundle.sh
+PETGEM_FM_MT=build/fm.mt pytest tests/mt
+
 # everything:
 PETGEM_FM_CSEM=build/fm.csem pytest
 ```
 
-Fixtures `pytest.skip` cleanly when the PETSc toolchain (levels 1-3) or the
-`fm.csem` binary (levels 4-5) is unavailable, so partial environments still get
-whatever coverage they can run.
+Fixtures `pytest.skip` cleanly when the PETSc toolchain (levels 1-3), the
+`fm.csem` binary (levels 4-5) or the `fm.mt` binary (tests/mt) is unavailable,
+so partial environments still get whatever coverage they can run.
 
 ### Determinism & tolerances
 * Levels 1-3 assert exact analytic invariants (tol ≈ `1e-9`).
@@ -217,10 +224,12 @@ docker run --rm -v "$PWD":/workspace -w /workspace petgem-env \
 
 ## GitHub Actions execution strategy
 
-Workflow: [`.github/workflows/tests-fm-csem.yml`](../.github/workflows/tests-fm-csem.yml)
-— a **reusable** workflow called by
+Workflows: [`.github/workflows/tests-fm-csem.yml`](../.github/workflows/tests-fm-csem.yml)
+and [`.github/workflows/tests-fm-mt.yml`](../.github/workflows/tests-fm-mt.yml)
+— **reusable** workflows called by
 [`ci-develop.yml`](../.github/workflows/ci-develop.yml) after it has compiled the
-`fm.csem` binary. It consumes that artifact rather than rebuilding it. The CI
+`fm.csem` and `fm.mt` binaries (artifact `kernel-binaries`). They consume that
+artifact rather than rebuilding it. The CI
 image itself is built separately by
 [`image.yml`](../.github/workflows/image.yml) (only when `docker/**` changes) and
 merely pulled here. All jobs run inside that prebuilt image (PETSc, mpicc, gmsh,
@@ -231,9 +240,10 @@ python, h5py, numpy).
 | `fe-core-tests` | `pytest tests/unit` — levels 1-3, all orders 1-6, ~10 s | CI image (no binary) |
 | `e2e-tests` | `pytest tests/e2e` — levels 4-5, orders 1-3, `FM_CSEM_NP=2` | the `fm.csem` artifact |
 | `mms-tests` | `make_bundle.sh 4` then `pytest tests/mms` — level 6, orders 1/3/6, `FM_CSEM_NP=2`, ~3 min | the `fm.csem` artifact |
+| `mt-tests` (tests-fm-mt.yml) | `tests/mt/make_bundle.sh` then `pytest tests/mt` — MT half-space, order 2, 1 and 3 MPI tasks | the `fm.mt` artifact |
 
 The order override is passed as `-order N`, which also bypasses the bundle's
 order dataset, so all six orders run against the single committed `input.h5`
 (and, for level 6, against the on-the-fly N=4 MMS bundle).
 
-> Scope: FM-CSEM only. IM-CSEM (inverse kernel) is intentionally out of scope.
+> Scope: FM-CSEM and FM-MT. IM-CSEM (inverse kernel) is intentionally out of scope.

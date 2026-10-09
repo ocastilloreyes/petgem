@@ -10,14 +10,17 @@ domain. It discretizes the electric field with high-order Nédélec (edge) finit
 elements of polynomial order 1 to 6 on unstructured tetrahedral meshes, and is
 written in C on top of `PETSc <https://petsc.org/release/>`_ and MPI.
 
-The repository builds two kernels and a dispatcher:
+The repository builds three kernels and a dispatcher:
 
 - ``fm.csem`` - forward modeling: computes the CSEM response of a given
   conductivity model.
 - ``im.csem`` - inverse modeling: recovers a per-material conductivity model
   from observed data with L-BFGS and adjoint-state gradients.
-- ``petgem`` - a dispatcher that selects either kernel
-  (``petgem fm`` / ``petgem im``).
+- ``fm.mt`` - MT forward modeling: computes the magnetotelluric response
+  (impedance, apparent resistivity, phase, tipper) of a given conductivity
+  model.
+- ``petgem`` - a dispatcher that selects a kernel
+  (``petgem fm`` / ``petgem im`` / ``petgem mt``).
 
 Pre- and post-processing are handled by a small Python package under ``utils/``
 (importable as ``petgem``), which assembles the HDF5 input bundle the kernels
@@ -50,6 +53,13 @@ More information
 
    manual/inverse_modeling
    manual/inverse_examples
+
+.. toctree::
+   :maxdepth: 2
+   :caption: MT modeling:
+
+   manual/mt_modeling
+   manual/mt_examples
 
 .. toctree::
    :maxdepth: 2

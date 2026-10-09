@@ -48,6 +48,11 @@ The resulting ``.msh`` is passed to ``utils/preprocess.py`` via
 up from ``sigmas.txt`` by material id) into the input bundle. A pre-generated
 ``.msh`` can be used directly.
 
+Write the mesh in the MSH 2.2 format (``Mesh.MshFileVersion = 2.2;`` in the
+``.geo``, as in the shipped examples). With MSH 4 and several physical volumes,
+meshio returns one tetrahedral block per volume and the preprocess reads only
+the first.
+
 One mesh, any order
 -------------------
 The polynomial order is a property of the basis, not of the mesh: the same

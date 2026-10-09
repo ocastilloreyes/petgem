@@ -4,7 +4,7 @@ Data formats
 
 This page documents the files **PETGEM** reads and writes: the text and HDF5
 inputs consumed by ``utils/preprocess.py``, the input bundle it produces, and
-the responses file written by ``fm.csem``. The HDF5 files use PETSc's viewer
+the files written by ``fm.csem``, ``im.csem`` and ``fm.mt``. The HDF5 files use PETSc's viewer
 layout; the Python readers in :doc:`python_api` return NumPy arrays.
 
 Conductivity table (``sigmas.txt``)
@@ -53,6 +53,15 @@ Forward modeling (``-source_filename``) uses a single frequency shared by all
 transmitters; inverse modeling (``-im_source_filename``) carries one row per
 ``(frequency, dipole)`` pair.
 
+MT frequency (``-mt_frequency_filename``, MT only)
+--------------------------------------------------
+One frequency (Hz); ``#`` comments are allowed.
+
+.. code-block::
+
+   # Frequency (Hz)
+   2.0
+
 Receivers (``-receiver_filename``)
 ----------------------------------
 Receiver positions, one Cartesian point per row. Columns may be separated by
@@ -89,8 +98,9 @@ noise level is supplied with ``-error_level``, or left to the kernel default.
 Input bundle (``-input_filename``, default ``input.h5``)
 --------------------------------------------------------
 ``utils/preprocess.py`` writes a single HDF5 bundle that the kernel reads in
-full. Both modes share the same skeleton - mesh, model, order, receivers, and
-``/sources``; inverse runs add ``/observed`` and ``/im_meta``.
+full. All modes share the same skeleton - mesh, model, order, and receivers;
+CSEM runs add ``/sources``, inverse runs also ``/observed`` and ``/im_meta``,
+and MT runs ``/mt``.
 
 .. list-table::
    :header-rows: 1
@@ -100,20 +110,20 @@ full. Both modes share the same skeleton - mesh, model, order, receivers, and
      - Mode
      - Contents
    * - DMPlex blocks
-     - both
+     - all
      - The mesh, written by PETSc's DMPlex viewer into its own top-level groups
        (``topology``, ``topologies``, ``geometry``, ``labels``). The per-cell
        model - ``sigma_x, sigma_y, sigma_z`` plus the material id - is the
        ``model_data`` Vec stored with them. Read back by the kernel; the exact
        nesting is PETSc's, not **PETGEM**'s.
    * - ``/order``
-     - both
+     - all
      - Polynomial order (length-1 Vec)
    * - ``/receivers``
-     - both
+     - all
      - Receiver positions, flattened ``[N_recv * 3]``
    * - ``/sources/*``
-     - both
+     - fm, im
      - Transmitters, as separate Vecs: ``freq``, ``position`` (flattened),
        ``current``, ``length``, ``dipAngle``, ``azimuthAngle`` - one entry each
        per transmitter
@@ -123,6 +133,9 @@ full. Both modes share the same skeleton - mesh, model, order, receivers, and
    * - ``/im_meta/fixed_materials``
      - inverse
      - 0-based material ids held fixed (int32)
+   * - ``/mt/freq``
+     - mt
+     - Frequency (length-1 Vec)
 
 ``petgem.readBundle(path)`` returns a dict with ``receivers`` (``[N_recv, 3]``),
 ``order``, ``frequency`` (that of the first transmitter), and ``sources``
@@ -132,9 +145,9 @@ kernel.
 
 Output files
 ------------
-Both kernels write ``{output_dir}/{output_filename}.h5``. The **root
-provenance block is identical** in both, written by one shared routine, so any
-PETGEM product can be traced back to the run that made it:
+Every kernel writes ``{output_dir}/{output_filename}.h5``. The **root
+provenance block is identical** in all of them, written by one shared routine,
+so any PETGEM product can be traced back to the run that made it:
 
 .. list-table::
    :header-rows: 1
@@ -145,7 +158,8 @@ PETGEM product can be traced back to the run that made it:
    * - ``petgem_version``
      - Version of the code that produced the file
    * - ``simulation_type``
-     - ``fm`` or ``im`` - which kernel wrote it
+     - ``fm`` (``fm.csem``), ``im`` (``im.csem``) or ``fm.mt`` - which kernel
+       wrote it
    * - ``input_filename``
      - Path of the input bundle (which carries the mesh, model, and geometry)
    * - ``order``
@@ -186,6 +200,29 @@ frequency).
 Per-source attributes (``/sources/src{k}``, ``k`` 1-based): ``frequency``,
 ``x_pos``, ``y_pos``, ``z_pos``, ``current``, ``length``, ``dip_angle``,
 ``azimuth_angle``.
+
+MT responses (``fm.mt``)
+************************
+Fields of both polarizations and the MT transfer functions at the receivers.
+Every dataset is a complex PETSc Vec of length ``N_recv``; apparent resistivity
+and phase are real values stored in the real part.
+
+Layout::
+
+    /                              root attrs (shared provenance block above)
+    /polarizations/x/fields/Ex     x-polarization fields: Ex Ey Ez Hx Hy Hz
+    ...
+    /polarizations/y/fields/Ex     y-polarization fields: Ex Ey Ez Hx Hy Hz
+    ...
+    /impedance/xx                  Z_xx  (also xy, yx, yy)
+    /apparent_resistivity/xx       rho_xx in Ohm.m  (also xy, yx, yy)
+    /phase/xx                      phi_xx in degrees, atan2(Im Z, Re Z)  (also xy, yx, yy)
+    /tipper/x                      T_x  (also y)
+
+Additional root attributes: ``frequency``, ``num_receivers``.
+
+The phase follows the :math:`e^{-i\omega t}` convention with :math:`z` up (a
+half-space gives ``phi_xy = 135``, ``phi_yx = -45``); see :doc:`method`.
 
 Inversion results (``im.csem``)
 *******************************
