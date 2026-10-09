@@ -33,6 +33,7 @@ HARNESS_SOURCES = {
     "test_basis":    ["fe_nedelec.c", "fe_nodal.c"],
     "test_dofs":     ["fe_nedelec.c", "fe_nodal.c"],
     "test_elements": ["fem.c", "fe_nedelec.c", "fe_nodal.c"],
+    "test_boundary": ["grid.c", "common.c", "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
 }
 
 #: Field components in a responses file.
@@ -76,9 +77,12 @@ def build_harness(name, outdir):
     return exe, ""
 
 
-def run_harness(exe, order):
+def run_harness(exe, order, nprocs=1):
     """Run a compiled harness for one order; return the CompletedProcess."""
-    return subprocess.run([str(exe), str(order)], capture_output=True, text=True, timeout=120)
+    cmd = [str(exe), str(order)]
+    if nprocs > 1:
+        cmd = ["mpirun", "-n", str(nprocs), *cmd]
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
 
 def load_fields(h5py, path):

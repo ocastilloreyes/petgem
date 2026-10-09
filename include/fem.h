@@ -33,6 +33,13 @@ typedef struct {
   PetscReal* weights;  /**< Quadrature weights. */
 } Quadrature3D;
 
+/** @brief 2D (triangle) Gauss quadrature rule (points and weights). */
+typedef struct {
+  PetscInt numPoints;  /**< Number of quadrature points. */
+  PetscReal** points;  /**< Quadrature point coordinates (per point, 2 reals). */
+  PetscReal* weights;  /**< Quadrature weights. */
+} Quadrature2D;
+
 /**
  * @brief Computes a 3D unit vector from sequential azimuth/dip rotations.
  *
@@ -98,6 +105,32 @@ PetscErrorCode computeNum3DQuadraturePoints(const PetscInt order, Quadrature3D* 
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature);
+
+/**
+ * @brief Sets the number of 2D quadrature points for a triangle.
+ *
+ * Stroud conical rule with (order+1) points per axis, exact to degree
+ * 2*order+1. Total (order+1)^2 points.
+ *
+ * @param[in]  order       Basis order driving the quadrature degree.
+ * @param[out] quadrature  Rule whose numPoints is set.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode computeNum2DQuadraturePoints(const PetscInt order, Quadrature2D* quadrature);
+
+/**
+ * @brief Populates 2D Gauss quadrature points and weights for a triangle.
+ *
+ * Points on the unit reference triangle (0,0), (1,0), (0,1), weights summing
+ * to its area 1/2. A point (s,t) maps to v0 + s*(v1-v0) + t*(v2-v0) on a
+ * physical triangle, with measure 2*area*weight.
+ *
+ * @param[in,out] quadrature  Rule (numPoints set) whose points/weights fill.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode compute2DQuadraturePoints(Quadrature2D* quadrature);
 
 /**
  * @brief Computes the elemental mass and stiffness matrices for a cell.

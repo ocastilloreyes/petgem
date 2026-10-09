@@ -788,3 +788,119 @@ PetscErrorCode logGridSummary(const petgemParams params, const DM dm, const Grid
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/**
+ * @brief Returns the local outer-boundary faces of the mesh.
+ *
+ * This function reads stratum 100 of the "Boundary" label created by
+ * setupNedelecGrid and keeps the depth-2 points (faces).
+ *
+ * @param[in]  dm     DMPlex mesh configured by setupNedelecGrid.
+ * @param[out] faces  Local boundary face points (caller destroys).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode getBoundaryFaces(const DM dm, IS* faces) {
+  PetscFunctionBeginUser;
+
+  DMLabel         label;
+  IS              stratum;
+  const PetscInt *points = NULL;
+  PetscInt       *faceList;
+  PetscInt        numPoints = 0, numFaces = 0, faceStart, faceEnd;
+
+  PetscCall(DMGetLabel(dm, "Boundary", &label));
+  PetscCheck(label, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "getBoundaryFaces: no \"Boundary\" label (call setupNedelecGrid first)");
+
+  PetscCall(DMPlexGetDepthStratum(dm, 2, &faceStart, &faceEnd));
+  PetscCall(DMLabelGetStratumIS(label, 100, &stratum));
+  if (stratum) {
+    PetscCall(ISGetLocalSize(stratum, &numPoints));
+    PetscCall(ISGetIndices(stratum, &points));
+  }
+
+  PetscCall(PetscMalloc1(numPoints, &faceList));
+  for (PetscInt i = 0; i < numPoints; i++) {
+    if (points[i] >= faceStart && points[i] < faceEnd) faceList[numFaces++] = points[i];
+  }
+
+  if (stratum) {
+    PetscCall(ISRestoreIndices(stratum, &points));
+    PetscCall(ISDestroy(&stratum));
+  }
+
+  PetscCall(ISCreateGeneral(PETSC_COMM_SELF, numFaces, faceList, PETSC_OWN_POINTER, faces));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Computes the geometry of an outer-boundary face.
+ *
+ * This function returns the face's support cell, its vertex coordinates, its
+ * area and its unit normal oriented away from the support cell centroid.
+ *
+ * @param[in]  dm        DMPlex mesh.
+ * @param[in]  face      Boundary face point.
+ * @param[out] cell      Cell that owns the face (its single support point).
+ * @param[out] vertices  Face vertex coordinates, in face-closure order.
+ * @param[out] normal    Outward unit normal.
+ * @param[out] area      Face area.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode computeBoundaryFaceGeometry(const DM dm, const PetscInt face, PetscInt* cell,
+                                           PetscReal vertices[NUM_VERTICES_PER_FACE][NUM_DIMENSIONS],
+                                           PetscReal normal[NUM_DIMENSIONS], PetscReal* area) {
+  PetscFunctionBeginUser;
+
+  const PetscInt    *support;
+  PetscInt           supportSize, numCoords;
+  PetscBool          isDG;
+  const PetscScalar *arrayCoords;
+  PetscScalar       *coords = NULL;
+  Cell               owner;
+  PetscReal          e1[NUM_DIMENSIONS], e2[NUM_DIMENSIONS], outward[NUM_DIMENSIONS];
+  PetscReal          length, orientation = 0.0;
+
+  PetscCall(DMPlexGetSupportSize(dm, face, &supportSize));
+  PetscCheck(supportSize == 1, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
+             "computeBoundaryFaceGeometry: face %" PetscInt_FMT " has %" PetscInt_FMT " support cells, expected 1", face, supportSize);
+  PetscCall(DMPlexGetSupport(dm, face, &support));
+  *cell = support[0];
+
+  /* Face vertex coordinates */
+  PetscCall(DMPlexGetCellCoordinates(dm, face, &isDG, &numCoords, &arrayCoords, &coords));
+  PetscCheck(numCoords == NUM_VERTICES_PER_FACE * NUM_DIMENSIONS, PETSC_COMM_SELF, PETSC_ERR_SUP,
+             "computeBoundaryFaceGeometry: unexpected number of face coordinates (%" PetscInt_FMT ")", numCoords);
+  for (PetscInt v = 0; v < NUM_VERTICES_PER_FACE; v++) {
+    for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+      vertices[v][d] = PetscRealPart(coords[v * NUM_DIMENSIONS + d]);
+    }
+  }
+  PetscCall(DMPlexRestoreCellCoordinates(dm, face, &isDG, &numCoords, &arrayCoords, &coords));
+
+  /* Support cell centroid */
+  PetscCall(extractCellCoordinates(dm, *cell, &owner));
+  PetscCall(computeCellCentroid(&owner));
+
+  /* Normal (v1 - v0) x (v2 - v0), oriented away from the cell centroid */
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+    e1[d]      = vertices[1][d] - vertices[0][d];
+    e2[d]      = vertices[2][d] - vertices[0][d];
+    outward[d] = (vertices[0][d] + vertices[1][d] + vertices[2][d]) / 3.0 - owner.centroid[d];
+  }
+  normal[0] = e1[1] * e2[2] - e1[2] * e2[1];
+  normal[1] = e1[2] * e2[0] - e1[0] * e2[2];
+  normal[2] = e1[0] * e2[1] - e1[1] * e2[0];
+
+  length = PetscSqrtReal(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+  PetscCheck(length > 0.0, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG, "computeBoundaryFaceGeometry: face %" PetscInt_FMT " is degenerate", face);
+  *area = 0.5 * length;
+
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) orientation += normal[d] * outward[d];
+  if (orientation < 0.0) length = -length;
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) normal[d] /= length;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

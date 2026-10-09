@@ -164,6 +164,49 @@ static PetscErrorCode femGaussPoints3D(PetscInt m, PetscReal **points, PetscReal
 
 
 /**
+ * @brief Fills Stroud conical quadrature points and weights on the unit triangle.
+ *
+ * This function maps a PETSc rule on the biunit triangle to the unit triangle
+ * (0,0), (1,0), (0,1) and checks that the weights sum to its area 1/2.
+ *
+ * @param[in]  m        Points per axis.
+ * @param[out] points   Point coordinates (m*m points, 2 reals each).
+ * @param[out] weights  Weights (m*m entries).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode femGaussPoints2D(PetscInt m, PetscReal **points, PetscReal *weights){
+    PetscFunctionBeginUser;
+
+    PetscQuadrature    quad;
+    const PetscReal   *qpts, *qwts;
+    PetscInt           qdim, qNc, qn;
+    PetscReal          wsum = 0.0;
+
+    /* Biunit triangle -> unit triangle: x = (x_biunit + 1)/2, w = w_biunit/4 */
+    PetscCall(PetscDTStroudConicalQuadrature(2, 1, m, -1.0, 1.0, &quad));
+    PetscCall(PetscQuadratureGetData(quad, &qdim, &qNc, &qn, &qpts, &qwts));
+
+    PetscCheck(qdim == 2 && qn == m*m, PETSC_COMM_SELF, PETSC_ERR_PLIB,
+               "femGaussPoints2D: unexpected quadrature (dim %" PetscInt_FMT ", %" PetscInt_FMT " points)", qdim, qn);
+
+    for (PetscInt i = 0; i < qn; i++) {
+        for (PetscInt j = 0; j < 2; j++) {
+            points[i][j] = 0.5 * (qpts[i*2 + j] + 1.0);
+        }
+        weights[i] = qwts[i] / 4.0;
+        wsum += weights[i];
+    }
+    PetscCall(PetscQuadratureDestroy(&quad));
+
+    PetscCheck(PetscAbsReal(wsum - 0.5) < 1.0e-10, PETSC_COMM_SELF, PETSC_ERR_PLIB,
+               "femGaussPoints2D: weights sum to %g, expected 1/2 (quadrature convention mismatch)", (double)wsum);
+
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
  * @brief Releases the process-wide cached Nedelec reference handle.
  *
  * This function destroys the lazily-built reference element and resets the
@@ -916,6 +959,52 @@ PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature){
                "compute3DQuadraturePoints: numPoints %" PetscInt_FMT " is not a perfect cube", quadrature->numPoints);
 
     PetscCall(femGaussPoints3D(m, quadrature->points, quadrature->weights));
+
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
+ * @brief Sets the number of 2D quadrature points for a triangle.
+ *
+ * This function selects a Stroud conical rule with order+1 points per axis,
+ * exact to degree 2*order+1, and stores the total point count (order+1)^2.
+ *
+ * @param[in]  order       Basis order driving the quadrature degree.
+ * @param[out] quadrature  Rule whose numPoints is set.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode computeNum2DQuadraturePoints(const PetscInt order, Quadrature2D* quadrature){
+    PetscFunctionBeginUser;
+
+    PetscCheck(order >= 1, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE, "Error: order must be >= 1 (got %" PetscInt_FMT ").\n", order);
+
+    const PetscInt m = order + 1;
+    quadrature->numPoints = m * m;
+
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/**
+ * @brief Populates the 2D quadrature points and weights for a triangle.
+ *
+ * This function recovers the per-axis point count m = order+1 from the stored
+ * numPoints (a perfect square) and fills the rule on the unit reference triangle.
+ *
+ * @param[in,out] quadrature  Rule (numPoints set) whose points/weights are filled.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode compute2DQuadraturePoints(Quadrature2D* quadrature){
+    PetscFunctionBeginUser;
+
+    const PetscInt m = (PetscInt)(PetscSqrtReal((PetscReal)quadrature->numPoints) + 0.5);
+    PetscCheck(m*m == quadrature->numPoints, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
+               "compute2DQuadraturePoints: numPoints %" PetscInt_FMT " is not a perfect square", quadrature->numPoints);
+
+    PetscCall(femGaussPoints2D(m, quadrature->points, quadrature->weights));
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }

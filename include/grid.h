@@ -235,4 +235,33 @@ PetscErrorCode computeCellCentroid(Cell* cell);
  */
 PetscErrorCode printCellEntities(const DM dm, const PetscInt cell);
 
+/**
+ * @brief Returns the local outer-boundary faces of the mesh.
+ *
+ * Faces (depth 2) in stratum 100 of the "Boundary" label created by
+ * setupNedelecGrid.
+ *
+ * @param[in]  dm     DMPlex mesh configured by setupNedelecGrid.
+ * @param[out] faces  Local boundary face points (caller destroys).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode getBoundaryFaces(const DM dm, IS* faces);
+
+/**
+ * @brief Computes the geometry of an outer-boundary face.
+ *
+ * @param[in]  dm        DMPlex mesh.
+ * @param[in]  face      Boundary face point.
+ * @param[out] cell      Cell that owns the face (its single support point).
+ * @param[out] vertices  Face vertex coordinates, in face-closure order.
+ * @param[out] normal    Outward unit normal.
+ * @param[out] area      Face area.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode computeBoundaryFaceGeometry(const DM dm, const PetscInt face, PetscInt* cell,
+                                           PetscReal vertices[NUM_VERTICES_PER_FACE][NUM_DIMENSIONS],
+                                           PetscReal normal[NUM_DIMENSIONS], PetscReal* area);
+
 #endif
