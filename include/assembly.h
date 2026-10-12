@@ -4,81 +4,40 @@
  * Date: 2026-02-03
  *
  * Description:
- * Function prototypes for the assembly routines used throughout PETGEM.
+ * Global assembly of the H(curl) Maxwell operator, its discrete gradient
+ * and mass-matrix refill, and the right-hand-side containers.
  */
 
 #ifndef ASSEMBLY_H
 #define ASSEMBLY_H
 
 #include "grid.h"
-#include "io.h"
-#include "mms.h"   /* MMSRhsKind, consumed by assembleCsemMMSRHS */
-#include "transmitter.h"
 #include "fem.h"
 #include <petsc.h>
 
 /**
- * @brief Assembles the CSEM right-hand side matrix.
+ * @brief Creates a global right-hand-side Vec that accepts closure insertion
+ *        (DM local-to-global mapping, negative indices ignored).
  *
- * Produces B with one column per transmitter, with Dirichlet boundary DOFs
- * eliminated, ready for solveMaxwellSystem.
- *
- * @param[in]  params   Forward-modeling parameters (order, MPI tasks).
- * @param[in]  sources  Transmitter set (one column of B per source).
- * @param[in]  dm       DMPlex mesh and H(curl) discretization.
- * @param[in]  grid     Finite-element grid descriptor.
- * @param[in]  constFactor  Fused-mode factor iωμ; ignored when Ms != NULL.
- * @param[out] B        Assembled right-hand side matrix.
+ * @param[in]  dm  DMPlex mesh carrying the H(curl) section.
+ * @param[out] b   Right-hand-side Vec.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemRHS(const petgemParams params,
-                               const CsemSourceSet sources,
-                               const DM dm,
-                               const Grid grid,
-                               const PetscScalar constFactor,
-                               Mat* B);
+PetscErrorCode createRhsVector(const DM dm, Vec *b);
 
 /**
- * @brief Assembles the volumetric manufactured-source RHS for MMS verification.
+ * @brief Creates a dense matrix with one column per right-hand side, laid out like @p b.
  *
- * Replaces the point-dipole RHS (assembleCsemRHS) when running in MMS mode
- * (-mms). Instead of a Dirac source in one cell, it integrates the manufactured
- * forcing f* (include/mms.h) against the Nedelec basis over EVERY cell:
+ * @param[in]  b       Template right-hand-side Vec.
+ * @param[in]  numRhs  Number of columns.
+ * @param[out] B       Dense right-hand-side matrix.
  *
- *     b_j = sum_cells sum_q  w_q * detJ_cell * ( N_j(x_q) . f*(x_q) )
- *
- * where x_q is the physical image of reference quadrature point q, f* is
- * complex, and the same (weights, detJ) measure as computeElementalMatrices is
- * used so b is consistent with the operator A = K - i omega mu Ms. The single
- * manufactured RHS is written to a one-column dense matrix B. Boundary DOFs are
- * eliminated via VEC_IGNORE_NEGATIVE_INDICES (E* already satisfies n x E* = 0).
- * No final iωμ scaling is applied - f* already carries it.
- *
- * The integrand is selected by `kind` (see MMSRhsKind in include/mms.h):
- * MMS_RHS_FORCING integrates f*, MMS_RHS_PROJECTION integrates the exact field
- * E* itself (the L2 moments of the best-approximation baseline, no iωμ and no
- * sigma), and MMS_RHS_FORCING_NO_MASS integrates the incomplete forcing of the
- * negative control.
- *
- * @param[in]  params        Forward-modeling parameters (order, MPI tasks).
- * @param[in]  sources       Transmitter set; only sources.freq (-> omega) is used.
- * @param[in]  dm            DMPlex mesh and H(curl) discretization.
- * @param[in]  grid          Finite-element grid descriptor.
- * @param[in]  conductivity  Per-cell conductivity Vec (diagonal sigma in f*).
- * @param[in]  kind          Which right-hand side to build.
- * @param[out] B             One-column dense RHS matrix (created by this call).
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
-                                  const CsemSourceSet sources,
-                                  const DM dm,
-                                  const Grid grid,
-                                  const Vec conductivity,
-                                  const MMSRhsKind kind,
-                                  Mat* B);
+PetscErrorCode createRhsMatrix(const Vec b, const PetscInt numRhs, Mat *B);
 
 /**
  * @brief Assembles the Maxwell operator A = K - iωμ·Ms (unified K/Ms or fused).
@@ -102,13 +61,12 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
  * Matrices:
  *   - K      : curl-curl stiffness, ∫_K (μ⁻¹ curl Ni)·curl Nj.
  *   - Ms     : mass × σ,            ∫_K (ε_r ⊙ Ni)·Nj.
- *   - G_BDDC : high-order discrete gradient (buildDiscreteGradientMatrix)
+ *   - G      : high-order discrete gradient (buildDiscreteGradientMatrix)
  *              consumed by PCBDDCSetDiscreteGradient. Each H(curl) DOF's
  *              gradient is resolved against the full P_order H1 closure, so
  *              grad(phi_k) = sum_i G_ik N_i exactly (K·G = 0). Built against
  *              grid.H1dm_P_order; one solver code path serves every order.
  *
- * @param[in]  params       Forward-modeling parameters (order, MPI tasks).
  * @param[in]  dm           DMPlex mesh and H(curl) discretization.
  * @param[in]  grid         Finite-element grid descriptor.
  * @param[in]  conductivity Per-cell conductivity Vec.
@@ -120,15 +78,12 @@ PetscErrorCode assembleCsemMMSRHS(const petgemParams params,
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleMaxwellOperator(const petgemParams params, const DM dm, const Grid grid,
-                                       const Vec conductivity,
-                                       const PetscScalar constFactor,
-                                       Mat *KorA, Mat *Ms,
-                                       Mat *G_BDDC);
+PetscErrorCode assembleMaxwellOperator(const DM dm, const Grid *grid, const Vec conductivity, const PetscScalar constFactor, Mat *KorA,
+                                       Mat *Ms, Mat *G);
 /**
  * @brief Refills an existing Ms matrix for the current conductivity field.
  *
- * Used by the inverse kernel inside the L-BFGS loop: K and G_BDDC are
+ * Used by the inverse kernel inside the L-BFGS loop: K and G are
  * σ-independent and built once at setup via assembleMaxwellOperator, while Ms
  * must be re-computed every iteration when σ changes. fm.csem does not use
  * this routine; it assembles through the fused single-pass call to
@@ -138,7 +93,7 @@ PetscErrorCode assembleMaxwellOperator(const petgemParams params, const DM dm, c
  *   - `Ms` is already allocated with the same sparsity pattern as the K
  *     produced by assembleMaxwellOperator for the same mesh / order (typically
  *     `MatDuplicate(K, MAT_DO_NOT_COPY_VALUES, &Ms)`).
- *   - `quadrature_3d`, `Me`, `Ke` are caller-owned workspace buffers of the
+ *   - `quadrature3D`, `Me`, `Ke` are caller-owned workspace buffers of the
  *     same shape used inside assembleMaxwellOperator (numDofInCell² for Me / Ke),
  *     passed in so a single allocation can serve all iterations.
  *
@@ -146,11 +101,10 @@ PetscErrorCode assembleMaxwellOperator(const petgemParams params, const DM dm, c
  * preserved. Ke is computed by computeElementalMatrices but is unused here
  * (kept in the signature so the caller can share the gradient-pass scratch).
  *
- * @param[in]     params         Forward-modeling parameters (order).
  * @param[in]     dm             DMPlex mesh and H(curl) discretization.
  * @param[in]     grid           Finite-element grid descriptor.
  * @param[in]     conductivity   Current per-cell conductivity Vec.
- * @param[in]     quadrature_3d  Caller-owned 3D quadrature workspace.
+ * @param[in]     quadrature3D  Caller-owned 3D quadrature workspace.
  * @param[in,out] Me             Scratch elemental mass buffer (numDofInCell²).
  * @param[in,out] Ke             Scratch elemental stiffness buffer (unused output).
  * @param[in,out] Ms             Pre-allocated matrix refilled with mass-σ entries.
@@ -158,22 +112,7 @@ PetscErrorCode assembleMaxwellOperator(const petgemParams params, const DM dm, c
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode assembleCsemMsRefill(const petgemParams params,
-                                    const DM dm, const Grid grid,
-                                    const Vec conductivity,
-                                    const Quadrature3D *quadrature_3d,
-                                    PetscReal **Me, PetscReal **Ke,
-                                    Mat Ms);
-
-/* DOFs on cells more conductive than threshold, for PCBDDC primal vertices.
- * Documented in src/assembly.c. */
-PetscErrorCode buildHighSigmaPrimalIS(const DM dm, const Vec conductivity,
-                                      const PetscReal threshold, IS *primal);
-
-/* Cross-check a primal index set against the assembled operator: the selected
- * rows must carry far larger diagonals than the rest, because the conductivity
- * enters through the mass term. Catches a wrong global numbering, which would
- * otherwise look like the preconditioner under-performing. */
-PetscErrorCode verifyPrimalISAgainstOperator(Mat A, IS primal);
+PetscErrorCode refillMassMatrix(const DM dm, const Grid *grid, const Vec conductivity, const Quadrature3D *quadrature3D, PetscReal **Me,
+                                PetscReal **Ke, Mat Ms);
 
 #endif

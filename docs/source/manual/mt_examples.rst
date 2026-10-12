@@ -2,8 +2,8 @@
 MT examples
 ===========
 
-Trapezoidal hill (``examples/mt1``)
------------------------------------
+Trapezoidal hill (``examples/fm_mt_hill``)
+------------------------------------------
 The 3D trapezoidal hill of Nam et al. (2007), used in Castillo-Reyes et al.
 (2022), Section 3.1: a 100 Ω·m half-space with a 450 m high hill (top
 450 × 450 m, base 2000 × 2000 m) under air (``1e8`` Ω·m), at 2 Hz. The 41
@@ -27,15 +27,15 @@ From the repository root:
 
    # 1. Input bundle: order 2, 4 skin depths, mesh from geometry/mesh.geo.
    #    A third argument sets hmin (m) or gives an existing Gmsh mesh instead.
-   bash examples/mt1/scripts/build_bundles.sh 2 4
+   bash examples/fm_mt_hill/scripts/build_bundles.sh 2 4
 
    # 2. Forward solve.
-   (cd examples/mt1 && mpirun -n 4 ../../build/fm.mt -options_file configs/params.txt \
+   (cd examples/fm_mt_hill && mpirun -n 4 ../../build/fm.mt -options_file configs/params.txt \
        -input_filename outputs/input_p2_n4.h5 -output_dir outputs/ \
        -output_filename responses_p2_n4)
 
    # 3. Compare with the references and plot.
-   python3 examples/mt1/scripts/postprocess.py -order 2
+   python3 examples/fm_mt_hill/scripts/postprocess.py -order 2
 
 ``postprocess.py`` reads every ``outputs/responses_p<order>_n<nskin>.h5``
 present, prints the median misfit in apparent resistivity (%) and phase (deg)

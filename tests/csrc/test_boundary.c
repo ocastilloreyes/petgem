@@ -5,7 +5,7 @@
  *
  * Description:
  * Boundary tools. For a given order (argv[1]) checks:
- *   - the 2D triangle rule (compute2DQuadraturePoints): weights sum to 1/2,
+ *   - the 2D triangle rule (createQuadrature2D): weights sum to 1/2,
  *     points inside the unit triangle, exact monomials up to degree 2*order+1;
  *   - setupNedelecGrid on a box mesh: global DOF counts for PETGEM_BC_NATURAL
  *     (all DOFs) and PETGEM_BC_PEC (interior DOFs only);
@@ -25,30 +25,23 @@ static const PetscInt  boxFaces[3] = {2, 3, 2};
 static const PetscReal boxLower[3] = {0.0, 0.0, -1.0};
 static const PetscReal boxUpper[3] = {2.0, 3.0, 0.5};
 
-static PetscReal factorial(PetscInt n)
-{
+static PetscReal factorial(PetscInt n) {
   PetscReal f = 1.0;
   for (PetscInt i = 2; i <= n; i++) f *= (PetscReal)i;
   return f;
 }
 
-static void check_quadrature_2d(PetscInt order, PetscMPIInt rank)
-{
-  Quadrature2D q;
-  PetscCallAbort(PETSC_COMM_SELF, computeNum2DQuadraturePoints(order, &q));
-  PT_CHECK(q.numPoints == (order + 1) * (order + 1), "order=%d: numPoints=%d", (int)order, (int)q.numPoints);
-
-  PetscCallAbort(PETSC_COMM_SELF, PetscCalloc1(q.numPoints, &q.points));
-  for (PetscInt i = 0; i < q.numPoints; i++) PetscCallAbort(PETSC_COMM_SELF, PetscCalloc1(2, &q.points[i]));
-  PetscCallAbort(PETSC_COMM_SELF, PetscCalloc1(q.numPoints, &q.weights));
-  PetscCallAbort(PETSC_COMM_SELF, compute2DQuadraturePoints(&q));
+static void check_quadrature_2d(PetscInt order, PetscMPIInt rank) {
+  Quadrature2D quad;
+  PetscCallAbort(PETSC_COMM_SELF, createQuadrature2D(order, &quad));
+  PT_CHECK(quad.numPoints == (order + 1) * (order + 1), "order=%d: numPoints=%d", (int)order, (int)quad.numPoints);
 
   PetscReal wsum = 0.0;
-  for (PetscInt i = 0; i < q.numPoints; i++) {
-    const PetscReal s = q.points[i][0], t = q.points[i][1];
-    wsum += q.weights[i];
-    PT_CHECK(q.weights[i] > 0.0, "order=%d: weight %d not positive", (int)order, (int)i);
-    PT_CHECK(s > 0.0 && t > 0.0 && s + t < 1.0, "order=%d: point %d (%g,%g) outside the triangle", (int)order, (int)i, s, t);
+  for (PetscInt q = 0; q < quad.numPoints; q++) {
+    const PetscReal s = quad.points[q][0], t = quad.points[q][1];
+    wsum += quad.weights[q];
+    PT_CHECK(quad.weights[q] > 0.0, "order=%d: weight %d not positive", (int)order, (int)q);
+    PT_CHECK(s > 0.0 && t > 0.0 && s + t < 1.0, "order=%d: point %d (%g,%g) outside the triangle", (int)order, (int)q, s, t);
   }
   PT_CLOSE(wsum, 0.5, 1e-14, "order=%d: weights sum %.16g != 1/2", (int)order, wsum);
 
@@ -57,26 +50,24 @@ static void check_quadrature_2d(PetscInt order, PetscMPIInt rank)
   for (PetscInt a = 0; a <= degree; a++) {
     for (PetscInt b = 0; a + b <= degree; b++) {
       PetscReal num = 0.0;
-      for (PetscInt i = 0; i < q.numPoints; i++) num += q.weights[i] * PetscPowRealInt(q.points[i][0], a) * PetscPowRealInt(q.points[i][1], b);
+      for (PetscInt q = 0; q < quad.numPoints; q++)
+        num += quad.weights[q] * PetscPowRealInt(quad.points[q][0], a) * PetscPowRealInt(quad.points[q][1], b);
       const PetscReal exact = factorial(a) * factorial(b) / factorial(a + b + 2);
-      PT_CLOSE(num, exact, 1e-13 * exact + 1e-16, "order=%d: s^%d t^%d integrates to %.16g, exact %.16g", (int)order, (int)a, (int)b, num, exact);
+      PT_CLOSE(num, exact, 1e-13 * exact + 1e-16, "order=%d: s^%d t^%d integrates to %.16g, exact %.16g", (int)order, (int)a, (int)b, num,
+               exact);
     }
   }
 
-  for (PetscInt i = 0; i < q.numPoints; i++) PetscCallAbort(PETSC_COMM_SELF, PetscFree(q.points[i]));
-  PetscCallAbort(PETSC_COMM_SELF, PetscFree(q.points));
-  PetscCallAbort(PETSC_COMM_SELF, PetscFree(q.weights));
+  PetscCallAbort(PETSC_COMM_SELF, destroyQuadrature2D(&quad));
   (void)rank;
 }
 
-static void create_box(DM *dm)
-{
+static void create_box(DM *dm) {
   create_box_mesh(boxFaces, boxLower, boxUpper, 0.0, dm);
 }
 
 /* Global counts of edges / faces / cells, total and on the "Boundary" label. */
-static void count_entities(DM dm, PetscInt all[3], PetscInt bnd[3])
-{
+static void count_entities(DM dm, PetscInt all[3], PetscInt bnd[3]) {
   IS              numbering;
   const PetscInt *gidx;
   DMLabel         label;
@@ -100,11 +91,13 @@ static void count_entities(DM dm, PetscInt all[3], PetscInt bnd[3])
   PetscCallAbort(PETSC_COMM_WORLD, ISRestoreIndices(numbering, &gidx));
   PetscCallAbort(PETSC_COMM_WORLD, ISDestroy(&numbering));
   PetscCallMPIAbort(PETSC_COMM_WORLD, MPI_Allreduce(local, global, 6, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD));
-  for (int i = 0; i < 3; i++) { all[i] = global[i]; bnd[i] = global[3 + i]; }
+  for (int i = 0; i < 3; i++) {
+    all[i] = global[i];
+    bnd[i] = global[3 + i];
+  }
 }
 
-static PetscInt global_dofs(DM dm)
-{
+static PetscInt global_dofs(DM dm) {
   Vec      v;
   PetscInt n;
   PetscCallAbort(PETSC_COMM_WORLD, DMCreateGlobalVector(dm, &v));
@@ -113,17 +106,13 @@ static PetscInt global_dofs(DM dm)
   return n;
 }
 
-static void check_grid(PetscInt order, PetgemBoundaryCondition bc, const char *tag)
-{
-  DM           dm;
-  Grid         grid;
-  petgemParams params;
-  PetscInt     all[3], bnd[3];
+static void check_grid(PetscInt order, PetgemBoundaryCondition bc, const char *tag) {
+  DM       dm;
+  Grid     grid;
+  PetscInt all[3], bnd[3];
 
-  PetscCallAbort(PETSC_COMM_WORLD, PetscMemzero(&params, sizeof(params)));
-  params.order = order;
   create_box(&dm);
-  PetscCallAbort(PETSC_COMM_WORLD, setupNedelecGrid(params, bc, &dm, &grid));
+  PetscCallAbort(PETSC_COMM_WORLD, setupNedelecGrid(order, bc, &dm, &grid));
   PT_CHECK(grid.bc == bc, "[%s] order=%d: grid.bc not stored", tag, (int)order);
 
   count_entities(dm, all, bnd);
@@ -149,8 +138,10 @@ static void check_grid(PetscInt order, PetgemBoundaryCondition bc, const char *t
     PetscCallAbort(PETSC_COMM_WORLD, computeBoundaryFaceGeometry(dm, fidx[i], &cell, vtx, normal, &area));
 
     PetscInt axis = 0;
-    for (PetscInt d = 1; d < NUM_DIMENSIONS; d++) if (PetscAbsReal(normal[d]) > PetscAbsReal(normal[axis])) axis = d;
-    PT_CLOSE(PetscAbsReal(normal[axis]), 1.0, 1e-12, "[%s] face %d: normal (%g,%g,%g) not axis-aligned", tag, (int)fidx[i], normal[0], normal[1], normal[2]);
+    for (PetscInt d = 1; d < NUM_DIMENSIONS; d++)
+      if (PetscAbsReal(normal[d]) > PetscAbsReal(normal[axis])) axis = d;
+    PT_CLOSE(PetscAbsReal(normal[axis]), 1.0, 1e-12, "[%s] face %d: normal (%g,%g,%g) not axis-aligned", tag, (int)fidx[i], normal[0],
+             normal[1], normal[2]);
     const PetscReal plane = normal[axis] > 0 ? boxUpper[axis] : boxLower[axis];
     for (PetscInt v = 0; v < NUM_VERTICES_PER_FACE; v++) {
       PT_CLOSE(vtx[v][axis], plane, 1e-12, "[%s] face %d: vertex off the outward box plane", tag, (int)fidx[i]);
@@ -174,12 +165,11 @@ static void check_grid(PetscInt order, PetgemBoundaryCondition bc, const char *t
     PT_CLOSE(gsums[d], 0.0, 1e-12, "[%s] sum of n*area component %d = %.3e", tag, (int)d, gsums[d]);
   }
 
-  PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&grid.H1dm));
+  PetscCallAbort(PETSC_COMM_WORLD, destroyGrid(&grid));
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dm));
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   PetscMPIInt rank;
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
@@ -192,8 +182,10 @@ int main(int argc, char **argv)
   int localFail = pt_failures, anyFail = 0;
   PetscCallMPI(MPI_Allreduce(&localFail, &anyFail, 1, MPI_INT, MPI_SUM, PETSC_COMM_WORLD));
   int rc = 0;
-  if (rank == 0) rc = pt_report("test_boundary");
-  else if (pt_failures) fprintf(stderr, "rank %d: %d failures\n", rank, pt_failures);
+  if (rank == 0)
+    rc = pt_report("test_boundary");
+  else if (pt_failures)
+    fprintf(stderr, "rank %d: %d failures\n", rank, pt_failures);
   PetscCall(PetscFinalize());
   return (rc || anyFail) ? 1 : 0;
 }

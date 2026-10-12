@@ -1,18 +1,10 @@
-"""LEVEL 4 - Global assembly tests (unit cube, pipeline orders 1..3).
+"""LEVEL 4 - Global assembly (unit cube, orders 1..3).
 
-Runs fm.csem end-to-end with a trivial solver (assembly is the object under
-test, the "solution" is ignored) and checks, from the real assembled system:
-  * the per-cell discrete-gradient kernel property held everywhere during
-    assembly (no `Error element` from checkGradientKernel),
-  * the mesh topology loaded from the bundle is the expected, order-independent
-    unit-cube topology,
-  * per-order Nedelec DOF-per-entity counts follow the closed forms,
-  * the global DOF count is bounded above by the total
-    (pre-boundary-condition) DOF count.
-
-Orders 1/2/3 exercise every DOF entity class (edge / face / interior), so the
-assembly code paths are fully covered here; the FE core is verified for ALL
-orders 1..6 by the fast level 1-3 harnesses.
+Runs fm.csem with a trivial solver and checks, from the run report:
+  * no `Error element` from the per-cell gradient-kernel check,
+  * the unit-cube mesh topology,
+  * the Nedelec DOF-per-entity closed forms,
+  * 0 < global DOFs <= total DOFs (boundary DOFs are constrained).
 """
 import pytest
 
@@ -38,8 +30,8 @@ def test_global_assembly(fm_run, order):
     s = parse_grid_stats(run.stdout)
 
     # (b) mesh topology is order-independent and fixed for this dataset.
-    for k, v in MESH.items():
-        assert s.get(k) == v, f"order {order}: mesh {k}={s.get(k)} expected {v}"
+    for key, expected in MESH.items():
+        assert s.get(key) == expected, f"order {order}: mesh {key}={s.get(key)} expected {expected}"
 
     # (c) per-order Nedelec DOF-per-entity closed forms.
     assert s["order"] == order

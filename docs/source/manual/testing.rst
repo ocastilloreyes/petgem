@@ -2,156 +2,121 @@
 Testing
 =======
 
-**PETGEM** ships a `pytest <https://docs.pytest.org/>`_ suite under ``tests/``,
-covering the **forward** kernels (``fm.csem`` and ``fm.mt``). The inverse
-kernel is out of scope for the suite. The full rationale is in
-``tests/README.md``.
+The `pytest <https://docs.pytest.org/>`_ suite under ``tests/`` covers the
+three kernels. The C harnesses link against the unchanged ``src/`` files, and
+the end-to-end tests run the built binaries. ``tests/README.md`` lists the
+files and the exact checks.
 
-The tests never modify the production sources: the C harnesses link against the
-unchanged ``src/`` translation units, and the end-to-end tests drive the built
-binary.
-
-Structure
----------
-Six levels of increasing scope, split so the finite-element core is checked at
-**every** order cheaply, while the expensive full-pipeline runs are limited to
-the orders that exercise new code paths.
-
+Test levels
+-----------
 .. list-table::
    :header-rows: 1
-   :widths: 8 34 14 44
+   :widths: 10 30 12 48
 
    * - Level
-     - What it verifies
+     - What it checks
      - Orders
      - How
    * - 1
      - Basis functions
      - 1-6
-     - C harness against ``fe_nedelec.c``, ``fe_nodal.c``
+     - C harness ``test_basis.c``
    * - 2
      - DOF ordering
      - 1-6
-     - C harness against ``fe_nedelec.c``, ``fe_nodal.c``
+     - C harness ``test_dofs.c``
    * - 3
      - Element matrices
      - 1-6
-     - C harness against ``fem.c``
+     - C harness ``test_elements.c``
    * - 4
      - Global assembly
      - 1-3
-     - ``fm.csem`` (assembly only)
+     - ``fm.csem`` on ``examples/fm_csem_unit_cube``
    * - 5
-     - Basic physics
+     - Fields at the receivers
      - 1-3
-     - ``fm.csem`` with a direct LU/MUMPS solve
+     - ``fm.csem`` with MUMPS against golden responses
    * - 6
      - Order of accuracy (MMS)
      - 1, 3, 6
-     - ``fm.csem -mms`` vs. committed golden errors
+     - ``build/mms`` against golden error norms
+   * - MT
+     - Boundary quadrature, 1D field, boundary right-hand side
+     - 1-6
+     - C harnesses ``test_boundary.c``, ``test_mt1d.c``, ``test_mt_rhs.c``
+   * - MT
+     - Half-space response
+     - 2
+     - ``fm.mt`` on 1 and 3 ranks
+   * - IM
+     - Reduced ``im_csem_block`` inversion
+     - 1
+     - ``im.csem``, 2 L-BFGS iterations against a golden
 
-Levels 1-3 (``tests/unit/``) are fast and need PETSc and ``mpicc``, but no
-built binary. Levels 4-5 (``tests/e2e/``) run the assemble → solve →
-interpolate pipeline on ``examples/unit_cube``. Orders 1, 2, 3 are enough there
-because they activate every DOF entity class - order 1 has edge DOFs only,
-order 2 adds face DOFs, order 3 adds interior DOFs; higher orders only add more
-DOFs of the same classes, already covered by levels 1-3.
+Levels 4 and 5 stop at order 3: orders 1, 2 and 3 already have edge, face and
+interior DOFs, and higher orders only add more of the same. Level 6 runs the
+manufactured-solution program described in :doc:`method`.
 
-Level 6 (``tests/mms/``) is the order-of-accuracy check. It runs ``fm.csem
--mms`` on the :math:`[0,1]^3` cube with a manufactured solution (see
-:doc:`method`), and compares the reported relative :math:`L^2` and
-:math:`H(\mathrm{curl})` errors and the DOF count against
-``tests/mms/reference/mms_golden.json``. Its bundle is self-contained and built
-on demand by ``tests/mms/make_bundle.sh``.
-
-MT tests
---------
-The MT layer is covered by three C harnesses in ``tests/unit/``, run on 1 and 3
-MPI tasks, and by an end-to-end check in ``tests/mt/``:
-
-- ``test_boundary_tools.py`` - triangle quadrature (exact up to degree
-  :math:`2p+1`), DOF counts of ``setupNedelecGrid`` for ``PETGEM_BC_NATURAL``
-  and ``PETGEM_BC_PEC``, and the boundary faces of a box (count, area,
-  :math:`\sum n\,|F| = 0`, outward axis-aligned normals).
-- ``test_mt_1d.py`` - the 1D boundary field against the exact layered solution
-  for both 1D equations (second-order convergence), the box-face classification,
-  and the lateral conductivity profile (identical on every rank; non-1D lateral
-  boundaries and non-box domains are rejected).
-- ``test_mt_rhs.py`` - the boundary right-hand side, orders 1-6: for a field
-  :math:`F` in the Nédélec space with coefficients :math:`c` from its
-  :math:`L^2` projection, :math:`c^T b = -i\omega\mu \oint F\cdot(n\times\hat{H})`
-  in closed form.
-- ``tests/mt/test_mt_halfspace.py`` - ``fm.mt`` on a 100 Ω·m half-space at
-  order 2 with ``-mt_1d_equation h``: :math:`\rho = 100` Ω·m within 1 %,
-  :math:`\phi_{xy} = 135^\circ` and :math:`\phi_{yx} = -45^\circ` within
-  0.5°, vanishing :math:`Z_{xx}`, :math:`Z_{yy}` and tipper, and the same
-  impedance on 1 and 3 MPI tasks. Its bundle is built by
-  ``tests/mt/make_bundle.sh``.
-
-Markers, declared in ``pytest.ini``:
-
-- ``e2e`` - needs the built binary and the ``unit_cube`` dataset; skipped
-  automatically when the binary is unavailable.
-- ``slow`` - the full-pipeline family (levels 4-5).
-
-``testpaths`` is ``tests/unit tests/e2e``, so a bare ``pytest`` does not collect
-level 6; run it explicitly.
+``tests/unit/test_layers.py`` checks the module layering described in
+:doc:`contributing`.
 
 Running
 -------
 .. code-block:: bash
 
-   # Levels 1-3 - all orders 1..6, fast (needs PETSc + mpicc; no binary)
+   # Levels 1-3 and the MT harnesses (needs PETSc and mpicc)
    pytest tests/unit
 
-   # Levels 4-5 - orders 1..3 (needs the fm.csem binary)
-   PETGEM_FM_CSEM=build/fm.csem pytest tests/e2e
+   # Levels 4-5
+   bash examples/fm_csem_unit_cube/scripts/build_bundles.sh
+   PETGEM_FM_CSEM=build/fm.csem PETGEM_NP=2 pytest tests/e2e
 
-   # ... with 4 MPI tasks for the solves
-   PETGEM_FM_CSEM=build/fm.csem FM_CSEM_NP=4 pytest tests/e2e
+   # Level 6 (make mms)
+   bash tests/mms/build_bundle.sh 4
+   PETGEM_MMS=build/mms PETGEM_NP=2 pytest tests/mms
 
-   # Level 6 - MMS (needs the binary + gmsh; build the N=4 bundle first)
-   bash tests/mms/make_bundle.sh 4
-   PETGEM_FM_CSEM=build/fm.csem FM_CSEM_NP=2 pytest tests/mms
-
-   # MT half-space (needs the fm.mt binary + gmsh; build the bundle first)
-   bash tests/mt/make_bundle.sh
+   # MT half-space
+   bash tests/mt/build_bundle.sh
    PETGEM_FM_MT=build/fm.mt pytest tests/mt
 
-Environment variables:
+   # Reduced inversion
+   bash tests/im/build_bundle.sh
+   PETGEM_IM_CSEM=build/im.csem pytest tests/im
 
-- ``PETGEM_FM_CSEM`` - path to the ``fm.csem`` binary. Without it, the tests
-  that need a binary skip.
-- ``FM_CSEM_NP`` - number of MPI ranks for the kernel runs.
-- ``PETGEM_FM_MT`` - path to the ``fm.mt`` binary, for ``tests/mt``.
+A bare ``pytest`` runs everything available. Tests whose toolchain, binary or
+bundle is missing are skipped. Without the ``PETGEM_*`` variables the binaries
+are looked up in ``build/``, the current directory and ``PATH``.
+``PETGEM_NP`` sets the number of MPI ranks. ``pytest -m "not slow"`` runs
+only the tests that do not start a kernel.
 
-Fixtures skip cleanly when the PETSc toolchain (levels 1-3) or the binary
-(levels 4-6) is unavailable, so a partial environment still runs whatever it
-can.
+Tolerances
+----------
+- Levels 1-3 check analytic properties (DOF counts, reproduction of constant
+  fields, partition of unity, symmetry, :math:`K_e G_e = 0`) to about
+  ``1e-9``.
+- Level 5 compares against the goldens with a relative tolerance of ``1e-3``.
+- Level 6 uses ``atol + rtol*|golden|`` with ``rtol = 1e-3``, ``atol = 1e-8``,
+  and requires :math:`\|Ax-b\|/\|b\| < 10^{-10}`.
+- The MT half-space must give :math:`\rho = 100` Ω·m within 1 % and
+  :math:`\phi_{xy} = 135^\circ`, :math:`\phi_{yx} = -45^\circ` within 0.5°.
+- The reduced inversion matches its golden RMS history and model norm to
+  ``rtol = 1e-8``.
 
-Determinism and tolerances
---------------------------
-- Levels 1-3 assert analytic invariants (DOF-count closed forms, H(curl)
-  constant-vector reproduction, partition of unity, symmetry of the element
-  matrices, and the de Rham identity :math:`K_e G_e = 0`) to about ``1e-9``.
-- Level 5 compares a **direct LU (MUMPS)** solve against committed exact-LU
-  golden responses to a relative tolerance of ``1e-3``. A direct solve is
-  deterministic and always succeeds, so the check is stable across rank counts
-  and does not depend on iterative-solver convergence.
-- Level 6 compares the MMS error norms against the golden with a combined
-  ``atol + rtol*|golden|`` tolerance (``rtol=1e-3``, ``atol=1e-8``), and
-  requires the backward residual :math:`\|Ax-b\|/\|b\|` to stay below
-  ``1e-10``.
+Every test that solves a system uses a direct MUMPS solve, so none depends
+on iterative convergence.
 
-Golden references are exact serial LU solves of the current code; regenerate
-them only after an intentional change to the forward result. The commands are in
-``tests/README.md`` and ``examples/unit_cube/README.md``.
+The goldens are regenerated only after an intended change of the results:
+
+.. code-block:: bash
+
+   bash examples/fm_csem_unit_cube/scripts/regen_golden.sh  # levels 4-5
+   bash tests/mms/regen_golden.sh                           # level 6
 
 Continuous integration
 ----------------------
-``.github/workflows/ci-develop.yml`` compiles ``fm.csem`` and ``fm.mt`` and
-calls the reusable ``tests-fm-csem.yml`` workflow, which runs the suite (levels
-1-3 and the MT harnesses; levels 4-5 and 6 against the compiled binary) plus an
-Extrae smoke run, and the reusable ``tests-fm-mt.yml`` workflow, which runs
-``tests/mt`` against ``fm.mt``, inside the project's CI image. Code and documentation jobs are gated independently, so a docs-only
-change skips the kernel build.
+``.github/workflows/ci-develop.yml`` builds the binaries and the MMS program
+in the CI image and runs ``tests-fm-csem.yml`` (harnesses, levels 4-6),
+``tests-fm-mt.yml`` (MT half-space) and ``tests-im-csem.yml`` (reduced
+inversion). Documentation
+jobs run only when the docs or sources change.

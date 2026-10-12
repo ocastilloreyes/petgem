@@ -85,7 +85,7 @@ bilinear form of the operator above,
 the total field solves :math:`a(E, v) = l(v)` for all test functions, with no
 constrained boundary DOFs (``PETGEM_BC_NATURAL``). The matrix is the same
 :math:`A` assembled by ``assembleMaxwellOperator``; the right-hand side is the
-boundary integral, assembled by ``assembleMtBoundaryRHS`` (``src/mt.c``) with a
+boundary integral, assembled by ``assembleMtBoundaryRhs`` (``src/mt.c``) with a
 triangle quadrature on every boundary face.
 
 The domain is an axis-aligned box with faces :math:`\Gamma_1` (top) to
@@ -134,7 +134,7 @@ references in the first-quadrant convention use
 
 Inverse problem
 ---------------
-``im.csem`` recovers a conductivity model :math:`m` - one value per invertable
+``im.csem`` recovers a conductivity model :math:`m` - one value per invertible
 material - by minimizing a regularized data-misfit functional combining the
 difference between observed and predicted responses (weighted by the relative
 data-error level, ``-im_error_level``) with a Tikhonov term of weight
@@ -152,7 +152,8 @@ fixed are excluded from the update. Options are listed in
 Verification
 ------------
 The discretization is verified by a **method of manufactured solutions** (MMS)
-mode, enabled with ``fm.csem -mms``. On the cube :math:`\Omega = [0,L]^3` with
+program, ``build/mms`` (``make mms``, source in ``tests/mms/``), which runs the
+fm.csem discretization on a manufactured problem. On the cube :math:`\Omega = [0,L]^3` with
 :math:`k = m\pi/L` the exact field is a Hodge split of a solenoidal and a
 gradient part,
 
@@ -174,7 +175,7 @@ the assembled operator is, per component,
    f^*_d = a\left(2k^2 - i\,\omega\,\mu_0\,\sigma_d\right) S_d
            - i\,\omega\,\mu_0\,\sigma_d\,b\,G_d .
 
-In this mode the kernel assembles a volumetric right-hand side from
+The program assembles a volumetric right-hand side from
 :math:`f^*` instead of a dipole, and reports relative :math:`L^2` and **energy**
 errors against :math:`E^*`, the energy norm being the one the operator induces,
 
@@ -189,7 +190,7 @@ Both converge as :math:`O(h^p)` for the first-kind Nédélec family of degree
 quadrature rule, and ``-mms_drop_mass`` runs a negative control in which the
 forcing is incomplete and the error does not converge.
 
-The definitions live in ``include/mms.h`` and are mirrored in
+The definitions live in ``tests/mms/mms.h`` and are mirrored in
 ``data/test1/mms_reference.py``; ``data/test1/verify_c_reference.sh`` checks the
 two against each other. See ``data/test1/README.md`` for the design and the
 verification protocol, and :doc:`testing`.

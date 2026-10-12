@@ -3,7 +3,7 @@
 * test1 - Gmsh geometry for the PETGEM MMS order-of-accuracy study
 *
 * Homogeneous CUBE [0,L]^3 with L = 1000 m, single (anisotropic) material.
-* Same workflow as examples/fm (gmsh -> preprocess -> fm.csem); only the
+* Same workflow as examples/fm_csem_marine (gmsh -> preprocess -> fm.csem); only the
 * refinement knob N changes between runs.
 *
 * WHY THE CORNER SITS AT THE ORIGIN. The manufactured field verified here is
@@ -18,7 +18,7 @@
 * vanishes on the whole boundary. That is exactly the homogeneous Dirichlet
 * condition fm.csem imposes by constraining boundary DOFs out of the
 * PetscSection (src/grid.c), so NO nonzero-BC code path is needed and the
-* verification runs on the production assembly and solve. On a centred cube
+* verification runs on the production assembly and solve. On a centered cube
 * [-L/2,L/2]^3 this trace is NOT zero and the test is invalid: do not move or
 * rescale the domain without changing E* (see mms_reference.py).
 *
@@ -34,7 +34,7 @@
 * much smaller than the skin depth (nu -> 0) drives kappa up and the measured
 * slopes report the arithmetic floor kappa*eps instead of the discretization
 * error. On the unit cube at the same frequency nu = 7.9e-5, a factor 1e6
-* worse. L is duplicated in include/mms.h (MMS_L) and mms_reference.py (L):
+* worse. L is duplicated in tests/mms/mms.h (MMS_L) and mms_reference.py (L):
 * keep the three in step.
 *
 * CONVERGENCE SEQUENCE: regenerate this mesh for several N to get a family of
@@ -66,7 +66,7 @@ If(!Exists(N))
 EndIf
 
 // Edge length of the domain [0,L]^3 in metres.
-// MUST match MMS_L in include/mms.h and L in mms_reference.py;
+// MUST match MMS_L in tests/mms/mms.h and L in mms_reference.py;
 // runMMSVerification checks it against the mesh bounding box and aborts on a mismatch.
 L = 1000.0;
 

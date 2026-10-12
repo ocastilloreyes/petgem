@@ -9,18 +9,9 @@
 
 /*
  * Notes:
- * The CSEM forward kernel (runForward), the CSEM inverse kernel (runInverse)
- * and the MT forward kernel (runMtForward) are exposed as functions so they
- * can be called either from the single-purpose binaries (fm.csem, im.csem,
- * fm.mt) or from the unified dispatcher (petgem).
- *
- * Each function owns its complete PETSc lifecycle: it calls
- * PetscInitialize at entry and PetscFinalize at exit, and returns the
- * PetscErrorCode (cast to int) as the would-be exit status.
- *
- * Usage:
- *     #include "kernels.h"
- *     int main(int argc, char **argv) { return runForward(argc, argv); }
+ * Each kernel is called from its own binary (fm.csem, im.csem, fm.mt) and
+ * from the unified dispatcher (petgem). Each one owns the whole PETSc
+ * lifecycle (PetscInitialize ... PetscFinalize) and returns the exit status.
  */
 
 #ifndef KERNELS_H

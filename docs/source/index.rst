@@ -20,7 +20,7 @@ The repository builds three kernels and a dispatcher:
   (impedance, apparent resistivity, phase, tipper) of a given conductivity
   model.
 - ``petgem`` - a dispatcher that selects a kernel
-  (``petgem fm`` / ``petgem im`` / ``petgem mt``).
+  (``petgem fm.csem`` / ``petgem im.csem`` / ``petgem fm.mt``).
 
 Pre- and post-processing are handled by a small Python package under ``utils/``
 (importable as ``petgem``), which assembles the HDF5 input bundle the kernels

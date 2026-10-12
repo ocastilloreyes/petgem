@@ -1,10 +1,8 @@
 # =============================================================================
 # Build + push the PETGEM CI image (PETSc + mpicc + gmsh + python + h5py).
 #
-# Split out of ci-develop.yml so the image is rebuilt ONLY when the container
-# definition changes (docker/**) or on manual dispatch - not on every push/PR.
-# The correctness workflows (ci-develop.yml, tests-fm-csem.yml) merely *pull*
-# the resulting :latest tag, which keeps normal CI runs fast and deterministic.
+# Runs when docker/** changes or on manual dispatch; the test workflows pull
+# the resulting :latest tag.
 #
 # NOTE: a change under docker/** triggers this build AND ci-develop.yml at the
 # same time; that CI run pulls the *previous* image. Re-run CI after the image

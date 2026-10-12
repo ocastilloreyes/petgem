@@ -1,0 +1,62 @@
+# =============================================================================
+# IM-CSEM test suite. See tests/README.md.
+#
+# Reusable workflow called by ci-develop.yml with the CI image and the compiled
+# binaries.
+#
+#   im-tests : reduced im_csem_block inversion, im.csem vs golden RMS history, 2 MPI tasks
+# =============================================================================
+name: IM-CSEM tests
+
+on:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: CI image (PETSc + mpicc + gmsh + python + h5py).
+        required: true
+        type: string
+      binary_artifact:
+        description: Artifact holding build/fm.csem and build/im.csem.
+        required: false
+        type: string
+        default: kernel-binaries
+  workflow_dispatch:
+    inputs:
+      docker_image:
+        description: CI image (leave blank to use the default GHCR tag).
+        required: false
+        default: ""
+
+env:
+  PETSC_DIR: /usr/local/petsc
+  PETSC_ARCH: arch-linux-c-opt
+
+jobs:
+  im-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.binary_artifact }}
+          path: build
+      - name: Make binaries executable
+        run: chmod +x build/fm.csem build/im.csem
+      - name: Resolve CI image
+        id: img
+        run: echo "image=${{ inputs.docker_image != '' && inputs.docker_image || format('ghcr.io/{0}/petgem-ci-env:latest', github.repository_owner) }}" >> "$GITHUB_OUTPUT"
+      - name: Pull CI image
+        run: docker pull ${{ steps.img.outputs.image }}
+      - name: Build the reduced im_csem_block bundle (fm.csem -> observations -> tests/im/input.h5)
+        run: |
+          docker run --rm -e PETSC_DIR -e PETSC_ARCH \
+            -e PETGEM_FM_CSEM=/workspace/build/fm.csem \
+            -v ${{ github.workspace }}:/workspace -w /workspace \
+            ${{ steps.img.outputs.image }} bash -c "bash tests/im/build_bundle.sh"
+      - name: Reduced inversion (2 L-BFGS iterations, 2 MPI tasks) vs golden
+        run: |
+          docker run --rm \
+            -e PETGEM_IM_CSEM=/workspace/build/im.csem \
+            -v ${{ github.workspace }}:/workspace -w /workspace \
+            ${{ steps.img.outputs.image }} bash -c "pytest tests/im -ra"

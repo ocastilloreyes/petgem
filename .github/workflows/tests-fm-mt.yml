@@ -23,6 +23,12 @@ on:
         required: false
         type: string
         default: kernel-binaries
+  workflow_dispatch:
+    inputs:
+      docker_image:
+        description: CI image (leave blank to use the default GHCR tag).
+        required: false
+        default: ""
 
 env:
   PETSC_DIR: /usr/local/petsc
@@ -40,16 +46,19 @@ jobs:
           path: build
       - name: Make binary executable
         run: chmod +x build/fm.mt
+      - name: Resolve CI image
+        id: img
+        run: echo "image=${{ inputs.docker_image != '' && inputs.docker_image || format('ghcr.io/{0}/petgem-ci-env:latest', github.repository_owner) }}" >> "$GITHUB_OUTPUT"
       - name: Pull CI image
-        run: docker pull ${{ inputs.docker_image }}
-      - name: Build the MT half-space bundle (gmsh -> preprocess -mode mt -> tests/mt/input.h5)
+        run: docker pull ${{ steps.img.outputs.image }}
+      - name: Build the MT half-space bundle (gmsh -> preprocess -mode fm.mt -> tests/mt/input.h5)
         run: |
           docker run --rm -e PETSC_DIR -e PETSC_ARCH \
             -v ${{ github.workspace }}:/workspace -w /workspace \
-            ${{ inputs.docker_image }} bash -c "bash tests/mt/make_bundle.sh"
+            ${{ steps.img.outputs.image }} bash -c "bash tests/mt/build_bundle.sh"
       - name: MT half-space (order 2, 1 and 3 MPI tasks)
         run: |
           docker run --rm \
             -e PETGEM_FM_MT=/workspace/build/fm.mt \
             -v ${{ github.workspace }}:/workspace -w /workspace \
-            ${{ inputs.docker_image }} bash -c "pytest tests/mt -ra"
+            ${{ steps.img.outputs.image }} bash -c "pytest tests/mt -ra"

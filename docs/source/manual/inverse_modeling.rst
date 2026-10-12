@@ -2,119 +2,99 @@
 Inverse modeling
 ================
 
-``im.csem`` recovers a conductivity model from observed CSEM data. It reuses
-the forward kernel's assembly and solver: each iteration solves forward and
-adjoint problems for every frequency, assembles the gradient of the data misfit
-by the adjoint-state method, and updates the model with L-BFGS. The model is
-parameterized **per material**, not per cell: one conductivity value per row of
-``sigmas.txt``, with materials flagged ``fixed`` excluded from the update.
+``im.csem`` recovers a conductivity model from observed :math:`E_x` data at
+several frequencies. The model has one value per material (one row of
+``sigmas.txt``), not per cell. Each iteration solves the forward and adjoint
+problems for every frequency, computes the gradient of the regularized misfit,
+and updates the model with L-BFGS (see :doc:`method`).
 
-Workflow
---------
-1. Generate or import a mesh (see :doc:`meshing`).
-2. Define the starting model in ``sigmas.txt``, marking materials to hold fixed
-   with the ``fixed`` column.
-3. Run ``utils/preprocess.py -mode im`` to assemble the input bundle.
-4. Run ``im.csem``.
-5. Inspect the recovered model (optionally via VTU snapshots).
+Inputs
+------
+``preprocess.py -mode im.csem`` needs, besides the mesh, receivers and
+starting model:
 
-Inverse inputs
---------------
-Inverse preprocessing requires two inputs that forward modeling does not, both
-embedded into the bundle:
+``-im_source_filename``
+   One row per (frequency, dipole) pair, 8 fields each:
+   ``freq x y z current length dip azimuth``. Row ``k`` matches row ``k`` of
+   the observed data.
 
-- ``-im_source_filename`` - a **multi-frequency** source file: one row per
-  ``(frequency, dipole)`` pair, 8 fields each
-  (``freq x y z current length dip azimuth``). Stored under ``/sources``.
-- ``-observed_filename`` - the observed field, either an HDF5 file with
-  ``/Ex [N_freq, N_recv]`` or a raw MATLAB-style ``invEx.dat`` text file (parsed
-  inline). Stored under ``/observed/Ex``. Both layouts are described in
-  :doc:`formats`.
+``-observed_filename``
+   Observed ``Ex`` as an ``[N_freq, N_recv]`` array, in HDF5 or as a
+   MATLAB-style ``invEx.dat`` text file (see :doc:`formats`). Preprocessing
+   checks that its shape matches the sources and the receivers.
 
-Two further quantities are derived during preprocessing and embedded in the
-bundle, each overridable on the kernel command line:
+``-error_level`` (optional)
+   Relative noise level used to weight the misfit. It overrides the
+   ``error_level`` attribute of an HDF5 observed-data file.
 
-- **Noise level** (``/observed`` ``@error_level``) - the relative data error
-  used to weight the misfit. Set with ``-error_level`` at preprocessing time
-  (or read from the HDF5 file's attribute); override at run time with
-  ``-im_error_level``.
-- **Fixed materials** (``/im_meta/fixed_materials``) - the 0-based material ids
-  flagged in the ``fixed`` column of ``sigmas.txt``. Override with
-  ``-im_fixed_materials``.
+Materials with a non-zero ``fixed`` column in ``sigmas.txt`` are held fixed:
+they are neither updated nor smoothed. Their ids are stored in the bundle.
 
 Kernel options
 --------------
-``im.csem`` accepts the forward kernel's required options (``-input_filename``,
-``-output_dir``, ``-output_filename``) and ``-order``, plus the inversion
-options below. Values in brackets are the kernel defaults, which apply when the
-option is absent from both the parameter file and the command line.
+``im.csem`` takes the common options of :doc:`overview` and the following.
+Defaults apply when an option is set neither in the parameter file nor on the
+command line.
 
 .. list-table::
    :header-rows: 1
-   :widths: 32 14 54
+   :widths: 30 14 56
 
    * - Option
      - Default
      - Meaning
    * - ``-im_max_iter``
-     - ``80``
-     - Maximum L-BFGS iterations.
+     - 80
+     - Maximum number of L-BFGS iterations.
    * - ``-im_lbfgs_memory``
-     - ``5``
+     - 5
      - Number of correction pairs kept by L-BFGS.
    * - ``-im_lambda``
-     - ``0.1``
+     - 0.1
      - Tikhonov regularization weight.
    * - ``-im_error_level``
-     - ``0.01``
-     - Relative data-error level. Overrides the bundle's ``@error_level``.
+     - 0.01
+     - Relative data error. Overrides the value in the bundle.
    * - ``-im_gtol``
-     - ``1e-5``
-     - Gradient-norm convergence tolerance.
+     - 1e-5
+     - Stop when the gradient norm falls below this value.
    * - ``-im_rms_tol``
-     - ``0`` (off)
-     - Absolute RMS misfit early-stop threshold.
+     - 0 (off)
+     - Stop when the RMS misfit falls below this value.
    * - ``-im_rms_rtol``
-     - ``1e-3``
-     - Relative RMS-improvement threshold for the plateau stop. ``0`` disables it.
+     - 1e-3
+     - Stop when the relative RMS improvement stays below this value for
+       ``-im_rms_stall_window`` iterations. 0 disables it.
    * - ``-im_rms_stall_window``
-     - ``3``
-     - Consecutive iterations below ``-im_rms_rtol`` required to declare a
-       plateau and stop.
+     - 3
+     - Iterations used by ``-im_rms_rtol``.
    * - ``-im_diag_weight``
-     - ``0`` (off)
+     - 0 (off)
      - Self-weight of the neighbor smoother applied to the gradient.
    * - ``-im_fixed_materials``
      - from bundle
-     - Comma-separated material ids excluded from the update and from smoothing.
+     - Comma-separated material ids to hold fixed. Overrides the bundle.
    * - ``-im_snapshot_interval``
-     - ``0`` (off)
-     - Write a VTU snapshot every N accepted L-BFGS steps, and of the last
-       accepted step, into ``-output_dir``.
-       Each snapshot carries a single cell field, ``rho`` (Ohm.m).
+     - 0 (off)
+     - Write a VTU snapshot of the model every N accepted steps, and of the
+       last one.
    * - ``-im_observed_mode``
      - ``external``
-     - Where the observed data comes from. ``external`` reads the bundle's
-       ``/observed/Ex``; ``fm_native`` reads an ``fm.csem`` responses file
-       through its ``/sources/src{k}/fields/Ex`` layout (source ``k`` →
-       frequency row ``k``).
+     - ``external`` reads ``/observed/Ex`` from the bundle (or from
+       ``-im_observed_file``). ``fm_native`` reads an ``fm.csem`` output
+       file, using transmitter ``k`` as frequency row ``k``.
    * - ``-im_observed_file``
-     - bundle
-     - Path to the observed-data file. Optional in ``external`` mode (defaults
-       to ``-input_filename``); **required** in ``fm_native`` mode. Any noise
-       must already be present in that file.
-
-Besides the absolute ``-im_rms_tol``, the L-BFGS loop stops when the RMS misfit
-plateaus: when the relative improvement stays below ``-im_rms_rtol`` for
-``-im_rms_stall_window`` consecutive iterations.
+     - the bundle
+     - File with the observed data. Required with ``fm_native``; noise is
+       not added by the kernel.
 
 Parameter file
-**************
-``utils/preprocess.py -mode im`` emits:
+--------------
+``preprocess.py -mode im.csem`` writes:
 
 .. code-block::
 
-   -input_filename <case_dir>/input.h5
+   -input_filename <case_dir>/<input_filename>
    -dm_mat_type is
    -ksp_type fgmres
    -pc_type bddc
@@ -122,45 +102,28 @@ Parameter file
    -pc_bddc_coarse_pc_type lu
    -pc_bddc_monolithic
    -ksp_rtol 1.0e-10
-   -im_max_iter               150
-   -im_lbfgs_memory           2
-   -im_lambda                 0.1
-   -im_diag_weight            0.0
-   -im_gtol                   1.0e-5
-   -im_rms_tol                1.05
-   -im_snapshot_interval      1
+   -im_max_iter                150
+   -im_lbfgs_memory            2
+   -im_lambda                  0.1
+   -im_diag_weight             0.0
+   -im_gtol                    1.0e-5
+   -im_rms_tol                 1.05
+   -im_snapshot_interval       1
    -output_dir <case_dir>/
-   -output_filename responses
+   -output_filename responses_p<order>
 
-This template overrides several kernel defaults and selects the **iterative**
-PCBDDC solve. Both kernels support both solver families and read the same
-unprefixed option keys, so swapping in a direct solve is a matter of replacing
-that block (``-dm_mat_type aij -ksp_type preonly -pc_type lu
--pc_factor_mat_solver_type mumps``) or appending a solver preset as a second
-``-options_file``; see :doc:`solver`.
-
-The operator type is what selects the family: ``-dm_mat_type is`` builds the
-MATIS operator PCBDDC requires, while a direct factorization needs AIJ.
-``im.csem`` falls back to MATIS when the parameter file names no type.
-
-``im.csem``'s adjoint system :math:`A_f \cdot nx = nB` uses the same operator as
-its forward solve and therefore the same KSP, so this one block governs both
-solves. ``-ksp_rtol`` is set tight because the adjoint solution enters the
-objective gradient.
-
-``-im_error_level`` and ``-im_fixed_materials`` are accepted but absent from
-the template, since their values come from the bundle.
+``-im_error_level`` and ``-im_fixed_materials`` are left out because their
+values come from the bundle. To use MUMPS instead of BDDC, see
+:doc:`solver`.
 
 Running
 -------
 .. code-block:: bash
 
-   mpirun -n 4 build/im.csem -options_file path/to/params.txt
+   mpirun -n 4 build/im.csem -options_file params.txt -im_max_iter 30
 
-or through the dispatcher:
-
-.. code-block:: bash
-
-   mpirun -n 4 build/petgem im -options_file path/to/params.txt
-
-Any option can be overridden on the command line, e.g. ``-im_max_iter 30``.
+Output
+------
+``<output_dir>/<output_filename>.h5`` holds the recovered conductivity, the
+model vector and the RMS history; snapshots go to
+``<output_dir>/snapshots/``. See :doc:`formats`.

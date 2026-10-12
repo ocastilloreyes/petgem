@@ -1,5 +1,5 @@
 {
-  "_comment": "Golden MMS relative errors for fm.csem CI (tests/mms/test_level6_mms.py). Regenerate with tests/mms/update_golden.sh only after an intentional discretisation change.",
+  "_comment": "Golden MMS relative errors for fm.csem CI (tests/mms/test_level6_mms.py). Regenerate with tests/mms/regen_golden.sh only after an intentional discretization change.",
   "mesh": "cube [0,1000]^3 at N=4 (6*4^3 tetrahedra)",
   "frequency_hz": 10.0,
   "sigma_S_per_m": [

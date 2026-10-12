@@ -9,7 +9,7 @@
  * order, evaluate values/curls at reference-cell points, and query the
  * defining-functional node/tangent of each DOF for the discrete gradient.
  *
- * A single handle is NOT reentrant: evaluation writes through scratch owned
+ * A single handle is not reentrant: evaluation writes through scratch owned
  * by the handle.
  */
 
@@ -58,25 +58,27 @@ PetscInt feNedelecGetOrder(const FeNedelec *fe);
  * @brief Evaluates the reference Nedelec values at a reference-cell point.
  *
  * @param[in]  fe     Element handle.
- * @param[in]  x,y,z  Reference-cell coordinates.
+ * @param[in]  x      Reference-cell x coordinate.
+ * @param[in]  y      Reference-cell y coordinate.
+ * @param[in]  z      Reference-cell z coordinate.
  * @param[out] shape  dof x 3 row-major basis values.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode feNedelecCalcVShape(const FeNedelec *fe, PetscReal x, PetscReal y,
-                                   PetscReal z, PetscReal *shape);
+PetscErrorCode feNedelecCalcVShape(const FeNedelec *fe, PetscReal x, PetscReal y, PetscReal z, PetscReal *shape);
 
 /**
  * @brief Evaluates the reference Nedelec curls at a reference-cell point.
  *
  * @param[in]  fe     Element handle.
- * @param[in]  x,y,z  Reference-cell coordinates.
+ * @param[in]  x      Reference-cell x coordinate.
+ * @param[in]  y      Reference-cell y coordinate.
+ * @param[in]  z      Reference-cell z coordinate.
  * @param[out] curl   dof x 3 row-major curl values.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode feNedelecCalcCurlShape(const FeNedelec *fe, PetscReal x, PetscReal y,
-                                      PetscReal z, PetscReal *curl);
+PetscErrorCode feNedelecCalcCurlShape(const FeNedelec *fe, PetscReal x, PetscReal y, PetscReal z, PetscReal *curl);
 
 /**
  * @brief Returns the defining-functional node and tangent of a DOF.
@@ -88,7 +90,6 @@ PetscErrorCode feNedelecCalcCurlShape(const FeNedelec *fe, PetscReal x, PetscRea
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode feNedelecGetDofInfo(const FeNedelec *fe, PetscInt m,
-                                   PetscReal node[3], PetscReal tangent[3]);
+PetscErrorCode feNedelecGetDofInfo(const FeNedelec *fe, PetscInt m, PetscReal node[3], PetscReal tangent[3]);
 
 #endif

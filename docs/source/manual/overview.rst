@@ -2,128 +2,125 @@
 Overview
 ========
 
-**PETGEM** provides three execution modes built on the same high-order Nédélec
-finite-element core: **forward modeling** of the 3D CSEM response,
-**inverse modeling**, which recovers a per-material conductivity model from
-observed data, and **MT forward modeling** of the 3D magnetotelluric response.
-All modes read the same kind of HDF5 input bundle, produced by the same
-preprocessing script.
+**PETGEM** has three kernels built on the same Nédélec finite-element core:
 
-Execution modes
----------------
-``make`` builds four binaries into ``build/``:
+- ``fm.csem`` - CSEM forward modeling (:doc:`forward_modeling`).
+- ``im.csem`` - CSEM inversion of a per-material conductivity model
+  (:doc:`inverse_modeling`).
+- ``fm.mt`` - MT forward modeling (:doc:`mt_modeling`).
 
-- ``fm.csem`` - CSEM forward kernel.
-- ``im.csem`` - CSEM inverse kernel.
-- ``fm.mt`` - MT forward kernel.
-- ``petgem`` - dispatcher, selecting the mode from the command line:
-
-  .. code-block:: bash
-
-     ./petgem fm -options_file params.txt   # CSEM forward  (== fm.csem)
-     ./petgem im -options_file params.txt   # CSEM inverse  (== im.csem)
-     ./petgem mt -options_file params.txt   # MT forward    (== fm.mt)
-
-The dispatcher calls the same ``runForward`` / ``runInverse`` /
-``runMtForward`` entry points as the single-purpose binaries, so the code paths
-are identical. ``-mode fm`` / ``-mode im`` / ``-mode mt`` is accepted as an
-alternative to the positional subcommand, and ``forward``/``modeling`` and
-``inverse`` are accepted as aliases of ``fm`` and ``im``.
-
-Naming convention
-*****************
-``fm``, ``im`` and ``mt`` are the canonical tags for the three simulation
-types, used consistently across the whole interface: the binaries
-(``fm.csem``, ``im.csem``, ``fm.mt``), the dispatcher subcommands, the
-preprocess ``-mode``, the kernel options (``-im_*`` for the inversion,
-``-mt_*`` for MT), and the ``simulation_type`` attribute stamped into every
-output file (``fm``, ``im``, ``fm.mt``).
-
-Shared workflow
----------------
-1. Generate or import a tetrahedral mesh (`Gmsh <http://gmsh.info/>`_ ``.msh``,
-   or VTK ``.vtk``/``.vtu`` - see :doc:`meshing`).
-2. Describe the conductivity model in a text table (``sigmas.txt``).
-3. Run ``utils/preprocess.py`` to assemble the **input bundle** and a matching
-   **parameter file**.
-4. Run the kernel (``fm.csem``, ``im.csem`` or ``fm.mt``).
-5. Post-process the results.
-
-The input bundle
-****************
-``utils/preprocess.py`` is the entry point for all modes. It reads the mesh,
-conductivity table, receivers, and sources or frequency, and writes a single HDF5 bundle
-(``-input_filename``, default ``input.h5``) plus a PETSc options file
-(``-params_filename``, default ``params.txt``).
-
-The bundle carries everything case-specific: the mesh, the per-cell
-conductivity, the polynomial order (``/order``), the receivers, the sources
-(CSEM) or the frequency (MT), and - for inverse runs - the observed data, the
-noise level, and the fixed-material list. The parameter file carries only solver and runtime
-options. The layout is documented in :doc:`formats`.
-
-The mode is selected with ``-mode``:
+Each kernel is a binary in ``build/``. The ``petgem`` dispatcher runs the same
+code, selected by a subcommand or by ``-mode``:
 
 .. code-block:: bash
 
-   python3 utils/preprocess.py -mode fm ...   # CSEM forward bundle + params
-   python3 utils/preprocess.py -mode im ...   # CSEM inverse bundle + params
-   python3 utils/preprocess.py -mode mt ...   # MT forward bundle + params
+   petgem fm.csem -options_file params.txt
+   petgem -mode fm.csem -options_file params.txt
 
-Forward mode requires ``-source_filename``; inverse mode requires
-``-im_source_filename`` and ``-observed_filename``; MT mode requires
-``-mt_frequency_filename``.
+The kernel name is used unchanged everywhere: binaries, dispatcher
+subcommands, the preprocessing ``-mode`` and the ``simulation_type`` attribute
+of the output files.
+
+Workflow
+--------
+Every run follows the same steps:
+
+1. Build a tetrahedral mesh (see :doc:`meshing`).
+2. Write the conductivity table ``sigmas.txt`` and the survey files.
+3. Run ``utils/preprocess.py`` to produce the **input bundle** (HDF5) and a
+   **parameter file** (PETSc options).
+4. Run the kernel with ``-options_file``.
+5. Read the output HDF5 (see :doc:`python_api`).
+
+The bundle holds everything specific to the case: mesh, per-cell
+conductivity, polynomial order, receivers, and the sources (CSEM), frequency
+(MT) or observed data (inversion). The parameter file holds the solver and
+run options. Both formats are described in :doc:`formats`.
+
+Preprocessing
+-------------
+.. code-block:: bash
+
+   python3 utils/preprocess.py -mode <kernel> -order <p> -case_dir <dir> \
+       -mesh_filename <mesh> -receiver_filename <receivers> -sigma_file <sigmas> \
+       [mode-specific inputs] [-input_filename input.h5] [-params_filename params.txt]
+
+File names are relative to ``-case_dir``. Each mode needs its own inputs and
+rejects those of the other modes:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - ``-mode``
+     - Required inputs
+   * - ``fm.csem``
+     - ``-source_filename``
+   * - ``im.csem``
+     - ``-im_source_filename``, ``-observed_filename`` (and optionally
+       ``-error_level``)
+   * - ``fm.mt``
+     - ``-mt_frequency_filename``
+
+``-output_vtk model.vtu`` also writes the conductivity model for ParaView.
+``python3 utils/preprocess.py -h`` lists every argument.
+
+Common kernel options
+---------------------
+All kernels read their options from the PETSc options database
+(``-options_file`` or the command line):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Option
+     - Meaning
+   * - ``-input_filename``
+     - Input bundle. Required.
+   * - ``-output_dir``
+     - Output directory, created if absent. Required.
+   * - ``-output_filename``
+     - Output stem; the kernel writes ``<output_dir>/<stem>.h5``. Required.
+   * - ``-order <1..6>``
+     - Overrides the order stored in the bundle.
+
+Any other option goes to PETSc (see :doc:`solver`). ``-help intro`` prints a
+short usage summary, ``-help`` the full option list, and ``--version`` the
+version.
 
 Polynomial order
-****************
-The Nédélec basis order is an integer in ``1..6``. It is passed to the
-preprocess with ``-order`` and stored in the bundle as ``/order``. The kernels
-read it from the bundle, and accept ``-order`` at run time as an override -
-which also bypasses the stored value, so one bundle can serve every order.
-
-Conductivity model
-******************
-The conductivity model is a whitespace text table passed via ``-sigma_file``
-(relative to ``-case_dir``). Each row is one material, indexed by 0-based
-material id:
-
-.. code-block::
-
-   # sigma_x sigma_y sigma_z [fixed]
-   0.1 0.1 0.1 1     # held fixed during inversion (e.g. air, ocean)
-   1.0 1.0 1.0 0     # invertable
-   2.0 2.0 2.0       # 'fixed' column omitted -> defaults to 0
-
-The optional fourth column (``fixed``) is only meaningful for inverse modeling:
-a non-zero entry marks the material as held fixed. Forward modeling ignores it.
-
-Pre- and post-processing
-************************
-The Python package under ``utils/`` (importable as ``petgem``) provides:
-
-- Mesh and model reading, and assembly of the input bundle
-  (``runPreprocessing``).
-- Optional export of the conductivity model to VTU for visualization
-  (``-output_vtk``).
-- Readers for the bundle and for the kernel responses (``readBundle``,
-  ``readResponses``, ``readAllResponses``) - see :doc:`python_api`.
-
-Comparison against a reference is done by the per-case ``scripts/postprocess.py``.
+----------------
+The order of the Nédélec basis is 1 to 6. The mesh does not depend on it.
+``preprocess.py -order`` stores it in the bundle, and the kernel's ``-order``
+overrides it, so one bundle can be run at any order.
 
 Example cases
-*************
-The cases under ``examples/`` share the same layout (``geometry/``,
-``survey/``, ``configs/``, ``scripts/``, ``reference/``), among them:
+-------------
+The cases in ``examples/`` share one layout: ``geometry/``, ``survey/``,
+``configs/``, ``scripts/``, ``reference/``. Generated files go to
+``outputs/``, which is git-ignored.
 
-- ``examples/fm`` - a marine CSEM benchmark with a thin resistive
-  layer, with a precomputed reference for validation.
-- ``examples/unit_cube`` - a small homogeneous cube; the dataset the test suite
-  is built around.
-- ``examples/im1`` - the CSEM inversion benchmark: a buried conductive block
-  recovered from noisy synthetic observations.
-- ``examples/mt1`` - the MT trapezoidal hill of Castillo-Reyes et al. (2022),
-  with two reference solutions.
+.. list-table::
+   :header-rows: 1
+   :widths: 22 18 60
 
-The first two are forward cases (see :doc:`examples`); ``examples/im1`` covers
-the full inverse workflow (see :doc:`inverse_examples`); ``examples/mt1`` the MT
-workflow (see :doc:`mt_examples`).
+   * - Case
+     - Kernel
+     - Content
+   * - ``examples/fm_csem_marine``
+     - ``fm.csem``
+     - Marine CSEM model with a thin resistive layer (:doc:`examples`)
+   * - ``examples/fm_csem_unit_cube``
+     - ``fm.csem``
+     - Homogeneous unit cube used by the test suite (:doc:`examples`)
+   * - ``examples/im_csem_block``
+     - ``im.csem``
+     - Conductive block recovered from synthetic data
+       (:doc:`inverse_examples`)
+   * - ``examples/im_csem_checkerboard``
+     - ``im.csem``
+     - Two conductive and two resistive blocks (:doc:`inverse_examples`)
+   * - ``examples/fm_mt_hill``
+     - ``fm.mt``
+     - Trapezoidal hill with two reference solutions (:doc:`mt_examples`)

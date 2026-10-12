@@ -13,7 +13,7 @@
  * curls, mass/stiffness and discrete gradient returned here are already oriented
  * and ready to insert into the DMPlex-closure-ordered global system.
  *
- * The struct-based signatures below (Cell / FEMSpace / Quadrature3D) are thin
+ * The struct-based signatures below (Cell / FemSpace / Quadrature3D) are thin
  * adapters over the reference core so the assembly, postprocessing and
  * receiver-interpolation code can stay DMPlex-centric.
  */
@@ -28,16 +28,16 @@
 
 /** @brief 3D (tetrahedron) Gauss quadrature rule (points and weights). */
 typedef struct {
-  PetscInt numPoints;  /**< Number of quadrature points. */
-  PetscReal** points;  /**< Quadrature point coordinates (per point, 3 reals). */
-  PetscReal* weights;  /**< Quadrature weights. */
+  PetscInt    numPoints; /**< Number of quadrature points. */
+  PetscReal **points;    /**< Quadrature point coordinates (per point, 3 reals). */
+  PetscReal  *weights;   /**< Quadrature weights. */
 } Quadrature3D;
 
 /** @brief 2D (triangle) Gauss quadrature rule (points and weights). */
 typedef struct {
-  PetscInt numPoints;  /**< Number of quadrature points. */
-  PetscReal** points;  /**< Quadrature point coordinates (per point, 2 reals). */
-  PetscReal* weights;  /**< Quadrature weights. */
+  PetscInt    numPoints; /**< Number of quadrature points. */
+  PetscReal **points;    /**< Quadrature point coordinates (per point, 2 reals). */
+  PetscReal  *weights;   /**< Quadrature weights. */
 } Quadrature2D;
 
 /**
@@ -49,8 +49,7 @@ typedef struct {
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal dip,
-                                     PetscReal rotationVector[NUM_DIMENSIONS]);
+PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal dip, PetscReal rotationVector[NUM_DIMENSIONS]);
 
 /**
  * @brief Maps global Cartesian coordinates to reference-tetrahedron coordinates.
@@ -64,7 +63,7 @@ PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal di
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode tetrahedronXYZToReference(const PetscReal coordinates[NUM_VERTICES_PER_CELL * NUM_DIMENSIONS],
+PetscErrorCode tetrahedronXyzToReference(const PetscReal coordinates[NUM_VERTICES_PER_CELL * NUM_DIMENSIONS],
                                          const PetscReal point[NUM_DIMENSIONS], PetscReal XiEtaZeta[NUM_DIMENSIONS]);
 
 /**
@@ -78,59 +77,62 @@ PetscErrorCode tetrahedronXYZToReference(const PetscReal coordinates[NUM_VERTICE
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode computeCellJacobian(Cell* cell);
+PetscErrorCode computeCellJacobian(Cell *cell);
 
 /**
- * @brief Sets the number of 3D quadrature points for a tetrahedron.
- *
- * One quadrature path for every order: a Stroud conical rule with (order+1)
- * points per axis, exact to degree 2*order+1 (covers the degree-2*order
- * mass-matrix integrand on an affine tetrahedron). Total (order+1)^3 points.
- *
- * @param[in]  order        Basis order driving the quadrature degree.
- * @param[out] quadrature  Rule whose numPoints is set.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
- */
-PetscErrorCode computeNum3DQuadraturePoints(const PetscInt order, Quadrature3D* quadrature);
-
-/**
- * @brief Populates 3D Gauss quadrature points and weights for a tetrahedron.
- *
- * The point/weight convention matches the reference element bases: points on
- * the unit reference tetrahedron, weights summing to its volume 1/6.
- *
- * @param[in,out] quadrature  Rule (numPoints set) whose points/weights fill.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
- */
-PetscErrorCode compute3DQuadraturePoints(Quadrature3D* quadrature);
-
-/**
- * @brief Sets the number of 2D quadrature points for a triangle.
- *
- * Stroud conical rule with (order+1) points per axis, exact to degree
- * 2*order+1. Total (order+1)^2 points.
+ * @brief Allocates and fills the 3D quadrature rule for a basis order.
  *
  * @param[in]  order       Basis order driving the quadrature degree.
- * @param[out] quadrature  Rule whose numPoints is set.
+ * @param[out] quadrature  Rule; release it with destroyQuadrature3D().
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode computeNum2DQuadraturePoints(const PetscInt order, Quadrature2D* quadrature);
+PetscErrorCode createQuadrature3D(const PetscInt order, Quadrature3D *quadrature);
 
 /**
- * @brief Populates 2D Gauss quadrature points and weights for a triangle.
+ * @brief Frees a rule created by createQuadrature3D().
+ */
+PetscErrorCode destroyQuadrature3D(Quadrature3D *quadrature);
+
+/**
+ * @brief Allocates and fills the 2D quadrature rule for a basis order.
  *
- * Points on the unit reference triangle (0,0), (1,0), (0,1), weights summing
- * to its area 1/2. A point (s,t) maps to v0 + s*(v1-v0) + t*(v2-v0) on a
- * physical triangle, with measure 2*area*weight.
- *
- * @param[in,out] quadrature  Rule (numPoints set) whose points/weights fill.
+ * @param[in]  order       Basis order driving the quadrature degree.
+ * @param[out] quadrature  Rule; release it with destroyQuadrature2D().
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode compute2DQuadraturePoints(Quadrature2D* quadrature);
+PetscErrorCode createQuadrature2D(const PetscInt order, Quadrature2D *quadrature);
+
+/**
+ * @brief Frees a rule created by createQuadrature2D().
+ */
+PetscErrorCode destroyQuadrature2D(Quadrature2D *quadrature);
+
+/**
+ * @brief Allocates a zeroed rows x cols matrix as row pointers into one contiguous block.
+ */
+PetscErrorCode createDenseRows(PetscInt rows, PetscInt cols, PetscReal ***M);
+
+/**
+ * @brief Frees a matrix created by createDenseRows() (NULL-safe).
+ */
+PetscErrorCode destroyDenseRows(PetscReal ***M);
+
+/**
+ * @brief Allocates a zeroed basis-value buffer N[d][dof], d in [0,3).
+ *
+ * @param[in]  numDof  Number of DOFs per cell.
+ * @param[out] N       Buffer; release it with destroyBasisValues().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode createBasisValues(const PetscInt numDof, PetscReal ***N);
+
+/**
+ * @brief Frees a buffer created by createBasisValues().
+ */
+PetscErrorCode destroyBasisValues(PetscReal ***N);
 
 /**
  * @brief Computes the elemental mass and stiffness matrices for a cell.
@@ -149,8 +151,8 @@ PetscErrorCode compute2DQuadraturePoints(Quadrature2D* quadrature);
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, const Quadrature3D* quadrature,
-                                        PetscReal** Me, PetscReal** Ke);
+PetscErrorCode computeElementalMatrices(const FemSpace *fem, const Cell *cell, const Quadrature3D *quadrature, PetscReal **Me,
+                                        PetscReal **Ke);
 
 /**
  * @brief Builds the high-order discrete gradient block G_e for one cell (the
@@ -165,8 +167,7 @@ PetscErrorCode computeElementalMatrices(const FEMSpace* fem, const Cell* cell, c
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode buildDiscreteGradientMatrix(const FEMSpace* fem, const Cell* cell,
-                                           PetscReal** gradientMatrix);
+PetscErrorCode buildDiscreteGradientMatrix(const FemSpace *fem, const Cell *cell, PetscReal **gradientMatrix);
 
 /**
  * @brief Evaluates the Nedelec basis (and optionally curls) at a reference point.
@@ -182,8 +183,7 @@ PetscErrorCode buildDiscreteGradientMatrix(const FEMSpace* fem, const Cell* cell
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode evaluateNedelecBasis(const FEMSpace* fem, const Cell* cell,
-                                    const PetscReal point[NUM_DIMENSIONS],
-                                    PetscReal** Ni, PetscReal** NiCurl);
+PetscErrorCode evaluateNedelecBasis(const FemSpace *fem, const Cell *cell, const PetscReal point[NUM_DIMENSIONS], PetscReal **Ni,
+                                    PetscReal **NiCurl);
 
 #endif

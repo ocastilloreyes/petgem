@@ -7,9 +7,9 @@ Reads CLI arguments, loads the per-material conductivity table from
 unified PETGEM input HDF5 plus the matching params file.
 
 Mode-specific arguments (validated by runPreprocessing):
-    -mode fm    requires -source_filename
+    -mode fm.csem    requires -source_filename
                      forbids  -im_source_filename, -observed_filename
-    -mode im    requires -im_source_filename, -observed_filename
+    -mode im.csem    requires -im_source_filename, -observed_filename
                      forbids  -source_filename
                      (the inverse kernel reads multi-freq sources from
                       /sources/* in the bundle)
@@ -17,7 +17,7 @@ Mode-specific arguments (validated by runPreprocessing):
                      MATLAB-style invEx.dat text file (parsed inline, so no
                      separate convert-to-HDF5 step is needed); -error_level
                      optionally records the noise level.
-    -mode mt    requires -mt_frequency_filename
+    -mode fm.mt    requires -mt_frequency_filename
                      forbids  -source_filename, -im_source_filename,
                               -observed_filename
 
@@ -28,7 +28,7 @@ Shared arguments (all modes):
 Usage examples:
     # Forward modeling
     python3 utils/preprocess.py \\
-        -mode fm \\
+        -mode fm.csem \\
         -order 1 \\
         -case_dir examples/<case> \\
         -mesh_filename mesh_p1.msh \\
@@ -39,7 +39,7 @@ Usage examples:
 
     # Inverse modeling
     python3 utils/preprocess.py \\
-        -mode im \\
+        -mode im.csem \\
         -order 1 \\
         -case_dir examples/<case> \\
         -mesh_filename mesh_p1.msh \\
@@ -51,7 +51,7 @@ Usage examples:
 
     # MT forward modeling
     python3 utils/preprocess.py \\
-        -mode mt \\
+        -mode fm.mt \\
         -order 1 \\
         -case_dir examples/<case> \\
         -mesh_filename mesh_p1.msh \\
@@ -63,16 +63,7 @@ Usage examples:
 import os
 import sys
 
-try:
-    import petgem
-except ModuleNotFoundError:
-    # Allow running directly from a fresh clone, without `pip install -e .`:
-    # expose the in-tree `utils` package under its distribution name
-    # `petgem` (same shim as tests/conftest.py).
-    sys.path.insert(
-        0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    import utils as petgem
-    sys.modules["petgem"] = petgem
+import functions as petgem  # the copy next to this script
 
 
 def main():
@@ -101,10 +92,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Expected user-input problems (missing file, malformed table, bad mode /
-    # argument combination) are reported as a one-line message and a non-zero
-    # exit, instead of a Python traceback. Unexpected errors are left to
-    # propagate so genuine bugs still show a full traceback.
     try:
         main()
     except (FileNotFoundError, ValueError) as err:

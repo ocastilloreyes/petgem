@@ -4,15 +4,14 @@
  * Date: 2026-05-20
  *
  * Description:
- * Cross-file prototypes for the inversion kernel that are NOT part of
+ * Cross-file prototypes for the inversion kernel that are not part of
  * the public API exposed via include/inversion.h.
  */
 
 /*
  * Notes:
- * writeInversionResults and buildNotFixedMask need linkage across the
- * inverse-kernel translation units, but must not be advertised to
- * im_csem.c or postprocessing.c.
+ * Prototypes shared by the inversion translation units only
+ * (inversion.c, inversion_io.c, inversion_smoother.c).
  */
 
 #ifndef INVERSION_INTERNAL_H
@@ -36,48 +35,37 @@
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode buildNotFixedMask(const NeighborGraph *graph,
-                                  DM                  dmInversion,
-                                  const Grid         *grid,
-                                  Vec                *notFixedMaskGlobal,
-                                  Vec                *notFixedMaskLocal);
+PetscErrorCode buildNotFixedMask(const NeighborGraph *graph, DM dmInversion, const Grid *grid, Vec *maskGlobal, Vec *maskLocal);
 
 /**
- * @brief Builds the parallel overlap=1 smoothing graph and workspace.
+ * @brief Clones the topology of @p dm with one scalar DOF per cell.
  *
- * Defined in src/inversion_smoother.c. Builds the per-rank overlap=1
- * neighbor graph and ghost-aware Vec workspace used by the fully-parallel
- * block-Jacobi Gauss-Seidel path of applyGaussSeidelSmoothing. No-op on a
- * single MPI rank. Must be called AFTER buildNeighborSmoothingGraph and
- * createInversionDM, and BEFORE the first L-BFGS evaluation.
+ * Registers a 1-component PetscFV as field 0 so cell data can be written to VTU.
  *
- * @param[in,out] graph  Neighbor graph extended with parallel overlap data.
- * @param[in]     dm     DMPlex mesh.
- * @param[in]     grid   Finite-element grid descriptor.
+ * @param[in]  dm     DMPlex whose topology is cloned.
+ * @param[out] cellDm 1-DOF/cell DM.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
-                                            const DM       dm,
-                                            const Grid    *grid);
+PetscErrorCode createCellScalarDm(DM dm, DM *cellDm);
 
 /**
  * @brief Writes the final inversion results to HDF5.
  *
- * Defined in src/io.c. Dumps the recovered model, the per-iteration RMS
+ * Defined in src/inversion_io.c. Dumps the recovered model, the per-iteration RMS
  * history, and provenance attributes. Called once at the end of
  * runCsemInversion.
  *
- * @param[in] im_Params       Inversion parameters / provenance.
+ * @param[in] imParams       Inversion parameters / provenance.
  * @param[in] dmConductivity  DM for the per-cell conductivity field.
  * @param[in] conductivity    Recovered conductivity Vec.
  * @param[in] X               Recovered log-perturbation / model Vec.
- * @param[in] allRMS          Array of per-evaluation RMS values.
+ * @param[in] allRms          Array of per-evaluation RMS values.
  * @param[in] numIters        Accepted L-BFGS steps (the "iteration" count a
  *                            user sees in the optimizer table).
  * @param[in] numEvals        Objective-gradient evaluations, i.e. the number of
- *                            entries in @p allRMS. Exceeds @p numIters by the
+ *                            entries in @p allRms. Exceeds @p numIters by the
  *                            line-search trials that were rejected, so the RMS
  *                            history it indexes is not monotone.
  * @param[in] reasonStr       Human-readable convergence/stop reason.
@@ -85,13 +73,7 @@ PetscErrorCode setupParallelSmoothingGraph(NeighborGraph *graph,
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode writeInversionResults(const imParams *iparams,
-                                      DM               dmConductivity,
-                                      Vec              conductivity,
-                                      Vec              X,
-                                      const PetscReal *allRMS,
-                                      PetscInt         numIters,
-                                      PetscInt         numEvals,
-                                      const char      *reasonStr);
+PetscErrorCode writeInversionResults(const ImParams *imParams, DM dmConductivity, Vec conductivity, Vec X, const PetscReal *allRms,
+                                     PetscInt numIters, PetscInt numEvals, const char *reasonStr);
 
 #endif /* INVERSION_INTERNAL_H */

@@ -13,26 +13,23 @@
 
 /* Reference tangents of the six Nedelec DOF families (edges and the derived
  * face/interior directions), indexed by dof2tk. */
-static const PetscReal feNd_tk[6][3] = {
-  { 1., 0., 0.}, { 0., 1., 0.}, { 0., 0., 1.},
-  {-1., 1., 0.}, {-1., 0., 1.}, { 0.,-1., 1.}
-};
+static const PetscReal feNdTangents[6][3] = {{1., 0., 0.}, {0., 1., 0.}, {0., 0., 1.}, {-1., 1., 0.}, {-1., 0., 1.}, {0., -1., 1.}};
 /* Barycenter shift applied to the raw curl-conforming basis factors. */
-static const PetscReal feNd_c = 0.25;
+static const PetscReal feNdCenter = 0.25;
 
 struct FeNedelec {
-  PetscInt   order;    /* polynomial order p */
-  PetscInt   dof;      /* number of H(curl) DOFs */
-  PetscReal *Ti;       /* dof x dof, row-major: Ti[n*dof + o] = (T^{-1})_{n,o} */
-  PetscReal *nodes;    /* dof x 3, row-major: defining-functional node coords */
-  PetscInt  *dof2tk;   /* dof: tangent index in [0,5] of each functional */
+  PetscInt   order;  /* polynomial order p */
+  PetscInt   dof;    /* number of H(curl) DOFs */
+  PetscReal *Ti;     /* dof x dof, row-major: Ti[n*dof + o] = (T^{-1})_{n,o} */
+  PetscReal *nodes;  /* dof x 3, row-major: defining-functional node coords */
+  PetscInt  *dof2tk; /* dof: tangent index in [0,5] of each functional */
 
   /* Evaluation scratch owned by the handle:
    * the 1D Chebyshev values/derivatives in x,y,z,lambda and the raw space.
-   * Evaluation writes through these, so a single handle is NOT reentrant. */
-  PetscReal *sx, *sy, *sz, *sl;   /* size order each */
-  PetscReal *dx, *dy, *dz, *dl;   /* size order each */
-  PetscReal *Uscr;                /* size dof x 3 (raw V or curl)            */
+   * Evaluation writes through these, so a single handle is not reentrant. */
+  PetscReal *sx, *sy, *sz, *sl; /* size order each */
+  PetscReal *dx, *dy, *dz, *dl; /* size order each */
+  PetscReal *Uscr;              /* size dof x 3 (raw V or curl)            */
 };
 
 /**
@@ -52,7 +49,7 @@ static void feNdChebyshev(PetscInt p, PetscReal x, PetscReal *u) {
   u[0] = 1.0;
   if (p == 0) return;
   PetscReal z = 2.0 * x - 1.0;
-  u[1] = z;
+  u[1]        = z;
   for (PetscInt i = 1; i < p; i++) u[i + 1] = 2.0 * z * u[i] - u[i - 1];
 }
 
@@ -71,16 +68,17 @@ static void feNdChebyshev(PetscInt p, PetscReal x, PetscReal *u) {
  * @param[out] d  Array receiving the p+1 polynomial derivatives d[0..p].
  */
 static void feNdChebyshevD(PetscInt p, PetscReal x, PetscReal *u, PetscReal *d) {
-  u[0] = 1.0; d[0] = 0.0;
+  u[0] = 1.0;
+  d[0] = 0.0;
   if (p == 0) return;
   PetscReal z = 2.0 * x - 1.0;
-  u[1] = z; d[1] = 2.0;
+  u[1]        = z;
+  d[1]        = 2.0;
   for (PetscInt i = 1; i < p; i++) {
     u[i + 1] = 2.0 * z * u[i] - u[i - 1];
     d[i + 1] = (i + 1) * (z * d[i] / i + 2.0 * u[i]);
   }
 }
-
 
 /**
  * @brief Computes the n open Gauss-Legendre nodes on the interval (0, 1).
@@ -101,20 +99,19 @@ static void feNdGaussLegendre01(PetscInt n, PetscReal *pts) {
     PetscReal z1, pp;
     do {
       PetscReal p0 = 1.0, p1 = 0.0;
-      for (PetscInt j = 0; j < n; j++) {     /* Legendre recurrence -> P_n(z) */
+      for (PetscInt j = 0; j < n; j++) { /* Legendre recurrence -> P_n(z) */
         PetscReal p2 = p1;
-        p1 = p0;
-        p0 = ((2.0 * j + 1.0) * z * p1 - j * p2) / (j + 1.0);
+        p1           = p0;
+        p0           = ((2.0 * j + 1.0) * z * p1 - j * p2) / (j + 1.0);
       }
       pp = n * (z * p0 - p1) / (z * z - 1.0); /* P_n'(z) */
       z1 = z;
-      z = z1 - p0 / pp;                       /* Newton step */
+      z  = z1 - p0 / pp; /* Newton step */
     } while (PetscAbsReal(z - z1) > 1.0e-15);
     /* descending z in (-1,1) -> ascending t in (0,1): reverse the index */
     pts[n - 1 - i] = 0.5 * (1.0 + z);
   }
 }
-
 
 /**
  * @brief Assembles the raw (pre-nodal) H(curl) space values at a point.
@@ -136,33 +133,50 @@ static void feNdGaussLegendre01(PetscInt n, PetscReal *pts) {
  * @param[in]  sl     Chebyshev values in lambda = 1-x-y-z (order entries).
  * @param[out] U      Raw space values, dof x 3 row-major.
  */
-static void feNdRawV(PetscInt order, PetscReal x, PetscReal y, PetscReal z, const PetscReal *sx, const PetscReal *sy, 
-                     const PetscReal *sz, const PetscReal *sl, PetscReal *U) {
+static void feNdRawV(PetscInt order, PetscReal x, PetscReal y, PetscReal z, const PetscReal *sx, const PetscReal *sy, const PetscReal *sz,
+                     const PetscReal *sl, PetscReal *U) {
 
-  const PetscInt pm1 = order - 1;
-  const PetscReal cx = x - feNd_c, cy = y - feNd_c, cz = z - feNd_c;
-  PetscInt n = 0;
+  const PetscInt  pm1 = order - 1;
+  const PetscReal cx = x - feNdCenter, cy = y - feNdCenter, cz = z - feNdCenter;
+  PetscInt        n = 0;
 
   for (PetscInt i = 0; i <= pm1; i++)
     for (PetscInt j = 0; j + i <= pm1; j++)
       for (PetscInt k = 0; k + j + i <= pm1; k++) {
-        PetscReal s = sx[k] * sy[j] * sz[i] * sl[pm1 - i - j - k];
-        U[n*3+0] = s;  U[n*3+1] = 0.; U[n*3+2] = 0.; n++;
-        U[n*3+0] = 0.; U[n*3+1] = s;  U[n*3+2] = 0.; n++;
-        U[n*3+0] = 0.; U[n*3+1] = 0.; U[n*3+2] = s;  n++;
+        PetscReal s  = sx[k] * sy[j] * sz[i] * sl[pm1 - i - j - k];
+        U[n * 3 + 0] = s;
+        U[n * 3 + 1] = 0.;
+        U[n * 3 + 2] = 0.;
+        n++;
+        U[n * 3 + 0] = 0.;
+        U[n * 3 + 1] = s;
+        U[n * 3 + 2] = 0.;
+        n++;
+        U[n * 3 + 0] = 0.;
+        U[n * 3 + 1] = 0.;
+        U[n * 3 + 2] = s;
+        n++;
       }
   for (PetscInt i = 0; i <= pm1; i++)
     for (PetscInt j = 0; j + i <= pm1; j++) {
-      PetscReal s = sx[pm1 - j - i] * sy[j] * sz[i];
-      U[n*3+0] = s * cy;  U[n*3+1] = -s * cx; U[n*3+2] = 0.;      n++;
-      U[n*3+0] = s * cz;  U[n*3+1] = 0.;      U[n*3+2] = -s * cx; n++;
+      PetscReal s  = sx[pm1 - j - i] * sy[j] * sz[i];
+      U[n * 3 + 0] = s * cy;
+      U[n * 3 + 1] = -s * cx;
+      U[n * 3 + 2] = 0.;
+      n++;
+      U[n * 3 + 0] = s * cz;
+      U[n * 3 + 1] = 0.;
+      U[n * 3 + 2] = -s * cx;
+      n++;
     }
   for (PetscInt i = 0; i <= pm1; i++) {
-    PetscReal s = sy[pm1 - i] * sz[i];
-    U[n*3+0] = 0.; U[n*3+1] = s * cz; U[n*3+2] = -s * cy; n++;
+    PetscReal s  = sy[pm1 - i] * sz[i];
+    U[n * 3 + 0] = 0.;
+    U[n * 3 + 1] = s * cz;
+    U[n * 3 + 2] = -s * cy;
+    n++;
   }
 }
-
 
 /**
  * @brief Assembles the raw (pre-nodal) H(curl) curls at a point.
@@ -181,57 +195,63 @@ static void feNdRawV(PetscInt order, PetscReal x, PetscReal y, PetscReal z, cons
  * @param[out] Uc           Raw curl values, dof x 3 row-major.
  */
 static void feNdRawCurl(PetscInt order, PetscReal x, PetscReal y, PetscReal z, const PetscReal *sx, const PetscReal *sy,
-                        const PetscReal *sz, const PetscReal *sl, const PetscReal *dx, const PetscReal *dy,
-                        const PetscReal *dz, const PetscReal *dl, PetscReal *Uc) {
+                        const PetscReal *sz, const PetscReal *sl, const PetscReal *dx, const PetscReal *dy, const PetscReal *dz,
+                        const PetscReal *dl, PetscReal *Uc) {
 
-  const PetscInt pm1 = order - 1;
-  const PetscReal cx = x - feNd_c, cy = y - feNd_c, cz = z - feNd_c;
-  PetscInt n = 0;
+  const PetscInt  pm1 = order - 1;
+  const PetscReal cx = x - feNdCenter, cy = y - feNdCenter, cz = z - feNdCenter;
+  PetscInt        n = 0;
   (void)z;
 
   for (PetscInt i = 0; i <= pm1; i++)
     for (PetscInt j = 0; j + i <= pm1; j++)
       for (PetscInt k = 0; k + j + i <= pm1; k++) {
-        PetscInt l = pm1 - i - j - k;
-        PetscReal gx = (dx[k] * sl[l] - sx[k] * dl[l]) * sy[j] * sz[i];
-        PetscReal gy = (dy[j] * sl[l] - sy[j] * dl[l]) * sx[k] * sz[i];
-        PetscReal gz = (dz[i] * sl[l] - sz[i] * dl[l]) * sx[k] * sy[j];
-        Uc[n*3+0] =  0.; Uc[n*3+1] =  gz; Uc[n*3+2] = -gy; n++;
-        Uc[n*3+0] = -gz; Uc[n*3+1] =  0.; Uc[n*3+2] =  gx; n++;
-        Uc[n*3+0] =  gy; Uc[n*3+1] = -gx; Uc[n*3+2] =  0.; n++;
+        PetscInt  l   = pm1 - i - j - k;
+        PetscReal gx  = (dx[k] * sl[l] - sx[k] * dl[l]) * sy[j] * sz[i];
+        PetscReal gy  = (dy[j] * sl[l] - sy[j] * dl[l]) * sx[k] * sz[i];
+        PetscReal gz  = (dz[i] * sl[l] - sz[i] * dl[l]) * sx[k] * sy[j];
+        Uc[n * 3 + 0] = 0.;
+        Uc[n * 3 + 1] = gz;
+        Uc[n * 3 + 2] = -gy;
+        n++;
+        Uc[n * 3 + 0] = -gz;
+        Uc[n * 3 + 1] = 0.;
+        Uc[n * 3 + 2] = gx;
+        n++;
+        Uc[n * 3 + 0] = gy;
+        Uc[n * 3 + 1] = -gx;
+        Uc[n * 3 + 2] = 0.;
+        n++;
       }
   for (PetscInt i = 0; i <= pm1; i++)
     for (PetscInt j = 0; j + i <= pm1; j++) {
       PetscInt k = pm1 - j - i;
       /* curl of  sx*sy*sz * (cy, -cx, 0) */
-      Uc[n*3+0] = sx[k] * cx * sy[j] * dz[i];
-      Uc[n*3+1] = sx[k] * sy[j] * cy * dz[i];
-      Uc[n*3+2] = -((dx[k] * cx + sx[k]) * sy[j] * sz[i] +
-                    (dy[j] * cy + sy[j]) * sx[k] * sz[i]);
+      Uc[n * 3 + 0] = sx[k] * cx * sy[j] * dz[i];
+      Uc[n * 3 + 1] = sx[k] * sy[j] * cy * dz[i];
+      Uc[n * 3 + 2] = -((dx[k] * cx + sx[k]) * sy[j] * sz[i] + (dy[j] * cy + sy[j]) * sx[k] * sz[i]);
       n++;
       /* curl of  sx*sy*sz * (cz, 0, -cx) */
-      Uc[n*3+0] = -sx[k] * cx * dy[j] * sz[i];
-      Uc[n*3+1] = sx[k] * sy[j] * (dz[i] * cz + sz[i]) +
-                  (dx[k] * cx + sx[k]) * sy[j] * sz[i];
-      Uc[n*3+2] = -sx[k] * dy[j] * sz[i] * cz;
+      Uc[n * 3 + 0] = -sx[k] * cx * dy[j] * sz[i];
+      Uc[n * 3 + 1] = sx[k] * sy[j] * (dz[i] * cz + sz[i]) + (dx[k] * cx + sx[k]) * sy[j] * sz[i];
+      Uc[n * 3 + 2] = -sx[k] * dy[j] * sz[i] * cz;
       n++;
     }
   for (PetscInt i = 0; i <= pm1; i++) {
     PetscInt j = pm1 - i;
     /* curl of  sy*sz * (0, cz, -cy) */
-    Uc[n*3+0] = -((dy[j] * cy + sy[j]) * sz[i] + sy[j] * (dz[i] * cz + sz[i]));
-    Uc[n*3+1] = 0.;
-    Uc[n*3+2] = 0.;
+    Uc[n * 3 + 0] = -((dy[j] * cy + sy[j]) * sz[i] + sy[j] * (dz[i] * cz + sz[i]));
+    Uc[n * 3 + 1] = 0.;
+    Uc[n * 3 + 2] = 0.;
     n++;
   }
 }
-
 
 /**
  * @brief Builds the Nedelec DOF nodes and their tangent indices.
  *
  * This function fills the defining-functional node coordinates (nodes, dof x 3
- * row-major) and the per-DOF tangent index (dof2tk, into feNd_tk) in the
+ * row-major) and the per-DOF tangent index (dof2tk, into feNdTangents) in the
  * canonical MFEM order: the six edges first (order points each), then the four
  * faces (two tangent DOFs per face node), then the interior (three tangent
  * DOFs per node). Edge, face and interior nodes are placed from the open
@@ -245,59 +265,66 @@ static void feNdRawCurl(PetscInt order, PetscReal x, PetscReal y, PetscReal z, c
  * @param[out] nodes   DOF node coordinates, dof x 3 row-major.
  * @param[out] dof2tk  Per-DOF tangent index in [0, 5].
  */
-static void feNdBuildNodes(PetscInt p, const PetscReal *eop, const PetscReal *fop, const PetscReal *iop, PetscReal *nodes, PetscInt *dof2tk) {
-  
+static void feNdBuildNodes(PetscInt p, const PetscReal *eop, const PetscReal *fop, const PetscReal *iop, PetscReal *nodes,
+                           PetscInt *dof2tk) {
+
   const PetscInt pm1 = p - 1, pm2 = p - 2, pm3 = p - 3;
-  
+
   PetscInt o = 0;
-  
-  #define FE_ND_SET(px,py,pz,tk) do { nodes[o*3+0]=(px); nodes[o*3+1]=(py); \
-                                      nodes[o*3+2]=(pz); dof2tk[o]=(tk); o++; } while (0)
+
+#define FE_ND_SET(px, py, pz, tk)                                                                                                          \
+  do {                                                                                                                                     \
+    nodes[o * 3 + 0] = (px);                                                                                                               \
+    nodes[o * 3 + 1] = (py);                                                                                                               \
+    nodes[o * 3 + 2] = (pz);                                                                                                               \
+    dof2tk[o]        = (tk);                                                                                                               \
+    o++;                                                                                                                                   \
+  } while (0)
 
   /* edges: (0,1) (0,2) (0,3) (1,2) (1,3) (2,3) */
   for (PetscInt i = 0; i < p; i++) FE_ND_SET(eop[i], 0., 0., 0);
   for (PetscInt i = 0; i < p; i++) FE_ND_SET(0., eop[i], 0., 1);
   for (PetscInt i = 0; i < p; i++) FE_ND_SET(0., 0., eop[i], 2);
-  for (PetscInt i = 0; i < p; i++) FE_ND_SET(eop[pm1-i], eop[i], 0., 3);
-  for (PetscInt i = 0; i < p; i++) FE_ND_SET(eop[pm1-i], 0., eop[i], 4);
-  for (PetscInt i = 0; i < p; i++) FE_ND_SET(0., eop[pm1-i], eop[i], 5);
+  for (PetscInt i = 0; i < p; i++) FE_ND_SET(eop[pm1 - i], eop[i], 0., 3);
+  for (PetscInt i = 0; i < p; i++) FE_ND_SET(eop[pm1 - i], 0., eop[i], 4);
+  for (PetscInt i = 0; i < p; i++) FE_ND_SET(0., eop[pm1 - i], eop[i], 5);
 
   /* faces: (1,2,3) (0,3,2) (0,1,3) (0,2,1), two tangents per node */
   for (PetscInt i = 0; i <= pm2; i++)
     for (PetscInt j = 0; j + i <= pm2; j++) {
-      PetscReal w = fop[i] + fop[j] + fop[pm2-i-j];
-      FE_ND_SET(fop[pm2-i-j]/w, fop[j]/w, fop[i]/w, 3);
-      FE_ND_SET(fop[pm2-i-j]/w, fop[j]/w, fop[i]/w, 4);
+      PetscReal w = fop[i] + fop[j] + fop[pm2 - i - j];
+      FE_ND_SET(fop[pm2 - i - j] / w, fop[j] / w, fop[i] / w, 3);
+      FE_ND_SET(fop[pm2 - i - j] / w, fop[j] / w, fop[i] / w, 4);
     }
   for (PetscInt i = 0; i <= pm2; i++)
     for (PetscInt j = 0; j + i <= pm2; j++) {
-      PetscReal w = fop[i] + fop[j] + fop[pm2-i-j];
-      FE_ND_SET(0., fop[i]/w, fop[j]/w, 2);
-      FE_ND_SET(0., fop[i]/w, fop[j]/w, 1);
+      PetscReal w = fop[i] + fop[j] + fop[pm2 - i - j];
+      FE_ND_SET(0., fop[i] / w, fop[j] / w, 2);
+      FE_ND_SET(0., fop[i] / w, fop[j] / w, 1);
     }
   for (PetscInt i = 0; i <= pm2; i++)
     for (PetscInt j = 0; j + i <= pm2; j++) {
-      PetscReal w = fop[i] + fop[j] + fop[pm2-i-j];
-      FE_ND_SET(fop[j]/w, 0., fop[i]/w, 0);
-      FE_ND_SET(fop[j]/w, 0., fop[i]/w, 2);
+      PetscReal w = fop[i] + fop[j] + fop[pm2 - i - j];
+      FE_ND_SET(fop[j] / w, 0., fop[i] / w, 0);
+      FE_ND_SET(fop[j] / w, 0., fop[i] / w, 2);
     }
   for (PetscInt i = 0; i <= pm2; i++)
     for (PetscInt j = 0; j + i <= pm2; j++) {
-      PetscReal w = fop[i] + fop[j] + fop[pm2-i-j];
-      FE_ND_SET(fop[i]/w, fop[j]/w, 0., 1);
-      FE_ND_SET(fop[i]/w, fop[j]/w, 0., 0);
+      PetscReal w = fop[i] + fop[j] + fop[pm2 - i - j];
+      FE_ND_SET(fop[i] / w, fop[j] / w, 0., 1);
+      FE_ND_SET(fop[i] / w, fop[j] / w, 0., 0);
     }
 
   /* interior: three tangents per node */
   for (PetscInt i = 0; i <= pm3; i++)
     for (PetscInt j = 0; j + i <= pm3; j++)
       for (PetscInt k = 0; k + j + i <= pm3; k++) {
-        PetscReal w = iop[k] + iop[j] + iop[i] + iop[pm3-i-j-k];
-        FE_ND_SET(iop[k]/w, iop[j]/w, iop[i]/w, 0);
-        FE_ND_SET(iop[k]/w, iop[j]/w, iop[i]/w, 1);
-        FE_ND_SET(iop[k]/w, iop[j]/w, iop[i]/w, 2);
+        PetscReal w = iop[k] + iop[j] + iop[i] + iop[pm3 - i - j - k];
+        FE_ND_SET(iop[k] / w, iop[j] / w, iop[i] / w, 0);
+        FE_ND_SET(iop[k] / w, iop[j] / w, iop[i] / w, 1);
+        FE_ND_SET(iop[k] / w, iop[j] / w, iop[i] / w, 2);
       }
-  #undef FE_ND_SET
+#undef FE_ND_SET
 }
 
 /**
@@ -318,29 +345,30 @@ static void feNdBuildNodes(PetscInt p, const PetscReal *eop, const PetscReal *fo
  *         (PETSC_ERR_MAT_LU_ZRPVT) if the matrix is singular.
  */
 static PetscErrorCode feNdInvert(PetscInt N, const PetscReal *A, PetscReal *Ainv) {
-  
+
   PetscFunctionBeginUser;
   PetscReal *M;
-  
+
   PetscCall(PetscMalloc1(N * N, &M));
-  
+
   for (PetscInt i = 0; i < N * N; i++) {
     M[i] = A[i];
   }
-  
+
   for (PetscInt i = 0; i < N; i++) {
     for (PetscInt j = 0; j < N; j++) {
-      Ainv[i*N+j] = (i == j) ? 1.0 : 0.0;
+      Ainv[i * N + j] = (i == j) ? 1.0 : 0.0;
     }
   }
 
   for (PetscInt i = 0; i < N; i++) {
-    PetscInt piv = i;
-    PetscReal best = PetscAbsReal(M[i*N+i]);
+    PetscInt  piv  = i;
+    PetscReal best = PetscAbsReal(M[i * N + i]);
     for (PetscInt j = i + 1; j < N; j++) {
-      PetscReal v = PetscAbsReal(M[j*N+i]);
-      if (v > best) { 
-        best = v; piv = j; 
+      PetscReal v = PetscAbsReal(M[j * N + i]);
+      if (v > best) {
+        best = v;
+        piv  = j;
       }
     }
     if (best < 1.0e-300) {
@@ -351,33 +379,34 @@ static PetscErrorCode feNdInvert(PetscInt N, const PetscReal *A, PetscReal *Ainv
     if (piv != i)
       for (PetscInt j = 0; j < N; j++) {
         PetscReal t;
-        t           = M[i*N+j];    
-        M[i*N+j]    = M[piv*N+j];    
-        M[piv*N+j]  = t;
-        t           = Ainv[i*N+j]; 
-        Ainv[i*N+j] = Ainv[piv*N+j]; 
-        Ainv[piv*N+j] = t;
+        t                 = M[i * N + j];
+        M[i * N + j]      = M[piv * N + j];
+        M[piv * N + j]    = t;
+        t                 = Ainv[i * N + j];
+        Ainv[i * N + j]   = Ainv[piv * N + j];
+        Ainv[piv * N + j] = t;
       }
 
-    PetscReal d = M[i*N+i];
-    for (PetscInt j = 0; j < N; j++) { 
-      M[i*N+j] /= d; Ainv[i*N+j] /= d; 
+    PetscReal d = M[i * N + i];
+    for (PetscInt j = 0; j < N; j++) {
+      M[i * N + j] /= d;
+      Ainv[i * N + j] /= d;
     }
-    
+
     for (PetscInt j = 0; j < N; j++) {
       if (j == i) {
         continue;
       }
-      
-      PetscReal f = M[j*N+i];
-      
+
+      PetscReal f = M[j * N + i];
+
       if (f == 0.0) {
         continue;
       }
-      
+
       for (PetscInt k = 0; k < N; k++) {
-        M[j*N+k]    -= f * M[i*N+k];
-        Ainv[j*N+k] -= f * Ainv[i*N+k];
+        M[j * N + k] -= f * M[i * N + k];
+        Ainv[j * N + k] -= f * Ainv[i * N + k];
       }
     }
   }
@@ -391,17 +420,13 @@ static PetscErrorCode feNdInvert(PetscInt N, const PetscReal *A, PetscReal *Ainv
  *
  * This function returns the dimension of the arbitrary-order Nedelec space on
  * a tetrahedron, order*(order+2)*(order+3)/2, or 0 for a non-positive order.
- *
- * @param[in] order  Polynomial order p (>= 1).
- *
- * @return The number of H(curl) DOFs, or 0 when order < 1.
  */
 PetscInt feNedelecDofCount(PetscInt order) {
-  
+
   if (order < 1) {
     return 0;
   }
-  
+
   return order * (order + 2) * (order + 3) / 2;
 }
 
@@ -414,24 +439,19 @@ PetscInt feNedelecDofCount(PetscInt order) {
  * T(o,m) = U_o(node_m) . tk[m] of the raw space against the DOF functionals,
  * storing its inverse Ti = T^{-1} for later value/curl evaluation. The caller
  * owns the returned handle and must release it with feNedelecDestroy.
- *
- * @param[in]  order  Polynomial order p (>= 1).
- * @param[out] out    Newly created handle.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 PetscErrorCode feNedelecCreate(PetscInt order, FeNedelec **out) {
-  
+
   PetscFunctionBeginUser;
   PetscCheck(order >= 1, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "fe_nedelec: order must be >= 1 (got %" PetscInt_FMT ")", order);
-  
+
   *out = NULL;
 
   FeNedelec *fe;
   PetscCall(PetscNew(&fe));
   fe->order = order;
   fe->dof   = feNedelecDofCount(order);
-  
+
   const PetscInt dof = fe->dof, p = order;
   PetscCall(PetscMalloc1(dof * dof, &fe->Ti));
   PetscCall(PetscMalloc1(dof * 3, &fe->nodes));
@@ -444,15 +464,15 @@ PetscErrorCode feNedelecCreate(PetscInt order, FeNedelec **out) {
   PetscReal *eop = NULL, *fop = NULL, *iop = NULL;
   PetscCall(PetscMalloc1(p, &eop));
   feNdGaussLegendre01(p, eop);
-  
-  if (p > 1) { 
-    PetscCall(PetscMalloc1(p - 1, &fop)); 
-    feNdGaussLegendre01(p - 1, fop); 
+
+  if (p > 1) {
+    PetscCall(PetscMalloc1(p - 1, &fop));
+    feNdGaussLegendre01(p - 1, fop);
   }
-  
-  if (p > 2) { 
-    PetscCall(PetscMalloc1(p - 2, &iop)); 
-    feNdGaussLegendre01(p - 2, iop); 
+
+  if (p > 2) {
+    PetscCall(PetscMalloc1(p - 2, &iop));
+    feNdGaussLegendre01(p - 2, iop);
   }
 
   feNdBuildNodes(p, eop, fop, iop, fe->nodes, fe->dof2tk);
@@ -460,22 +480,22 @@ PetscErrorCode feNedelecCreate(PetscInt order, FeNedelec **out) {
   /* Vandermonde T(o,m) = U_o(node_m) . tk[dof2tk[m]], then Ti = T^{-1}. */
   PetscReal *T = NULL;
   PetscCall(PetscMalloc1(dof * dof, &T));
-  
+
   for (PetscInt i = 0; i < dof; i++) {
-    const PetscReal X = fe->nodes[i*3+0], Y = fe->nodes[i*3+1], Z = fe->nodes[i*3+2];
-    const PetscReal *tm = feNd_tk[fe->dof2tk[i]];
-  
+    const PetscReal  X = fe->nodes[i * 3 + 0], Y = fe->nodes[i * 3 + 1], Z = fe->nodes[i * 3 + 2];
+    const PetscReal *tm = feNdTangents[fe->dof2tk[i]];
+
     feNdChebyshev(p - 1, X, fe->sx);
     feNdChebyshev(p - 1, Y, fe->sy);
     feNdChebyshev(p - 1, Z, fe->sz);
     feNdChebyshev(p - 1, 1.0 - X - Y - Z, fe->sl);
     feNdRawV(p, X, Y, Z, fe->sx, fe->sy, fe->sz, fe->sl, fe->Uscr);
-  
+
     for (PetscInt j = 0; j < dof; j++) {
-      T[j*dof+i] = fe->Uscr[j*3+0]*tm[0] + fe->Uscr[j*3+1]*tm[1] + fe->Uscr[j*3+2]*tm[2];
+      T[j * dof + i] = fe->Uscr[j * 3 + 0] * tm[0] + fe->Uscr[j * 3 + 1] * tm[1] + fe->Uscr[j * 3 + 2] * tm[2];
     }
   }
-  
+
   PetscCall(feNdInvert(dof, T, fe->Ti));
 
   PetscCall(PetscFree(T));
@@ -493,19 +513,15 @@ PetscErrorCode feNedelecCreate(PetscInt order, FeNedelec **out) {
  * This function frees every buffer owned by the handle (Vandermonde inverse,
  * nodes, tangent indices, evaluation scratch) and the handle itself, then sets
  * the caller's pointer to NULL. Passing a NULL or already-freed handle is safe.
- *
- * @param[in,out] fe  Handle to free; set to NULL on return.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 PetscErrorCode feNedelecDestroy(FeNedelec **fe) {
-  
+
   PetscFunctionBeginUser;
-  
+
   if (!fe || !*fe) {
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  
+
   PetscCall(PetscFree((*fe)->Ti));
   PetscCall(PetscFree((*fe)->nodes));
   PetscCall(PetscFree((*fe)->dof2tk));
@@ -515,7 +531,7 @@ PetscErrorCode feNedelecDestroy(FeNedelec **fe) {
   PetscCall(PetscFree(*fe));
 
   *fe = NULL;
-  
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -526,8 +542,8 @@ PetscErrorCode feNedelecDestroy(FeNedelec **fe) {
  *
  * @return The DOF count, or 0 when fe is NULL.
  */
-PetscInt feNedelecGetDof(const FeNedelec *fe)   { 
-  return fe ? fe->dof : 0; 
+PetscInt feNedelecGetDof(const FeNedelec *fe) {
+  return fe ? fe->dof : 0;
 }
 
 /**
@@ -537,8 +553,8 @@ PetscInt feNedelecGetDof(const FeNedelec *fe)   {
  *
  * @return The polynomial order, or 0 when fe is NULL.
  */
-PetscInt feNedelecGetOrder(const FeNedelec *fe) { 
-  return fe ? fe->order : 0; 
+PetscInt feNedelecGetOrder(const FeNedelec *fe) {
+  return fe ? fe->order : 0;
 }
 
 /**
@@ -548,15 +564,9 @@ PetscInt feNedelecGetOrder(const FeNedelec *fe) {
  * applies the stored Vandermonde inverse Ti to obtain the nodal basis values,
  * writing them into shape as dof x 3 row-major. The handle's 1D scratch is
  * overwritten, so a single handle is not reentrant.
- *
- * @param[in]  fe     Element handle.
- * @param[in]  x,y,z  Reference-cell coordinates.
- * @param[out] shape  dof x 3 row-major basis values.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 PetscErrorCode feNedelecCalcVShape(const FeNedelec *fe, PetscReal x, PetscReal y, PetscReal z, PetscReal *shape) {
-  
+
   PetscFunctionBeginUser;
 
   const PetscInt dof = fe->dof, p = fe->order;
@@ -569,16 +579,18 @@ PetscErrorCode feNedelecCalcVShape(const FeNedelec *fe, PetscReal x, PetscReal y
 
   for (PetscInt i = 0; i < dof; i++) {
     PetscReal a0 = 0., a1 = 0., a2 = 0.;
-    
-    const PetscReal *ti = &fe->Ti[i*dof];
-    
+
+    const PetscReal *ti = &fe->Ti[i * dof];
+
     for (PetscInt j = 0; j < dof; j++) {
-      a0 += ti[j] * fe->Uscr[j*3+0];
-      a1 += ti[j] * fe->Uscr[j*3+1];
-      a2 += ti[j] * fe->Uscr[j*3+2];
+      a0 += ti[j] * fe->Uscr[j * 3 + 0];
+      a1 += ti[j] * fe->Uscr[j * 3 + 1];
+      a2 += ti[j] * fe->Uscr[j * 3 + 2];
     }
-    
-    shape[i*3+0] = a0; shape[i*3+1] = a1; shape[i*3+2] = a2;
+
+    shape[i * 3 + 0] = a0;
+    shape[i * 3 + 1] = a1;
+    shape[i * 3 + 2] = a2;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -592,15 +604,9 @@ PetscErrorCode feNedelecCalcVShape(const FeNedelec *fe, PetscReal x, PetscReal y
  * lambda = 1-x-y-z is already carried inside the raw-curl expressions, so the
  * plain Chebyshev derivative is passed as the lambda factor. The handle's 1D
  * scratch is overwritten, so a single handle is not reentrant.
- *
- * @param[in]  fe     Element handle.
- * @param[in]  x,y,z  Reference-cell coordinates.
- * @param[out] curl   dof x 3 row-major curl values.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 PetscErrorCode feNedelecCalcCurlShape(const FeNedelec *fe, PetscReal x, PetscReal y, PetscReal z, PetscReal *curl) {
-  
+
   PetscFunctionBeginUser;
   const PetscInt dof = fe->dof, p = fe->order;
 
@@ -608,20 +614,22 @@ PetscErrorCode feNedelecCalcCurlShape(const FeNedelec *fe, PetscReal x, PetscRea
   feNdChebyshevD(p - 1, y, fe->sy, fe->dy);
   feNdChebyshevD(p - 1, z, fe->sz, fe->dz);
   feNdChebyshevD(p - 1, 1.0 - x - y - z, fe->sl, fe->dl);
-  
+
   /* d/d(lambda) carries a -1 from lambda = 1 - x - y - z in the chain rule; the
    * raw-curl formulas already encode that sign, so dl is the plain T' here. */
   feNdRawCurl(p, x, y, z, fe->sx, fe->sy, fe->sz, fe->sl, fe->dx, fe->dy, fe->dz, fe->dl, fe->Uscr);
 
   for (PetscInt i = 0; i < dof; i++) {
-    PetscReal a0 = 0., a1 = 0., a2 = 0.;
-    const PetscReal *ti = &fe->Ti[i*dof];
+    PetscReal        a0 = 0., a1 = 0., a2 = 0.;
+    const PetscReal *ti = &fe->Ti[i * dof];
     for (PetscInt j = 0; j < dof; j++) {
-      a0 += ti[j] * fe->Uscr[j*3+0];
-      a1 += ti[j] * fe->Uscr[j*3+1];
-      a2 += ti[j] * fe->Uscr[j*3+2];
+      a0 += ti[j] * fe->Uscr[j * 3 + 0];
+      a1 += ti[j] * fe->Uscr[j * 3 + 1];
+      a2 += ti[j] * fe->Uscr[j * 3 + 2];
     }
-    curl[i*3+0] = a0; curl[i*3+1] = a1; curl[i*3+2] = a2;
+    curl[i * 3 + 0] = a0;
+    curl[i * 3 + 1] = a1;
+    curl[i * 3 + 2] = a2;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -630,33 +638,27 @@ PetscErrorCode feNedelecCalcCurlShape(const FeNedelec *fe, PetscReal x, PetscRea
  * @brief Returns the defining-functional node and tangent of a DOF.
  *
  * This function reports the reference-cell node coordinates and the tangent
- * direction (from feNd_tk, via the DOF's tangent index) of functional m.
+ * direction (from feNdTangents, via the DOF's tangent index) of functional m.
  * Either output may be NULL to skip it. The DOF index is bounds-checked.
- *
- * @param[in]  fe       Element handle.
- * @param[in]  m        DOF index in [0, dof).
- * @param[out] node     Reference-cell node coordinates (3); may be NULL.
- * @param[out] tangent  DOF tangent direction (3); may be NULL.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 PetscErrorCode feNedelecGetDofInfo(const FeNedelec *fe, PetscInt m, PetscReal node[3], PetscReal tangent[3]) {
   PetscFunctionBeginUser;
-  
-  PetscCheck(m >= 0 && m < fe->dof, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "fe_nedelec: DOF index %" PetscInt_FMT " out of range [0,%" PetscInt_FMT ")", m, fe->dof);
-  
-  if (node) { 
-    node[0] = fe->nodes[m*3+0]; 
-    node[1] = fe->nodes[m*3+1]; 
-    node[2] = fe->nodes[m*3+2]; 
+
+  PetscCheck(m >= 0 && m < fe->dof, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
+             "fe_nedelec: DOF index %" PetscInt_FMT " out of range [0,%" PetscInt_FMT ")", m, fe->dof);
+
+  if (node) {
+    node[0] = fe->nodes[m * 3 + 0];
+    node[1] = fe->nodes[m * 3 + 1];
+    node[2] = fe->nodes[m * 3 + 2];
   }
-  
+
   if (tangent) {
-    const PetscReal *tm = feNd_tk[fe->dof2tk[m]];
-    tangent[0] = tm[0]; 
-    tangent[1] = tm[1];
-    tangent[2] = tm[2];
+    const PetscReal *tm = feNdTangents[fe->dof2tk[m]];
+    tangent[0]          = tm[0];
+    tangent[1]          = tm[1];
+    tangent[2]          = tm[2];
   }
-  
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }

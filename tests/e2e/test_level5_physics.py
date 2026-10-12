@@ -1,20 +1,9 @@
-"""LEVEL 5 - Basic FM-CSEM physics tests (unit cube, pipeline orders 1..3).
+"""LEVEL 5 - Basic FM-CSEM physics (unit cube, orders 1..3).
 
-Minimal end-to-end forward run on the homogeneous unit cube (one 2 Hz dipole,
-three receivers) solved with a DIRECT LU factorization (MUMPS), which is exact
-and deterministic both serially and under MPI. Checks:
-  * every field component exists, has the right shape and is finite,
-  * the electric and magnetic fields are non-trivial (not all-zero),
-  * the solved fields reproduce the committed exact-LU golden references to a
-    robust tolerance (a regression guard on the whole assemble->solve->interp
-    pipeline).
-
-The goldens in examples/unit_cube/reference/ are exact LU solves of the current
-code, so a direct solve here reproduces them to round-off; a loose relative
-tolerance keeps the check stable across MPI rank counts. The regression check is
-deliberately decoupled from the production PCBDDC iterative solver, whose
-convergence is order/rank sensitive and is a solver property, not part of
-fm.csem's forward-modelling behaviour.
+Forward run on the homogeneous unit cube (one 2 Hz dipole, three receivers)
+with a direct LU solve. Checks that every field component is present, finite
+and non-trivial, and that it matches the committed LU golden in
+examples/fm_csem_unit_cube/reference/ to a relative 1e-3.
 """
 import numpy as np
 import pytest
@@ -25,7 +14,7 @@ from fmcsem_testlib import PIPELINE_ORDERS, FIELD_COMPONENTS, REFERENCE_DIR, loa
 pytestmark = pytest.mark.slow
 
 N_RECV = 3
-REL_TOL = 1e-3   # robust: direct-LU solve vs LU golden (round-off); loose for MPI/MUMPS
+REL_TOL = 1e-3
 
 
 @pytest.mark.e2e
@@ -43,8 +32,8 @@ def test_fields_valid_and_match_reference(fm_run, h5py_mod, order):
         a = got[comp]
         assert a.shape == (N_RECV,), f"{comp} shape {a.shape} != ({N_RECV},) at order {order}"
         assert np.all(np.isfinite(a)), f"{comp} has non-finite values at order {order}"
-    assert sum(np.linalg.norm(got[c]) for c in ("Ex", "Ey", "Ez")) > 0, f"E all-zero at order {order}"
-    assert sum(np.linalg.norm(got[c]) for c in ("Hx", "Hy", "Hz")) > 0, f"H all-zero at order {order}"
+    assert sum(np.linalg.norm(got[comp]) for comp in ("Ex", "Ey", "Ez")) > 0, f"E all-zero at order {order}"
+    assert sum(np.linalg.norm(got[comp]) for comp in ("Hx", "Hy", "Hz")) > 0, f"H all-zero at order {order}"
 
     # (b) reproduce the committed golden reference
     ref = REFERENCE_DIR / f"responses_p{order}.h5"

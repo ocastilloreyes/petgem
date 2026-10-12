@@ -14,6 +14,7 @@
 #include <petscviewerhdf5.h>
 
 /* PETGEM functions */
+#include "assembly.h"
 #include "common.h"
 #include "constants.h"
 #include "fem.h"
@@ -28,26 +29,28 @@
 /**
  * @brief Reads the MT options -mt_1d_refine and -mt_1d_equation.
  *
- * @param[out] mt  MT options.
+ * @param[out] mtParams  MT options.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode readMtParams(MtParams *mt) {
+PetscErrorCode readMtParams(MtParams *mtParams) {
   PetscFunctionBeginUser;
 
   const char *equations[] = {"paper", "h"};
   PetscInt    equation    = MT_1D_EQUATION_PAPER;
 
-  mt->refine1D = 10;
+  mtParams->refine1D = 10;
 
   PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "fm.mt: MT options (optional)", "PETGEM");
-  PetscCall(PetscOptionsInt("-mt_1d_refine", "1D element size = boundary 3D edge length / refine", "fm.mt", mt->refine1D, &mt->refine1D, NULL));
+  PetscCall(PetscOptionsInt("-mt_1d_refine", "1D element size = boundary 3D edge length / refine", "fm.mt", mtParams->refine1D,
+                            &mtParams->refine1D, NULL));
   PetscCall(PetscOptionsEList("-mt_1d_equation", "1D boundary equation: 'paper' (H'' + iωμσH = 0) or 'h' ((ρH')' + iωμH = 0)", "fm.mt",
                               equations, 2, equations[equation], &equation, NULL));
   PetscOptionsEnd();
 
-  PetscCheck(mt->refine1D >= 1, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE, "-mt_1d_refine must be >= 1 (got %" PetscInt_FMT ")", mt->refine1D);
-  mt->equation1D = (Mt1DEquation)equation;
+  PetscCheck(mtParams->refine1D >= 1, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE, "-mt_1d_refine must be >= 1 (got %" PetscInt_FMT ")",
+             mtParams->refine1D);
+  mtParams->equation1D = (Mt1DEquation)equation;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -56,11 +59,11 @@ PetscErrorCode readMtParams(MtParams *mt) {
  * @brief Reads the MT frequency from the bundle's /mt/freq dataset.
  *
  * @param[in]     params  Parameters (input file).
- * @param[in,out] mt      MT options; frequency is set.
+ * @param[in,out] mtParams      MT options; frequency is set.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode loadMtSettings(const petgemParams *params, MtParams *mt) {
+PetscErrorCode loadMtSettings(const PetgemParams *params, MtParams *mtParams) {
   PetscFunctionBeginUser;
 
   PetscViewer        viewer;
@@ -77,27 +80,21 @@ PetscErrorCode loadMtSettings(const petgemParams *params, MtParams *mt) {
   PetscCall(PetscViewerDestroy(&viewer));
 
   PetscCall(VecGetSize(freq, &n));
-  PetscCheck(n == 1, PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED, "loadMtSettings: /mt/freq has %" PetscInt_FMT " entries, expected 1 (bundle %s)",
-             n, params->inputFile);
+  PetscCheck(n == 1, PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED,
+             "loadMtSettings: /mt/freq has %" PetscInt_FMT " entries, expected 1 (bundle %s)", n, params->inputFile);
   PetscCall(VecGetArrayRead(freq, &arr));
-  mt->frequency = PetscRealPart(arr[0]);
+  mtParams->frequency = PetscRealPart(arr[0]);
   PetscCall(VecRestoreArrayRead(freq, &arr));
   PetscCall(VecDestroy(&freq));
 
-  PetscCheck(mt->frequency > 0.0, PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED, "loadMtSettings: /mt/freq = %g is not positive (bundle %s)",
-             (double)mt->frequency, params->inputFile);
+  PetscCheck(mtParams->frequency > 0.0, PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED,
+             "loadMtSettings: /mt/freq = %g is not positive (bundle %s)", (double)mtParams->frequency, params->inputFile);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /**
  * @brief Assigns each boundary face to a box face Gamma_1..Gamma_6.
- *
- * @param[in]  dm     DMPlex mesh.
- * @param[in]  faces  Local boundary faces (getBoundaryFaces).
- * @param[out] tags   Box face of each entry of faces (caller frees).
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 PetscErrorCode classifyMtBoxFaces(const DM dm, IS faces, MtBoxFace **tags) {
   PetscFunctionBeginUser;
@@ -131,7 +128,8 @@ PetscErrorCode classifyMtBoxFaces(const DM dm, IS faces, MtBoxFace **tags) {
     const PetscReal plane = (normal[axis] > 0.0) ? upper[axis] : lower[axis];
     for (PetscInt v = 0; v < NUM_VERTICES_PER_FACE; v++) {
       PetscCheck(PetscAbsReal(vertices[v][axis] - plane) <= tolPlane, PETSC_COMM_SELF, PETSC_ERR_SUP,
-                 "classifyMtBoxFaces: boundary face %" PetscInt_FMT " is off the bounding-box plane %c = %g; the MT domain must be an axis-aligned box",
+                 "classifyMtBoxFaces: boundary face %" PetscInt_FMT
+                 " is off the bounding-box plane %c = %g; the MT domain must be an axis-aligned box",
                  faceIdx[i], "xyz"[axis], (double)plane);
     }
     (*tags)[i] = (normal[axis] > 0.0) ? highFace[axis] : lowFace[axis];
@@ -152,14 +150,6 @@ static int compareReal(const void *a, const void *b) {
 
 /**
  * @brief Builds the layered conductivity of the lateral faces Gamma_2..Gamma_5.
- *
- * @param[in]  dm            DMPlex mesh.
- * @param[in]  conductivity  Per-cell conductivity Vec.
- * @param[in]  faces         Local boundary faces (getBoundaryFaces).
- * @param[in]  tags          Box face of each entry of faces (classifyMtBoxFaces).
- * @param[out] profile       Layered conductivity, identical on every rank.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, const MtBoxFace *tags, Mt1DProfile *profile) {
   PetscFunctionBeginUser;
@@ -188,12 +178,12 @@ PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, c
 
     PetscCall(computeBoundaryFaceGeometry(dm, faceIdx[i], &cell, vertices, normal, &area));
     PetscCall(extractCellConductivity(dmConductivity, conductivity, cell, &owner));
-    PetscCheck(PetscAbsReal(owner.conductivity[0] - owner.conductivity[1]) <= 1.0e-12 * PetscAbsReal(owner.conductivity[0]), PETSC_COMM_SELF, PETSC_ERR_SUP,
-               "buildMt1DProfile: lateral cell %" PetscInt_FMT " has sigma_x = %g != sigma_y = %g", cell,
+    PetscCheck(PetscAbsReal(owner.conductivity[0] - owner.conductivity[1]) <= 1.0e-12 * PetscAbsReal(owner.conductivity[0]),
+               PETSC_COMM_SELF, PETSC_ERR_SUP, "buildMt1DProfile: lateral cell %" PetscInt_FMT " has sigma_x = %g != sigma_y = %g", cell,
                (double)owner.conductivity[0], (double)owner.conductivity[1]);
 
     for (PetscInt a = 0; a < NUM_VERTICES_PER_FACE; a++) {
-      const PetscInt b = (a + 1) % NUM_VERTICES_PER_FACE;
+      const PetscInt b    = (a + 1) % NUM_VERTICES_PER_FACE;
       PetscReal      len2 = 0.0;
       for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) len2 += (vertices[b][d] - vertices[a][d]) * (vertices[b][d] - vertices[a][d]);
       h = PetscMin(h, PetscSqrtReal(len2));
@@ -211,9 +201,9 @@ PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, c
   PetscCall(PetscMPIIntCast(MT_FACE_RECORD * numLateral, &sendCount));
   PetscCall(PetscMalloc2(size, &counts, size, &displs));
   PetscCallMPI(MPI_Allgather(&sendCount, 1, MPI_INT, counts, 1, MPI_INT, comm));
-  for (PetscMPIInt r = 0; r < size; r++) {
-    PetscCall(PetscMPIIntCast(totalRecords, &displs[r]));
-    totalRecords += counts[r];
+  for (PetscMPIInt rank = 0; rank < size; rank++) {
+    PetscCall(PetscMPIIntCast(totalRecords, &displs[rank]));
+    totalRecords += counts[rank];
   }
   PetscCall(PetscMalloc1(totalRecords, &all));
   PetscCallMPI(MPI_Allgatherv(local, sendCount, MPIU_REAL, all, counts, displs, MPIU_REAL, comm));
@@ -230,7 +220,7 @@ PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, c
     breaks[2 * f + 1] = all[MT_FACE_RECORD * f + 1];
   }
   qsort(breaks, (size_t)(2 * numRecords), sizeof(PetscReal), compareReal);
-  const PetscReal tolZ = 1.0e-9 * (breaks[2 * numRecords - 1] - breaks[0]);
+  const PetscReal tolZ      = 1.0e-9 * (breaks[2 * numRecords - 1] - breaks[0]);
   PetscInt        numBreaks = 1;
   for (PetscInt i = 1; i < 2 * numRecords; i++) {
     if (breaks[i] - breaks[numBreaks - 1] > tolZ) breaks[numBreaks++] = breaks[i];
@@ -252,8 +242,10 @@ PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, c
     /* first break at or above zlo */
     while (lo < hi) {
       const PetscInt mid = (lo + hi) / 2;
-      if (breaks[mid] < zlo - tolZ) lo = mid + 1;
-      else hi = mid;
+      if (breaks[mid] < zlo - tolZ)
+        lo = mid + 1;
+      else
+        hi = mid;
     }
     for (PetscInt k = lo; k < numIntervals && breaks[k] < zhi - tolZ; k++) {
       if (intervalSigma[k] < 0.0) {
@@ -279,7 +271,7 @@ PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, c
   profile->numLayers = numLayers;
   PetscCall(PetscMalloc3(numLayers + 1, &profile->z, numLayers, &profile->sigma, numLayers, &profile->h));
 
-  PetscInt layer = 0;
+  PetscInt layer    = 0;
   profile->z[0]     = breaks[0];
   profile->sigma[0] = intervalSigma[0];
   profile->h[0]     = intervalH[0];
@@ -303,18 +295,11 @@ PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, c
 
 /**
  * @brief Solves the 1D boundary problem for H(z).
- *
- * @param[in]  profile  Layered conductivity.
- * @param[in]  mt       MT options (refine1D, equation1D).
- * @param[in]  omega    Angular frequency.
- * @param[out] field    Nodal H(z).
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mt, const PetscReal omega, Mt1DField *field) {
+PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mtParams, Mt1DField *field) {
   PetscFunctionBeginUser;
 
-  const PetscScalar iomegamu = PETSC_i * omega * MU;
+  const PetscScalar iomegamu = iOmegaMu(mtParams->frequency);
   PetscInt         *numElements, numNodes = 1;
   PetscScalar      *lower, *diag, *upper, *rhs;
 
@@ -322,7 +307,7 @@ PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mt, const P
   PetscCall(PetscMalloc1(profile->numLayers, &numElements));
   for (PetscInt l = 0; l < profile->numLayers; l++) {
     const PetscReal thickness = profile->z[l + 1] - profile->z[l];
-    numElements[l] = PetscMax(1, (PetscInt)PetscCeilReal(thickness * mt->refine1D / profile->h[l]));
+    numElements[l]            = PetscMax(1, (PetscInt)PetscCeilReal(thickness * mtParams->refine1D / profile->h[l]));
     numNodes += numElements[l];
   }
 
@@ -331,14 +316,14 @@ PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mt, const P
   PetscCall(PetscCalloc4(numNodes, &lower, numNodes, &diag, numNodes, &upper, numNodes, &rhs));
 
   PetscInt node = 0;
-  field->z[0] = profile->z[0];
+  field->z[0]   = profile->z[0];
   for (PetscInt l = 0; l < profile->numLayers; l++) {
     const PetscReal hElem = (profile->z[l + 1] - profile->z[l]) / numElements[l];
     const PetscReal sigma = profile->sigma[l];
     PetscScalar     kDiag, kOff, mDiag, mOff;
 
     /* Element matrix A_e = K_e - iωμ M_e */
-    if (mt->equation1D == MT_1D_EQUATION_PAPER) {
+    if (mtParams->equation1D == MT_1D_EQUATION_PAPER) {
       kDiag = 1.0 / hElem;
       mDiag = sigma * hElem / 3.0;
       mOff  = sigma * hElem / 6.0;
@@ -347,14 +332,14 @@ PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mt, const P
       mDiag = hElem / 3.0;
       mOff  = hElem / 6.0;
     }
-    kOff = -kDiag;
+    kOff                    = -kDiag;
     const PetscScalar aDiag = kDiag - iomegamu * mDiag;
     const PetscScalar aOff  = kOff - iomegamu * mOff;
 
     for (PetscInt e = 0; e < numElements[l]; e++, node++) {
-      diag[node]      += aDiag;
-      diag[node + 1]  += aDiag;
-      upper[node]     += aOff;
+      diag[node] += aDiag;
+      diag[node + 1] += aDiag;
+      upper[node] += aOff;
       lower[node + 1] += aOff;
       field->z[node + 1] = (e == numElements[l] - 1) ? profile->z[l + 1] : profile->z[l] + (e + 1) * hElem;
     }
@@ -362,9 +347,9 @@ PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mt, const P
   PetscCall(PetscFree(numElements));
 
   /* Dirichlet: H(z_min) = 0, H(z_max) = 1 */
-  diag[0]  = 1.0;
-  upper[0] = 0.0;
-  rhs[0]   = 0.0;
+  diag[0]             = 1.0;
+  upper[0]            = 0.0;
+  rhs[0]              = 0.0;
   diag[numNodes - 1]  = 1.0;
   lower[numNodes - 1] = 0.0;
   rhs[numNodes - 1]   = 1.0;
@@ -373,7 +358,7 @@ PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mt, const P
   for (PetscInt i = 1; i < numNodes; i++) {
     const PetscScalar w = lower[i] / diag[i - 1];
     diag[i] -= w * upper[i - 1];
-    rhs[i]  -= w * rhs[i - 1];
+    rhs[i] -= w * rhs[i - 1];
   }
   field->H[numNodes - 1] = rhs[numNodes - 1] / diag[numNodes - 1];
   for (PetscInt i = numNodes - 2; i >= 0; i--) {
@@ -411,11 +396,13 @@ PetscErrorCode evalMt1DField(const Mt1DField *field, const PetscReal z, PetscSca
   PetscInt lo = 0, hi = n - 1;
   while (hi - lo > 1) {
     const PetscInt mid = (lo + hi) / 2;
-    if (field->z[mid] <= z) lo = mid;
-    else hi = mid;
+    if (field->z[mid] <= z)
+      lo = mid;
+    else
+      hi = mid;
   }
   const PetscReal t = (z - field->z[lo]) / (field->z[lo + 1] - field->z[lo]);
-  *H = (1.0 - t) * field->H[lo] + t * field->H[lo + 1];
+  *H                = (1.0 - t) * field->H[lo] + t * field->H[lo + 1];
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -429,96 +416,67 @@ PetscErrorCode evalMt1DField(const Mt1DField *field, const PetscReal z, PetscSca
  * the x-polarization, Ĥ = (0, H(z), 0); column 1 the y-polarization,
  * Ĥ = (H(z), 0, 0).
  *
- * @param[in]  params  Parameters (order).
- * @param[in]  omega   Angular frequency.
- * @param[in]  dm      DMPlex mesh and H(curl) discretization.
- * @param[in]  grid    Finite-element grid descriptor.
- * @param[in]  faces   Local boundary faces (getBoundaryFaces).
- * @param[in]  tags    Box face of each entry of faces (classifyMtBoxFaces).
- * @param[in]  field   Nodal H(z) (solveMt1D).
- * @param[out] B       Right-hand side matrix, one column per polarization.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
- *
  * @note The caller is responsible for destroying the returned matrix `B`.
  */
-PetscErrorCode assembleMtBoundaryRHS(const petgemParams params, const PetscReal omega, const DM dm, const Grid grid,
-                                     IS faces, const MtBoxFace *tags, const Mt1DField *field, Mat *B) {
+PetscErrorCode assembleMtBoundaryRhs(const PetscReal frequency, const DM dm, const Grid *grid, IS faces, const MtBoxFace *tags,
+                                     const Mt1DField *field, Mat *B) {
   PetscFunctionBeginUser;
 
   /* Variables declaration */
-  Cell                   cell;
-  Quadrature2D           quadrature_2d;
-  PetscInt               m, M, numFaces, numDofIndices, *dofIndices;
-  const PetscInt        *faceIdx;
-  PetscReal            **Ni, XiEtaZeta[NUM_DIMENSIONS];
-  PetscScalar           *closureRHS[MT_NUM_POLARIZATIONS];
-  PetscSection           section;
-  Vec                    b[MT_NUM_POLARIZATIONS], bcol;
-  VecType                vtype;
-  ISLocalToGlobalMapping mapping;
-  MPI_Comm               comm = PetscObjectComm((PetscObject)dm);
-  const PetscScalar      constFactor = -PETSC_i * omega * MU;
+  Cell              cell;
+  Quadrature2D      quadrature2D;
+  PetscInt          numFaces, numDofIndices, *dofIndices;
+  const PetscInt   *faceIdx;
+  PetscReal       **Ni, XiEtaZeta[NUM_DIMENSIONS];
+  PetscScalar      *closureRhs[MT_NUM_POLARIZATIONS];
+  PetscSection      section;
+  Vec               b[MT_NUM_POLARIZATIONS], bcol;
+  MPI_Comm          comm        = PetscObjectComm((PetscObject)dm);
+  const PetscScalar constFactor = -iOmegaMu(frequency);
 
-  PetscCheck(grid.bc == PETGEM_BC_NATURAL, comm, PETSC_ERR_ARG_WRONGSTATE,
+  PetscCheck(grid->bc == PETGEM_BC_NATURAL, comm, PETSC_ERR_ARG_WRONGSTATE,
              "assembleMtBoundaryRHS: the grid must be set up with PETGEM_BC_NATURAL");
 
   /* One vector per polarization */
-  PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
   for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-    PetscCall(DMCreateGlobalVector(dm, &b[k]));
-    PetscCall(VecSetLocalToGlobalMapping(b[k], mapping));
-    PetscCall(VecSetOption(b[k], VEC_IGNORE_NEGATIVE_INDICES, PETSC_TRUE));
-    PetscCall(VecSetFromOptions(b[k]));
+    PetscCall(createRhsVector(dm, &b[k]));
     PetscCall(VecZeroEntries(b[k]));
   }
 
   /* Matrix holding both right-hand sides */
-  PetscCall(VecGetSize(b[0], &M));
-  PetscCall(VecGetLocalSize(b[0], &m));
-  PetscCall(VecGetType(b[0], &vtype));
-  PetscCall(MatCreateDenseFromVecType(comm, vtype, m, PETSC_DECIDE, M, MT_NUM_POLARIZATIONS, m, NULL, B));
+  PetscCall(createRhsMatrix(b[0], MT_NUM_POLARIZATIONS, B));
 
   /* Get DM section */
   PetscCall(DMGetLocalSection(dm, &section));
 
   /* Compute 2D quadrature points */
-  PetscCall(computeNum2DQuadraturePoints(params.order, &quadrature_2d));
-  PetscCall(PetscCalloc1(quadrature_2d.numPoints, &quadrature_2d.points));
-  for (PetscInt i = 0; i < quadrature_2d.numPoints; i++) {
-    PetscCall(PetscCalloc1(2, &quadrature_2d.points[i]));
-  }
-  PetscCall(PetscCalloc1(quadrature_2d.numPoints, &quadrature_2d.weights));
-  PetscCall(compute2DQuadraturePoints(&quadrature_2d));
+  PetscCall(createQuadrature2D(grid->fem.order, &quadrature2D));
 
   /* Allocate memory */
   for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-    PetscCall(PetscCalloc1(grid.numDofInCell, &closureRHS[k]));
+    PetscCall(PetscCalloc1(grid->fem.numDofInCell, &closureRhs[k]));
   }
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Ni));
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    PetscCall(PetscCalloc1(grid.numDofInCell, &Ni[i]));
-  }
+  PetscCall(createBasisValues(grid->fem.numDofInCell, &Ni));
 
   /* Boundary integral, face by face */
   PetscCall(ISGetLocalSize(faces, &numFaces));
   PetscCall(ISGetIndices(faces, &faceIdx));
   for (PetscInt f = 0; f < numFaces; f++) {
-    PetscInt  cellID;
+    PetscInt  cellId;
     PetscReal vertices[NUM_VERTICES_PER_FACE][NUM_DIMENSIONS], normal[NUM_DIMENSIONS], area;
 
     if (tags[f] == MT_FACE_BOTTOM) continue;
 
     /* Face geometry and support cell */
-    PetscCall(computeBoundaryFaceGeometry(dm, faceIdx[f], &cellID, vertices, normal, &area));
-    PetscCall(extractCellCoordinates(dm, cellID, &cell));
+    PetscCall(computeBoundaryFaceGeometry(dm, faceIdx[f], &cellId, vertices, normal, &area));
+    PetscCall(extractCellCoordinates(dm, cellId, &cell));
 
     for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-      for (PetscInt j = 0; j < grid.numDofInCell; j++) closureRHS[k][j] = 0.0;
+      for (PetscInt j = 0; j < grid->fem.numDofInCell; j++) closureRhs[k][j] = 0.0;
     }
 
-    for (PetscInt q = 0; q < quadrature_2d.numPoints; q++) {
-      const PetscReal s = quadrature_2d.points[q][0], t = quadrature_2d.points[q][1];
+    for (PetscInt q = 0; q < quadrature2D.numPoints; q++) {
+      const PetscReal s = quadrature2D.points[q][0], t = quadrature2D.points[q][1];
       PetscReal       point[NUM_DIMENSIONS];
       PetscScalar     H, nxH[MT_NUM_POLARIZATIONS][NUM_DIMENSIONS];
 
@@ -526,8 +484,8 @@ PetscErrorCode assembleMtBoundaryRHS(const petgemParams params, const PetscReal 
       for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
         point[d] = vertices[0][d] + s * (vertices[1][d] - vertices[0][d]) + t * (vertices[2][d] - vertices[0][d]);
       }
-      PetscCall(tetrahedronXYZToReference(cell.coordinates, point, XiEtaZeta));
-      PetscCall(evaluateNedelecBasis(&grid.fem, &cell, XiEtaZeta, Ni, NULL));
+      PetscCall(tetrahedronXyzToReference(cell.coordinates, point, XiEtaZeta));
+      PetscCall(evaluateNedelecBasis(&grid->fem, &cell, XiEtaZeta, Ni, NULL));
 
       /* n x Ĥ: x-polarization Ĥ = (0, H, 0), y-polarization Ĥ = (H, 0, 0) */
       PetscCall(evalMt1DField(field, point[2], &H));
@@ -538,24 +496,24 @@ PetscErrorCode assembleMtBoundaryRHS(const petgemParams params, const PetscReal 
       nxH[1][1] = normal[2] * H;
       nxH[1][2] = -normal[1] * H;
 
-      const PetscReal wdet = quadrature_2d.weights[q] * 2.0 * area;
+      const PetscReal wdet = quadrature2D.weights[q] * 2.0 * area;
       for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-        for (PetscInt j = 0; j < grid.numDofInCell; j++) {
+        for (PetscInt j = 0; j < grid->fem.numDofInCell; j++) {
           PetscScalar dot = 0.0;
           for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
             dot += (PetscScalar)Ni[d][j] * nxH[k][d];
           }
-          closureRHS[k][j] += wdet * constFactor * dot;
+          closureRhs[k][j] += wdet * constFactor * dot;
         }
       }
     }
 
     /* Add face contribution through the support cell closure */
-    PetscCall(DMPlexGetClosureIndices(dm, section, section, cellID, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
+    PetscCall(DMPlexGetClosureIndices(dm, section, section, cellId, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
     for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-      PetscCall(VecSetValuesLocal(b[k], numDofIndices, dofIndices, closureRHS[k], ADD_VALUES));
+      PetscCall(VecSetValuesLocal(b[k], numDofIndices, dofIndices, closureRhs[k], ADD_VALUES));
     }
-    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, cellID, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
+    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, cellId, PETSC_TRUE, &numDofIndices, &dofIndices, NULL, NULL));
   }
   PetscCall(ISRestoreIndices(faces, &faceIdx));
 
@@ -570,17 +528,10 @@ PetscErrorCode assembleMtBoundaryRHS(const petgemParams params, const PetscReal 
   }
 
   /* Free memory */
-  PetscCall(PetscFree(quadrature_2d.weights));
-  for (PetscInt i = 0; i < quadrature_2d.numPoints; i++) {
-    PetscCall(PetscFree(quadrature_2d.points[i]));
-  }
-  PetscCall(PetscFree(quadrature_2d.points));
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    PetscCall(PetscFree(Ni[i]));
-  }
-  PetscCall(PetscFree(Ni));
+  PetscCall(destroyQuadrature2D(&quadrature2D));
+  PetscCall(destroyBasisValues(&Ni));
   for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-    PetscCall(PetscFree(closureRHS[k]));
+    PetscCall(PetscFree(closureRhs[k]));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -590,14 +541,14 @@ PetscErrorCode assembleMtBoundaryRHS(const petgemParams params, const PetscReal 
  * @brief Prints the "MT" section of the run report.
  *
  * @param[in] comm      Communicator.
- * @param[in] mt        MT options.
+ * @param[in] mtParams        MT options.
  * @param[in] faces     Local boundary faces.
  * @param[in] profile   Layered conductivity of the lateral faces.
  * @param[in] field     Nodal H(z).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mt, IS faces, const Mt1DProfile *profile, const Mt1DField *field) {
+PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mtParams, IS faces, const Mt1DProfile *profile, const Mt1DField *field) {
   PetscFunctionBeginUser;
 
   PetscInt numFaces, numFacesGlobal;
@@ -606,19 +557,86 @@ PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mt, IS faces, const Mt1
   PetscCallMPI(MPI_Allreduce(&numFaces, &numFacesGlobal, 1, MPIU_INT, MPI_SUM, comm));
 
   PetscCall(logSection(comm, "MT"));
-  PetscCall(logKVReal(comm, "Frequency (Hz)", mt->frequency));
-  PetscCall(logKVStr(comm, "Polarizations", "x, y"));
-  PetscCall(logKVInt(comm, "Boundary faces", numFacesGlobal));
-  PetscCall(logKVStr(comm, "1D equation", mt->equation1D == MT_1D_EQUATION_PAPER ? "H'' + iωμσH = 0" : "(ρH')' + iωμH = 0"));
-  PetscCall(logKVInt(comm, "1D refinement", mt->refine1D));
-  PetscCall(logKVInt(comm, "1D nodes", field->numNodes));
-  PetscCall(logKVInt(comm, "1D layers", profile->numLayers));
+  PetscCall(logKvReal(comm, "Frequency (Hz)", mtParams->frequency));
+  PetscCall(logKvStr(comm, "Polarizations", "x, y"));
+  PetscCall(logKvInt(comm, "Boundary faces", numFacesGlobal));
+  PetscCall(logKvStr(comm, "1D equation", mtParams->equation1D == MT_1D_EQUATION_PAPER ? "H'' + iωμσH = 0" : "(ρH')' + iωμH = 0"));
+  PetscCall(logKvInt(comm, "1D refinement", mtParams->refine1D));
+  PetscCall(logKvInt(comm, "1D nodes", field->numNodes));
+  PetscCall(logKvInt(comm, "1D layers", profile->numLayers));
   for (PetscInt l = profile->numLayers - 1; l >= 0; l--) {
     char key[32];
     PetscCall(PetscSNPrintf(key, sizeof(key), "  Layer %" PetscInt_FMT, profile->numLayers - l));
-    PetscCall(logKVf(comm, key, "z = [%g, %g] m, sigma = %g S/m", (double)profile->z[l], (double)profile->z[l + 1], (double)profile->sigma[l]));
+    PetscCall(
+        logKvf(comm, key, "z = [%g, %g] m, sigma = %g S/m", (double)profile->z[l], (double)profile->z[l + 1], (double)profile->sigma[l]));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode createNamedLike(Vec tmpl, const char *name, Vec *v) {
+  PetscFunctionBeginUser;
+  PetscCall(VecDuplicate(tmpl, v));
+  PetscCall(PetscObjectSetName((PetscObject)*v, name));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode viewGroup(PetscViewer viewer, const char *group, Vec v[], PetscInt n) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscViewerHDF5PushGroup(viewer, group));
+  for (PetscInt comp = 0; comp < n; comp++) PetscCall(VecView(v[comp], viewer));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* Per receiver: Z = [E1 E2][H1 H2]^-1, T = [Hz1 Hz2][H1 H2]^-1 (Eq. A.3), rho (Eq. A.4), phi in degrees (Eq. A.5). */
+static PetscErrorCode computeImpedance(Vec fields[MT_NUM_POLARIZATIONS][NUM_RECEIVER_FIELDS], PetscReal omega, Vec Z[4], Vec rho[4],
+                                       Vec phi[4], Vec T[2]) {
+  PetscFunctionBeginUser;
+  const PetscScalar *f[MT_NUM_POLARIZATIONS][NUM_RECEIVER_FIELDS];
+  PetscScalar       *z[4], *r[4], *p[4], *t[2];
+  PetscInt           n;
+
+  PetscCall(VecGetLocalSize(fields[0][0], &n));
+  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
+    for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(VecGetArrayRead(fields[k][comp], &f[k][comp]));
+  }
+  for (PetscInt comp = 0; comp < 4; comp++) {
+    PetscCall(VecGetArray(Z[comp], &z[comp]));
+    PetscCall(VecGetArray(rho[comp], &r[comp]));
+    PetscCall(VecGetArray(phi[comp], &p[comp]));
+  }
+  for (PetscInt comp = 0; comp < 2; comp++) PetscCall(VecGetArray(T[comp], &t[comp]));
+
+  for (PetscInt i = 0; i < n; i++) {
+    const PetscScalar E1x = f[0][RECV_EX][i], E1y = f[0][RECV_EY][i];
+    const PetscScalar H1x = f[0][RECV_HX][i], H1y = f[0][RECV_HY][i], H1z = f[0][RECV_HZ][i];
+    const PetscScalar E2x = f[1][RECV_EX][i], E2y = f[1][RECV_EY][i];
+    const PetscScalar H2x = f[1][RECV_HX][i], H2y = f[1][RECV_HY][i], H2z = f[1][RECV_HZ][i];
+    /* [H1 H2]^-1 = [H2y -H2x; -H1y H1x] / det */
+    const PetscScalar det = H1x * H2y - H2x * H1y;
+
+    z[0][i] = (E1x * H2y - E2x * H1y) / det;
+    z[1][i] = (E2x * H1x - E1x * H2x) / det;
+    z[2][i] = (E1y * H2y - E2y * H1y) / det;
+    z[3][i] = (E2y * H1x - E1y * H2x) / det;
+    t[0][i] = (H1z * H2y - H2z * H1y) / det;
+    t[1][i] = (H2z * H1x - H1z * H2x) / det;
+    for (PetscInt comp = 0; comp < 4; comp++) {
+      r[comp][i] = PetscSqr(PetscAbsScalar(z[comp][i])) / (omega * MU);
+      p[comp][i] = PetscAtan2Real(PetscImaginaryPart(z[comp][i]), PetscRealPart(z[comp][i])) * 180.0 / PETSC_PI;
+    }
+  }
+
+  for (PetscInt comp = 0; comp < 2; comp++) PetscCall(VecRestoreArray(T[comp], &t[comp]));
+  for (PetscInt comp = 0; comp < 4; comp++) {
+    PetscCall(VecRestoreArray(phi[comp], &p[comp]));
+    PetscCall(VecRestoreArray(rho[comp], &r[comp]));
+    PetscCall(VecRestoreArray(Z[comp], &z[comp]));
+  }
+  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
+    for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(VecRestoreArrayRead(fields[k][comp], &f[k][comp]));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -630,161 +648,63 @@ PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mt, IS faces, const Mt1
  * systems of Eq. (A.3) per receiver for the impedance and the tipper, derives
  * the apparent resistivity and phase, and writes everything to a single HDF5
  * file through PETSc's HDF5 viewer.
- *
- * @param[in] params     Parameters (order, output paths).
- * @param[in] mt         MT options (frequency).
- * @param[in] dm         DMPlex mesh and H(curl) discretization.
- * @param[in] grid       Finite-element grid descriptor.
- * @param[in] receivers  Serial Vec of 3·N_recv receiver coordinates.
- * @param[in] X          Solution matrix, one column per polarization.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode computeMtResponses(const petgemParams params, const MtParams *mt, const DM dm, const Grid grid,
-                                  Vec receivers, const Mat X) {
+PetscErrorCode computeMtResponses(const PetgemParams *params, const MtParams *mtParams, const DM dm, const Grid *grid, Vec receivers,
+                                  const Mat X) {
   PetscFunctionBeginUser;
 
-  /* Variable declarations */
-  const char *fieldNames[6]    = {"Ex", "Ey", "Ez", "Hx", "Hy", "Hz"};
-  const char *polGroups[2]     = {"/polarizations/x/fields", "/polarizations/y/fields"};
-  const char *tensorNames[4]   = {"xx", "xy", "yx", "yy"};
-  const char *tipperNames[2]   = {"x", "y"};
-  const PetscReal   omega       = 2.0 * PETSC_PI * mt->frequency;
-  const PetscScalar constFactor = PETSC_i * omega * MU;
+  const char                   *polGroups[MT_NUM_POLARIZATIONS] = {"/polarizations/x/fields", "/polarizations/y/fields"};
+  const char                   *tensorNames[4]                  = {"xx", "xy", "yx", "yy"};
+  const char                   *tipperNames[2]                  = {"x", "y"};
+  const PetscReal               omega                           = angularFrequency(mtParams->frequency);
+  const PetscScalar             constFactor                     = iOmegaMu(mtParams->frequency);
   ReceiverInterpolationMatrices Q;
-  Vec          fields[MT_NUM_POLARIZATIONS][6], Z[4], rho[4], phi[4], T[2];
-  PetscViewer  viewer;
-  PetscInt     numReceivers, numLocal;
-  char         outFileName[PETSC_MAX_PATH_LEN];
-  MPI_Comm     comm = PetscObjectComm((PetscObject)dm);
-
-  /* Receiver interpolation operators */
-  PetscCall(buildReceiverInterpolationMatrices(params.order, receivers, dm, &grid, &Q));
-  Mat QE[6] = {Q.QEx, Q.QEy, Q.QEz, Q.QHx, Q.QHy, Q.QHz};
+  Vec                           fields[MT_NUM_POLARIZATIONS][NUM_RECEIVER_FIELDS], Z[4], rho[4], phi[4], T[2];
+  PetscViewer                   viewer;
+  PetscInt                      numReceivers;
+  char                          outFileName[PETSC_MAX_PATH_LEN];
+  MPI_Comm                      comm = PetscObjectComm((PetscObject)dm);
 
   /* E and H at the receivers for each polarization */
+  PetscCall(buildReceiverInterpolationMatrices(receivers, dm, grid, &Q));
   for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
     Vec x;
+    PetscCall(createReceiverFields(&Q, fields[k]));
     PetscCall(MatDenseGetColumnVecRead(X, k, &x));
-    for (PetscInt c = 0; c < 6; c++) {
-      PetscCall(MatCreateVecs(QE[c], NULL, &fields[k][c]));
-      PetscCall(MatMult(QE[c], x, fields[k][c]));
-      if (c >= 3) PetscCall(VecScale(fields[k][c], 1.0 / constFactor));
-      PetscCall(PetscObjectSetName((PetscObject)fields[k][c], fieldNames[c]));
-    }
+    PetscCall(interpolateReceiverFields(&Q, x, constFactor, fields[k]));
     PetscCall(MatDenseRestoreColumnVecRead(X, k, &x));
   }
-
-  /* Impedance, apparent resistivity, phase and tipper (same layout as the fields) */
-  for (PetscInt c = 0; c < 4; c++) {
-    PetscCall(VecDuplicate(fields[0][0], &Z[c]));
-    PetscCall(VecDuplicate(fields[0][0], &rho[c]));
-    PetscCall(VecDuplicate(fields[0][0], &phi[c]));
-    PetscCall(PetscObjectSetName((PetscObject)Z[c], tensorNames[c]));
-    PetscCall(PetscObjectSetName((PetscObject)rho[c], tensorNames[c]));
-    PetscCall(PetscObjectSetName((PetscObject)phi[c], tensorNames[c]));
-  }
-  for (PetscInt c = 0; c < 2; c++) {
-    PetscCall(VecDuplicate(fields[0][0], &T[c]));
-    PetscCall(PetscObjectSetName((PetscObject)T[c], tipperNames[c]));
-  }
-
-  {
-    const PetscScalar *E1x, *E1y, *H1x, *H1y, *H1z, *E2x, *E2y, *H2x, *H2y, *H2z;
-    PetscScalar       *z[4], *r[4], *p[4], *t[2];
-
-    PetscCall(VecGetLocalSize(fields[0][0], &numLocal));
-    PetscCall(VecGetArrayRead(fields[0][0], &E1x));
-    PetscCall(VecGetArrayRead(fields[0][1], &E1y));
-    PetscCall(VecGetArrayRead(fields[0][3], &H1x));
-    PetscCall(VecGetArrayRead(fields[0][4], &H1y));
-    PetscCall(VecGetArrayRead(fields[0][5], &H1z));
-    PetscCall(VecGetArrayRead(fields[1][0], &E2x));
-    PetscCall(VecGetArrayRead(fields[1][1], &E2y));
-    PetscCall(VecGetArrayRead(fields[1][3], &H2x));
-    PetscCall(VecGetArrayRead(fields[1][4], &H2y));
-    PetscCall(VecGetArrayRead(fields[1][5], &H2z));
-    for (PetscInt c = 0; c < 4; c++) {
-      PetscCall(VecGetArray(Z[c], &z[c]));
-      PetscCall(VecGetArray(rho[c], &r[c]));
-      PetscCall(VecGetArray(phi[c], &p[c]));
-    }
-    for (PetscInt c = 0; c < 2; c++) PetscCall(VecGetArray(T[c], &t[c]));
-
-    for (PetscInt i = 0; i < numLocal; i++) {
-      /* [H1 H2]^-1 = [H2y -H2x; -H1y H1x] / det */
-      const PetscScalar det = H1x[i] * H2y[i] - H2x[i] * H1y[i];
-
-      z[0][i] = (E1x[i] * H2y[i] - E2x[i] * H1y[i]) / det;
-      z[1][i] = (E2x[i] * H1x[i] - E1x[i] * H2x[i]) / det;
-      z[2][i] = (E1y[i] * H2y[i] - E2y[i] * H1y[i]) / det;
-      z[3][i] = (E2y[i] * H1x[i] - E1y[i] * H2x[i]) / det;
-      t[0][i] = (H1z[i] * H2y[i] - H2z[i] * H1y[i]) / det;
-      t[1][i] = (H2z[i] * H1x[i] - H1z[i] * H2x[i]) / det;
-
-      for (PetscInt c = 0; c < 4; c++) {
-        r[c][i] = PetscSqr(PetscAbsScalar(z[c][i])) / (omega * MU);
-        p[c][i] = PetscAtan2Real(PetscImaginaryPart(z[c][i]), PetscRealPart(z[c][i])) * 180.0 / PETSC_PI;
-      }
-    }
-
-    for (PetscInt c = 0; c < 2; c++) PetscCall(VecRestoreArray(T[c], &t[c]));
-    for (PetscInt c = 0; c < 4; c++) {
-      PetscCall(VecRestoreArray(phi[c], &p[c]));
-      PetscCall(VecRestoreArray(rho[c], &r[c]));
-      PetscCall(VecRestoreArray(Z[c], &z[c]));
-    }
-    PetscCall(VecRestoreArrayRead(fields[1][5], &H2z));
-    PetscCall(VecRestoreArrayRead(fields[1][4], &H2y));
-    PetscCall(VecRestoreArrayRead(fields[1][3], &H2x));
-    PetscCall(VecRestoreArrayRead(fields[1][1], &E2y));
-    PetscCall(VecRestoreArrayRead(fields[1][0], &E2x));
-    PetscCall(VecRestoreArrayRead(fields[0][5], &H1z));
-    PetscCall(VecRestoreArrayRead(fields[0][4], &H1y));
-    PetscCall(VecRestoreArrayRead(fields[0][3], &H1x));
-    PetscCall(VecRestoreArrayRead(fields[0][1], &E1y));
-    PetscCall(VecRestoreArrayRead(fields[0][0], &E1x));
-  }
-
-  /* Single output file: {output_dir}/{output_filename}.h5 */
-  PetscCall(buildOutputPath(&params, ".h5", outFileName, sizeof(outFileName)));
-  PetscCall(PetscViewerHDF5Open(comm, outFileName, FILE_MODE_WRITE, &viewer));
-  PetscCall(writeRunProvenance(viewer, &params, PETGEM_SIM_MT));
-  PetscCall(VecGetSize(fields[0][0], &numReceivers));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "frequency",     PETSC_REAL, &mt->frequency));
-  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "num_receivers", PETSC_INT,  &numReceivers));
-
-  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-    PetscCall(PetscViewerHDF5PushGroup(viewer, polGroups[k]));
-    for (PetscInt c = 0; c < 6; c++) PetscCall(VecView(fields[k][c], viewer));
-    PetscCall(PetscViewerHDF5PopGroup(viewer));
-  }
-  PetscCall(PetscViewerHDF5PushGroup(viewer, "/impedance"));
-  for (PetscInt c = 0; c < 4; c++) PetscCall(VecView(Z[c], viewer));
-  PetscCall(PetscViewerHDF5PopGroup(viewer));
-  PetscCall(PetscViewerHDF5PushGroup(viewer, "/apparent_resistivity"));
-  for (PetscInt c = 0; c < 4; c++) PetscCall(VecView(rho[c], viewer));
-  PetscCall(PetscViewerHDF5PopGroup(viewer));
-  PetscCall(PetscViewerHDF5PushGroup(viewer, "/phase"));
-  for (PetscInt c = 0; c < 4; c++) PetscCall(VecView(phi[c], viewer));
-  PetscCall(PetscViewerHDF5PopGroup(viewer));
-  PetscCall(PetscViewerHDF5PushGroup(viewer, "/tipper"));
-  for (PetscInt c = 0; c < 2; c++) PetscCall(VecView(T[c], viewer));
-  PetscCall(PetscViewerHDF5PopGroup(viewer));
-  PetscCall(PetscViewerDestroy(&viewer));
-
-  /* Free memory */
-  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-    for (PetscInt c = 0; c < 6; c++) PetscCall(VecDestroy(&fields[k][c]));
-  }
-  for (PetscInt c = 0; c < 4; c++) {
-    PetscCall(VecDestroy(&Z[c]));
-    PetscCall(VecDestroy(&rho[c]));
-    PetscCall(VecDestroy(&phi[c]));
-  }
-  for (PetscInt c = 0; c < 2; c++) PetscCall(VecDestroy(&T[c]));
   PetscCall(destroyReceiverInterpolationMatrices(&Q));
 
+  for (PetscInt comp = 0; comp < 4; comp++) {
+    PetscCall(createNamedLike(fields[0][0], tensorNames[comp], &Z[comp]));
+    PetscCall(createNamedLike(fields[0][0], tensorNames[comp], &rho[comp]));
+    PetscCall(createNamedLike(fields[0][0], tensorNames[comp], &phi[comp]));
+  }
+  for (PetscInt comp = 0; comp < 2; comp++) PetscCall(createNamedLike(fields[0][0], tipperNames[comp], &T[comp]));
+  PetscCall(computeImpedance(fields, omega, Z, rho, phi, T));
+
+  /* Single output file: {output_dir}/{output_filename}.h5 */
+  PetscCall(buildOutputPath(params, ".h5", outFileName, sizeof(outFileName)));
+  PetscCall(PetscViewerHDF5Open(comm, outFileName, FILE_MODE_WRITE, &viewer));
+  PetscCall(writeRunProvenance(viewer, params, PETGEM_SIM_MT));
+  PetscCall(VecGetSize(fields[0][0], &numReceivers));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "frequency", PETSC_REAL, &mtParams->frequency));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "num_receivers", PETSC_INT, &numReceivers));
+  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) PetscCall(viewGroup(viewer, polGroups[k], fields[k], NUM_RECEIVER_FIELDS));
+  PetscCall(viewGroup(viewer, "/impedance", Z, 4));
+  PetscCall(viewGroup(viewer, "/apparent_resistivity", rho, 4));
+  PetscCall(viewGroup(viewer, "/phase", phi, 4));
+  PetscCall(viewGroup(viewer, "/tipper", T, 2));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) PetscCall(destroyReceiverFields(fields[k]));
+  for (PetscInt comp = 0; comp < 4; comp++) {
+    PetscCall(VecDestroy(&Z[comp]));
+    PetscCall(VecDestroy(&rho[comp]));
+    PetscCall(VecDestroy(&phi[comp]));
+  }
+  for (PetscInt comp = 0; comp < 2; comp++) PetscCall(VecDestroy(&T[comp]));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

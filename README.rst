@@ -27,100 +27,78 @@
    :target: https://github.com/ocastilloreyes/petgem/pkgs/container/petgem-ci-env
    :alt: Docker image version
 
-**PETGEM** (Parallel Edge-element Toolkit for General Electromagnetic Modeling) is a high-performance open-source software designed for 
-the simulation of electromagnetic (EM) fields. It is developed and maintained by researchers at the `Universitat Politècnica de Catalunya (UPC) <https://www.ac.upc.edu/en?set_language=en>`_ and the `Barcelona Supercomputing Center (BSC) <https://www.bsc.es/es/discover-bsc/organisation/scientific-structure/geophysical-applications>`_.
+**PETGEM** is a parallel code for 3D frequency-domain electromagnetic
+modeling with high-order Nédélec (edge) finite elements, orders 1 to 6, on
+unstructured tetrahedral meshes. It is written in C on top of
+`PETSc <https://petsc.org/>`_ and MPI, and developed at the
+`Universitat Politècnica de Catalunya (UPC) <https://www.ac.upc.edu/en?set_language=en>`_
+and the `Barcelona Supercomputing Center (BSC) <https://www.bsc.es/es/discover-bsc/organisation/scientific-structure/geophysical-applications>`_.
 
-Key features include:
+It provides three kernels:
 
-- Parallel and scalable solver for large-scale 3D EM forward and inverse modeling
-- Support for tetrahedral meshes and high-order edge finite element formulations
-- Optimized for **HPC clusters and exascale architectures**
-- Flexible **C kernels** for performance
+- ``fm.csem`` - CSEM forward modeling
+- ``im.csem`` - CSEM inversion (L-BFGS, adjoint-state gradients)
+- ``fm.mt`` - MT forward modeling
+
+and a ``petgem`` dispatcher that runs any of them. A small Python package in
+``utils/`` builds the HDF5 input files and reads the results.
 
 Dependencies
 ------------
-
-PETGEM requires the following main dependencies:
-
-- `PETSc <https://petsc.org/>`_ (with MPI, BLAS/LAPACK, MUMPS, HDF5, petsc4py)
-
+- PETSc with **complex scalars**, MPI, MUMPS and HDF5, plus ``petsc4py``
 - `Gmsh <http://gmsh.info/>`_
+- Python 3 with ``numpy``, ``h5py`` and ``meshio``; ``matplotlib`` for the
+  example scripts, ``pytest`` for the tests
 
-- Python 3.x packages
-   - numpy
-   - matplotlib
-   - h5py
-   - meshio
-   - cython 
-   - setuptools 
-   - wheel
-   - sphinx (for documentation)
-   - pytest (for testing)
+The Docker image in ``docker/dockerfile.develop`` contains all of them.
 
-For a fully reproducible environment, a Docker image is provided (see below).
-
-Docker support
---------------
-
-You can build and run PETGEM inside Docker for a consistent development and testing environment.
-
+Quick start
+-----------
 .. code-block:: bash
 
-   # Clone repository
    git clone https://github.com/ocastilloreyes/petgem.git
    cd petgem
 
-   # Build Docker image
-   docker build -t petgem-env -f docker/dockerfile.release .
+   docker build -t petgem-env -f docker/dockerfile.develop .
+   docker run --rm -it -u $(id -u):$(id -g) -v $(pwd):/workspace -w /workspace petgem-env bash
 
-   # Run PETGEM inside container
-   docker run --rm -it -v $(pwd):/workspace -w /workspace petgem-env bash
-
-   # Compile PETGEM
+   # inside the container
    make
+   bash examples/fm_csem_marine/scripts/build_bundles.sh 1
+   (cd examples/fm_csem_marine && mpirun -n 4 ../../build/fm.csem -options_file configs/params.txt)
+   python3 examples/fm_csem_marine/scripts/postprocess.py
 
-   # Setup environment
-   export MODEL_DIR=examples/fm
-   export ORDER=1
-
-   # Mesh generation and input bundle
-   bash ${MODEL_DIR}/scripts/build_bundles.sh ${ORDER}
-
-   # Forward modeling (committed solver options in configs/)
-   (cd ${MODEL_DIR} && mpirun -n 14 ../../build/petgem fm -options_file configs/params.txt)
-
-   # Postprocess output
-   python3 ${MODEL_DIR}/scripts/postprocess.py
-
+This runs the marine CSEM example and compares it with its reference. The
+other cases are in ``examples/``.
 
 Documentation
 -------------
-
-Full user and developer documentation is available at:
-
-📖 https://petgem.readthedocs.io/en/latest/index.html
+https://petgem.readthedocs.io/en/latest/index.html
 
 Citing PETGEM
 -------------
-
-If you use **PETGEM** in your research, please cite the following articles:
+If you use **PETGEM** in your research, please cite:
 
 - Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019).
   *Parallel 3-D marine controlled-source electromagnetic modelling using high-order
-  tetrahedral Nédélec elements*. Geophysical Journal International, Volume 219,
-  Issue 1, October 2019, Pages 39–65, https://doi.org/10.1093/gji/ggz285
+  tetrahedral Nédélec elements*. Geophysical Journal International, 219(1), 39–65.
+  https://doi.org/10.1093/gji/ggz285
 
 - Castillo-Reyes, O., de la Puente, J., Cela, J. M. (2018). *PETGEM: A parallel
   code for 3D CSEM forward modeling using edge finite elements*. Computers &
-  Geosciences, vol 119: 123-136. ISSN 0098-3004,  Elsevier.
-  https://doi.org/10.1016/j.cageo.2018.07.005
+  Geosciences, 119, 123–136. https://doi.org/10.1016/j.cageo.2018.07.005
 
-For additional publications, you may consult:
+For MT modeling, also cite:
 
-- `Google Scholar profile <https://scholar.google.es/citations?user=ifjbBssAAAAJ&hl=es&oi=ao>`_  
+- Castillo-Reyes, O., Modesto, D., Queralt, P., Marcuello, A., Ledo, J.,
+  Amor-Martin, A., de la Puente, J., García-Castillo, L.E. (2022). *3D
+  magnetotelluric modeling using high-order tetrahedral Nédélec elements on
+  massively parallel computing platforms*. Computers & Geosciences, 160, 105030.
+  https://doi.org/10.1016/j.cageo.2021.105030
+
+More publications are listed in the documentation and on
+`Google Scholar <https://scholar.google.es/citations?user=ifjbBssAAAAJ&hl=es&oi=ao>`_.
 
 License
 -------
-
-This project is distributed under the **BSD 3-Clause License**.  
-See the `License <LICENSE.rst>`_ for details.
+BSD 3-Clause. See `LICENSE.rst <LICENSE.rst>`_.

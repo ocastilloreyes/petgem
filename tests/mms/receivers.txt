@@ -1,7 +1,7 @@
 #       x               y               z
 # Receiver file for the test4 MMS verification.
 #
-# INERT. fm.csem -mms reports volumetric error norms computed at the quadrature
+# INERT. The mms program reports volumetric error norms computed at the quadrature
 # points of every cell, not point responses, so no receiver is interpolated.
 # The entries exist only because the input bundle requires a non-empty receiver
 # table; they sit well inside [0,L]^3 so the bundle's point location succeeds.

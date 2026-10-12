@@ -8,7 +8,7 @@ observed-data HDF5 that the inverse kernel (im.csem) consumes.
 
 This tool is problem-independent: the model, mesh, survey and frequency list
 are supplied on the command line, so it can build the observed data for any
-CSEM inversion example. See examples/im1 for a complete benchmark.
+CSEM inversion example. See examples/im_csem_block for a complete benchmark.
 
 NOISE MODEL
     For every datum, independently on the real and imaginary parts,
@@ -26,12 +26,12 @@ REPRODUCIBILITY
 
 Usage:
     python3 utils/make_observed.py \\
-        -case_dir examples/im1 \\
+        -case_dir examples/im_csem_block \\
         -pattern  "outputs/responses_fm_f{freq}_p2.h5" \\
         -freqs    1,10,50,100,300,800,1500 \\
         -seed     20260720 \\
         -error_level 0.01 \\
-        -out      outputs/observed.h5
+        -output_filename outputs/observed.h5
 """
 import argparse
 import os
@@ -40,34 +40,27 @@ import sys
 import h5py
 import numpy as np
 
-try:
-    import petgem
-except ModuleNotFoundError:
-    # Allow running directly from a fresh clone, without `pip install -e .`:
-    # expose the in-tree `utils` package under its distribution name `petgem`.
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    import utils as petgem  # noqa: E402
-    sys.modules["petgem"] = petgem
+import functions as petgem  # the copy next to this script
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("-case_dir", required=True,
-                    help="Base directory; -pattern and -out are relative to it.")
-    ap.add_argument("-pattern", default="outputs/responses_fm_f{freq}_p2.h5",
-                    help="fm.csem responses filename pattern ('{freq}' placeholder).")
-    ap.add_argument("-freqs", required=True,
-                    help="Comma-separated frequency list, e.g. 1,10,50,100,300,800,1500.")
-    ap.add_argument("-seed", type=int, required=True,
-                    help="RNG seed for the noise draw.")
-    ap.add_argument("-error_level", type=float, default=0.01,
-                    help="Relative noise level (0.01 = 1%%). Default 0.01.")
-    ap.add_argument("-out", default="outputs/observed.h5",
-                    help="Output HDF5 (relative to -case_dir).")
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-case_dir", required=True,
+                        help="Base directory; -pattern and -output_filename are relative to it.")
+    parser.add_argument("-pattern", default="outputs/responses_fm_f{freq}_p2.h5",
+                        help="fm.csem responses filename pattern ('{freq}' placeholder).")
+    parser.add_argument("-freqs", required=True,
+                        help="Comma-separated frequency list, e.g. 1,10,50,100,300,800,1500.")
+    parser.add_argument("-seed", type=int, required=True,
+                        help="RNG seed for the noise draw.")
+    parser.add_argument("-error_level", type=float, default=0.01,
+                        help="Relative noise level (0.01 = 1%%). Default 0.01.")
+    parser.add_argument("-output_filename", default="outputs/observed.h5",
+                        help="Output HDF5 (relative to -case_dir).")
+    args = parser.parse_args()
 
-    freqs = [float(x) for x in args.freqs.split(",")]
+    freqs = [float(value) for value in args.freqs.split(",")]
 
     clean_rows, nrec = [], set()
     for fr in freqs:
@@ -100,7 +93,7 @@ def main():
     rms_true = float(np.sqrt(np.sum(np.abs(w * (noisy - clean)) ** 2)
                              / (noisy.size * 2)))
 
-    out = os.path.join(args.case_dir, args.out)
+    out = os.path.join(args.case_dir, args.output_filename)
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     with h5py.File(out, "w") as f:
         f.create_dataset("Ex", data=noisy)

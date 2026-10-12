@@ -7,57 +7,33 @@ import textwrap
 from petsc4py import PETSc
 
 
-# Canonical mode tags, and the aliases accepted for them. Mirrors exactly the
-# set the C dispatcher accepts (parseModeArg in src/common.c), so `-mode X`
-# here and `petgem X` there take the same words:
-#     fm  <- fm, forward, modeling
-#     im  <- im, inverse
-#     mt  <- mt
-MODE_ALIASES = {
-    "fm":       "fm",
-    "forward":  "fm",
-    "modeling": "fm",
-    "im":       "im",
-    "inverse":  "im",
-    "mt":       "mt",
-}
+# Kernel names, identical to the binaries and to the petgem subcommands.
+KERNELS = ("fm.csem", "im.csem", "fm.mt")
 
 
-def normalizeMode(mode):
-    """Map a mode alias onto its canonical tag (``'fm'``, ``'im'`` or ``'mt'``).
-
-    Raises ValueError on an unknown mode.
-    """
-    try:
-        return MODE_ALIASES[mode]
-    except KeyError:
-        raise ValueError(
-            f"unknown mode {mode!r}; expected one of "
-            f"{sorted(MODE_ALIASES)}") from None
+def checkMode(mode):
+    """Return ``mode`` if it is a kernel name; raise ValueError otherwise."""
+    if mode not in KERNELS:
+        raise ValueError(f"unknown mode {mode!r}; expected one of {list(KERNELS)}")
+    return mode
 
 
 def parsePreprocessingArgs():
-    """CLI surface for the centralized utils/preprocess.py entry point.
+    """Parse the command line of ``utils/preprocess.py``.
 
-    Conductivity is read from a text table (-sigma_file) instead of being
-    hard-coded in a per-case Python script. Whitespace layout (one row per
-    material, 0-based row index = material id, comments allowed):
-        # sigma_x sigma_y sigma_z
-        0.1 0.1 0.1
-        1.0 1.0 1.0
+    Mode-specific inputs are validated later by :func:`runPreprocessing`.
     """
     parser = argparse.ArgumentParser(
         description="Preprocess mesh, conductivity, receivers and sources into a "
                     "single PETGEM input HDF5 file."
     )
-    parser.add_argument("-mode",              choices=sorted(MODE_ALIASES),
-                        default="fm",
-                        help="Simulation type: 'fm' (CSEM forward), 'im' (CSEM "
-                             "inverse) or 'mt' (MT forward). The aliases accepted "
-                             "by the petgem dispatcher (forward/modeling, inverse) "
-                             "also work. Default: fm")
+    parser.add_argument("-mode",              choices=KERNELS,
+                        default="fm.csem",
+                        help="Kernel the bundle is for: 'fm.csem' (CSEM forward), "
+                             "'im.csem' (CSEM inverse) or 'fm.mt' (MT forward). "
+                             "Default: fm.csem")
     parser.add_argument("-order",              type=int, required=True, dest="order",
-                        help="Polynomial order (1..6) - written into the params file only")
+                        help="Polynomial order (1..6), stored in the bundle as /order")
     parser.add_argument("-case_dir",          type=str, required=True,
                         help="Directory containing case data (also output directory)")
     parser.add_argument("-mesh_filename",     type=str, required=True,
@@ -68,29 +44,27 @@ def parsePreprocessingArgs():
     parser.add_argument("-receiver_filename", type=str, required=True,
                         help="Receivers text file (x y z per row) inside case_dir")
     parser.add_argument("-source_filename",   type=str, default=None,
-                        help="Single-frequency forward sources text file inside "
-                             "case_dir. Format: first non-comment line = frequency "
-                             "(Hz); subsequent lines = 'x y z current length dip "
-                             "azimuth'. Required when -mode fm; optional "
-                             "(skipped) when -mode im - the inverse kernel "
-                             "reads multi-frequency sources from /sources/* "
-                             "via -im_source_filename.")
+                        help="Forward sources text file inside case_dir, one "
+                             "frequency for all rows: 8 fields per row "
+                             "'freq x y z current length dip azimuth', or a "
+                             "frequency line followed by 7-field rows. Required "
+                             "with -mode fm.csem, rejected otherwise.")
     parser.add_argument("-im_source_filename", type=str, default=None,
                         help="Multi-frequency sources text file inside case_dir, "
-                             "required when -mode im. Format: one row per "
+                             "required when -mode im.csem. Format: one row per "
                              "(freq, dipole) pair with 8 fields: "
                              "'freq x y z current length dip azimuth'. "
                              "Embedded into the bundle under /sources/*.")
     parser.add_argument("-observed_filename", type=str, default=None,
                         help="Observed-data file inside case_dir, required when "
-                             "-mode im. Either an HDF5 (.h5/.hdf5) with "
+                             "-mode im.csem. Either an HDF5 (.h5/.hdf5) with "
                              "/Ex [N_freq, N_recv] complex128 ({r,i} compound), "
                              "OR a raw MATLAB-style invEx.dat text file (parsed "
                              "inline - no separate conversion step). Embedded "
                              "into the bundle under /observed/Ex.")
     parser.add_argument("-mt_frequency_filename", type=str, default=None,
                         help="MT frequency text file inside case_dir, required "
-                             "when -mode mt. Format: one frequency (Hz); '#' "
+                             "when -mode fm.mt. Format: one frequency (Hz); '#' "
                              "comments allowed. Embedded into the bundle under "
                              "/mt/freq.")
     parser.add_argument("-error_level", type=float, default=None,
@@ -120,6 +94,22 @@ def parsePreprocessingArgs():
     return parser.parse_args()
 
 
+def _readTokens(path, commas=False):
+    """Token lists of the non-blank lines of a text table; '#' starts a comment.
+
+    With ``commas=True`` commas also separate tokens.
+    """
+    rows = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.split('#', 1)[0].strip()
+            if commas:
+                line = line.replace(',', ' ')
+            if line:
+                rows.append(line.split())
+    return rows
+
+
 def readSigmaTable(path):
     """Read the per-material conductivity table (``sigmas.txt``).
 
@@ -128,7 +118,7 @@ def readSigmaTable(path):
 
         # sigma_x sigma_y sigma_z [fixed]
         0.1 0.1 0.1 1     # fixed in inversion (e.g. air, ocean)
-        1.0 1.0 1.0 0     # invertable
+        1.0 1.0 1.0 0     # invertible
         2.0 2.0 2.0       # 'fixed' column omitted -> defaults to 0
 
     The 4th column (`fixed`) is optional and only meaningful for inverse
@@ -144,12 +134,7 @@ def readSigmaTable(path):
         raise FileNotFoundError(
             f"Conductivity table not found: '{path}'. "
             f"Check -case_dir and -sigma_file.")
-    rows = []
-    with open(path) as fh:
-        for line in fh:
-            line = line.split('#', 1)[0].strip()
-            if line:
-                rows.append([float(v) for v in line.split()])
+    rows = [[float(tok) for tok in toks] for toks in _readTokens(path)]
     if not rows:
         raise ValueError(f"{path}: no material rows found")
     ncol = len(rows[0])
@@ -160,7 +145,7 @@ def readSigmaTable(path):
     data = np.asarray(rows, dtype=float)
     sx, sy, sz = data[:, 0], data[:, 1], data[:, 2]
     if ncol == 4:
-        fixed_ids = sorted(int(i) for i, f in enumerate(data[:, 3].astype(int)) if f)
+        fixed_ids = sorted(int(i) for i, flag in enumerate(data[:, 3].astype(int)) if flag)
     else:
         fixed_ids = []
     return sx, sy, sz, fixed_ids
@@ -223,19 +208,13 @@ def readSourcesText(path):
     Forward modeling uses a single (repeated) frequency with one or more
     transmitters; inverse modeling carries one row per (frequency, dipole).
     """
-    data_lines = []
-    with open(path) as f:
-        for raw in f:
-            line = raw.split('#', 1)[0].strip()
-            if line:
-                data_lines.append(line.split())
-
+    data_lines = _readTokens(path)
     if not data_lines:
         raise ValueError(f"{path}: no source rows found")
 
     widths = {len(toks) for toks in data_lines}
     if widths == {8}:
-        rows = [[float(v) for v in toks] for toks in data_lines]
+        rows = [[float(tok) for tok in toks] for toks in data_lines]
     elif data_lines[0] and len(data_lines[0]) == 1:
         # Legacy: first line is the scalar frequency, rest are 7-field rows.
         freq = float(data_lines[0][0])
@@ -245,7 +224,7 @@ def readSourcesText(path):
                 raise ValueError(
                     f"{path}: legacy format expects 7 fields per source row "
                     f"(x y z current length dip azimuth), got {len(toks)}: {toks}")
-            rows.append([freq] + [float(v) for v in toks])
+            rows.append([freq] + [float(tok) for tok in toks])
         if not rows:
             raise ValueError(f"{path}: frequency line but no source rows")
     else:
@@ -254,13 +233,6 @@ def readSourcesText(path):
             f"(freq x y z current length dip azimuth) or a legacy "
             f"<freq> header followed by 7-field rows; got column widths {widths}")
     return np.asarray(rows, dtype=float)
-
-
-# Inverse sources use the same unified (N, 8) layout; kept as an alias of
-# readSourcesText so existing callers keep working.
-def readInverseSourcesText(path):
-    """Alias of :func:`readSourcesText` (unified 8-field source format)."""
-    return readSourcesText(path)
 
 
 def readInvExDat(path):
@@ -276,11 +248,6 @@ def readInvExDat(path):
     :func:`readObservedDataH5` - a raw .dat carries no error-level attribute,
     so the noise level is supplied separately (``-error_level`` /
     ``-im_error_level``) or left to the kernel default.
-
-    Folding this in lets ``preprocess.py`` consume ``invEx.dat`` directly, so
-    no separate convert-to-HDF5 step is required (the standalone
-    ``utils/convert_invex_to_hdf5.py`` remains available for producing a
-    reusable .h5).
     """
     data = np.loadtxt(path, comments="#", ndmin=2)
     values = data[:, 1:]                       # drop the freq label column
@@ -293,8 +260,7 @@ def readInvExDat(path):
 
 
 def readObservedDataH5(path):
-    """Read an observed-data HDF5 file produced by generate_observed_data.py
-    or convert_invex_to_hdf5.py.
+    """Read an observed-data HDF5 file (e.g. written by utils/make_observed.py).
 
     Returns (Ex, error_level) where Ex is the [N_freq, N_recv] complex128
     ndarray stored at /Ex and error_level is the amplitude-relative noise
@@ -306,8 +272,7 @@ def readObservedDataH5(path):
         if "Ex" not in f:
             raise KeyError(f"{path}: missing /Ex dataset")
         data = np.asarray(f["Ex"])
-        # `error_level` may live as an attribute on the file root (current
-        # generate_observed_data.py convention) or on the /Ex dataset itself.
+        # `error_level` may sit on the file root or on the /Ex dataset.
         error_level = None
         for holder in (f, f["Ex"]):
             if "error_level" in holder.attrs:
@@ -375,12 +340,7 @@ def writeInversionPayload(filename, observed_Ex,
 
 def readMtFrequencyText(path):
     """Read the MT frequency (Hz) from a text file: one value, '#' comments allowed."""
-    values = []
-    with open(path) as fh:
-        for line in fh:
-            line = line.split('#', 1)[0].strip()
-            if line:
-                values.extend(float(tok) for tok in line.replace(',', ' ').split())
+    values = [float(tok) for toks in _readTokens(path, commas=True) for tok in toks]
     if len(values) != 1 or values[0] <= 0.0:
         raise ValueError(f"{path}: expected one positive frequency (Hz), got {values}")
     return values[0]
@@ -436,17 +396,18 @@ def writePetgemInputFile(plex, conductivity, materials_id,
                          receivers_arr, sources8, order,
                          output_filename, cells=None, coords=None,
                          output_vtk=None):
-    """Write the unified PETGEM input file.
+    """Write the mesh, model, receivers, order and sources of a bundle.
 
     Contents of `output_filename` (HDF5):
-      /petgem_mesh/...     mesh topology, labels, coordinates, sections, fields
-                            (HDF5_PETSC format, written via DMPlex *View routines)
+      DMPlex blocks        mesh ``petgem_mesh`` and the ``model_data`` Vec
+                           (sigma_x, sigma_y, sigma_z, material id per cell),
+                           written with PETSc's HDF5_PETSC format
       /receivers           Vec, length 3*N_recv, layout [x0 y0 z0 x1 y1 z1 ...]
-      /order                Vec, length 1 - polynomial order used to size the case
-      /sources/...         transmitters, one entry per row of `sources8`
-                            (per-entry frequency). Same group for forward and
-                            inverse; inverse adds /observed and /im_meta later
-                            via writeInversionPayload.
+      /order               Vec, length 1
+      /sources/...         one entry per row of `sources8`; skipped when None
+
+    Inverse and MT bundles are completed afterwards by
+    :func:`writeInversionPayload` and :func:`writeMtPayload`.
 
     Parameters
     ----------
@@ -523,12 +484,8 @@ def writePetgemInputFile(plex, conductivity, materials_id,
     v_model.destroy()
 
 
-# Solver block emitted per mode. Both kernels support both solver families and
-# both read the SAME unprefixed option keys, so a preset file is portable
-# between them. The operator type is what selects the family: "-dm_mat_type is"
-# builds a MATIS operator and enables the PCBDDC iterative path, while an AIJ
-# operator enables a direct factorization (-ksp_type preonly -pc_type lu
-# -pc_factor_mat_solver_type mumps).
+# Solver block emitted per mode; the same keys work for every kernel.
+# "-dm_mat_type is" selects PCBDDC, an AIJ operator a direct MUMPS solve.
 #
 # The template emits the iterative path for fm and im and the direct path for
 # mt; users switch by editing this block or by appending a solver preset with
@@ -554,16 +511,15 @@ _DIRECT_SOLVER_BLOCK = (
 )
 
 _SOLVER_BLOCK = {
-    "fm": _ITERATIVE_SOLVER_BLOCK,
-    "im": _ITERATIVE_SOLVER_BLOCK + "-ksp_rtol 1.0e-10\n",
-    "mt": _DIRECT_SOLVER_BLOCK,
+    "fm.csem": _ITERATIVE_SOLVER_BLOCK,
+    "im.csem": _ITERATIVE_SOLVER_BLOCK + "-ksp_rtol 1.0e-10\n",
+    "fm.mt":   _DIRECT_SOLVER_BLOCK,
 }
 
-# Inversion tuning block (im only). Every option is -im_*, matching the
-# im.csem kernel, the imParams struct and the `petgem im` subcommand.
-# -im_error_level and -im_fixed_materials are deliberately absent: their
-# values come from the bundle (/observed @error_level, /im_meta/fixed_materials)
-# and the CLI flags exist only as overrides.
+# Inversion tuning block (im.csem only). Every option is -im_*, matching the
+# im.csem kernel and the ImParams struct.
+# -im_error_level and -im_fixed_materials are left out: they come from the
+# bundle (/observed @error_level, /im_meta/fixed_materials).
 _IM_TUNING_BLOCK = (
     "-im_max_iter                150\n"
     "-im_lbfgs_memory            2\n"
@@ -579,18 +535,15 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
                     params_filename):
     """Emit the PETSc options file for any kernel.
 
-    One writer for both modes: the input/output keys are identical, and the
-    mode only selects the solver block (plus the inversion tuning block for
-    ``im``). This replaces the former separate forward/inverse writers, which
-    duplicated the shared keys and could drift apart.
-
-    The polynomial order is NOT written here - both kernels read it from the
-    bundle's ``/order`` dataset, with ``-order`` available as a CLI override.
+    The mode selects the solver block (BDDC for ``fm.csem`` and ``im.csem``,
+    MUMPS for ``fm.mt``) and, for ``im.csem``, adds the inversion block. The
+    polynomial order is not written: the kernels read ``/order`` from the
+    bundle.
 
     Parameters
     ----------
-    mode : {'fm', 'im', 'mt'}
-        Canonical mode tag (see MODE_ALIASES).
+    mode : {'fm.csem', 'im.csem', 'fm.mt'}
+        Kernel name (see KERNELS).
     output_dir : str
         Case/output directory; also where the params file is written.
     output_filename : str
@@ -602,12 +555,12 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
     """
     if mode not in _SOLVER_BLOCK:
         raise ValueError(f"writeParamsFile: unknown mode {mode!r} "
-                         f"(expected 'fm', 'im' or 'mt')")
+                         f"(expected one of {list(KERNELS)})")
 
     content = (
         f"-input_filename {output_dir}/{input_filename}\n"
         + _SOLVER_BLOCK[mode]
-        + (_IM_TUNING_BLOCK if mode == "im" else "")
+        + (_IM_TUNING_BLOCK if mode == "im.csem" else "")
         + f"-output_dir {output_dir}/\n"
         + f"-output_filename {output_filename}\n"
     )
@@ -624,13 +577,7 @@ def _loadXYZText(path):
     exported from MATLAB/other tools (often comma-separated) load directly
     without a manual conversion step.
     """
-    rows = []
-    with open(path) as fh:
-        for line in fh:
-            line = line.split('#', 1)[0].strip()
-            if not line:
-                continue
-            rows.append([float(tok) for tok in line.replace(',', ' ').split()])
+    rows = [[float(tok) for tok in toks] for toks in _readTokens(path, commas=True)]
     return np.asarray(rows, dtype=float)
 
 
@@ -641,7 +588,7 @@ def _extractTetraMaterial(mesh, tetra_idx, path):
     stage accepts both Gmsh ``.msh`` and VTK ``.vtk``/``.vtu`` meshes:
 
     * Gmsh: the canonical 1-based ``gmsh:physical`` tag is used as before
-      (``id = tag - 1``), preserving existing behaviour exactly.
+      (``id = tag - 1``), preserving existing behavior exactly.
     * VTK: an arbitrary integer cell-data array (auto-detected, commonly
       ``cell_scalars``) carries region codes that need not be contiguous
       or 0-based (e.g. ``{10, 20, 30, 40}``). ``np.unique`` maps the
@@ -659,7 +606,7 @@ def _extractTetraMaterial(mesh, tetra_idx, path):
 
     candidates = ("cell_scalars", "materials_id", "material_id", "MaterialID",
                   "material", "CellEntityIds")
-    name = next((n for n in candidates if n in mesh.cell_data), None)
+    name = next((candidate for candidate in candidates if candidate in mesh.cell_data), None)
     if name is None:
         raise ValueError(
             f"{path}: no material cell-data array found (looked for "
@@ -681,6 +628,14 @@ def _require_input_file(path, label, hint=None):
         raise FileNotFoundError(msg)
 
 
+# Mode-specific input files: required in their mode, rejected in the others.
+_MODE_INPUTS = {
+    "fm.csem": {"source_filename"},
+    "im.csem": {"im_source_filename", "observed_filename"},
+    "fm.mt":   {"mt_frequency_filename"},
+}
+
+
 def runPreprocessing(*, mode, order, case_dir,
                      mesh_filename, receiver_filename, source_filename=None,
                      sigma_x, sigma_y, sigma_z,
@@ -692,73 +647,68 @@ def runPreprocessing(*, mode, order, case_dir,
                      error_level=None,
                      mt_frequency_filename=None,
                      output_vtk=None, dm_view=False):
-    """Shared preprocessing pipeline for the PETGEM kernels (fm, im, mt).
+    """Build the input bundle and the parameter file for one kernel run.
 
-    Pure library function - no CLI parsing.  Builds the DMPlex, assigns the
-    per-cell conductivity from `sigma_{x,y,z}` indexed by the gmsh:physical
-    tag, parses the receivers and sources text files, and bundles everything
-    into a single HDF5 input file (`<case_dir>/<input_filename>`).  Also
-    emits the matching params file.
+    Reads the mesh (Gmsh ``.msh`` or VTK ``.vtk``/``.vtu``), assigns the
+    per-cell conductivity by material id, reads receivers and sources (or the
+    MT frequency), and writes ``<case_dir>/<input_filename>`` and
+    ``<case_dir>/<params_filename>``. All file names are relative to
+    `case_dir`.
 
     Parameters
     ----------
-    mode : {'fm', 'im', 'mt'} or an alias
-        Selects the payload and the params-file template.
+    mode : {'fm.csem', 'im.csem', 'fm.mt'}
+        Kernel the bundle is for.
     order : int
-        Polynomial order, written into the params file.
+        Polynomial order, stored as ``/order``. It also sets the output stem
+        ``responses_p<order>`` in the parameter file.
     case_dir : str
-        Directory containing the input data and where the bundle is written.
-    mesh_filename, receiver_filename, source_filename : str
-        Filenames relative to `case_dir`.
-    mt_frequency_filename : str or None
-        MT frequency text file relative to `case_dir` (mode 'mt' only).
+        Directory the other file names are relative to.
+    mesh_filename, receiver_filename : str
+        Mesh and receiver table.
+    source_filename : str or None
+        Forward sources (``fm.csem`` only). Must hold a single frequency.
     sigma_x, sigma_y, sigma_z : array_like
-        Per-material conductivity. Index = 0-based material id
-        (gmsh:physical - 1). Lengths must match.
-    input_filename : str
-        Bundle filename inside `case_dir`. Default: input.h5
-    params_filename : str
-        Filename of the PETGEM params file emitted inside `case_dir`.
-        Default: params.txt
+        Per-material conductivity, indexed by 0-based material id.
+    fixed_materials : iterable of int
+        Material ids held fixed by the inversion (``im.csem`` only).
+    input_filename, params_filename : str
+        Names of the bundle and the parameter file to write.
+    im_source_filename : str or None
+        Multi-frequency sources, one row per (frequency, dipole)
+        (``im.csem`` only).
+    observed_filename : str or None
+        Observed ``Ex``, HDF5 or ``invEx.dat`` text (``im.csem`` only).
+    error_level : float or None
+        Relative noise level; overrides the one stored in an HDF5
+        observed-data file.
+    mt_frequency_filename : str or None
+        MT frequency file (``fm.mt`` only).
     output_vtk : str or None
-        Optional VTU filename for the conductivity + materials_id view.
+        Also write the conductivity and material ids to this VTU file.
     dm_view : bool
-        If True, dumps DMPlex info to stdout via PETSc options.
+        Print the DMPlex summary.
+
+    Raises
+    ------
+    ValueError
+        Unknown mode, a mode-specific input missing or given to the wrong
+        mode, material ids outside the conductivity table, more than one
+        frequency for ``fm.csem``, or observed data whose shape does not match
+        the sources and receivers.
+    FileNotFoundError
+        A required input file does not exist.
     """
-    mode = normalizeMode(mode)   # 'forward'/'modeling' -> 'fm', 'inverse' -> 'im'
-    if mode == "fm":
-        if source_filename is None:
-            raise ValueError("runPreprocessing: -source_filename is required "
-                             "when mode='fm'")
-        if im_source_filename is not None or observed_filename is not None:
-            raise ValueError(
-                "runPreprocessing: -im_source_filename and -observed_filename "
-                "are valid only with mode='im'.")
-    if mode != "mt" and mt_frequency_filename is not None:
-        raise ValueError("runPreprocessing: -mt_frequency_filename is valid "
-                         "only with mode='mt'.")
-    if mode == "mt":
-        if (source_filename is not None or im_source_filename is not None
-                or observed_filename is not None):
-            raise ValueError(
-                "runPreprocessing: -source_filename, -im_source_filename and "
-                "-observed_filename are not valid with mode='mt'.")
-        if mt_frequency_filename is None:
-            raise ValueError("runPreprocessing: -mt_frequency_filename is "
-                             "required when mode='mt'")
-    if mode == "im":
-        if source_filename is not None:
-            raise ValueError(
-                "runPreprocessing: -source_filename is forward-mode only. "
-                "The inverse kernel reads multi-freq sources from "
-                "/sources/* in the bundle; pass -im_source_filename "
-                "instead.")
-        if im_source_filename is None:
-            raise ValueError("runPreprocessing: -im_source_filename is required "
-                             "when mode='im'")
-        if observed_filename is None:
-            raise ValueError("runPreprocessing: -observed_filename is required "
-                             "when mode='im'")
+    mode = checkMode(mode)
+    given = {"source_filename": source_filename,
+             "im_source_filename": im_source_filename,
+             "observed_filename": observed_filename,
+             "mt_frequency_filename": mt_frequency_filename}
+    for name, value in given.items():
+        if name in _MODE_INPUTS[mode] and value is None:
+            raise ValueError(f"runPreprocessing: -{name} is required when mode='{mode}'")
+        if name not in _MODE_INPUTS[mode] and value is not None:
+            raise ValueError(f"runPreprocessing: -{name} is not valid with mode='{mode}'")
 
     sigma_x = np.asarray(sigma_x, dtype=float)
     sigma_y = np.asarray(sigma_y, dtype=float)
@@ -768,20 +718,18 @@ def runPreprocessing(*, mode, order, case_dir,
 
     NUM_DIMENSIONS = 3
 
-    input_mesh_filename      = os.path.join(case_dir, mesh_filename)
-    input_receivers_filename = os.path.join(case_dir, receiver_filename)
-    input_sources_filename   = (os.path.join(case_dir, source_filename)
-                                if source_filename is not None else None)
-    output_filename          = os.path.join(case_dir, input_filename)
-    output_petgem_filename   = f"responses_p{order}"
-    output_vtk_filename      = (os.path.join(case_dir, output_vtk)
-                                if output_vtk is not None else None)
-    input_im_sources_filename = (os.path.join(case_dir, im_source_filename)
-                                  if im_source_filename is not None else None)
-    input_observed_filename    = (os.path.join(case_dir, observed_filename)
-                                  if observed_filename is not None else None)
-    input_mt_frequency_filename = (os.path.join(case_dir, mt_frequency_filename)
-                                   if mt_frequency_filename is not None else None)
+    def inCase(name):
+        return os.path.join(case_dir, name) if name is not None else None
+
+    input_mesh_filename         = inCase(mesh_filename)
+    input_receivers_filename    = inCase(receiver_filename)
+    input_sources_filename      = inCase(source_filename)
+    output_filename             = inCase(input_filename)
+    output_petgem_filename      = f"responses_p{order}"
+    output_vtk_filename         = inCase(output_vtk)
+    input_im_sources_filename   = inCase(im_source_filename)
+    input_observed_filename     = inCase(observed_filename)
+    input_mt_frequency_filename = inCase(mt_frequency_filename)
 
     print("====================================================")
     print(f" PETGEM INPUT PREPROCESSING ({mode})")
@@ -790,26 +738,23 @@ def runPreprocessing(*, mode, order, case_dir,
     print(f"  Case directory         : {case_dir}")
     print(f"  Mesh file              : {input_mesh_filename}")
     print(f"  Receivers file         : {input_receivers_filename}")
-    if mode == "fm":
+    if mode == "fm.csem":
         print(f"  Sources file           : {input_sources_filename}")
-    if mode == "mt":
+    if mode == "fm.mt":
         print(f"  MT frequency file      : {input_mt_frequency_filename}")
-    if mode == "im":
+    if mode == "im.csem":
         print(f"  IM sources file        : {input_im_sources_filename}")
         print(f"  Observed data file     : {input_observed_filename}")
     print(f"  Output bundle          : {output_filename}")
     print(f"\n  Number of materials    : {len(sigma_x)}")
 
-    # 0. Validate that every required input file exists up front, so a missing
-    #    or mistyped path fails with a clear message here rather than as a raw
-    #    meshio / numpy / open() traceback several lines down. Pure guard: on
-    #    the success path nothing changes.
+    # 0. Required input files must exist
     _require_input_file(input_mesh_filename, "Mesh file",
-                        hint="generate it (e.g. run gmsh on the .geo)")
+                        hint="run gmsh on the .geo")
     _require_input_file(input_receivers_filename, "Receivers file")
-    if mode == "fm":
+    if mode == "fm.csem":
         _require_input_file(input_sources_filename, "Sources file")
-    elif mode == "im":
+    elif mode == "im.csem":
         _require_input_file(input_im_sources_filename, "Inverse sources file")
         _require_input_file(input_observed_filename, "Observed-data file")
     else:
@@ -822,12 +767,12 @@ def runPreprocessing(*, mode, order, case_dir,
     print("\nReading mesh")
     mesh = meshio.read(input_mesh_filename)
     coords = mesh.points
-    tetra_idx = next((i for i, b in enumerate(mesh.cells) if b.type == "tetra"),
+    tetra_idx = next((i for i, block in enumerate(mesh.cells) if block.type == "tetra"),
                      None)
     if tetra_idx is None:
         raise ValueError(
             f"{input_mesh_filename}: no tetrahedral cell block found "
-            f"(blocks: {[b.type for b in mesh.cells]}); PETGEM is tetra-only.")
+            f"(blocks: {[block.type for block in mesh.cells]}); PETGEM is tetra-only.")
     cells = mesh.cells[tetra_idx].data
     num_cells = cells.shape[0]
     print(f"  Total elements          : {num_cells}")
@@ -842,8 +787,8 @@ def runPreprocessing(*, mode, order, case_dir,
     if codes is not None:
         counts = np.bincount(materials_id, minlength=len(codes))
         print("  Material codes -> rows  : " + ", ".join(
-            f"{int(c)}->{i} ({int(n)} cells)"
-            for i, (c, n) in enumerate(zip(codes, counts))))
+            f"{int(code)}->{i} ({int(count)} cells)"
+            for i, (code, count) in enumerate(zip(codes, counts))))
     mn, mx = int(materials_id.min()), int(materials_id.max())
     if mn < 0 or mx >= nmat:
         raise ValueError(
@@ -870,21 +815,25 @@ def runPreprocessing(*, mode, order, case_dir,
     print(f"  Number of receivers     : {receivers_arr.shape[0]}")
 
     # 4. Sources (text → unified (N, 8) [freq x y z current length dip az]).
-    # The same /sources group is written for fm and im; forward repeats a
+    # The same /sources group is written for fm.csem and im.csem; forward repeats a
     # single frequency across its transmitters, inverse carries one row per
     # (frequency, dipole). mt has no /sources group, only /mt/freq.
     sources8 = None
-    if mode == "mt":
+    if mode == "fm.mt":
         print("\nReading MT frequency")
         mt_frequency = readMtFrequencyText(input_mt_frequency_filename)
         print(f"  Frequency (Hz)          : {mt_frequency}")
     else:
-        src_path = input_sources_filename if mode == "fm" else input_im_sources_filename
+        src_path = input_sources_filename if mode == "fm.csem" else input_im_sources_filename
         print("\nReading sources")
         sources8 = readSourcesText(src_path)
         uniq_freqs = np.unique(sources8[:, 0])
         print(f"  Transmitters            : {sources8.shape[0]}")
         print(f"  Frequencies (Hz)        : {uniq_freqs.tolist()}")
+        if mode == "fm.csem" and len(uniq_freqs) != 1:
+            raise ValueError(
+                f"{src_path}: fm.csem solves one frequency per run, got "
+                f"{uniq_freqs.tolist()} Hz; build one bundle per frequency")
 
     # 5. Build the DMPlex
     print("\nCreating PETSc DM (DMPlex)")
@@ -897,7 +846,7 @@ def runPreprocessing(*, mode, order, case_dir,
                          output_filename,
                          cells=cells, coords=coords,
                          output_vtk=output_vtk_filename)
-    if mode == "mt":
+    if mode == "fm.mt":
         writeMtPayload(output_filename, mt_frequency)
     print(f"  Output file: {output_filename}")
     if output_vtk_filename:
@@ -905,7 +854,7 @@ def runPreprocessing(*, mode, order, case_dir,
 
     # 6b. Inverse-only payload: append /observed/Ex and /im_meta.
     # (The sources already live in the unified /sources group above.)
-    if mode == "im":
+    if mode == "im.csem":
         print("\nReading observed data")
         # Accept either a prebuilt HDF5 (.h5/.hdf5) or a raw MATLAB-style
         # invEx.dat text file - the .dat is parsed inline, so no separate
@@ -958,7 +907,7 @@ def runPreprocessing(*, mode, order, case_dir,
 
 
 def readBundle(filename):
-    """Read the case-independent payload of a PETGEM input bundle HDF5.
+    """Read the receivers, order and sources of a CSEM input bundle.
 
     Returns a dict with keys::
 
@@ -969,10 +918,8 @@ def readBundle(filename):
       sources   : (N_src, 8) ndarray, columns =
                   [freq, x, y, z, current, length, dipAngle, azimuthAngle]
 
-    The DMPlex / model_data fields inside the bundle are not returned -
-    those are consumed by the C kernel via loadCsemInputs. This loader is
-    for the Python postprocessing side and exposes only the parameters a
-    case-specific validation script actually needs.
+    The mesh and the per-cell model are not returned. MT bundles have no
+    ``/sources`` group and cannot be read with this function.
     """
     receivers = np.real(np.array(readVectorH5(filename, 'receivers'))).reshape(-1, 3)
 
@@ -997,12 +944,7 @@ def readBundle(filename):
 
 
 def readResponses(filename, source=1):
-    """Read one source's responses from a PETGEM single-file output HDF5.
-
-    The fm.csem postprocessing writes a single file containing every
-    transmitter under ``/sources/src{k}/`` groups (k is 1-based).  This
-    helper returns the per-source dict for the requested transmitter,
-    keeping the per-source result shape that pre-refactor callers used.
+    """Read the fields of one transmitter from an ``fm.csem`` output file.
 
     Parameters
     ----------
@@ -1020,15 +962,13 @@ def readResponses(filename, source=1):
           source      : dict of /sources/src{k} attributes
                         (frequency, x_pos, y_pos, z_pos, current, length,
                          dip_angle, azimuth_angle)
-          provenance  : dict of root-level attributes
-                        (petgem_version, input_filename, date, order,
-                         mpi_tasks, num_sources, frequency)
+          provenance  : dict of root attributes (provenance block,
+                        num_sources, frequency)
 
-    Notes
-    -----
-    Attributes are read via h5py (petsc4py's attribute API is awkward for
-    this read pattern). Vec components live under
-    ``/sources/src{k}/fields/`` in the new single-file layout.
+    Raises
+    ------
+    KeyError
+        The file has no ``/sources/src{source}`` group.
     """
     import h5py
 
@@ -1045,18 +985,18 @@ def readResponses(filename, source=1):
                 f"{filename}: missing group {src_group!r} (file holds "
                 f"{int(f.attrs.get('num_sources', -1))} sources)"
             )
-        out['source']     = {k: _decodeH5Attr(v) for k, v in f[src_group].attrs.items()}
-        out['provenance'] = {k: _decodeH5Attr(v) for k, v in f.attrs.items()}
+        out['source']     = {key: _decodeH5Attr(value) for key, value in f[src_group].attrs.items()}
+        out['provenance'] = {key: _decodeH5Attr(value) for key, value in f.attrs.items()}
     return out
 
 
 def readAllResponses(filename):
-    """Read every source's responses from a single PETGEM responses file.
+    """Read the fields of every transmitter from an ``fm.csem`` output file.
 
     Parameters
     ----------
     filename : str
-        Path to the responses HDF5 file written by fm.csem postprocessing.
+        Path to the responses HDF5 file.
 
     Returns
     -------
@@ -1064,26 +1004,22 @@ def readAllResponses(filename):
         Keys::
 
           provenance : dict of root-level attributes (see ``readResponses``)
-          num_sources : int (mirrors provenance['num_sources'] for convenience)
+          num_sources : int
           sources    : dict keyed by 1-based source index; each value has the
                        same shape as ``readResponses(filename, source=k)``
                        (Ex..Hz arrays + 'source' attrs + 'provenance').
 
-    Notes
-    -----
-    Source indices are discovered from root attribute ``num_sources``; the
-    underlying groups are named ``/sources/src1`` ... ``/sources/srcN``.
     """
     import h5py
 
     with h5py.File(filename, 'r') as f:
-        provenance = {k: _decodeH5Attr(v) for k, v in f.attrs.items()}
+        provenance = {key: _decodeH5Attr(value) for key, value in f.attrs.items()}
         num_sources = int(provenance.get('num_sources', 0))
         if num_sources <= 0 and '/sources' in f:
-            num_sources = len([k for k in f['/sources'].keys() if k.startswith('src')])
+            num_sources = len([name for name in f['/sources'].keys() if name.startswith('src')])
 
-    sources = {k: readResponses(filename, source=k)
-               for k in range(1, num_sources + 1)}
+    sources = {source: readResponses(filename, source=source)
+               for source in range(1, num_sources + 1)}
     return {
         'provenance':  provenance,
         'num_sources': num_sources,
@@ -1094,10 +1030,8 @@ def readAllResponses(filename):
 def compareMagnitude(computed, reference):
     """Magnitude-domain error metrics between a computed and a reference field.
 
-    Shared postprocessing helper so every case reports the same three metrics
-    the same way, instead of re-deriving them inline in each per-case script.
-    Both inputs are 1-D field arrays (complex on a PETSc complex build, or
-    real); the comparison is done on ``|field|``.
+    The comparison is done on ``|field|``, so complex and real inputs are
+    both accepted.
 
     Parameters
     ----------
@@ -1148,9 +1082,12 @@ def readVectorH5(filename, dataset_name, group=None):
     dataset_name : str
         Vec name (the HDF5 dataset name within the active group).
     group : str or None
-        Optional HDF5 group (e.g. "/fields"). When set, the viewer pushes
-        this group before loading so that `dataset_name` resolves to
-        `{group}/{dataset_name}`.
+        HDF5 group holding the Vec, e.g. ``/sources/src1/fields``.
+
+    Returns
+    -------
+    ndarray
+        The Vec values (complex on a complex PETSc build).
     """
     tmp = PETSc.Vec().create(comm=PETSc.COMM_SELF)
     tmp.setName(dataset_name)

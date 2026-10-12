@@ -29,15 +29,14 @@ static const PetscReal modelSigma[3] = {1.0, 0.01, 1.0e-8};
 static const PetscReal modelH[3]     = {100.0, 100.0, 100.0};
 
 /* Box mesh: 3 x 2 x 3 hexahedra on [0,3] x [0,2] x [-1,0.5]; layers by cell centroid z */
-static const PetscInt  boxFaces[3]    = {3, 2, 3};
-static const PetscReal boxLower[3]    = {0.0, 0.0, -1.0};
-static const PetscReal boxUpper[3]    = {3.0, 2.0, 0.5};
-static const PetscReal boxLayerZ[4]   = {-1.0, -0.5, 0.0, 0.5};
-static const PetscReal boxSigma[3]    = {0.1, 1.0, 1.0e-8};
+static const PetscInt  boxFaces[3]  = {3, 2, 3};
+static const PetscReal boxLower[3]  = {0.0, 0.0, -1.0};
+static const PetscReal boxUpper[3]  = {3.0, 2.0, 0.5};
+static const PetscReal boxLayerZ[4] = {-1.0, -0.5, 0.0, 0.5};
+static const PetscReal boxSigma[3]  = {0.1, 1.0, 1.0e-8};
 
 /* Exact H(z): propagate (H, H') upward from H(z_min) = 0, H'(z_min) = 1, then scale to H(z_max) = 1. */
-static PetscScalar exact_h(const Mt1DProfile *p, Mt1DEquation eq, PetscReal omega, PetscReal z)
-{
+static PetscScalar exact_h(const Mt1DProfile *p, Mt1DEquation eq, PetscReal omega, PetscReal z) {
   PetscScalar H = 0.0, dH = 1.0, Htop = 0.0;
   PetscScalar Hz = 0.0;
   for (PetscInt l = 0; l < p->numLayers; l++) {
@@ -45,42 +44,41 @@ static PetscScalar exact_h(const Mt1DProfile *p, Mt1DEquation eq, PetscReal omeg
     if (l > 0 && eq == MT_1D_EQUATION_H) dH *= p->sigma[l] / p->sigma[l - 1];
     if (z >= p->z[l] && z <= p->z[l + 1]) {
       const PetscReal d = z - p->z[l];
-      Hz = H * PetscCosComplex(k * d) + dH / k * PetscSinComplex(k * d);
+      Hz                = H * PetscCosComplex(k * d) + dH / k * PetscSinComplex(k * d);
     }
     const PetscReal   d  = p->z[l + 1] - p->z[l];
     const PetscScalar H1 = H * PetscCosComplex(k * d) + dH / k * PetscSinComplex(k * d);
     const PetscScalar d1 = -H * k * PetscSinComplex(k * d) + dH * PetscCosComplex(k * d);
-    H = H1;
-    dH = d1;
+    H                    = H1;
+    dH                   = d1;
   }
   Htop = H;
   return Hz / Htop;
 }
 
-static PetscReal field_error(const Mt1DField *f, const Mt1DProfile *p, Mt1DEquation eq, PetscReal omega)
-{
+static PetscReal field_error(const Mt1DField *f, const Mt1DProfile *p, Mt1DEquation eq, PetscReal omega) {
   PetscReal err = 0.0;
   for (PetscInt i = 0; i < f->numNodes; i++) err = PetscMax(err, PetscAbsScalar(f->H[i] - exact_h(p, eq, omega, f->z[i])));
   return err;
 }
 
-static void check_solve(Mt1DEquation eq, const char *tag)
-{
-  Mt1DProfile p;
-  Mt1DField   f10, f20;
-  MtParams    mt;
+static void check_solve(Mt1DEquation eq, const char *tag) {
+  Mt1DProfile     p;
+  Mt1DField       f10, f20;
+  MtParams        mtParams;
   const PetscReal omega = 2.0 * PETSC_PI * 1.0;
 
-  p.numLayers = 3;
-  p.z = (PetscReal *)modelZ;
-  p.sigma = (PetscReal *)modelSigma;
-  p.h = (PetscReal *)modelH;
-  mt.equation1D = eq;
+  p.numLayers         = 3;
+  p.z                 = (PetscReal *)modelZ;
+  p.sigma             = (PetscReal *)modelSigma;
+  p.h                 = (PetscReal *)modelH;
+  mtParams.frequency  = 1.0;
+  mtParams.equation1D = eq;
 
-  mt.refine1D = 10;
-  PetscCallAbort(PETSC_COMM_SELF, solveMt1D(&p, &mt, omega, &f10));
-  mt.refine1D = 20;
-  PetscCallAbort(PETSC_COMM_SELF, solveMt1D(&p, &mt, omega, &f20));
+  mtParams.refine1D = 10;
+  PetscCallAbort(PETSC_COMM_SELF, solveMt1D(&p, &mtParams, &f10));
+  mtParams.refine1D = 20;
+  PetscCallAbort(PETSC_COMM_SELF, solveMt1D(&p, &mtParams, &f20));
 
   PT_CHECK(f10.numNodes == 401, "[%s] %d nodes at refine 10, expected 401", tag, (int)f10.numNodes);
   PT_CLOSE(f10.z[0], modelZ[0], 1e-12, "[%s] first node %g", tag, f10.z[0]);
@@ -89,7 +87,8 @@ static void check_solve(Mt1DEquation eq, const char *tag)
   PT_CLOSE(PetscAbsScalar(f10.H[f10.numNodes - 1] - 1.0), 0.0, 1e-14, "[%s] H(z_max) != 1", tag);
   for (PetscInt l = 1; l < 3; l++) {
     PetscBool found = PETSC_FALSE;
-    for (PetscInt i = 0; i < f10.numNodes; i++) if (f10.z[i] == modelZ[l]) found = PETSC_TRUE;
+    for (PetscInt j = 0; j < f10.numNodes; j++)
+      if (f10.z[j] == modelZ[l]) found = PETSC_TRUE;
     PT_CHECK(found, "[%s] no node at interface z = %g", tag, modelZ[l]);
   }
 
@@ -97,7 +96,8 @@ static void check_solve(Mt1DEquation eq, const char *tag)
   const PetscReal e20 = field_error(&f20, &p, eq, omega);
   PT_CHECK(e10 < 1e-3, "[%s] max |H - H_exact| = %.3e at refine 10", tag, e10);
   PT_CHECK(e10 / e20 > 3.5 && e10 / e20 < 4.5, "[%s] convergence ratio %.3f (expected ~4)", tag, e10 / e20);
-  PetscCallAbort(PETSC_COMM_WORLD, PetscPrintf(PETSC_COMM_WORLD, "[%s] max error refine 10: %.3e, refine 20: %.3e, ratio %.2f\n", tag, (double)e10, (double)e20, (double)(e10 / e20)));
+  PetscCallAbort(PETSC_COMM_WORLD, PetscPrintf(PETSC_COMM_WORLD, "[%s] max error refine 10: %.3e, refine 20: %.3e, ratio %.2f\n", tag,
+                                               (double)e10, (double)e20, (double)(e10 / e20)));
 
   /* Interpolation and clamping */
   PetscScalar H;
@@ -114,20 +114,19 @@ static void check_solve(Mt1DEquation eq, const char *tag)
   PetscCallAbort(PETSC_COMM_SELF, destroyMt1DField(&f20));
 }
 
-static void check_equations_differ(void)
-{
-  Mt1DProfile p;
-  Mt1DField   fp, fh;
-  MtParams    mt = {10, MT_1D_EQUATION_PAPER};
-  const PetscReal omega = 2.0 * PETSC_PI * 1.0;
+static void check_equations_differ(void) {
+  Mt1DProfile     p;
+  Mt1DField       fp, fh;
+  MtParams        mtParams = {.frequency = 1.0, .refine1D = 10, .equation1D = MT_1D_EQUATION_PAPER};
+  const PetscReal omega    = 2.0 * PETSC_PI * 1.0;
 
   p.numLayers = 3;
-  p.z = (PetscReal *)modelZ;
-  p.sigma = (PetscReal *)modelSigma;
-  p.h = (PetscReal *)modelH;
-  PetscCallAbort(PETSC_COMM_SELF, solveMt1D(&p, &mt, omega, &fp));
-  mt.equation1D = MT_1D_EQUATION_H;
-  PetscCallAbort(PETSC_COMM_SELF, solveMt1D(&p, &mt, omega, &fh));
+  p.z         = (PetscReal *)modelZ;
+  p.sigma     = (PetscReal *)modelSigma;
+  p.h         = (PetscReal *)modelH;
+  PetscCallAbort(PETSC_COMM_SELF, solveMt1D(&p, &mtParams, &fp));
+  mtParams.equation1D = MT_1D_EQUATION_H;
+  PetscCallAbort(PETSC_COMM_SELF, solveMt1D(&p, &mtParams, &fh));
   PetscReal diff = 0.0;
   for (PetscInt i = 0; i < fp.numNodes; i++) diff = PetscMax(diff, PetscAbsScalar(fp.H[i] - fh.H[i]));
   PT_CHECK(diff > 1e-2, "paper and h equations coincide on a layered model (max diff %.3e)", diff);
@@ -135,31 +134,24 @@ static void check_equations_differ(void)
   PetscCallAbort(PETSC_COMM_SELF, destroyMt1DField(&fh));
 }
 
-static PetscReal layered_sigma(const PetscReal c[3])
-{
+static PetscReal layered_sigma(const PetscReal c[3]) {
   PetscInt layer = 0;
   while (layer < 2 && c[2] > boxLayerZ[layer + 1]) layer++;
   return boxSigma[layer];
 }
 
-static PetscReal anomaly_sigma(const PetscReal c[3])
-{
+static PetscReal anomaly_sigma(const PetscReal c[3]) {
   const PetscReal s = layered_sigma(c);
   return (s == boxSigma[1] && c[0] < 1.0 && c[1] < 1.0) ? 5.0 : s;
 }
 
-static void setup_box(PetscReal topShift, DM *dm, Grid *grid, IS *faces)
-{
-  petgemParams params;
-  PetscCallAbort(PETSC_COMM_WORLD, PetscMemzero(&params, sizeof(params)));
-  params.order = 1;
+static void setup_box(PetscReal topShift, DM *dm, Grid *grid, IS *faces) {
   create_box_mesh(boxFaces, boxLower, boxUpper, topShift, dm);
-  PetscCallAbort(PETSC_COMM_WORLD, setupNedelecGrid(params, PETGEM_BC_NATURAL, dm, grid));
+  PetscCallAbort(PETSC_COMM_WORLD, setupNedelecGrid(1, PETGEM_BC_NATURAL, dm, grid));
   PetscCallAbort(PETSC_COMM_WORLD, getBoundaryFaces(*dm, faces));
 }
 
-static void check_box(void)
-{
+static void check_box(void) {
   DM              dm;
   Grid            grid;
   IS              faces;
@@ -175,15 +167,28 @@ static void check_box(void)
     PetscInt  cell;
     PetscReal vtx[NUM_VERTICES_PER_FACE][NUM_DIMENSIONS], n[NUM_DIMENSIONS], area;
     PetscCallAbort(PETSC_COMM_WORLD, computeBoundaryFaceGeometry(dm, fidx[i], &cell, vtx, n, &area));
-    const PetscReal c[3] = {(vtx[0][0] + vtx[1][0] + vtx[2][0]) / 3, (vtx[0][1] + vtx[1][1] + vtx[2][1]) / 3, (vtx[0][2] + vtx[1][2] + vtx[2][2]) / 3};
-    PetscBool ok = PETSC_FALSE;
+    const PetscReal c[3] = {(vtx[0][0] + vtx[1][0] + vtx[2][0]) / 3, (vtx[0][1] + vtx[1][1] + vtx[2][1]) / 3,
+                            (vtx[0][2] + vtx[1][2] + vtx[2][2]) / 3};
+    PetscBool       ok   = PETSC_FALSE;
     switch (tags[i]) {
-      case MT_FACE_TOP:    ok = (PetscBool)(PetscAbsReal(c[2] - boxUpper[2]) < 1e-12); break;
-      case MT_FACE_BOTTOM: ok = (PetscBool)(PetscAbsReal(c[2] - boxLower[2]) < 1e-12); break;
-      case MT_FACE_XMIN:   ok = (PetscBool)(PetscAbsReal(c[0] - boxLower[0]) < 1e-12); break;
-      case MT_FACE_XMAX:   ok = (PetscBool)(PetscAbsReal(c[0] - boxUpper[0]) < 1e-12); break;
-      case MT_FACE_YMIN:   ok = (PetscBool)(PetscAbsReal(c[1] - boxLower[1]) < 1e-12); break;
-      case MT_FACE_YMAX:   ok = (PetscBool)(PetscAbsReal(c[1] - boxUpper[1]) < 1e-12); break;
+    case MT_FACE_TOP:
+      ok = (PetscBool)(PetscAbsReal(c[2] - boxUpper[2]) < 1e-12);
+      break;
+    case MT_FACE_BOTTOM:
+      ok = (PetscBool)(PetscAbsReal(c[2] - boxLower[2]) < 1e-12);
+      break;
+    case MT_FACE_XMIN:
+      ok = (PetscBool)(PetscAbsReal(c[0] - boxLower[0]) < 1e-12);
+      break;
+    case MT_FACE_XMAX:
+      ok = (PetscBool)(PetscAbsReal(c[0] - boxUpper[0]) < 1e-12);
+      break;
+    case MT_FACE_YMIN:
+      ok = (PetscBool)(PetscAbsReal(c[1] - boxLower[1]) < 1e-12);
+      break;
+    case MT_FACE_YMAX:
+      ok = (PetscBool)(PetscAbsReal(c[1] - boxUpper[1]) < 1e-12);
+      break;
     }
     PT_CHECK(ok, "face %d tagged Gamma_%d off its plane", (int)fidx[i], (int)tags[i]);
     localCount[tags[i]]++;
@@ -192,7 +197,8 @@ static void check_box(void)
   PetscCallMPIAbort(PETSC_COMM_WORLD, MPI_Allreduce(localCount, count, 7, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD));
   const PetscInt nx = boxFaces[0], ny = boxFaces[1], nz = boxFaces[2];
   const PetscInt expected[7] = {0, 2 * nx * ny, 2 * nx * nz, 2 * ny * nz, 2 * nx * nz, 2 * ny * nz, 2 * nx * ny};
-  for (PetscInt g = 1; g <= 6; g++) PT_CHECK(count[g] == expected[g], "Gamma_%d has %d faces, expected %d", (int)g, (int)count[g], (int)expected[g]);
+  for (PetscInt g = 1; g <= 6; g++)
+    PT_CHECK(count[g] == expected[g], "Gamma_%d has %d faces, expected %d", (int)g, (int)count[g], (int)expected[g]);
 
   /* Profile of the layered box */
   Vec         sigma;
@@ -201,7 +207,8 @@ static void check_box(void)
   PetscCallAbort(PETSC_COMM_WORLD, buildMt1DProfile(dm, sigma, faces, tags, &p));
   PT_CHECK(p.numLayers == 3, "%d layers, expected 3", (int)p.numLayers);
   if (p.numLayers == 3) {
-    for (PetscInt l = 0; l <= 3; l++) PT_CLOSE(p.z[l], boxLayerZ[l], 1e-12, "interface %d at %g, expected %g", (int)l, p.z[l], boxLayerZ[l]);
+    for (PetscInt l = 0; l <= 3; l++)
+      PT_CLOSE(p.z[l], boxLayerZ[l], 1e-12, "interface %d at %g, expected %g", (int)l, p.z[l], boxLayerZ[l]);
     for (PetscInt l = 0; l < 3; l++) {
       PT_CLOSE(p.sigma[l], boxSigma[l], 1e-15, "layer %d sigma %g, expected %g", (int)l, p.sigma[l], boxSigma[l]);
       PT_CLOSE(p.h[l], 0.5, 1e-12, "layer %d edge length %g, expected 0.5", (int)l, p.h[l]);
@@ -222,12 +229,11 @@ static void check_box(void)
 
   PetscCallAbort(PETSC_COMM_WORLD, PetscFree(tags));
   PetscCallAbort(PETSC_COMM_WORLD, ISDestroy(&faces));
-  PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&grid.H1dm));
+  PetscCallAbort(PETSC_COMM_WORLD, destroyGrid(&grid));
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dm));
 }
 
-static void check_not_a_box(void)
-{
+static void check_not_a_box(void) {
   DM         dm;
   Grid       grid;
   IS         faces;
@@ -242,12 +248,11 @@ static void check_not_a_box(void)
   PT_CHECK(failedAny, "moved top vertex not rejected");
   PetscCallAbort(PETSC_COMM_WORLD, PetscFree(tags));
   PetscCallAbort(PETSC_COMM_WORLD, ISDestroy(&faces));
-  PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&grid.H1dm));
+  PetscCallAbort(PETSC_COMM_WORLD, destroyGrid(&grid));
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dm));
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   PetscMPIInt rank;
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
@@ -261,8 +266,10 @@ int main(int argc, char **argv)
   int localFail = pt_failures, anyFail = 0;
   PetscCallMPI(MPI_Allreduce(&localFail, &anyFail, 1, MPI_INT, MPI_SUM, PETSC_COMM_WORLD));
   int rc = 0;
-  if (rank == 0) rc = pt_report("test_mt1d");
-  else if (pt_failures) fprintf(stderr, "rank %d: %d failures\n", rank, pt_failures);
+  if (rank == 0)
+    rc = pt_report("test_mt1d");
+  else if (pt_failures)
+    fprintf(stderr, "rank %d: %d failures\n", rank, pt_failures);
   PetscCall(PetscFinalize());
   return (rc || anyFail) ? 1 : 0;
 }

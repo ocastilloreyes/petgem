@@ -13,9 +13,9 @@
  * to the electric and magnetic field components evaluated at receiver
  * locations:
  *
- *     Ex_recv = QEx * x         Hx_recv = (QHx * x) / (i*omega*mu)
- *     Ey_recv = QEy * x         Hy_recv = (QHy * x) / (i*omega*mu)
- *     Ez_recv = QEz * x         Hz_recv = (QHz * x) / (i*omega*mu)
+ *     Ex_recv = Q_Ex * x        Hx_recv = (Q_Hx * x) / (i*omega*mu)
+ *     Ey_recv = Q_Ey * x        Hy_recv = (Q_Hy * x) / (i*omega*mu)
+ *     Ez_recv = Q_Ez * x        Hz_recv = (Q_Hz * x) / (i*omega*mu)
  *
  * Both fm.csem (postprocessing) and im.csem (inversion residual +
  * adjoint RHS) call this routine.  Building Q once and using MatMult
@@ -39,29 +39,30 @@
 #include <petscdm.h>
 #include <petscmat.h>
 
+/** @brief Field components at a receiver; NUM_RECEIVER_FIELDS counts them. */
+typedef enum { RECV_EX, RECV_EY, RECV_EZ, RECV_HX, RECV_HY, RECV_HZ, NUM_RECEIVER_FIELDS } ReceiverField;
+
 /**
  * @brief Frequency-independent receiver-interpolation operators.
  *
- * QEx..QHz are (numReceivers x numDof) MATAIJ sparse matrices mapping an
+ * mat[RECV_*] are (numReceivers x numDof) MATAIJ sparse matrices mapping an
  * H(curl) DOF vector x to field components at the receivers:
- * Ex_recv = QEx * x; Hx_recv = (QHx * x) / constFactor (constFactor = iωμ).
+ * Ex_recv = mat[RECV_EX] * x; Hx_recv = (mat[RECV_HX] * x) / (iωμ).
  */
 typedef struct {
-  Mat      QEx, QEy, QEz; /**< Electric-field interpolation matrices. */
-  Mat      QHx, QHy, QHz; /**< Magnetic-field (curl) interpolation matrices. */
-  PetscInt numReceivers;  /**< Number of receivers (rows of each Q). */
-  PetscInt numDof;        /**< Number of H(curl) DOFs (columns of each Q). */
+  Mat      mat[NUM_RECEIVER_FIELDS]; /**< Interpolation matrix per field (E: basis, H: curl). */
+  PetscInt numReceivers;             /**< Number of receivers (rows of each matrix). */
+  PetscInt numDof;                   /**< Number of H(curl) DOFs (columns of each matrix). */
 } ReceiverInterpolationMatrices;
 
 /**
- * @brief Builds the receiver-interpolation matrices QEx..QHz.
+ * @brief Builds the receiver-interpolation matrices the matrices.
  *
  * Assembles the Q operators on the same DM as the H(curl) solution vector.
  * Building Q once with global column indexing makes the operator
  * MPI-invariant. The routine opens no file; the caller supplies the
  * receiver coordinates.
  *
- * @param[in]  order       Nédélec basis order (dispatched via fem->ops, 1..6).
  * @param[in]  receivers  Serial Vec (PETSC_COMM_SELF) of 3·N_recv reals,
  *                        laid out [x0 y0 z0 x1 y1 z1 ...]; produced by
  *                        loadModelInputs from /receivers in the input bundle.
@@ -73,20 +74,46 @@ typedef struct {
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
-                                                  Vec         receivers,
-                                                  const DM    dm,
-                                                  const Grid *grid,
-                                                  ReceiverInterpolationMatrices *Q);
+PetscErrorCode buildReceiverInterpolationMatrices(Vec receivers, const DM dm, const Grid *grid, ReceiverInterpolationMatrices *Q);
 
 /**
  * @brief Destroys the matrices held in a ReceiverInterpolationMatrices struct.
  *
- * @param[in,out] Q  Struct whose QEx..QHz matrices are destroyed.
+ * @param[in,out] Q  Struct whose the matrices matrices are destroyed.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyReceiverInterpolationMatrices(ReceiverInterpolationMatrices *Q);
+
+/**
+ * @brief Creates the receiver field Vecs, named Ex, Ey, Ez, Hx, Hy, Hz.
+ *
+ * @param[in]  Q       Receiver interpolation matrices (row layout).
+ * @param[out] fields  Field Vecs; free them with destroyReceiverFields().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode createReceiverFields(const ReceiverInterpolationMatrices *Q, Vec fields[NUM_RECEIVER_FIELDS]);
+
+/**
+ * @brief Interpolates E and H = curl(E)/(iωμ) at the receivers for one solution.
+ *
+ * @param[in]  Q            Receiver interpolation matrices.
+ * @param[in]  x            H(curl) solution vector.
+ * @param[in]  constFactor  iωμ.
+ * @param[out] fields       Ex, Ey, Ez, Hx, Hy, Hz at the receivers.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode interpolateReceiverFields(const ReceiverInterpolationMatrices *Q, Vec x, PetscScalar constFactor,
+                                         Vec fields[NUM_RECEIVER_FIELDS]);
+
+/**
+ * @brief Destroys the Vecs created by createReceiverFields().
+ */
+PetscErrorCode destroyReceiverFields(Vec fields[NUM_RECEIVER_FIELDS]);
 
 #endif /* RECEIVER_INTERP_H */

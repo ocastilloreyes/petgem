@@ -1,6 +1,6 @@
 # Transmitter file for the test4 MMS verification.
 #
-# Only the FREQUENCY is used by the MMS run: fm.csem -mms replaces the dipole
+# Only the FREQUENCY is used by the MMS run: the mms program replaces the dipole
 # excitation by the volumetric manufactured forcing f*, so the dipole entry
 # below is inert and exists only because the input bundle requires one. The
 # frequency, though, enters both the operator (A = K - i w mu0 M) and f*, and

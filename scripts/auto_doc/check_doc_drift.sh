@@ -4,7 +4,7 @@
 # Documentation drift check
 #
 # This script checks that the documentation and comments in the PETGEM C
-# sources still match the code. It runs two quick checks that do not need
+# sources still match the code. It runs three quick checks that do not need
 # PETSc:
 #
 #   1. Retired names. It fails if a removed symbol, HDF5 group or option
@@ -15,7 +15,10 @@
 #      documented @param no longer matches the function signature. Warnings
 #      about undocumented items are ignored on purpose.
 #
-# Comments that describe the behaviour wrongly without using a retired name
+#   3. Parameter names. It fails if a prototype in include/ names its
+#      parameters differently from the definition in src/.
+#
+# Comments that describe the behavior wrongly without using a retired name
 # cannot be detected here and still need code review.
 #
 # Usage:
@@ -48,17 +51,20 @@ GUARDS=(
   '"Nord"|retired output attribute "Nord" - the unified provenance block writes "order"'
   '"Petgem_version"|retired output attribute "Petgem_version" - now lowercase "petgem_version"'
   'inv_model_iter|retired VTU snapshot prefix - snapshots derive their stem from -output_filename'
-  '\bfmParams\b|renamed type fmParams - the shared base is petgemParams (fm.csem uses it directly, imParams embeds it as .common)'
+  '\bfmParams\b|renamed type fmParams - the shared base is PetgemParams (fm.csem uses it directly, ImParams embeds it as .common)'
   '\breadfmParams\b|renamed function readfmParams - now readPetgemParams (it parses the options common to BOTH kernels)'
   '\bINV_(MAX_FIXED_MATERIALS|MAX_FREQUENCIES|VTU_NUM_FIELDS)\b|retired INV_* constants - now IM_*'
+  '\bcomputeFields\b|renamed function computeFields - now computeCsemResponses (src/csem.c)'
+  '\bassembleCsemMMSRHS\b|renamed function assembleCsemMMSRHS - now assembleMmsRhs (tests/mms/mms.c)'
+  '\bassembleCsemMsRefill\b|renamed function assembleCsemMsRefill - now refillMassMatrix'
+  '(transmitter|postprocessing)\.h|removed header - the CSEM types and responses live in csem.h'
 )
 
 echo "== check_doc_drift: removed-symbol guard =="
 for g in "${GUARDS[@]}"; do
   regex="${g%%|*}"
   desc="${g##*|}"
-  # Lines tagged DRIFT_GUARD_ALLOW are skipped: they belong to the code that
-  # rejects the retired names (readimParams).
+  # Lines tagged DRIFT_GUARD_ALLOW are skipped.
   hits="$(grep -rInE "$regex" src/ include/ 2>/dev/null \
             | grep -v 'DRIFT_GUARD_ALLOW' || true)"
   if [ -n "$hits" ]; then
@@ -96,6 +102,50 @@ if command -v doxygen >/dev/null 2>&1; then
   fi
 else
   echo "  SKIP - doxygen not installed (install it to enable @param checks)."
+fi
+
+# ---------------------------------------------------------------------------
+# Check 3 - prototype-vs-definition parameter names
+# ---------------------------------------------------------------------------
+echo "== check_doc_drift: prototype parameter names =="
+if mismatches="$(python3 - <<'EOF'
+import glob, re
+
+SIG = r'^(?:static\s+)?(?:inline\s+)?(?:const\s+)?\w+\s*\**\s+\**(\w+)\s*\(([^)]*)\)\s*'
+
+def params(args):
+    names = []
+    for a in args.split(','):
+        a = a.strip()
+        if a and a != 'void':
+            m = re.search(r'(\w+)\s*(\[[^\]]*\])*$', a)
+            names.append(m.group(1) if m else a)
+    return names
+
+def signatures(paths, end):
+    out = {}
+    for path in paths:
+        text = re.sub(r'/\*.*?\*/', '', open(path).read(), flags=re.S)
+        for m in re.finditer(SIG + end, text, re.M):
+            out[m.group(1)] = (path, params(m.group(2)))
+    return out
+
+decl = signatures(sorted(glob.glob('include/*.h')), ';')
+defn = signatures(sorted(glob.glob('src/*.c')), r'\{')
+for name, (h, p) in sorted(decl.items()):
+    if name in defn and defn[name][1] != p:
+        print(f"{name}: {h} {p} vs {defn[name][0]} {defn[name][1]}")
+EOF
+)"; then
+  if [ -n "$mismatches" ]; then
+    echo "  DRIFT - prototypes whose parameter names differ from the definition:"
+    echo "$mismatches" | sed 's/^/      /'
+    fail=1
+  else
+    echo "  OK - every prototype matches its definition."
+  fi
+else
+  echo "  SKIP - python3 not available."
 fi
 
 echo

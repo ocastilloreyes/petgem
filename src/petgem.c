@@ -4,108 +4,100 @@
  * Date: 2026-05-20
  *
  * Description:
- * Unified PETGEM entry point. Dispatches to the CSEM forward, CSEM inverse or
- * MT forward kernel based on a positional subcommand or the -mode PETSc option.
+ * Unified PETGEM entry point. Runs the kernel named by a positional
+ * subcommand or by the -mode option: fm.csem, im.csem or fm.mt, the same
+ * names as the standalone binaries.
  */
 
 /*
  * Usage:
- *   - positional subcommand:   ./petgem fm -options_file ...
- *                              ./petgem im -options_file ...
- *                              ./petgem mt -options_file ...
- *   - PETSc option:            ./petgem -mode fm -options_file ...
- *                              ./petgem -mode im -options_file ...
- *                              ./petgem -mode mt -options_file ...
- * Both forms are accepted; positional takes precedence if present.
- * 'fm'/'im'/'mt' are canonical; 'forward'/'modeling' and 'inverse' are
- * aliases (parseModeArg), matching the -mode values utils/preprocess.py accepts.
- *
- * The single-purpose binaries (fm.csem, im.csem, fm.mt) call the same
- * runForward / runInverse / runMtForward functions.
+ *   ./petgem fm.csem|im.csem|fm.mt -options_file ...
+ *   ./petgem -mode fm.csem|im.csem|fm.mt -options_file ...
+ * The positional form takes precedence.
  */
 
 #include <stdio.h>
 #include <string.h>
 
-#include <petsc.h>
-
 #include "kernels.h"
-#include "version.h"
-#include "common.h" 
+#include "runtime.h"
 
-/**
- * @brief Unified PETGEM dispatcher entry point.
- *
- * Parses --version / --help / positional-subcommand / -mode and forwards
- * argv (with the mode token stripped) to runForward, runInverse or runMtForward.
- *
- * @param[in] argc  Argument count.
- * @param[in] argv  Argument vector.
- *
- * @return int the kernel's exit status, 0 for --version/--help, or 2 on invalid CLI usage.
- */
-int main(int argc, char **argv) {
-  /* --version short-circuit (no PETSc init) */
-  if (argc > 1 && strcmp(argv[1], "--version") == 0) {
-    printf("PETGEM version %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-    return 0;
+typedef int (*KernelMain)(int argc, char **argv);
+
+static const struct {
+  const char *name;
+  KernelMain  run;
+  const char *summary;
+} kernels[] = {
+    {"fm.csem", runForward, "CSEM forward modeling"},
+    {"im.csem", runInverse, "CSEM inverse modeling"},
+    {"fm.mt", runMtForward, "MT forward modeling"},
+};
+
+#define NUM_KERNELS ((int)(sizeof(kernels) / sizeof(kernels[0])))
+
+/* Kernel named s, or NULL. */
+static KernelMain findKernel(const char *s) {
+  for (int i = 0; i < NUM_KERNELS; i++) {
+    if (strcmp(s, kernels[i].name) == 0) return kernels[i].run;
   }
+  return NULL;
+}
 
-  if (argc > 1 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h")     == 0)) {
+/* Plain printf: called before PetscInitialize. */
+static void printUsage(const char *progname) {
+  printf("Usage:\n");
+  for (int i = 0; i < NUM_KERNELS; i++) {
+    printf("  %s %-8s [petsc options...]   # %s\n", progname, kernels[i].name, kernels[i].summary);
+  }
+  printf("  %s -mode <kernel> [petsc options...]\n"
+         "  %s --version\n"
+         "\n"
+         "Kernel names match the standalone binaries (fm.csem, im.csem, fm.mt).\n"
+         "Pass -options_file <file.txt> for the usual params input.\n",
+         progname, progname);
+}
+
+static int unknownKernel(const char *progname, const char *what, const char *name) {
+  fprintf(stderr, "PETGEM: unknown %s '%s' (expected fm.csem, im.csem or fm.mt)\n", what, name);
+  printUsage(progname);
+  return 2;
+}
+
+/* Removes argv[first .. first+count-1], keeping argv NULL-terminated. */
+static void removeArgs(int *argc, char **argv, int first, int count) {
+  for (int i = first; i + count <= *argc; i++) argv[i] = argv[i + count];
+  *argc -= count;
+}
+
+int main(int argc, char **argv) {
+  KernelMain run = NULL;
+
+  if (isVersionRequest(argc, argv)) return printVersion();
+  if (argc > 1 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
     printUsage(argv[0]);
     return 0;
   }
 
-  /* 1. positional subcommand: argv[1] is "fm"/"im"/"mt"/aliases. We splice it out of argv before forwarding so that the kernel
-   *     doesn't see an unrecognized first token.                       */
-  PetscInt mode = -1;
   if (argc > 1 && argv[1][0] != '-') {
-    if (parseModeArg(argv[1], &mode) != PETSC_SUCCESS) mode = -1;
-    if (mode < 0) {
-      fprintf(stderr, "PETGEM: unknown subcommand '%s' (expected 'fm', 'im' or 'mt')\n", argv[1]);
-      printUsage(argv[0]);
-      return 2;
-    }
-    /* Shift argv left by one, keeping argv[0] as program name.        */
-    for (PetscInt i = 1; i < argc - 1; i++) {
-      argv[i] = argv[i + 1];
-    }
-    argv[argc - 1] = NULL;
-    argc -= 1;
-  }
-
-  /* 2. PETSc -mode option fallback (works with options_file too). Done WITHOUT a full PetscInitialize: scan argv directly so we
-   *     can dispatch before either kernel takes over the lifecycle.   */
-  if (mode < 0) {
-    for (PetscInt i = 1; i < argc - 1; i++) {
+    run = findKernel(argv[1]);
+    if (!run) return unknownKernel(argv[0], "subcommand", argv[1]);
+    removeArgs(&argc, argv, 1, 1);
+  } else {
+    for (int i = 1; i < argc - 1; i++) {
       if (strcmp(argv[i], "-mode") == 0) {
-        if (parseModeArg(argv[i + 1], &mode) != PETSC_SUCCESS) mode = -1;
-        if (mode < 0) {
-          fprintf(stderr, "PETGEM: -mode value '%s' is invalid (expected 'fm', 'im' or 'mt')\n", argv[i + 1]);
-          return 2;
-        }
-        /* Strip "-mode <value>" from argv so the kernel doesn't see it. Both kernels' options-file readers tolerate unknown options
-         * (PETSc warns rather than errors), but stripping keeps the downstream log clean.                                       */
-        for (PetscInt j = i; j < argc - 2; j++) {
-          argv[j] = argv[j + 2];
-        }
-        argv[argc - 2] = NULL;
-        argv[argc - 1] = NULL;
-        argc -= 2;
+        run = findKernel(argv[i + 1]);
+        if (!run) return unknownKernel(argv[0], "-mode value", argv[i + 1]);
+        removeArgs(&argc, argv, i, 2);
         break;
       }
     }
   }
 
-  if (mode < 0) {
-    fprintf(stderr, "PETGEM: no mode specified.\n");
+  if (!run) {
+    fprintf(stderr, "PETGEM: no kernel specified.\n");
     printUsage(argv[0]);
     return 2;
   }
-
-  switch (mode) {
-    case 0:  return runForward(argc, argv);
-    case 1:  return runInverse(argc, argv);
-    default: return runMtForward(argc, argv);
-  }
+  return run(argc, argv);
 }

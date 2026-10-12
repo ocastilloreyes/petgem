@@ -51,7 +51,8 @@ RUN apt-get update && \
         texlive-latex-extra \
         texlive-fonts-recommended \
         dvipng \
-        cm-super && \
+        cm-super \
+        libxft2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -214,23 +215,9 @@ RUN git clone -b 5.0.3 \
 # ---------------------------
 # Cleanup
 # ---------------------------
+# PETGEM itself is mounted at run time.
 RUN rm -rf /workspace/*
 
-# ---------------------------
-# PETGEM Python layer
-# ---------------------------
 WORKDIR /workspace
-
-COPY . /workspace
-
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install -e .
-
-
-# ----------------------------
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    libxft2
-
 
 CMD ["bash"]

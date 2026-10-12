@@ -40,7 +40,7 @@ PetscErrorCode printFooter(void);
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode createDirectory(const char* path);
+PetscErrorCode createDirectory(const char *path);
 
 /**
  * @brief Prints the "Timers" section: per-stage time (hh:mm:ss.sss) and
@@ -56,30 +56,6 @@ PetscErrorCode createDirectory(const char* path);
 PetscErrorCode printTimers(const char *const labels[], const PetscLogDouble times[], PetscInt n);
 
 /**
- * @brief Parses the dispatcher mode argument into a numeric code.
- *
- * Accepts the synonyms "modeling"/"forward"/"fm" (mode 0),
- * "inverse"/"im" (mode 1) and "mt" (mode 2); anything else yields
- * mode -1 (unknown).
- *
- * @param[in]  s     Mode string from argv (must be non-NULL).
- * @param[out] mode  Receives the numeric mode code (0, 1, 2, or -1).
- *
- * @return PetscErrorCode PETSC_SUCCESS, or PETSC_ERR_ARG_NULL when `s` is NULL.
- */
-PetscErrorCode parseModeArg(const char *s, PetscInt *mode);
-
-/**
- * @brief Prints a one-screen CLI usage summary for the `petgem` dispatcher.
- *
- * @param[in] progname  Executable basename (typically argv[0]).
- *
- * @return PetscErrorCode PETSC_SUCCESS on success,
- *         or a PETSc error code otherwise.
- */
-PetscErrorCode printUsage(const char *progname);
-
-/**
  * @brief Formats an integer with space-grouped thousands for readable logs.
  *
  * Renders `value` with a space every three digits (e.g. 3738963 -> "3 738 963")
@@ -92,11 +68,10 @@ PetscErrorCode printUsage(const char *progname);
  */
 const char *formatGroupedInt(PetscInt value);
 
-
 /**
  * @brief Formats a real for logs, keeping it visibly a real.
  *
- * Renders `value` with %g-like significant-digit behaviour, then guarantees the
+ * Renders `value` with %g-like significant-digit behavior, then guarantees the
  * result still reads as floating point: a whole value gains a ".0" (1 -> "1.0",
  * -4000 -> "-4000.0") so it cannot be mistaken for a count, while values that
  * already carry a fractional part or an exponent are left as they are ("2.1",
@@ -114,7 +89,6 @@ const char *formatGroupedInt(PetscInt value);
  */
 const char *formatReal(PetscReal value);
 
-
 /**
  * @brief Prints a section header in the PETGEM run-report layout.
  *
@@ -131,7 +105,6 @@ const char *formatReal(PetscReal value);
  *         or a PETSc error code otherwise.
  */
 PetscErrorCode logSection(MPI_Comm comm, const char *title);
-
 
 /**
  * @brief Formats a real with "%.6g" (whole values print without a point).
@@ -159,8 +132,7 @@ const char *formatCompactReal(PetscReal value);
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode logKVStr(MPI_Comm comm, const char *key, const char *val);
-
+PetscErrorCode logKvStr(MPI_Comm comm, const char *key, const char *val);
 
 /**
  * @brief Prints an integer key-value line in the PETGEM run-report layout.
@@ -179,8 +151,7 @@ PetscErrorCode logKVStr(MPI_Comm comm, const char *key, const char *val);
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val);
-
+PetscErrorCode logKvInt(MPI_Comm comm, const char *key, PetscInt val);
 
 /**
  * @brief Prints a real-valued key-value line in the PETGEM run-report layout.
@@ -189,8 +160,8 @@ PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val);
  *
  *     "   %-24s = <value>\n"
  *
- * where the value is printed using %g. Only rank 0 of the communicator
- * produces output.
+ * where the value is printed with formatReal(). Only rank 0 of the
+ * communicator produces output.
  *
  * @param[in] comm  Communicator to print on (rank 0 emits).
  * @param[in] key   Left-hand label (padded to 24 columns).
@@ -199,8 +170,7 @@ PetscErrorCode logKVInt(MPI_Comm comm, const char *key, PetscInt val);
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode logKVReal(MPI_Comm comm, const char *key, PetscReal val);
-
+PetscErrorCode logKvReal(MPI_Comm comm, const char *key, PetscReal val);
 
 /**
  * @brief Prints a printf-formatted key-value line in the PETGEM run-report
@@ -221,25 +191,6 @@ PetscErrorCode logKVReal(MPI_Comm comm, const char *key, PetscReal val);
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode logKVf(MPI_Comm comm, const char *key, const char *valfmt, ...);
+PetscErrorCode logKvf(MPI_Comm comm, const char *key, const char *valfmt, ...);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#endif
+#endif /* COMMON_H */

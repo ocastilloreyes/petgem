@@ -20,15 +20,24 @@ BreakBeforeBraces: Attach
 PenaltyBreakBeforeFirstCallParameter: 1
 
 # Pointer & reference style
-PointerAlignment: Left
+PointerAlignment: Right
 
 # Keep readable blocks
 AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: false
-AllowShortLoopsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+
+# Alignment
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveMacros: Consecutive
+
+# Includes keep their hand-made grouping
+SortIncludes: Never
 
 # Comments
 AlignTrailingComments: true
+ReflowComments: false
 
 # Function separation
 SeparateDefinitionBlocks: Always

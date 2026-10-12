@@ -17,6 +17,9 @@
 #include "constants.h"
 #include "grid.h"
 #include "io.h"
+
+/** @brief simulation_type tag of fm.mt products. */
+#define PETGEM_SIM_MT "fm.mt"
 #include <petsc.h>
 
 /**
@@ -74,21 +77,21 @@ typedef struct {
 /**
  * @brief Reads the MT options -mt_1d_refine and -mt_1d_equation.
  *
- * @param[out] mt  MT options.
+ * @param[out] mtParams  MT options.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode readMtParams(MtParams *mt);
+PetscErrorCode readMtParams(MtParams *mtParams);
 
 /**
  * @brief Reads the MT frequency from the bundle's /mt/freq dataset.
  *
  * @param[in]     params  Parameters (input file).
- * @param[in,out] mt      MT options; frequency is set.
+ * @param[in,out] mtParams      MT options; frequency is set.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode loadMtSettings(const petgemParams *params, MtParams *mt);
+PetscErrorCode loadMtSettings(const PetgemParams *params, MtParams *mtParams);
 
 /**
  * @brief Assigns each boundary face to a box face Gamma_1..Gamma_6.
@@ -129,13 +132,12 @@ PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, c
  * every rank.
  *
  * @param[in]  profile  Layered conductivity.
- * @param[in]  mt       MT options (refine1D, equation1D).
- * @param[in]  omega    Angular frequency.
+ * @param[in]  mtParams       MT options (frequency, refine1D, equation1D).
  * @param[out] field    Nodal H(z).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mt, const PetscReal omega, Mt1DField *field);
+PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mtParams, Mt1DField *field);
 
 /**
  * @brief Evaluates H(z) by linear interpolation; z is clamped to [z_min, z_max].
@@ -157,8 +159,7 @@ PetscErrorCode evalMt1DField(const Mt1DField *field, const PetscReal z, PetscSca
  * column 1 (y-polarization). Gamma_6 is skipped (H(z_min) = 0). Requires a
  * grid set up with PETGEM_BC_NATURAL.
  *
- * @param[in]  params  Parameters (order).
- * @param[in]  omega   Angular frequency.
+ * @param[in]  frequency  Frequency (Hz).
  * @param[in]  dm      DMPlex mesh and H(curl) discretization.
  * @param[in]  grid    Finite-element grid descriptor.
  * @param[in]  faces   Local boundary faces (getBoundaryFaces).
@@ -168,21 +169,21 @@ PetscErrorCode evalMt1DField(const Mt1DField *field, const PetscReal z, PetscSca
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode assembleMtBoundaryRHS(const petgemParams params, const PetscReal omega, const DM dm, const Grid grid,
-                                     IS faces, const MtBoxFace *tags, const Mt1DField *field, Mat *B);
+PetscErrorCode assembleMtBoundaryRhs(const PetscReal frequency, const DM dm, const Grid *grid, IS faces, const MtBoxFace *tags,
+                                     const Mt1DField *field, Mat *B);
 
 /**
  * @brief Prints the "MT" section of the run report.
  *
  * @param[in] comm      Communicator.
- * @param[in] mt        MT options.
+ * @param[in] mtParams        MT options.
  * @param[in] faces     Local boundary faces.
  * @param[in] profile   Layered conductivity of the lateral faces.
  * @param[in] field     Nodal H(z).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mt, IS faces, const Mt1DProfile *profile, const Mt1DField *field);
+PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mtParams, IS faces, const Mt1DProfile *profile, const Mt1DField *field);
 
 /**
  * @brief Computes the MT responses at the receivers and writes them to HDF5.
@@ -199,8 +200,8 @@ PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mt, IS faces, const Mt1
  *   /phase                     xx, xy, yx, yy
  *   /tipper                    x, y
  *
- * @param[in] params     Parameters (order, output paths).
- * @param[in] mt         MT options (frequency).
+ * @param[in] params     Parameters (output paths).
+ * @param[in] mtParams         MT options (frequency).
  * @param[in] dm         DMPlex mesh and H(curl) discretization.
  * @param[in] grid       Finite-element grid descriptor.
  * @param[in] receivers  Serial Vec of 3·N_recv receiver coordinates.
@@ -208,8 +209,8 @@ PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mt, IS faces, const Mt1
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode computeMtResponses(const petgemParams params, const MtParams *mt, const DM dm, const Grid grid,
-                                  Vec receivers, const Mat X);
+PetscErrorCode computeMtResponses(const PetgemParams *params, const MtParams *mtParams, const DM dm, const Grid *grid, Vec receivers,
+                                  const Mat X);
 
 /**
  * @brief Frees an Mt1DProfile.

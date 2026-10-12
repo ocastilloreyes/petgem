@@ -32,19 +32,24 @@ explicit error if ``PETSC_DIR`` does not point at a PETSc installation.
 
 Docker
 ------
-The image in ``docker/`` provides PETSc (complex scalars), Gmsh, Extrae, and
-the Python stack:
+``docker/dockerfile.develop`` builds the development image: PETSc (complex
+scalars), Gmsh, Extrae, and the Python stack. The repository is mounted, not
+copied:
 
 .. code-block:: bash
 
    git clone https://github.com/ocastilloreyes/petgem.git
    cd petgem
 
-   docker build -t petgem-env -f docker/dockerfile.release .
-   docker run --rm -it -v $(pwd):/workspace -w /workspace petgem-env bash
+   docker build -t petgem-env -f docker/dockerfile.develop .
+   docker run --rm -it -u $(id -u):$(id -g) -v $(pwd):/workspace -w /workspace petgem-env bash
 
    # inside the container
    make
+
+``docker/dockerfile.release`` builds a runtime image on top of the development
+one, with the four binaries in ``/opt/petgem/bin`` and the Python layer in
+``/opt/petgem/utils``.
 
 See :doc:`quickstart` for a first run.
 
@@ -101,12 +106,12 @@ Set as ``make <target> OPTION=1``:
 
 Python helpers
 --------------
-The scripts under ``utils/`` run directly from a clone - ``utils/preprocess.py``
-adds the in-tree package to ``sys.path`` itself, so no install step is required:
+The scripts under ``utils/`` run directly from a clone and always use the code
+next to them, so no install step is required:
 
 .. code-block:: bash
 
-   python3 utils/preprocess.py -mode fm ...
+   python3 utils/preprocess.py -mode fm.csem ...
 
 To import the package as ``petgem`` from your own scripts:
 

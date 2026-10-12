@@ -15,9 +15,7 @@
 #include <petsc.h>
 
 /* topShift moves vertex (1, 1, faces[2]) of the top face by topShift in z. */
-static void create_box_mesh(const PetscInt faces[3], const PetscReal lower[3], const PetscReal upper[3],
-                            PetscReal topShift, DM *dm)
-{
+static void create_box_mesh(const PetscInt faces[3], const PetscReal lower[3], const PetscReal upper[3], PetscReal topShift, DM *dm) {
   DM          dmDist = NULL;
   PetscMPIInt rank;
   PetscInt    numCells = 0, numVertices = 0, *cells = NULL;
@@ -25,17 +23,17 @@ static void create_box_mesh(const PetscInt faces[3], const PetscReal lower[3], c
 
   PetscCallMPIAbort(PETSC_COMM_WORLD, MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
   if (rank == 0) {
-    const PetscInt nx = faces[0], ny = faces[1], nz = faces[2];
-    const PetscInt perm[6][3] = {{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}};
-    const PetscBool odd[6]    = {PETSC_FALSE, PETSC_TRUE, PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, PETSC_TRUE};
-    numVertices = (nx + 1) * (ny + 1) * (nz + 1);
-    numCells    = 6 * nx * ny * nz;
+    const PetscInt  nx = faces[0], ny = faces[1], nz = faces[2];
+    const PetscInt  perm[6][3] = {{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}};
+    const PetscBool odd[6]     = {PETSC_FALSE, PETSC_TRUE, PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, PETSC_TRUE};
+    numVertices                = (nx + 1) * (ny + 1) * (nz + 1);
+    numCells                   = 6 * nx * ny * nz;
     PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(3 * numVertices, &coords));
     PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(4 * numCells, &cells));
     for (PetscInt k = 0; k <= nz; k++)
       for (PetscInt j = 0; j <= ny; j++)
         for (PetscInt i = 0; i <= nx; i++) {
-          const PetscInt v = (k * (ny + 1) + j) * (nx + 1) + i;
+          const PetscInt v  = (k * (ny + 1) + j) * (nx + 1) + i;
           coords[3 * v + 0] = lower[0] + (upper[0] - lower[0]) * i / nx;
           coords[3 * v + 1] = lower[1] + (upper[1] - lower[1]) * j / ny;
           coords[3 * v + 2] = lower[2] + (upper[2] - lower[2]) * k / nz;
@@ -59,7 +57,8 @@ static void create_box_mesh(const PetscInt faces[3], const PetscReal lower[3], c
             c++;
           }
   }
-  PetscCallAbort(PETSC_COMM_WORLD, DMPlexCreateFromCellListPetsc(PETSC_COMM_WORLD, 3, numCells, numVertices, 4, PETSC_TRUE, cells, 3, coords, dm));
+  PetscCallAbort(PETSC_COMM_WORLD,
+                 DMPlexCreateFromCellListPetsc(PETSC_COMM_WORLD, 3, numCells, numVertices, 4, PETSC_TRUE, cells, 3, coords, dm));
   PetscCallAbort(PETSC_COMM_WORLD, PetscFree(cells));
   PetscCallAbort(PETSC_COMM_WORLD, PetscFree(coords));
   PetscCallAbort(PETSC_COMM_WORLD, DMPlexDistribute(*dm, 0, NULL, &dmDist));
@@ -70,8 +69,7 @@ static void create_box_mesh(const PetscInt faces[3], const PetscReal lower[3], c
 }
 
 /* Per-cell conductivity Vec laid out as loadModelInputs builds it; sigmaAt(centroid) gives the three components. */
-static void create_cell_conductivity(DM dm, PetscReal (*sigmaAt)(const PetscReal centroid[3]), Vec *sigma)
-{
+static void create_cell_conductivity(DM dm, PetscReal (*sigmaAt)(const PetscReal centroid[3]), Vec *sigma) {
   DM           dmS;
   PetscSection sec;
   PetscInt     pStart, pEnd, cStart, cEnd;
@@ -90,15 +88,15 @@ static void create_cell_conductivity(DM dm, PetscReal (*sigmaAt)(const PetscReal
   PetscCallAbort(PETSC_COMM_WORLD, DMGetLocalSection(dmS, &sec));
   PetscCallAbort(PETSC_COMM_WORLD, VecGetArray(*sigma, &arr));
   for (PetscInt c = cStart; c < cEnd; c++) {
-    PetscBool          isDG;
+    PetscBool          isDg;
     PetscInt           n, off;
     const PetscScalar *array;
-    PetscScalar       *coords = NULL;
+    PetscScalar       *coords      = NULL;
     PetscReal          centroid[3] = {0.0, 0.0, 0.0};
-    PetscCallAbort(PETSC_COMM_WORLD, DMPlexGetCellCoordinates(dm, c, &isDG, &n, &array, &coords));
+    PetscCallAbort(PETSC_COMM_WORLD, DMPlexGetCellCoordinates(dm, c, &isDg, &n, &array, &coords));
     for (PetscInt v = 0; v < n / 3; v++)
       for (PetscInt d = 0; d < 3; d++) centroid[d] += PetscRealPart(coords[3 * v + d]) / (n / 3);
-    PetscCallAbort(PETSC_COMM_WORLD, DMPlexRestoreCellCoordinates(dm, c, &isDG, &n, &array, &coords));
+    PetscCallAbort(PETSC_COMM_WORLD, DMPlexRestoreCellCoordinates(dm, c, &isDg, &n, &array, &coords));
     PetscCallAbort(PETSC_COMM_WORLD, PetscSectionGetOffset(sec, c, &off));
     for (PetscInt d = 0; d < 3; d++) arr[off + d] = sigmaAt(centroid);
   }

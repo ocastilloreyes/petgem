@@ -4,14 +4,13 @@
  * Date: 2026-02-03
  *
  * Description:
- * Prototypes for the linear-system solver routines used by the
- * PETGEM kernels.
+ * Linear solves of the Maxwell system: KSP setup, PCBDDC with the discrete
+ * gradient, and the optional BDDC primal vertices.
  */
 
 #ifndef SOLVER_H
 #define SOLVER_H
 
-#include "io.h"
 #include <petsc.h>
 #include <petscdmplex.h>
 
@@ -19,9 +18,9 @@
  * @brief Convergence summary of a linear solve, for the run report.
  */
 typedef struct {
-  PetscInt           its;     /**< KSP iterations (last right-hand side). */
-  KSPConvergedReason reason;  /**< KSP converged reason (last right-hand side). */
-  char               solver[32];  /**< PC type, or factorization package for LU/Cholesky. */
+  PetscInt           its;        /**< KSP iterations (last right-hand side). */
+  KSPConvergedReason reason;     /**< KSP converged reason (last right-hand side). */
+  char               solver[32]; /**< PC type, or factorization package for LU/Cholesky. */
 } SolveInfo;
 
 /**
@@ -45,8 +44,8 @@ typedef struct {
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode solveMaxwellSystem(const DM dm, const Mat A, const Mat B, const Mat G,
-                                  const PetscInt order, IS primalVertices, Mat* X, SolveInfo *info);
+PetscErrorCode solveMaxwellSystem(const DM dm, const Mat A, const Mat B, const Mat G, const PetscInt order, IS primalVertices, Mat *X,
+                                  SolveInfo *info);
 
 /**
  * @brief Returns the solver name of a configured KSP: the PC type, or the
@@ -65,23 +64,38 @@ PetscErrorCode getSolverName(KSP ksp, char name[], size_t len);
  * @brief Configures `ksp`'s PC as PCBDDC with the discrete-gradient hint, if
  *        the operator is MATIS and a gradient was supplied.
  *
- * Shared helper that captures the single BDDC policy used by both the
- * forward solver (solveMaxwellSystem) and the inverse solver (setupForwardKSP):
- * when A is of type MATIS and Gbddc is non-NULL, set PC to PCBDDC and
- * register Gbddc (the high-order discrete gradient) via
- * PCBDDCSetDiscreteGradient(..., order, 0, PETSC_TRUE, PETSC_TRUE). When the
- * conditions are not met the function is a no-op so the caller's existing
- * default PC stays in place.
+ * Used by the forward solver (solveMaxwellSystem) and the inverse solver
+ * (createFrequencyKsp). When A is MATIS and G is non-NULL, sets PC to PCBDDC,
+ * registers one local field spanning all local DOFs and registers G via
+ * PCBDDCSetDiscreteGradient(). Otherwise it is a no-op and the caller's PC
+ * stays in place.
  *
- * @param[in,out] ksp   KSP whose preconditioner is configured.
- * @param[in]     A     System matrix (probed for MATIS).
- * @param[in]     G     Discrete-gradient hint (may be NULL).
- * @param[in]     order  Nédélec basis order registered with the gradient.
+ * @param[in,out] ksp             KSP whose preconditioner is configured.
+ * @param[in]     A               System matrix (probed for MATIS).
+ * @param[in]     G               Discrete gradient (may be NULL).
+ * @param[in]     order           Nédélec basis order registered with the gradient.
+ * @param[in]     primalVertices  Extra PCBDDC primal vertices in global numbering (may be NULL).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode setupBDDCFromPetgemGradient(KSP ksp, Mat A, Mat Gbddc, PetscInt order,
-                                           IS primalVertices);
+PetscErrorCode setupBddcFromPetgemGradient(KSP ksp, Mat A, Mat G, PetscInt order, IS primalVertices);
+
+/**
+ * @brief Builds the optional PCBDDC primal vertices from the options database.
+ *
+ * Off unless -petgem_bddc_primal_sigma <S/m> is given: the DOFs of the cells
+ * above that conductivity become primal. -petgem_bddc_primal_check verifies
+ * the selection against the diagonal of @p A.
+ *
+ * @param[in]  dm            DMPlex mesh carrying the H(curl) section.
+ * @param[in]  A             System matrix.
+ * @param[in]  conductivity  Per-cell conductivity Vec.
+ * @param[out] primal        Primal vertices, or NULL when the option is off.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode setupPrimalVerticesFromOptions(const DM dm, const Mat A, const Vec conductivity, IS *primal);
 
 #endif

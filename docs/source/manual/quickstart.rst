@@ -2,82 +2,43 @@
 Quickstart
 ==========
 
-This page runs a first **PETGEM** forward simulation on the ``fm``
-example: a marine CSEM benchmark with a thin resistive layer. For the concepts
-behind each step see :doc:`overview`; for the full walkthrough see
-:doc:`examples`.
+This page runs the ``examples/fm_csem_marine`` marine CSEM case and checks the result
+against its reference. You need PETSc with complex scalars, Gmsh and the
+Python packages (see :doc:`install`); the Docker image has all of them.
 
-Prerequisites
--------------
-A build environment with PETSc (complex scalars), Gmsh, and the Python helpers -
-see :doc:`install`. The provided Docker image ships all of them.
-
-Build
------
 .. code-block:: bash
 
    make
 
-This builds ``build/fm.csem``, ``build/im.csem``, ``build/fm.mt``, and ``build/petgem``.
+   # Mesh + input bundle (outputs/mesh.msh, outputs/input.h5)
+   bash examples/fm_csem_marine/scripts/build_bundles.sh 1
 
-Run the forward example
------------------------
-.. code-block:: bash
+   # Forward solve
+   (cd examples/fm_csem_marine && mpirun -n 4 ../../build/fm.csem -options_file configs/params.txt)
 
-   export MODEL_DIR=examples/fm
-   export ORDER=1
+   # Compare |Ex| with the reference
+   python3 examples/fm_csem_marine/scripts/postprocess.py -tolerance 0.03
 
-   # 1. Mesh
-   gmsh -3 ${MODEL_DIR}/geometry/mesh.geo -o ${MODEL_DIR}/outputs/mesh.msh
+``build_bundles.sh`` runs Gmsh and then ``utils/preprocess.py``; open it to see
+the preprocessing arguments. The solve writes ``outputs/responses_p1.h5``.
+``postprocess.py`` prints the NRMSD, relative L2 error and MAPE of
+:math:`|E_x|`, saves a figure in ``outputs/`` and exits with a non-zero status
+when the NRMSD is above ``-tolerance``.
 
-   # 2. Assemble the input bundle
-   #    (or wrap steps 1-2 with: bash ${MODEL_DIR}/scripts/build_bundles.sh ${ORDER})
-   python3 utils/preprocess.py \
-      -mode fm \
-      -order ${ORDER} \
-      -case_dir ${MODEL_DIR} \
-      -mesh_filename outputs/mesh.msh \
-      -source_filename survey/sources.txt \
-      -receiver_filename survey/receivers.txt \
-      -sigma_file survey/sigmas.txt \
-      -input_filename outputs/input.h5 \
-      -params_filename outputs/_pp_p${ORDER}.txt
-
-   # 3. Forward modeling (committed solver options in configs/)
-   (cd ${MODEL_DIR} && mpirun -n 4 ../../build/fm.csem \
-      -options_file configs/params.txt -order ${ORDER})
-
-   # 4. Compare against the shipped reference
-   python3 ${MODEL_DIR}/scripts/postprocess.py -tolerance 0.03
-
-Step 4 reports the NRMSD, relative L2, and MAPE of :math:`|E_x|` against
-``reference/reference.h5``, and exits non-zero if the NRMSD exceeds ``-tolerance``.
-
-Selecting the polynomial order
-------------------------------
-The order is stored in the bundle (``/order``) by the preprocess step, and can
-also be overridden at run time with ``-order``:
+The kernel's ``-order`` would override the bundle, but ``postprocess.py``
+takes the order from the bundle to name its input and figure. To run order 2,
+rebuild the bundle and change the output name, which ``configs/params.txt``
+fixes to ``responses_p1``:
 
 .. code-block:: bash
 
-   (cd ${MODEL_DIR} && mpirun -n 4 ../../build/fm.csem -options_file configs/params.txt -order 2)
-
-Because the override bypasses the bundle's value, one bundle can be reused for
-any order in ``1..6``.
-
-Using the dispatcher
---------------------
-``build/petgem`` runs the same kernel code. The forward run above is equivalent
-to:
-
-.. code-block:: bash
-
-   (cd ${MODEL_DIR} && mpirun -n 4 ../../build/petgem fm \
-      -options_file configs/params.txt -order ${ORDER})
+   bash examples/fm_csem_marine/scripts/build_bundles.sh 2
+   (cd examples/fm_csem_marine && mpirun -n 4 ../../build/fm.csem -options_file configs/params.txt \
+       -output_filename responses_p2)
+   python3 examples/fm_csem_marine/scripts/postprocess.py
 
 Next steps
 ----------
-- :doc:`overview` - the shared workflow, the input bundle, the conductivity model
-- :doc:`examples` - the shipped example cases
-- :doc:`formats` - input and output data formats
-- :doc:`solver` - solver options
+- :doc:`overview` - workflow, bundle and kernel options
+- :doc:`examples` - the forward cases in detail
+- :doc:`solver` - choosing the linear solver

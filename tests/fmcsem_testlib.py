@@ -1,8 +1,7 @@
-"""Plain helpers shared by the FM-CSEM test suite (no pytest dependency).
+"""Plain helpers shared by the test suite (no pytest dependency).
 
-Kept separate from conftest.py so both the fixtures and the individual test
-modules can import the same constants/functions (``from fmcsem_testlib import
-ORDERS, ...``). conftest.py puts this directory on sys.path.
+conftest.py puts this directory on sys.path, so fixtures and test modules
+import from here (``from fmcsem_testlib import ORDERS, ...``).
 """
 import os
 import shutil
@@ -10,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-UNIT_CUBE = REPO_ROOT / "examples" / "unit_cube"
+UNIT_CUBE = REPO_ROOT / "examples" / "fm_csem_unit_cube"
 #: Generated fm.csem input bundle (built into the case's outputs/ by preprocess).
 INPUT_BUNDLE = UNIT_CUBE / "outputs" / "input.h5"
 CSRC = REPO_ROOT / "tests" / "csrc"
@@ -34,14 +33,35 @@ HARNESS_SOURCES = {
     "test_dofs":     ["fe_nedelec.c", "fe_nodal.c"],
     "test_elements": ["fem.c", "fe_nedelec.c", "fe_nodal.c"],
     "test_boundary": ["grid.c", "common.c", "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
-    "test_mt1d":     ["mt.c", "io.c", "receiver_interp.c", "grid.c", "common.c", "constants.c",
-                      "fem.c", "fe_nedelec.c", "fe_nodal.c"],
+    "test_mt1d":     ["mt.c", "io.c", "receiver_interp.c", "assembly.c", "grid.c", "common.c",
+                      "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
     "test_mt_rhs":   ["mt.c", "io.c", "receiver_interp.c", "assembly.c", "grid.c", "common.c",
                       "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
 }
 
 #: Field components in a responses file.
 FIELD_COMPONENTS = ("Ex", "Ey", "Ez", "Hx", "Hy", "Hz")
+
+#: Direct LU (MUMPS): exact and deterministic, serially and under MPI.
+DIRECT_SOLVER = ["-dm_mat_type", "aij", "-ksp_type", "preonly", "-pc_type", "lu",
+                 "-pc_factor_mat_solver_type", "mumps", "-ksp_error_if_not_converged"]
+
+
+def find_binary(name, env_var):
+    """Path of a kernel binary: $env_var, build/<name>, ./<name> or PATH; None if absent."""
+    env = os.environ.get(env_var)
+    candidates = ([Path(env)] if env else []) + [REPO_ROOT / "build" / name, REPO_ROOT / name]
+    which = shutil.which(name)
+    if which:
+        candidates.append(Path(which))
+    return next((candidate for candidate in candidates if candidate.exists()), None)
+
+
+def run_kernel(binary, args, nprocs=None):
+    """Run a kernel binary (under mpirun when nprocs > 1) from the repo root."""
+    launch = ["mpirun", "-n", str(nprocs)] if nprocs and int(nprocs) > 1 else []
+    return subprocess.run(launch + [str(binary), *args], capture_output=True, text=True,
+                          timeout=900, cwd=str(REPO_ROOT))
 
 
 def petsc_paths():
@@ -74,7 +94,7 @@ def build_harness(name, outdir):
     lib = [f"-L{petsc_dir}/{petsc_arch}/lib",
            f"-Wl,-rpath,{petsc_dir}/{petsc_arch}/lib", "-lpetsc", "-lhdf5", "-lm"]
     cmd = [cc, "-Wall", "-O2", *inc, str(CSRC / f"{name}.c"),
-           *[str(REPO_ROOT / "src" / s) for s in HARNESS_SOURCES[name]], *lib, "-o", str(exe)]
+           *[str(REPO_ROOT / "src" / source) for source in HARNESS_SOURCES[name]], *lib, "-o", str(exe)]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         return None, proc.stderr

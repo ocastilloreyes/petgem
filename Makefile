@@ -17,6 +17,7 @@ FM_TARGET := build/fm.csem
 IM_TARGET := build/im.csem
 MT_TARGET := build/fm.mt
 PT_TARGET := build/petgem
+MMS_TARGET := build/mms
 ifeq ($(USE_EXTRAE),1)
     FM_TARGET := build/fm.csem.extrae
     IM_TARGET := build/im.csem.extrae
@@ -56,13 +57,8 @@ include ${PETSC_DIR}/lib/petsc/conf/rules
 # an Intel PETSc it's mpiicc or mpiicx).
 CC := $(PCC)
 
-# Auto-detect Intel compiler from $(PCC) so the user doesn't have to pass
-# USE_INTEL=1 manually on Intel-PETSc systems (e.g. MareNostrum 5).
-# `make USE_INTEL=0` still forces gcc-style flags if needed.
-#
-# Care: `mpicc` (gcc) contains the substring "icc"; a plain findstring
-# would false-positive.  We match (a) the *basename* starting with
-# icc/icx/icpc/icpx, or (b) the full path containing mpiicc/mpiicx.
+# Intel compiler detected from $(PCC): basename icc/icx/icpc/icpx, or
+# mpiicc/mpiicx in the path. `make USE_INTEL=0` forces gcc-style flags.
 PCC_NAME := $(notdir $(PCC))
 INTEL_DETECTED := $(filter icc% icx% icpc% icpx%,$(PCC_NAME))$(findstring mpiicc,$(PCC))$(findstring mpiicx,$(PCC))
 USE_INTEL ?= $(if $(INTEL_DETECTED),1,0)
@@ -74,8 +70,7 @@ ifeq ($(USE_INTEL), 1)
     #           -Wpedantic from PETSc's own configure-time flags; we
     #           cannot easily strip it, so we silence the warning).
     #   11074 = "Inlining inhibited by limit max-size / max-total-size"
-    #           - informational IPO remark fired on the largest TUs
-    #           (hvfem, hvfem_hierarchical, inversion).
+    #           - informational IPO remark fired on the largest TUs.
     #   11076 = "To get full report use -qopt-report=4 -qopt-report-phase ipo"
     #           - companion to 11074; harmless suggestion.
     # INTEL_DIAG is propagated to both CFLAGS and the link command.
@@ -95,8 +90,8 @@ else
                    -Wunused-but-set-variable
 endif
 
-# Final CFLAGS: base flags + optional Extrae
-CFLAGS := $(BASE_CFLAGS) $(WARN_CFLAGS) $(EXTRA_CFLAGS)
+# Final CFLAGS: base flags + optional Extrae + header dependency files
+CFLAGS := $(BASE_CFLAGS) $(WARN_CFLAGS) $(EXTRA_CFLAGS) -MMD -MP
 
 # Include directory for PETGEM headers
 I_CFLAGS := -Iinclude -I$(OBJDIR)
@@ -104,16 +99,8 @@ I_CFLAGS := -Iinclude -I$(OBJDIR)
 # -----------------------------------------------------------------------------
 # Console output styling
 # -----------------------------------------------------------------------------
-# ANSI colours for readable build output. Auto-disabled when stdout is not a
-# terminal (CI logs, pipes) or when NO_COLOR is set (https://no-color.org).
-# When disabled the C_* variables expand to empty, so messages degrade to
-# plain text with no escape sequences.
-#
-# TTY detection uses MAKE_TERMOUT (GNU Make >= 4.1), which make sets to the
-# terminal device when its OWN stdout is a TTY. A `$(shell test -t 1)` probe
-# does NOT work here: inside $(shell ...) the subshell's stdout is a pipe
-# back to make, so the test is always false even in an interactive terminal.
-# On make < 4.1 MAKE_TERMOUT is unset, so colour stays off (safe fallback).
+# ANSI colors, off when stdout is not a terminal (MAKE_TERMOUT, GNU Make >= 4.1)
+# or when NO_COLOR is set (https://no-color.org).
 ifeq ($(NO_COLOR),)
   ifneq ($(MAKE_TERMOUT),)
     _ESC    := $(shell printf '\033')
@@ -141,6 +128,7 @@ endif
 # Source files
 # -----------------------------------------------------------------------------
 SHARED_SRCS := src/common.c \
+               src/runtime.c \
                src/io.c \
                src/grid.c \
                src/assembly.c \
@@ -150,28 +138,26 @@ SHARED_SRCS := src/common.c \
                src/fe_nodal.c \
                src/solver.c \
                src/receiver_interp.c \
-               src/postprocessing.c \
-               src/mms.c
+               src/csem.c
 
-# Kernel-specific sources
-# fm_csem.c, im_csem.c and fm_mt.c expose runForward / runInverse / runMtForward; the *_main.c
-# files are 3-line wrappers providing main() for the single-purpose binaries.
-# inversion.c was split into 3 inversion-only TUs (inversion + smoother +
-# lbfgs); the I/O half lives in shared src/io.c (merged with inputs.c).
-# They share private prototypes via include/inversion_internal.h.
-INV_SRCS := src/inversion.c src/inversion_smoother.c src/lbfgs.c
+# Kernel sources. fm_csem.c, im_csem.c and fm_mt.c define runForward,
+# runInverse and runMtForward; the *_main.c files only provide main().
+INV_SRCS := src/inversion.c src/inversion_io.c src/inversion_smoother.c src/lbfgs.c
 
 FM_SRCS := src/fm_csem.c src/fm_csem_main.c $(SHARED_SRCS)
 IM_SRCS := src/im_csem.c src/im_csem_main.c $(INV_SRCS) $(SHARED_SRCS)
 MT_SRCS := src/fm_mt.c src/fm_mt_main.c src/mt.c $(SHARED_SRCS)
-# Unified petgem binary: dispatcher main + all kernel cores + inversion + MT + shared.
 PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c src/fm_mt.c src/mt.c $(INV_SRCS) $(SHARED_SRCS)
+
+# MMS verification program (tests/mms), not part of 'all'
+MMS_SRCS := tests/mms/mms.c
 
 # Object files
 FM_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(FM_SRCS))
 IM_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(IM_SRCS))
 MT_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(MT_SRCS))
 PT_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(PT_SRCS))
+MMS_OBJS := $(OBJDIR)/mms.o $(patsubst src/%.c,$(OBJDIR)/%.o,$(SHARED_SRCS))
 
 # Ordered-unique list of every object compiled in a full build, used to
 # label compiles "[i/N] [CC] file.c". $(sort) is avoided because it would
@@ -184,9 +170,7 @@ NOBJS := $(words $(ALL_OBJS))
 # -----------------------------------------------------------------------------
 # Build rules for each kernel
 # -----------------------------------------------------------------------------
-# HDF5 flags. Raw HDF5 API (H5Fopen, H5Dread, H5Tcreate, …) is called
-# from src/io.c which is linked into ALL three binaries, so fm.csem
-# also needs -lhdf5 even though only loadObservedData uses the raw API.
+# src/io.c calls the raw HDF5 API and is linked into every binary.
 HDF5_LIB := -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lhdf5
 
 # One-time configuration banner, printed before any compilation. It is an
@@ -198,21 +182,12 @@ _preamble:
 	@echo "    options    : USE_INTEL=$(USE_INTEL)  USE_EXTRAE=$(USE_EXTRAE)  V=$(V)"
 	@echo "    units      : $(NOBJS) objects -> $(words $(TARGET)) binaries"
 
-$(FM_TARGET): $(FM_OBJS) | build
-	@echo "$(C_LD)[LD]$(C_RESET) $@"
-	$(Q)$(CLINKER) $(INTEL_DIAG) $^ -o $@ $(EXTRA_LDFLAGS) $(HDF5_LIB) $(PETSC_LIB)
-
-$(IM_TARGET): $(IM_OBJS) | build
-	@echo "$(C_LD)[LD]$(C_RESET) $@"
-	$(Q)$(CLINKER) $(INTEL_DIAG) $^ -o $@ $(EXTRA_LDFLAGS) $(HDF5_LIB) $(PETSC_LIB)
-
-$(MT_TARGET): $(MT_OBJS) | build
-	@echo "$(C_LD)[LD]$(C_RESET) $@"
-	$(Q)$(CLINKER) $(INTEL_DIAG) $^ -o $@ $(EXTRA_LDFLAGS) $(HDF5_LIB) $(PETSC_LIB)
-
-# Unified binary: dispatches to runForward / runInverse / runMtForward based on
-#   ./petgem fm | im | mt  (positional)  OR  -mode <fm|im|mt>
-$(PT_TARGET): $(PT_OBJS) | build
+$(FM_TARGET): $(FM_OBJS)
+$(IM_TARGET): $(IM_OBJS)
+$(MT_TARGET): $(MT_OBJS)
+$(PT_TARGET): $(PT_OBJS)
+$(MMS_TARGET): $(MMS_OBJS)
+$(TARGET) $(MMS_TARGET): | build
 	@echo "$(C_LD)[LD]$(C_RESET) $@"
 	$(Q)$(CLINKER) $(INTEL_DIAG) $^ -o $@ $(EXTRA_LDFLAGS) $(HDF5_LIB) $(PETSC_LIB)
 
@@ -238,12 +213,14 @@ $(foreach _o,$(ALL_OBJS),\
   $(eval __cc_ctr := $(__cc_ctr) x)\
   $(eval $(call _emit_cc_rule,$(_o),$(words $(__cc_ctr)))))
 
-# Fallback pattern rule for any object not covered above (none today, but
-# keeps the build robust if a new TU is added without regenerating). An
-# explicit rule always wins over this pattern.
-$(OBJDIR)/%.o: src/%.c | $(OBJDIR) _preamble
+$(OBJDIR)/mms.o: $(MMS_SRCS) | $(OBJDIR) _preamble
 	@echo "$(C_CC)[CC]$(C_RESET) $<"
 	$(Q)$(CC) $(CFLAGS) $(I_CFLAGS) -c $< -o $@
+
+mms: $(MMS_TARGET)                                      ## Build the MMS verification program build/mms (tests/mms)
+	@echo "$(C_LD)==>$(C_RESET) $(C_BOLD)MMS build complete$(C_RESET) -> $(MMS_TARGET)"
+
+-include $(ALL_OBJS:.o=.d) $(OBJDIR)/mms.d
 
 # Git revision shown in the run header; rewritten only when it changes.
 GIT_REV_H := $(OBJDIR)/git_rev.h
@@ -302,15 +279,15 @@ help:              ## Show this help message
         	| awk 'BEGIN {FS = ":.*?## "}; {printf "  $(C_CC)%-12s$(C_RESET) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(C_BOLD)Binaries built by 'all'$(C_RESET) (suffixed .extrae when USE_EXTRAE=1):"
-	@echo "  $(C_DIM)build/fm.csem$(C_RESET)   legacy forward kernel (single-purpose)"
-	@echo "  $(C_DIM)build/im.csem$(C_RESET)   legacy inverse kernel (single-purpose)"
-	@echo "  $(C_DIM)build/fm.mt$(C_RESET)     MT forward kernel (single-purpose)"
-	@echo "  $(C_DIM)build/petgem$(C_RESET)    unified dispatcher: ./petgem fm | im | mt"
+	@echo "  $(C_DIM)build/fm.csem$(C_RESET)   CSEM forward kernel"
+	@echo "  $(C_DIM)build/im.csem$(C_RESET)   CSEM inverse kernel"
+	@echo "  $(C_DIM)build/fm.mt$(C_RESET)     MT forward kernel"
+	@echo "  $(C_DIM)build/petgem$(C_RESET)    unified dispatcher: ./petgem fm.csem | im.csem | fm.mt"
 	@echo ""
 	@echo "$(C_BOLD)Build options$(C_RESET) (set with 'make <target> OPTION=1'):"
 	@echo "  USE_INTEL=1     force Intel MPI compiler flags (auto-detected from \$$(PCC))"
 	@echo "  USE_EXTRAE=1    build with Extrae instrumentation"
-	@echo "  NO_COLOR=1      disable coloured output"
+	@echo "  NO_COLOR=1      disable colored output"
 	@echo ""
 	@echo "$(C_BOLD)Documentation$(C_RESET):  make docs    (output: $(SPHINX_OUT)/index.html)"
 
@@ -318,4 +295,4 @@ help:              ## Show this help message
 # Phony targets - these never correspond to files, so always run regardless
 # of any same-named file in the tree.
 # -----------------------------------------------------------------------------
-.PHONY: all _preamble clean help docs docs_prep sphinx_html clean_doc
+.PHONY: all mms _preamble clean help docs docs_prep sphinx_html clean_doc

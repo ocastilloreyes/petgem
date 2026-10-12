@@ -1,104 +1,72 @@
-import glob
-import os
+"""Write the Sphinx/Breathe pages of the C API reference, plus an index.
+
+Public headers in include/ are grouped into the pages listed in PAGES.
+Private headers (*_internal.h) are skipped. A public header missing from
+PAGES is an error, so a new module must be placed in a page.
+
+Output: docs/source/api/<page>.rst and docs/source/api/index.rst.
+"""
 from pathlib import Path
 
-# Repo root derived from this file's location: scripts/auto_doc/<this>.
-# parents[2] == repo root. Robust to the caller's CWD, so we no longer
-# need to chdir or carry fragile '../../' relative paths.
 REPO_ROOT = Path(__file__).resolve().parents[2]
+HEADER_DIR = REPO_ROOT / "include"
+API_RST_DIR = REPO_ROOT / "docs" / "source" / "api"
+DOXYGEN_PROJECT = "PETGEM"
 
-# --- Configuration ---
-# C public-API headers live in include/, NOT src/ (src/ holds only .c
-# translation units). Globbing src/ here was the cause of the persistent
-# "No API modules generated yet" placeholder on Read the Docs: zero .h
-# files were found, so STEP 2 emitted the placeholder on every build.
-SOURCE_CODE_DIR = REPO_ROOT / 'include'        # C public-API header files
-API_RST_DIR = REPO_ROOT / 'docs' / 'source' / 'api'  # Output .rst directory
-PROJECT_NAME_DOXYGEN = "PETGEM"        # Doxygen project name
-CREATE_API_INDEX = True                 # Whether to create a master index.rst
-API_INDEX_FILENAME = 'index.rst'        # Filename for the API index.rst
-# Headers excluded from the PUBLIC API reference. *_internal.h are private
-# cross-TU headers ("Not intended for inclusion outside src/..."), so they
-# don't belong in the user-facing API docs.
-EXCLUDE_SUFFIXES = ('_internal.h',)
-# --- End Configuration ---
-
-
-def create_api_rst_files():
-    if not os.path.exists(API_RST_DIR):
-        os.makedirs(API_RST_DIR)
-        print(f"Directory created: {API_RST_DIR}")
-
-    # --- STEP 1: Process header files (.h), skipping private internals ---
-    header_files = sorted(glob.glob(os.path.join(str(SOURCE_CODE_DIR), '*.h')))
-    header_files = [h for h in header_files
-                    if not os.path.basename(h).endswith(EXCLUDE_SUFFIXES)]
-    generated_rst_basenames = []
-
-    for header_path in header_files:
-        h_filename = os.path.basename(header_path)
-        base_name = os.path.splitext(h_filename)[0]
-        rst_filename = f"{base_name}.rst"
-        rst_filepath = os.path.join(str(API_RST_DIR), rst_filename)
-
-        ref_label = f".. _api-{base_name}:\n\n"
-        title_text = f"{base_name.capitalize()} module ({h_filename})"
-        title_underline = "=" * len(title_text) + "\n\n"
-        title = f"{title_text}\n{title_underline}"
-
-        # Doxygen directive points to the header file (clean for Breathe)
-        doxygen_directive = f".. doxygenfile:: {h_filename}\n"
-        doxygen_directive += f"   :project: {PROJECT_NAME_DOXYGEN}\n"
-
-        rst_content = f"{ref_label}{title}{doxygen_directive}"
-
-        with open(rst_filepath, 'w') as f:
-            f.write(rst_content)
-        print(f"Generated: {rst_filepath}")
-        generated_rst_basenames.append(base_name)
-
-    # --- STEP 2: Fail loudly if no headers found ---
-    # A missing-headers situation is almost always a misconfiguration
-    # (wrong SOURCE_CODE_DIR, headers moved) rather than a legitimate
-    # "no API yet" state.  Emitting a silent placeholder + exit 0 is what
-    # let the src/-vs-include/ path bug hide for so long - the docs build
-    # "succeeded" with an empty API reference.  Raise instead so both
-    # `make docs` and the Read the Docs build fail visibly.
-    if not generated_rst_basenames:
-        raise SystemExit(
-            f"ERROR: api_rst_generator found no .h files under "
-            f"'{SOURCE_CODE_DIR}' (resolved from {os.getcwd()}).\n"
-            f"       The C public-API headers live in include/. Check "
-            f"SOURCE_CODE_DIR if this path is wrong.\n"
-            f"       Refusing to emit a 'No API modules generated yet' "
-            f"placeholder."
-        )
-
-    # --- STEP 3: Always create master API index ---
-    if CREATE_API_INDEX:
-        create_master_api_index(generated_rst_basenames)
+# (page, title, description, headers)
+PAGES = [
+    ("kernels", "Kernels and runtime",
+     "Kernel entry points and the run scaffolding they share.",
+     ["kernels.h", "runtime.h"]),
+    ("io", "Input, output and common utilities",
+     "Common parameters, bundle loading, output paths and provenance, report "
+     "printing, constants and version.",
+     ["io.h", "common.h", "constants.h", "version.h"]),
+    ("discretization", "Discretization",
+     "Nédélec and nodal bases, DMPlex grid setup, element matrices and "
+     "quadrature.",
+     ["fe_nedelec.h", "fe_nodal.h", "grid.h", "fem.h"]),
+    ("numerics", "Assembly, solver and receivers",
+     "Global operator and discrete gradient, linear solve and BDDC setup, "
+     "interpolation at the receivers.",
+     ["assembly.h", "solver.h", "receiver_interp.h"]),
+    ("physics", "CSEM and MT",
+     "Transmitters and dipole sources (CSEM); 1D boundary field, boundary "
+     "right-hand side and transfer functions (MT).",
+     ["csem.h", "mt.h"]),
+    ("inversion", "Inversion",
+     "im.csem parameters, objective and gradient, and the L-BFGS optimizer.",
+     ["inversion.h", "lbfgs.h"]),
+]
 
 
-def create_master_api_index(rst_basenames):
-    index_filepath = os.path.join(API_RST_DIR, API_INDEX_FILENAME)
-    if not os.path.exists(API_RST_DIR):
-        os.makedirs(API_RST_DIR)
+def main():
+    headers = {h.name for h in HEADER_DIR.glob("*.h") if not h.name.endswith("_internal.h")}
+    if not headers:
+        raise SystemExit(f"ERROR: no public headers found in {HEADER_DIR}")
+    listed = {h for _, _, _, hs in PAGES for h in hs}
+    if headers - listed:
+        raise SystemExit(f"ERROR: headers not assigned to an API page: {sorted(headers - listed)}")
+    if listed - headers:
+        raise SystemExit(f"ERROR: API pages list missing headers: {sorted(listed - headers)}")
 
-    title = "API Reference\n"
-    title += "=============\n\n"
-    toctree_content = ".. toctree::\n"
-    toctree_content += "   :maxdepth: 1\n"
-    toctree_content += "   :caption: Modules:\n\n"
+    API_RST_DIR.mkdir(parents=True, exist_ok=True)
+    for page, title, description, hs in PAGES:
+        text = f".. _api-{page}:\n\n{title}\n{'=' * len(title)}\n\n{description}\n\n"
+        for h in hs:
+            text += (f"``{h}``\n{'-' * (len(h) + 4)}\n\n"
+                     f".. doxygenfile:: {h}\n   :project: {DOXYGEN_PROJECT}\n\n")
+        out = API_RST_DIR / f"{page}.rst"
+        out.write_text(text)
+        print(f"Generated: {out}")
 
-    for basename in sorted(rst_basenames):
-        toctree_content += f"   {basename}\n"
-
-    with open(index_filepath, 'w') as f:
-        f.write(title + toctree_content)
-    print(f"Generated/Updated API index: {index_filepath}")
+    index = API_RST_DIR / "index.rst"
+    index.write_text("C API reference\n===============\n\n"
+                     "Generated from the Doxygen comments of the public headers in ``include/``.\n\n"
+                     ".. toctree::\n   :maxdepth: 1\n\n"
+                     + "".join(f"   {page}\n" for page, *_ in PAGES))
+    print(f"Generated: {index}")
 
 
 if __name__ == "__main__":
-    # All paths are absolute (derived from REPO_ROOT), so no chdir needed -
-    # the script works regardless of the caller's working directory.
-    create_api_rst_files()
+    main()

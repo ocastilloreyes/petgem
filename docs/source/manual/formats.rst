@@ -19,7 +19,7 @@ order. See :doc:`meshing`. ``#`` comments and blank lines are allowed.
 
    # sigma_x sigma_y sigma_z [fixed]
    0.1 0.1 0.1 1     # material 0 - held fixed during inversion (e.g. air)
-   1.0 1.0 1.0 0     # material 1 - invertable
+   1.0 1.0 1.0 0     # material 1 - invertible
    2.0 2.0 2.0       # material 2 - 'fixed' column omitted -> defaults to 0
 
 - ``sigma_x sigma_y sigma_z`` - the diagonal conductivity (S/m). Use equal
@@ -137,17 +137,14 @@ and MT runs ``/mt``.
      - mt
      - Frequency (length-1 Vec)
 
-``petgem.readBundle(path)`` returns a dict with ``receivers`` (``[N_recv, 3]``),
-``order``, ``frequency`` (that of the first transmitter), and ``sources``
-(``[N_src, 8]``: ``freq x y z current length dipAngle azimuthAngle``). The
-DMPlex mesh and ``model_data`` stay in the file and are consumed by the C
-kernel.
+``petgem.readBundle(path)`` reads a CSEM bundle and returns ``receivers``
+(``[N_recv, 3]``), ``order``, ``frequency`` (of the first transmitter) and
+``sources`` (``[N_src, 8]``).
 
 Output files
 ------------
-Every kernel writes ``{output_dir}/{output_filename}.h5``. The **root
-provenance block is identical** in all of them, written by one shared routine,
-so any PETGEM product can be traced back to the run that made it:
+Every kernel writes ``{output_dir}/{output_filename}.h5``, with the same
+provenance attributes on the root group:
 
 .. list-table::
    :header-rows: 1
@@ -158,29 +155,23 @@ so any PETGEM product can be traced back to the run that made it:
    * - ``petgem_version``
      - Version of the code that produced the file
    * - ``simulation_type``
-     - ``fm`` (``fm.csem``), ``im`` (``im.csem``) or ``fm.mt`` - which kernel
-       wrote it
+     - ``fm.csem``, ``im.csem`` or ``fm.mt`` - which kernel wrote it
    * - ``input_filename``
      - Path of the input bundle (which carries the mesh, model, and geometry)
    * - ``order``
      - Polynomial order actually used
    * - ``ksp_type`` / ``pc_type``
-     - Solver and preconditioner, as resolved from the options database
-       (``default`` when unset), so the file records the configuration the run
-       really used - including command-line overrides
+     - Solver and preconditioner from the options database, including
+       command-line overrides (``default`` when unset)
    * - ``mpi_tasks``
      - Number of MPI ranks
    * - ``date``
      - Execution timestamp
 
-Each kernel then adds its own product-specific attributes.
+Each kernel adds its own attributes, listed below.
 
 Forward responses (``fm.csem``)
 *******************************
-All six field components at the receivers, for every transmitter. The output
-Vecs are parallel on the kernel communicator, so writes are collective when
-PETSc is linked against a parallel HDF5 build.
-
 Layout::
 
     /                              root attrs (shared provenance block above)
@@ -200,6 +191,10 @@ frequency).
 Per-source attributes (``/sources/src{k}``, ``k`` 1-based): ``frequency``,
 ``x_pos``, ``y_pos``, ``z_pos``, ``current``, ``length``, ``dip_angle``,
 ``azimuth_angle``.
+
+``petgem.readResponses(path, source=k)`` returns the six fields of transmitter
+``k`` with its attributes; ``petgem.readAllResponses(path)`` returns all of
+them (see :doc:`python_api`).
 
 MT responses (``fm.mt``)
 ************************
@@ -226,8 +221,6 @@ half-space gives ``phi_xy = 135``, ``phi_yx = -45``); see :doc:`method`.
 
 Inversion results (``im.csem``)
 *******************************
-The recovered model and the convergence history.
-
 Layout::
 
     /                              root attrs (shared provenance block above)
@@ -238,42 +231,19 @@ Layout::
 Additional root attributes: ``num_frequencies``, ``lambda``, ``error_level``,
 ``num_iterations``, ``num_objgrad_evaluations``, ``convergence_reason``.
 
-The two counters are different and must not be substituted for one another:
-``num_iterations`` counts **accepted L-BFGS steps** (the rows of the optimizer
-table), while ``num_objgrad_evaluations`` counts **objective-gradient
-evaluations** and is the length of ``/rms_history``. The second exceeds the
-first by the line-search trials that were rejected, which is also why
-``/rms_history`` is not monotone. Files written before
-``num_objgrad_evaluations`` was added stored the evaluation count in
-``num_iterations``.
+``num_iterations`` counts accepted L-BFGS steps. ``num_objgrad_evaluations``
+counts objective-gradient evaluations and is the length of ``/rms_history``;
+it is larger because it includes rejected line-search trials, so
+``/rms_history`` is not monotone.
 
-With ``-im_snapshot_interval`` enabled, the kernel also writes a ParaView
-snapshot of the model every N accepted L-BFGS steps, into a ``snapshots``
-directory under the output directory. The last accepted step is always written;
-if no step is accepted, ``iter0000`` holds the initial model::
+With ``-im_snapshot_interval N`` the kernel also writes the model every N
+accepted steps, and the last accepted step, to ``snapshots/`` under the output
+directory. If no step is accepted, ``iter0000`` holds the initial model::
 
-    {output_dir}/snapshots/iter0001.pvtu       (master)
+    {output_dir}/snapshots/iter0001.pvtu       (open this in ParaView)
     {output_dir}/snapshots/iter0001_r0000.vtu  (one piece per rank)
 
-The directory carries the grouping so the file names carry only what varies,
-iteration and rank. This matters at volume: one snapshot per step on many ranks
-emits thousands of pieces (103 steps on 112 ranks is roughly 11 600 files), and
-keeping them out of ``{output_dir}`` leaves the actual results visible. Open the
-``.pvtu`` in ParaView; it references its pieces relatively, so the directory
-moves as a unit.
-
-The name is fixed rather than derived from ``-output_filename``, so two runs
-sharing one ``-output_dir`` share the directory and the later one overwrites
-matching iterations. Give concurrent runs distinct output directories.
-
-Each snapshot carries a single cell field, ``rho`` (resistivity in Ohm.m).
-
-Python readers:
-
-- ``petgem.readResponses(path, source=1)`` - the per-source dict (``Ex``…``Hz``
-  arrays, plus ``source`` and ``provenance`` attribute dicts).
-- ``petgem.readAllResponses(path)`` - ``{'provenance': ..., 'num_sources': N,
-  'sources': {1: {...}, ...}}``, each entry shaped like ``readResponses``.
-
-``examples/fm/scripts/postprocess.py`` uses these readers to compare
-against a reference.
+Each snapshot has one cell field, ``rho`` (resistivity in Ohm.m). The
+directory name is fixed, so runs that share an output directory overwrite each
+other's snapshots. A run on fewer ranks than a previous one leaves the extra
+pieces of the old run in place; clear the directory between runs.

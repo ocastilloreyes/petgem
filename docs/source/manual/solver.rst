@@ -2,16 +2,16 @@
 Solver options
 ==============
 
-**PETGEM** assembles a complex-symmetric linear system (see :doc:`method`) and
-solves it with PETSc. Any PETSc ``KSP``/``PC`` option can be set in the
-parameter file or on the command line; this page describes the defaults the
-preprocess emits and the preconditioner **PETGEM** configures itself.
+The kernels solve a complex-symmetric system (see :doc:`method`) with PETSc,
+so any ``KSP``/``PC`` option can go in the parameter file or on the command
+line. ``fm.csem`` and ``fm.mt`` solve all their right-hand sides in one call
+(transmitters, or the two MT polarizations). ``im.csem`` reuses one solver for
+the forward and adjoint solves of each frequency.
 
-Forward default: BDDC
----------------------
-The parameter file emitted by ``utils/preprocess.py -mode fm`` selects
-FGMRES with the **BDDC** preconditioner (deluxe scaling, LU coarse solve), on a
-``MATIS`` operator:
+BDDC (iterative)
+----------------
+The parameter files written for ``fm.csem`` and ``im.csem`` use FGMRES with
+BDDC:
 
 .. code-block::
 
@@ -20,56 +20,64 @@ FGMRES with the **BDDC** preconditioner (deluxe scaling, LU coarse solve), on a
    -pc_type bddc
    -pc_bddc_use_deluxe_scaling 1
    -pc_bddc_coarse_pc_type lu
+   -pc_bddc_monolithic
 
-BDDC requires ``-dm_mat_type is``: **PETGEM** configures ``PCBDDC`` only when the
-operator is of type ``MATIS``. In that case it registers the **discrete gradient
-matrix** :math:`G` assembled alongside the operator, via
-``PCBDDCSetDiscreteGradient(pc, G, order, 0, PETSC_TRUE, PETSC_TRUE)``
-(``setupBDDCFromPetgemGradient`` in ``src/solver.c``). :math:`G` is built at the
-**same polynomial order as the run**, so the coarse space captures the
-curl-kernel of the Nédélec space at that order. With a non-``MATIS`` matrix
-type, the ``PCBDDC`` setup is skipped and PETSc's option handling applies as
-usual.
+``im.csem`` adds ``-ksp_rtol 1.0e-10``, because the adjoint solution enters the
+gradient.
 
-Inverse default: direct solve
------------------------------
-The inverse kernel re-solves the system at every L-BFGS iteration (forward and
-adjoint, for each frequency), so ``utils/preprocess.py -mode im`` emits a
-**direct** factorization with MUMPS:
+When the operator is ``MATIS`` (``-dm_mat_type is``), **PETGEM** sets the
+preconditioner to ``PCBDDC`` and passes it the discrete gradient :math:`G` of
+the run's order (``setupBddcFromPetgemGradient`` in ``src/solver.c``). With
+any other matrix type this step is skipped, so ``-pc_type bddc`` needs
+``-dm_mat_type is``.
+
+Direct solve (MUMPS)
+--------------------
+The ``fm.mt`` parameter file uses a direct solve, and any kernel accepts the
+same block:
 
 .. code-block::
 
+   -dm_mat_type aij
    -ksp_type preonly
-   -pc_type                    lu
-   -pc_factor_mat_solver_type  mumps
-   -mat_mumps_icntl_14         80
-   -mat_mumps_icntl_28         1
+   -pc_type lu
+   -pc_factor_mat_solver_type mumps
 
-Using a direct solver
----------------------
-The solver keys can be overridden on the command line without touching the
-parameter file. To run the forward kernel with a direct solve:
+Options given later override earlier ones, so a parameter file can be
+switched on the command line or with a second options file:
 
 .. code-block:: bash
 
    mpirun -n 4 build/fm.csem -options_file params.txt \
-      -dm_mat_type aij -ksp_type preonly -pc_type lu \
-      -pc_factor_mat_solver_type mumps
+       -dm_mat_type aij -ksp_type preonly -pc_type lu -pc_factor_mat_solver_type mumps
 
-Note the ``-dm_mat_type aij``: it overrides the ``is`` in the parameter file,
-which exists only to enable BDDC. A direct solve is deterministic and
-independent of iterative convergence, which is why the test suite
-(:doc:`testing`) uses it for its reference comparisons.
+   mpirun -n 4 build/im.csem -options_file configs/params_im.txt \
+       -options_file configs/solver_mumps.txt
 
-Parallelism
------------
-The kernels are MPI-parallel:
+The inversion examples ship both blocks as ``configs/solver_bddc.txt`` and
+``configs/solver_mumps.txt``. ``im.csem`` uses ``MATIS`` when no
+``-dm_mat_type`` is given.
 
-.. code-block:: bash
+A direct solve does not depend on the number of ranks, which is why the test
+suite uses it. With BDDC the iteration count, and so the result of an
+unconverged solve, can change with the rank count and the order.
 
-   mpirun -n <ranks> build/fm.csem -options_file params.txt
+PETGEM-specific options
+-----------------------
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
 
-The receiver interpolation is written to be MPI-invariant, and the test suite
-runs the same comparisons under multiple rank counts. Note that iterative
-convergence (and hence the accuracy of an unconverged iterative solve) can
-depend on the rank count and the polynomial order; a direct solve does not.
+   * - Option
+     - Meaning
+   * - ``-petgem_bddc_primal_sigma <S/m>``
+     - ``fm.csem`` only. Add the DOFs of cells with conductivity above this
+       value to the BDDC primal space. Off by default.
+   * - ``-petgem_bddc_primal_check``
+     - With the option above, check the selected DOFs against the diagonal of
+       the operator.
+   * - ``-petgem_validate_gradient``
+     - Check the de Rham identity and the structure PCBDDC expects on the
+       assembled discrete gradient.
+   * - ``-petgem_grad_view``
+     - View the discrete gradient matrix (PETSc viewer syntax).

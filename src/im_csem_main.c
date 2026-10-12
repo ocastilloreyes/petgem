@@ -4,25 +4,11 @@
  * Date: 2026-05-20
  *
  * Description:
- * Standalone entry point for the legacy im.csem binary.
+ * Entry point of the im.csem binary; the kernel lives in src/im_csem.c.
  */
 
-/*
- * Notes:
- * The full inverse-kernel logic lives in runInverse (src/im_csem.c);
- * this wrapper exists only so the same translation unit can also be
- * linked into the unified petgem binary without symbol clashes.
- */
 #include "kernels.h"
 
-/**
- * @brief Standalone entry point for im.csem; delegates to runInverse.
- *
- * @param[in] argc  Argument count.
- * @param[in] argv  Argument vector.
- *
- * @return int the PetscErrorCode (cast to int) as the process exit status.
- */
 int main(int argc, char **argv) {
   return runInverse(argc, argv);
 }

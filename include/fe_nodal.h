@@ -35,7 +35,6 @@ PetscBool feNodalSupports(PetscInt order);
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-PetscErrorCode feNodalH1Shape(PetscInt order, const PetscReal *vertexCoords,
-                              const PetscReal X[3], PetscReal *ShapH, PetscReal **GradH);
+PetscErrorCode feNodalH1Shape(PetscInt order, const PetscReal *vertexCoords, const PetscReal X[3], PetscReal *ShapH, PetscReal **GradH);
 
 #endif

@@ -21,22 +21,21 @@ static int pt_checks   = 0;
 static int pt_failures = 0;
 
 /* Boolean invariant with a printf-style message emitted on failure. */
-#define PT_CHECK(cond, ...)                                                    \
-  do {                                                                         \
-    pt_checks++;                                                               \
-    if (!(cond)) {                                                             \
-      pt_failures++;                                                           \
-      fprintf(stderr, "  FAIL [%s:%d] ", __FILE__, __LINE__);                  \
-      fprintf(stderr, __VA_ARGS__);                                            \
-      fprintf(stderr, "\n");                                                   \
-    }                                                                          \
+#define PT_CHECK(cond, ...)                                                                                                                \
+  do {                                                                                                                                     \
+    pt_checks++;                                                                                                                           \
+    if (!(cond)) {                                                                                                                         \
+      pt_failures++;                                                                                                                       \
+      fprintf(stderr, "  FAIL [%s:%d] ", __FILE__, __LINE__);                                                                              \
+      fprintf(stderr, __VA_ARGS__);                                                                                                        \
+      fprintf(stderr, "\n");                                                                                                               \
+    }                                                                                                                                      \
   } while (0)
 
 /* |a - b| <= tol */
 #define PT_CLOSE(a, b, tol, ...) PT_CHECK(fabs((double)(a) - (double)(b)) <= (double)(tol), __VA_ARGS__)
 
-static int pt_report(const char *name)
-{
+static int pt_report(const char *name) {
   fprintf(stdout, "%s: %d checks, %d failures\n", name, pt_checks, pt_failures);
   fflush(stdout);
   return pt_failures ? 1 : 0;

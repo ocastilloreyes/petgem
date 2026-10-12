@@ -61,6 +61,7 @@ jobs:
               - '.github/workflows/ci-develop.yml'
               - '.github/workflows/tests-fm-csem.yml'
               - '.github/workflows/tests-fm-mt.yml'
+              - '.github/workflows/tests-im-csem.yml'
             docs:
               - 'docs/**'
               - 'scripts/auto_doc/**'
@@ -69,11 +70,8 @@ jobs:
               - 'src/**'
 
   # ==============================
-  # Compile fm.csem and fm.mt (forward kernels - the units under test)
+  # Compile every binary used by the test suites
   # ==============================
-  # Only the forward kernels are built. The Extrae-instrumented build, the
-  # `petgem` dispatcher and im.csem are out of scope for the forward-kernel
-  # regression CI; e2e drives build/fm.csem and build/fm.mt directly.
   compile-kernels:
     runs-on: ubuntu-latest
     needs: changes
@@ -84,12 +82,12 @@ jobs:
       - name: Pull CI image
         run: docker pull ${{ env.DOCKER_IMAGE }}
 
-      - name: Compile fm.csem and fm.mt
+      - name: Compile fm.csem, im.csem, fm.mt, petgem and the MMS program
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace -w /workspace \
             ${{ env.DOCKER_IMAGE }} \
-            bash -c "make build/fm.csem build/fm.mt"
+            bash -c "make -j2 all mms"
 
       - name: Upload kernel binaries
         uses: actions/upload-artifact@v4
@@ -97,15 +95,14 @@ jobs:
           name: kernel-binaries
           path: |
             build/fm.csem
+            build/im.csem
             build/fm.mt
+            build/mms
 
   # ==============================
   # FM-CSEM test suite (reusable)
   # ==============================
-  # Levels 1-3 (basis / DOF ordering / element matrices, ALL orders 1..6) +
-  # levels 4-5 (global assembly + basic physics on the unit cube, orders 1..3).
-  # Delegated to tests-fm-csem.yml, which reuses this run's CI image and the
-  # compiled fm.csem binary.
+  # C harnesses (all orders), levels 4-5 on the unit cube and level 6 (MMS).
   tests-fm-csem:
     needs: [changes, compile-kernels]
     if: needs.changes.outputs.fmcsem == 'true'
@@ -123,6 +120,18 @@ jobs:
     needs: [changes, compile-kernels]
     if: needs.changes.outputs.fmcsem == 'true'
     uses: ./.github/workflows/tests-fm-mt.yml
+    with:
+      docker_image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+      binary_artifact: kernel-binaries
+
+  # ==============================
+  # IM-CSEM test suite (reusable)
+  # ==============================
+  # Reduced im_csem_block inversion (tests/im) on the compiled binaries.
+  tests-im-csem:
+    needs: [changes, compile-kernels]
+    if: needs.changes.outputs.fmcsem == 'true'
+    uses: ./.github/workflows/tests-im-csem.yml
     with:
       docker_image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
       binary_artifact: kernel-binaries

@@ -4,7 +4,7 @@
  * Date: 2026-05-20
  *
  * Description:
- * Shared receiver-interpolation operator for both CSEM kernels.
+ * Shared receiver-interpolation operator (fm.csem, im.csem, fm.mt).
  */
 
 /*
@@ -49,313 +49,231 @@
  *
  * @return Non-negative global DOF offset.
  */
-static inline PetscInt decodeGlobalDOF(PetscInt rawIdx)
-{
+static inline PetscInt decodeGlobalDof(PetscInt rawIdx) {
   return (rawIdx >= 0) ? rawIdx : -(rawIdx + 1);
 }
 
-/**
- * @brief Builds the six receiver-interpolation matrices QEx..QHz.
- *
- * Q = {QEx, QEy, QEz, QHx, QHy, QHz} maps an H(curl) DOF vector to the
- * electric/magnetic field components evaluated at the receiver positions.
- * Used by both kernels (fm.csem in postprocessing.c, im.csem in inversion.c).
- * The full contract - receiver-location semantics, sign convention,
- * MPI-invariance argument, and the divide-by-(iωμ) factor for H - is
- * documented in include/receiver_interp.h.
- *
- * @param[in]  order       Nédélec basis order (dispatched via fem->ops, 1..6).
- * @param[in]  receivers  Serial Vec of 3·N_recv reals (caller-owned).
- * @param[in]  dm         H(curl) DM the solution lives on.
- * @param[in]  grid       Grid struct produced by setupNedelecGrid.
- * @param[out] Q          Output struct holding QEx..QHz.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success,
- *         or a PETSc error code otherwise.
- */
-PetscErrorCode buildReceiverInterpolationMatrices(PetscInt    order,
-                                                  Vec         receivers,
-                                                  const DM    dm,
-                                                  const Grid *grid,
-                                                  ReceiverInterpolationMatrices *Q)
-{
+/* Lowest rank that located each receiver (nprocs when none did). */
+static PetscErrorCode electReceiverOwners(MPI_Comm comm, PetscInt numReceivers, PetscInt numFound, const PetscInt *found,
+                                          const PetscSFNode *inCell, PetscInt *owner) {
   PetscFunctionBeginUser;
-
-  MPI_Comm comm = PetscObjectComm((PetscObject)dm);
-
-  /* Basis evaluation goes through evaluateNedelecBasis (see include/fem.h), which builds on the PETGEM-style reference Nedelec element covering
-   * order = 1..6. */
-  PetscCheck(order >= 1 && order <= 6, comm, PETSC_ERR_SUP, "buildReceiverInterpolationMatrices: order must be in 1..6  (got %" PetscInt_FMT ")", order);
-
-  /* `receivers` is owned by the caller (produced by loadModelInputs from the /receivers Vec inside the unified input HDF5). This routine only
-   * reads it: locates the points in the mesh and assembles the Q matrices. */
-  PetscInt globalSizeReceivers, numGlobalReceivers;
-  PetscCall(VecGetSize(receivers, &globalSizeReceivers));
-
-  PetscCheck(globalSizeReceivers % NUM_DIMENSIONS == 0, comm, PETSC_ERR_ARG_SIZ,
-             "Receiver vector size %" PetscInt_FMT " not divisible by %d", globalSizeReceivers, NUM_DIMENSIONS);
-
-  numGlobalReceivers = globalSizeReceivers / NUM_DIMENSIONS;
-  Q->numReceivers    = numGlobalReceivers;
-
-  /* Locate receivers in mesh */
-  PetscSF            receiverSF = NULL;
-  PetscInt           numFound;
-  const PetscSFNode *recvInCell;
-  const PetscInt    *recvFound;
-
-  PetscCall(DMLocatePoints(dm, receivers, DM_POINTLOCATION_REMOVE, &receiverSF));
-  PetscCall(PetscSFGetGraph(receiverSF, NULL, &numFound, &recvFound, &recvInCell));
-
- /* Receivers on partition boundaries may be located by multiple ranks. Assign ownership to the lowest-ranked locator so each receiver row 
-  * is assembled exactly once, avoiding MPI-decomposition-dependent double counting. Receivers exactly on an interface can still show 
-  * small rank-dependent differences because different adjacent cells may be selected for interpolation. */
   PetscMPIInt rank, nprocs;
+  PetscInt   *mine;
+
   PetscCallMPI(MPI_Comm_rank(comm, &rank));
   PetscCallMPI(MPI_Comm_size(comm, &nprocs));
-  PetscInt  *foundByRank, *ownerRank;
-  PetscBool *rowAssembled;
-  PetscCall(PetscMalloc3(numGlobalReceivers, &foundByRank, numGlobalReceivers, &ownerRank, numGlobalReceivers, &rowAssembled));
-  for (PetscInt r = 0; r < numGlobalReceivers; r++) { 
-    foundByRank[r] = nprocs; rowAssembled[r] = PETSC_FALSE; 
-  }
-  
+  PetscCall(PetscMalloc1(numReceivers, &mine));
+  for (PetscInt r = 0; r < numReceivers; r++) mine[r] = nprocs;
   for (PetscInt i = 0; i < numFound; i++) {
-    PetscInt ridx = recvFound ? recvFound[i] : i;
-    if (recvInCell[i].index >= 0 && ridx >= 0 && ridx < numGlobalReceivers && rank < foundByRank[ridx]) {
-      foundByRank[ridx] = rank;
+    const PetscInt r = found ? found[i] : i;
+    if (inCell[i].index >= 0 && r >= 0 && r < numReceivers) mine[r] = rank;
+  }
+  PetscCallMPI(MPI_Allreduce(mine, owner, numReceivers, MPIU_INT, MPI_MIN, comm));
+  PetscCall(PetscFree(mine));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* First local cell sharing a vertex with cellId whose Jacobian is not degenerate, or -1. */
+static PetscErrorCode findNonDegenerateNeighbor(DM dm, const Grid *grid, PetscInt cellId, PetscInt *neighborCell) {
+  PetscFunctionBeginUser;
+  PetscInt closureSize = 0, *closure = NULL;
+
+  *neighborCell = -1;
+  PetscCall(DMPlexGetTransitiveClosure(dm, cellId, PETSC_TRUE, &closureSize, &closure));
+  for (PetscInt i = 0; i < closureSize * 2 && *neighborCell < 0; i += 2) {
+    const PetscInt *support;
+    PetscInt        depth, supportSize;
+
+    PetscCall(DMPlexGetPointDepth(dm, closure[i], &depth));
+    if (depth != 0) continue;
+    PetscCall(DMPlexGetSupportSize(dm, closure[i], &supportSize));
+    PetscCall(DMPlexGetSupport(dm, closure[i], &support));
+    for (PetscInt j = 0; j < supportSize; j++) {
+      const PetscInt c = support[j];
+      Cell           cell;
+      if (c == cellId || c < grid->cellStart || c >= grid->cellEnd) continue;
+      PetscCall(extractCellCoordinates(dm, c, &cell));
+      PetscCall(computeCellJacobian(&cell));
+      if (PetscAbsReal(cell.detJacobian) > PETSC_SMALL) {
+        *neighborCell = c;
+        break;
+      }
     }
   }
-  PetscCallMPI(MPI_Allreduce(foundByRank, ownerRank, numGlobalReceivers, MPIU_INT, MPI_MIN, comm));
+  PetscCall(DMPlexRestoreTransitiveClosure(dm, cellId, PETSC_TRUE, &closureSize, &closure));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  /* Global DOF count for matrix column size */
-  Vec  tmpVec;
-  PetscInt M, m;
-  PetscCall(DMCreateGlobalVector(dm, &tmpVec));
-  PetscCall(VecGetSize(tmpVec, &M));
-  PetscCall(VecGetLocalSize(tmpVec, &m));
-  PetscCall(VecDestroy(&tmpVec));
-  Q->numDof = M;
+/* Adds receiver row ridx (basis and curl at point in cellId) to every matrix of Q. */
+static PetscErrorCode addReceiverRow(DM dm, const Grid *grid, PetscInt ridx, const PetscReal point[NUM_DIMENSIONS], const Cell *cell,
+                                     PetscInt cellId, PetscReal **Ni, PetscReal **NiCurl, ReceiverInterpolationMatrices *Q) {
+  PetscFunctionBeginUser;
+  PetscSection section, globalSection;
+  PetscReal    XiEtaZeta[NUM_DIMENSIONS];
+  PetscInt     numLocal, numGlobal, *localIdx, *globalIdx;
 
-  /* Create 6 sparse matrices (AIJ), Nrec rows x Ndof cols */
-  PetscCall(MatCreate(comm, &Q->QEx));
-  PetscCall(MatSetSizes(Q->QEx, PETSC_DECIDE, m, numGlobalReceivers, M));
-  PetscCall(MatSetType(Q->QEx, MATAIJ));
-  PetscCall(MatSetUp(Q->QEx));
+  PetscCall(tetrahedronXyzToReference(cell->coordinates, point, XiEtaZeta));
+  PetscCall(evaluateNedelecBasis(&grid->fem, cell, XiEtaZeta, Ni, NiCurl));
 
-  PetscCall(MatDuplicate(Q->QEx, MAT_DO_NOT_COPY_VALUES, &Q->QEy));
-  PetscCall(MatDuplicate(Q->QEx, MAT_DO_NOT_COPY_VALUES, &Q->QEz));
-  PetscCall(MatDuplicate(Q->QEx, MAT_DO_NOT_COPY_VALUES, &Q->QHx));
-  PetscCall(MatDuplicate(Q->QEx, MAT_DO_NOT_COPY_VALUES, &Q->QHy));
-  PetscCall(MatDuplicate(Q->QEx, MAT_DO_NOT_COPY_VALUES, &Q->QHz));
-
-  /* Allocate FEM basis arrays */
-  PetscReal **Ni, **NiCurl, *XiEtaZeta;
-
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &Ni));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &NiCurl));
-  PetscCall(PetscCalloc1(NUM_DIMENSIONS, &XiEtaZeta));
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    PetscCall(PetscCalloc1(grid->numDofInCell, &Ni[i]));
-    PetscCall(PetscCalloc1(grid->numDofInCell, &NiCurl[i]));
-  }
-
-  PetscSection    section;
-  const PetscScalar *coords;
+  /* Local indices flag constrained DOFs (< 0); global indices give the columns, in the same closure order */
   PetscCall(DMGetLocalSection(dm, &section));
+  PetscCall(DMGetGlobalSection(dm, &globalSection));
+  PetscCall(DMPlexGetClosureIndices(dm, section, section, cellId, PETSC_TRUE, &numLocal, &localIdx, NULL, NULL));
+  PetscCall(DMPlexGetClosureIndices(dm, section, globalSection, cellId, PETSC_TRUE, &numGlobal, &globalIdx, NULL, NULL));
+  for (PetscInt j = 0; j < grid->fem.numDofInCell; j++) {
+    const PetscInt gidx = decodeGlobalDof(globalIdx[j]);
+    if (localIdx[j] < 0 || gidx >= Q->numDof) continue;
+    for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+      PetscCall(MatSetValue(Q->mat[RECV_EX + d], ridx, gidx, Ni[d][j], ADD_VALUES));
+      PetscCall(MatSetValue(Q->mat[RECV_HX + d], ridx, gidx, NiCurl[d][j], ADD_VALUES));
+    }
+  }
+  PetscCall(DMPlexRestoreClosureIndices(dm, section, globalSection, cellId, PETSC_TRUE, &numGlobal, &globalIdx, NULL, NULL));
+  PetscCall(DMPlexRestoreClosureIndices(dm, section, section, cellId, PETSC_TRUE, &numLocal, &localIdx, NULL, NULL));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Builds the receiver-interpolation matrices Q->mat[RECV_EX..RECV_HZ].
+ *
+ * Each receiver row is assembled once, by the lowest rank that locates it, with
+ * global column indices. A receiver in a degenerate cell (|detJ| <= PETSC_SMALL)
+ * moves to a non-degenerate vertex neighbor, or is skipped with a warning.
+ * The contract is documented in include/receiver_interp.h.
+ */
+PetscErrorCode buildReceiverInterpolationMatrices(Vec receivers, const DM dm, const Grid *grid, ReceiverInterpolationMatrices *Q) {
+  PetscFunctionBeginUser;
+
+  MPI_Comm           comm = PetscObjectComm((PetscObject)dm);
+  PetscMPIInt        rank;
+  PetscSF            receiverSf = NULL;
+  PetscInt           size, m, numFound, numSkipped = 0, *ownerRank;
+  PetscBool         *rowAssembled;
+  const PetscSFNode *recvInCell;
+  const PetscInt    *recvFound;
+  const PetscScalar *coords;
+  PetscReal        **Ni, **NiCurl;
+  Vec                v;
+
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  PetscCall(VecGetSize(receivers, &size));
+  PetscCheck(size % NUM_DIMENSIONS == 0, comm, PETSC_ERR_ARG_SIZ, "Receiver vector size %" PetscInt_FMT " not divisible by %d", size,
+             NUM_DIMENSIONS);
+  Q->numReceivers = size / NUM_DIMENSIONS;
+
+  PetscCall(DMLocatePoints(dm, receivers, DM_POINTLOCATION_REMOVE, &receiverSf));
+  PetscCall(PetscSFGetGraph(receiverSf, NULL, &numFound, &recvFound, &recvInCell));
+  PetscCall(PetscMalloc2(Q->numReceivers, &ownerRank, Q->numReceivers, &rowAssembled));
+  PetscCall(PetscArrayzero(rowAssembled, Q->numReceivers));
+  PetscCall(electReceiverOwners(comm, Q->numReceivers, numFound, recvFound, recvInCell, ownerRank));
+
+  /* Q matrices: numReceivers x numDof, columns laid out like the solution */
+  PetscCall(DMGetGlobalVector(dm, &v));
+  PetscCall(VecGetSize(v, &Q->numDof));
+  PetscCall(VecGetLocalSize(v, &m));
+  PetscCall(DMRestoreGlobalVector(dm, &v));
+  PetscCall(MatCreate(comm, &Q->mat[0]));
+  PetscCall(MatSetSizes(Q->mat[0], PETSC_DECIDE, m, Q->numReceivers, Q->numDof));
+  PetscCall(MatSetType(Q->mat[0], MATAIJ));
+  PetscCall(MatSetUp(Q->mat[0]));
+  for (PetscInt comp = 1; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(MatDuplicate(Q->mat[0], MAT_DO_NOT_COPY_VALUES, &Q->mat[comp]));
+
+  PetscCall(createBasisValues(grid->fem.numDofInCell, &Ni));
+  PetscCall(createBasisValues(grid->fem.numDofInCell, &NiCurl));
   PetscCall(VecGetArrayRead(receivers, &coords));
 
-  /* Fill Q matrices row by row (one row per receiver) */
-  PetscInt numSkipped = 0;
   for (PetscInt i = 0; i < numFound; i++) {
-    PetscInt ridx  = recvFound ? recvFound[i] : i;
-    PetscInt cellID = recvInCell[i].index;
-    if (cellID < 0) {
-      continue;
-    }
+    const PetscInt ridx   = recvFound ? recvFound[i] : i;
+    PetscInt       cellId = recvInCell[i].index;
+    PetscReal      point[NUM_DIMENSIONS];
+    Cell           cell;
 
-    /* Only the canonical owner assembles this receiver's row, and only once (a rank may locate the same on-interface 
-    * receiver in two local cells). Every other locating rank skips it, so the row is written exactly once. */
-    if (rank != ownerRank[ridx] || rowAssembled[ridx]) {
-      continue;
-    }
+    /* A rank may locate the same on-interface receiver in two local cells */
+    if (cellId < 0 || rank != ownerRank[ridx] || rowAssembled[ridx]) continue;
     rowAssembled[ridx] = PETSC_TRUE;
+    for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) point[d] = PetscRealPart(coords[NUM_DIMENSIONS * ridx + d]);
 
-    PetscReal recvCoords[NUM_DIMENSIONS];
-    recvCoords[0] = PetscRealPart(coords[3 * ridx]);
-    recvCoords[1] = PetscRealPart(coords[3 * ridx + 1]);
-    recvCoords[2] = PetscRealPart(coords[3 * ridx + 2]);
-
-    Cell cell;
-    PetscCall(extractCellCoordinates(dm, cellID, &cell));
+    PetscCall(extractCellCoordinates(dm, cellId, &cell));
     PetscCall(computeCellJacobian(&cell));
-
-    /* If the located cell is degenerate (near-zero volume), search neighboring cells sharing a vertex 
-       for a valid alternative. DMLocatePoints may place receivers on partition boundaries or in thin 
-       surface cells where |detJ| <= PETSC_SMALL.       */
     if (PetscAbsReal(cell.detJacobian) <= PETSC_SMALL) {
-      PetscInt        altCell = -1;
-      PetscInt        closureSize = 0;
-      PetscInt       *closure     = NULL;
-      PetscCall(DMPlexGetTransitiveClosure(dm, cellID, PETSC_TRUE, &closureSize, &closure));
-      for (PetscInt j = 0; j < closureSize * 2; j += 2) {
-        PetscInt point = closure[j];
-        PetscInt pdepth;
-        PetscCall(DMPlexGetPointDepth(dm, point, &pdepth));
-        
-        if (pdepth != 0) {
-          continue;  /* only vertices */
-        }
-        
-        PetscInt        supportSize;
-        const PetscInt *support;
-        PetscCall(DMPlexGetSupportSize(dm, point, &supportSize));
-        PetscCall(DMPlexGetSupport(dm, point, &support));
-        
-        for (PetscInt k = 0; k < supportSize; k++) {
-          PetscInt neighbor = support[k];
-          if (neighbor == cellID) {
-            continue;
-          }
-          if (neighbor < grid->cellStart || neighbor >= grid->cellEnd) {
-            continue;
-          }
-          
-          Cell ncell;
-          PetscCall(extractCellCoordinates(dm, neighbor, &ncell));
-          PetscCall(computeCellJacobian(&ncell));
-          
-          if (PetscAbsReal(ncell.detJacobian) > PETSC_SMALL) {
-            altCell = neighbor;
-            break;
-          }
-        }
-        if (altCell >= 0) {
-          break;
-        }
-      }
-      
-      PetscCall(DMPlexRestoreTransitiveClosure(dm, cellID, PETSC_TRUE, &closureSize, &closure));
-      
-      if (altCell >= 0) {
+      PetscInt neighbor;
+      PetscCall(findNonDegenerateNeighbor(dm, grid, cellId, &neighbor));
+      if (neighbor < 0) {
         PetscCall(PetscPrintf(PETSC_COMM_SELF,
-          "   WARNING: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
-          " (|detJ| = %.2e); relocated to cell %" PetscInt_FMT ".\n",
-          ridx, cellID, (double)PetscAbsReal(cell.detJacobian), altCell));
-        
-        cellID = altCell;
-        PetscCall(extractCellCoordinates(dm, cellID, &cell));
-        PetscCall(computeCellJacobian(&cell));
-      } else {
-        PetscCall(PetscPrintf(PETSC_COMM_SELF,
-          "   WARNING: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
-          " (|detJ| = %.2e, coords = [%.4e, %.4e, %.4e]); no valid neighbor"
-          " found, skipping.\n",
-          ridx, cellID, (double)PetscAbsReal(cell.detJacobian),
-          (double)recvCoords[0], (double)recvCoords[1], (double)recvCoords[2]));
-        
+                              "   WARNING: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
+                              " (|detJ| = %.2e, coords = [%.4e, %.4e, %.4e]); no valid neighbor found, skipping.\n",
+                              ridx, cellId, (double)PetscAbsReal(cell.detJacobian), (double)point[0], (double)point[1], (double)point[2]));
         numSkipped++;
         continue;
       }
+      PetscCall(PetscPrintf(PETSC_COMM_SELF,
+                            "   WARNING: receiver %" PetscInt_FMT " in degenerate cell %" PetscInt_FMT
+                            " (|detJ| = %.2e); relocated to cell %" PetscInt_FMT ".\n",
+                            ridx, cellId, (double)PetscAbsReal(cell.detJacobian), neighbor));
+      cellId = neighbor;
+      PetscCall(extractCellCoordinates(dm, cellId, &cell));
+      PetscCall(computeCellJacobian(&cell));
     }
-
-    PetscCall(tetrahedronXYZToReference(cell.coordinates, recvCoords, XiEtaZeta));
-
-    /* order-agnostic basis + curl evaluation (1..6). The returned values and curls are already physical and geometrically oriented, 
-     * matching the forward assembly, so no per-DOF sign correction is applied. */
-    PetscCall(evaluateNedelecBasis(&grid->fem, &cell, XiEtaZeta, Ni, NiCurl));
-
-    /* Get BOTH local and global DOF indices for this cell's closure.
-     *
-     * - Local section idxSection => local indices.  Negative entries mark
-     *   BC-constrained DOFs (skip: they aren't free variables).
-     * - Global section idxSection => global indices, with PETSc's ghost  encoding: a ghost DOF (owned by another rank) is returned as
-     *   -(gOff + 1).  Owned DOFs are returned as a non-negative gOff.
-     *
-     * The two calls traverse the closure in the SAME order (driven by dmplex + useClosurePermutation=PETSC_TRUE), so slot k lines up */
-    PetscSection globalSection;
-    PetscCall(DMGetGlobalSection(dm, &globalSection));
-
-    PetscInt  numLocal, *localIdx;
-    PetscCall(DMPlexGetClosureIndices(dm, section, section, cellID, PETSC_TRUE, &numLocal, &localIdx, NULL, NULL));
-    PetscInt  numGlobal, *globalIdxRaw;
-    PetscCall(DMPlexGetClosureIndices(dm, section, globalSection, cellID, PETSC_TRUE, &numGlobal, &globalIdxRaw, NULL, NULL));
-
-    for (PetscInt j = 0; j < grid->numDofInCell; j++) {
-      if (localIdx[j] < 0) {
-        continue;                       /* BC-constrained: skip */
-      }
-      PetscInt gidx = decodeGlobalDOF(globalIdxRaw[j]);
-      if (gidx >= Q->numDof) {
-        continue;                     /* safety */
-      }
-
-      PetscCall(MatSetValue(Q->QEx, ridx, gidx, Ni[0][j], ADD_VALUES));
-      PetscCall(MatSetValue(Q->QEy, ridx, gidx, Ni[1][j], ADD_VALUES));
-      PetscCall(MatSetValue(Q->QEz, ridx, gidx, Ni[2][j], ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHx, ridx, gidx, NiCurl[0][j], ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHy, ridx, gidx, NiCurl[1][j], ADD_VALUES));
-      PetscCall(MatSetValue(Q->QHz, ridx, gidx, NiCurl[2][j], ADD_VALUES));
-    }
-
-    PetscCall(DMPlexRestoreClosureIndices(dm, section, globalSection, cellID, PETSC_TRUE, &numGlobal, &globalIdxRaw, NULL, NULL));
-    PetscCall(DMPlexRestoreClosureIndices(dm, section, section, cellID, PETSC_TRUE, &numLocal, &localIdx, NULL, NULL));
+    PetscCall(addReceiverRow(dm, grid, ridx, point, &cell, cellId, Ni, NiCurl, Q));
   }
-
   PetscCall(VecRestoreArrayRead(receivers, &coords));
 
   if (numSkipped > 0) {
     PetscCall(PetscPrintf(comm, "\n   WARNING: %s receiver(s) skipped due to degenerate cells.\n", formatGroupedInt(numSkipped)));
   }
 
-  /* Assemble all Q matrices */
-  PetscCall(MatAssemblyBegin(Q->QEx, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyBegin(Q->QEy, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyBegin(Q->QEz, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyBegin(Q->QHx, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyBegin(Q->QHy, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyBegin(Q->QHz, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(Q->QEx, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(Q->QEy, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(Q->QEz, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(Q->QHx, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(Q->QHy, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(Q->QHz, MAT_FINAL_ASSEMBLY));
+  for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(MatAssemblyBegin(Q->mat[comp], MAT_FINAL_ASSEMBLY));
+  for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(MatAssemblyEnd(Q->mat[comp], MAT_FINAL_ASSEMBLY));
 
-  /* Free FEM basis memory */
-  for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
-    PetscCall(PetscFree(Ni[i]));
-    PetscCall(PetscFree(NiCurl[i]));
-  }
-  PetscCall(PetscFree(Ni));
-  PetscCall(PetscFree(NiCurl));
-  PetscCall(PetscFree(XiEtaZeta));
-  PetscCall(PetscSFDestroy(&receiverSF));
-  PetscCall(PetscFree3(foundByRank, ownerRank, rowAssembled));
-  /* Note: `receivers` Vec is owned by the caller and not destroyed here. */
-
+  PetscCall(destroyBasisValues(&Ni));
+  PetscCall(destroyBasisValues(&NiCurl));
+  PetscCall(PetscSFDestroy(&receiverSf));
+  PetscCall(PetscFree2(ownerRank, rowAssembled));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /**
- * @brief Destroys the six Mats owned by a ReceiverInterpolationMatrices struct.
- *
- * Idempotent on individual fields (MatDestroy handles NULL). The Q struct
- * itself is stack-owned by the caller and is not freed.
- *
- * @param[in,out] Q  Struct whose QEx..QHz matrices are destroyed.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success,
- *         or a PETSc error code otherwise.
+ * @brief Destroys the matrices owned by a ReceiverInterpolationMatrices struct.
  */
-PetscErrorCode destroyReceiverInterpolationMatrices(ReceiverInterpolationMatrices *Q)
-{
+PetscErrorCode destroyReceiverInterpolationMatrices(ReceiverInterpolationMatrices *Q) {
   PetscFunctionBeginUser;
-  PetscCall(MatDestroy(&Q->QEx));
-  PetscCall(MatDestroy(&Q->QEy));
-  PetscCall(MatDestroy(&Q->QEz));
-  PetscCall(MatDestroy(&Q->QHx));
-  PetscCall(MatDestroy(&Q->QHy));
-  PetscCall(MatDestroy(&Q->QHz));
+  for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(MatDestroy(&Q->mat[comp]));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Creates the receiver field Vecs, named Ex, Ey, Ez, Hx, Hy, Hz.
+ */
+PetscErrorCode createReceiverFields(const ReceiverInterpolationMatrices *Q, Vec fields[NUM_RECEIVER_FIELDS]) {
+  PetscFunctionBeginUser;
+  const char *names[NUM_RECEIVER_FIELDS] = {"Ex", "Ey", "Ez", "Hx", "Hy", "Hz"};
+  for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) {
+    PetscCall(MatCreateVecs(Q->mat[comp], NULL, &fields[comp]));
+    PetscCall(PetscObjectSetName((PetscObject)fields[comp], names[comp]));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Interpolates E and H = curl(E)/(iωμ) at the receivers for one solution.
+ */
+PetscErrorCode interpolateReceiverFields(const ReceiverInterpolationMatrices *Q, Vec x, PetscScalar constFactor,
+                                         Vec fields[NUM_RECEIVER_FIELDS]) {
+  PetscFunctionBeginUser;
+  for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(MatMult(Q->mat[comp], x, fields[comp]));
+  for (PetscInt comp = RECV_HX; comp <= RECV_HZ; comp++) PetscCall(VecScale(fields[comp], 1.0 / constFactor));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Destroys the Vecs created by createReceiverFields().
+ *
+ * @param[in,out] fields  Field Vecs.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode destroyReceiverFields(Vec fields[NUM_RECEIVER_FIELDS]) {
+  PetscFunctionBeginUser;
+  for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(VecDestroy(&fields[comp]));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

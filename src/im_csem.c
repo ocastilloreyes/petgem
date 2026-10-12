@@ -4,12 +4,19 @@
  * Date: 2026-02-03
  *
  * Description:
- * Inverse CSEM kernel (runInverse). Linked into both the legacy
- * im.csem binary and the unified petgem dispatcher.
+ * Inverse CSEM kernel (runInverse), linked into im.csem and petgem.
  */
 
-static char imHelp[] =
-"================================================================\n\
+/* PETGEM functions */
+#include "common.h"
+#include "constants.h"
+#include "grid.h"
+#include "inversion.h"
+#include "io.h"
+#include "kernels.h"
+#include "runtime.h"
+
+static char imHelp[] = "================================================================\n\
  PETGEM  im.csem  --  CSEM inversion kernel\n\
 ================================================================\n\
 \n\
@@ -29,7 +36,7 @@ OPTIONAL  (inversion control; defaults in brackets)\n\
   -order <1..6>              Override bundle basis order.\n\
   -im_max_iter <n>           Max L-BFGS iterations            [80]\n\
   -im_lbfgs_memory <m>       L-BFGS history depth M            [5]\n\
-  -im_lambda <r>             Tikhonov regularisation weight  [0.1]\n\
+  -im_lambda <r>             Tikhonov regularization weight  [0.1]\n\
   -im_error_level <r>        Relative data-error level      [0.01]\n\
   -im_gtol <r>               Gradient-norm tolerance        [1e-5]\n\
   -im_rms_tol <r>            Absolute RMS early stop (0=off)   [0]\n\
@@ -42,267 +49,91 @@ OPTIONAL  (inversion control; defaults in brackets)\n\
   -im_observed_file <f>      Observed-data file (req. fm_native)\n\
 \n\
  Every inversion option is -im_* (matching this kernel and the\n\
- `petgem im` subcommand). \n\
+ `petgem im.csem` subcommand).\n\
 \n\
 EXAMPLES\n\
   mpirun -n 56 ./im.csem -options_file params_p1.txt -output_dir out/\n\
   mpirun -n 56 ./im.csem -options_file params.txt -im_max_iter 120 -im_lambda 0.05\n\
 \n\
 UNIFIED BINARY\n\
-  mpirun -n 56 ./petgem im -options_file params_p1.txt\n\
-\n\
-MORE\n\
-  -help        Full option database, incl. advanced PETSc flags.\n\
-  -help intro  This concise usage summary, then exit.\n\
-  --version    Print the PETGEM version and exit.\n\
-\n\
- Docs: github.com/ocastilloreyes/petgem\n\
-================================================================\n";
+  mpirun -n 56 ./petgem im.csem -options_file params_p1.txt\n\
+\n" PETGEM_HELP_FOOTER;
 
-/* C libraries */
-#include <stdio.h>
-#include <stdlib.h>
-
-/* PETGEM functions */
-#include "common.h"
-#include "constants.h"
-#include "grid.h"
-#include "inversion.h"
-#include "io.h"
-#include "kernels.h"
-#include "version.h"
-
-/* Extrae library for performance analysis */
-#ifdef USE_EXTRAE
-#include "extrae_user_events.h"
-#endif
-
-/**
- * @brief Main execution routine for the CSEM inverse-modeling kernel.
- * @param argc Argument count.
- * @param argv Argument vector.
- * @return int 0 on success, non-zero on failure.
- * @details Initializes PETSc, parses command-line arguments
- * (including `--version`).  Reads the unified bundle (mesh +
- * conductivity + materials_id + receivers + /sources +
- * /observed/Ex + case-property defaults), sets up the H(curl)
- * grid, the inversion DM (1 DOF/cell), the smoother neighbor
- * graph, the receiver-interpolation matrices, and the cached
- * K / Ms-template / G_BDDC matrices.  Runs custom L-BFGS
- * (Nocedal 1980) with an adjoint-state gradient until the
- * configured RMS-tolerance or max-iter is hit.  Writes the
- * recovered conductivity, the log-perturbation X, and the
- * RMS history to HDF5, then finalizes PETSc.  Includes Extrae
- * instrumentation hooks if compiled with USE_EXTRAE.
- */
 int runInverse(int argc, char **argv) {
 
-  /* ---------------------------------------------------------------- */
-  /* Check if the --version option is provided                        */
-  /* ---------------------------------------------------------------- */
-  if (argc > 1 && strcmp(argv[1], "--version") == 0) {
-    printf("PETGEM version %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-    return 0;
-  }
+  if (isVersionRequest(argc, argv)) return printVersion();
 
-  /* ---------------------------------------------------------------- */
-  /* Variables declaration                                            */
-  /* ---------------------------------------------------------------- */
-  PetscMPIInt     rank, size;
-  DM              dm;
-  Vec             conductivity, materials_id, receivers;
-  imParams        iparams;   /* embeds the shared petgemParams base as iparams.common */
-  Grid            grid;
-  InversionStats  stats;
-  PetscLogDouble  timers[3];
-  MPI_Comm        comm;
-  PetscLogDouble  start_timer, end_timer;
-  PetscLogStage stage_parse, stage_load, stage_grid;
-  PetscLogStage stage_assembly, stage_solve, stage_postproc;
-  PetscBool     helpRequested = PETSC_FALSE;
+  /* Variables declaration */
+  KernelRun      run;
+  DM             dm;
+  Vec            conductivity, materialsId, receivers;
+  ImParams       imParams; /* imParams.common holds the parameters shared with fm.csem */
+  Grid           grid;
+  InversionStats stats;
+  MPI_Comm       comm;
 
-  /* ---------------------------------------------------------------- */
-  /* PETSC initialization                                             */
-  /* ---------------------------------------------------------------- */
   PetscFunctionBeginUser;
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 1);
-#endif
-
-  PetscCall(PetscInitialize(&argc, &argv, (char *)0, imHelp));
+  PetscCall(beginKernelRun(&argc, &argv, imHelp, "im.csem", "Field interpolation", &run));
   comm = PETSC_COMM_WORLD;
-  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
-  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
 
-  /* ---------------------------------------------------------------- */
-  /* Resolve here the petsc help printing                             */
-  /* ---------------------------------------------------------------- */
-  PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
-
-  /* ---------------------------------------------------------------- */
-  /* Register the im.csem phase stages with PETSc's logging system    */
-  /* ---------------------------------------------------------------- */
-  PetscCall(PetscLogStageRegister("Read parameters",     &stage_parse));
-  PetscCall(PetscLogStageRegister("Load input bundle",   &stage_load));
-  PetscCall(PetscLogStageRegister("Setup grid",          &stage_grid));
-  PetscCall(PetscLogStageRegister("Assembly",            &stage_assembly));
-  PetscCall(PetscLogStageRegister("Linear solve",        &stage_solve));
-  PetscCall(PetscLogStageRegister("Field interpolation", &stage_postproc));
-
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
-
-  /* ---------------------------------------------------------------- */
-  /* Print PETGEM header                                              */
-  /* ---------------------------------------------------------------- */
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 2);
-#endif
-
-  if (!helpRequested) {
-    PetscCall(printHeader("im.csem"));
-  }
-
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
-
-  /* ---------------------------------------------------------------- */
-  /* Parse user parameters                                            */
-  /* ---------------------------------------------------------------- */
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 3);
-#endif
-
-  PetscCall(PetscLogStagePush(stage_parse));
-  PetscCall(PetscTime(&start_timer));
-  PetscCall(readPetgemParams(size, &iparams.common));
-  PetscCall(readimParams(&iparams));
-  PetscCall(PetscTime(&end_timer));
-  PetscCall(PetscLogStagePop());
-  timers[0] = end_timer - start_timer;
-
-  /* Option groups already printed by -help; skip inversion and exit. */
-  if (helpRequested) {
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\nTip: 'im.csem -help intro' shows the concise usage summary.\n"));
-    PetscCall(PetscFinalize());
+  /* Parse user parameters */
+  PetscCall(beginPhase(&run, PHASE_PARSE));
+  PetscCall(readPetgemParams(&imParams.common));
+  PetscCall(readImParams(&imParams));
+  PetscCall(endPhase(&run, PHASE_PARSE));
+  if (run.helpRequested) {
+    PetscCall(endHelpRun(&run));
     return 0;
   }
 
-  /* Pull case-property defaults out of the bundle (error_level, fixed_materials) - CLI overrides applied by readimParams
-   * already take precedence via the *FromCLI provenance flags. The bundle path is the shared base's input file 
-   * (iparams.common.inputFile). Runs after the -help exit above (it opens the bundle) and folds into the same
-   * "Read parameters" bucket. */
-  PetscCall(PetscLogStagePush(stage_parse));
-  PetscCall(PetscTime(&start_timer));
-  PetscCall(loadInversionMetaFromBundle(iparams.common.inputFile, &iparams));
-  PetscCall(PetscTime(&end_timer));
-  PetscCall(PetscLogStagePop());
-  timers[0] += end_timer - start_timer;
+  /* Case defaults stored in the bundle (error level, fixed materials); CLI values win */
+  PetscCall(beginPhase(&run, PHASE_PARSE));
+  PetscCall(loadInversionMetaFromBundle(imParams.common.inputFile, &imParams));
+  PetscCall(endPhase(&run, PHASE_PARSE));
 
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
+  /* Load mesh, conductivity, materials, receivers and sources */
+  PetscCall(beginPhase(&run, PHASE_LOAD));
+  PetscCall(loadModelInputs(&imParams.common, &dm, &conductivity, &materialsId, &receivers));
+  PetscCall(setupInversionSources(imParams.common.inputFile, &imParams));
+  PetscCall(endPhase(&run, PHASE_LOAD));
 
-  /* ----------------------------------------------------------------------- */
-  /* Load input data: mesh, conductivity, materials_id, sources, receivers   */
-  /* ----------------------------------------------------------------------- */
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 4);
-#endif
+  /* Setup grid */
+  PetscCall(beginPhase(&run, PHASE_GRID));
+  PetscCall(setupCsemGrid(imParams.common.order, &dm, &grid));
+  PetscCall(endPhase(&run, PHASE_GRID));
+  PetscCall(logGridSummary(imParams.common.inputFile, dm, &grid));
+  PetscCall(logInversionSummary(&imParams));
 
-  PetscCall(PetscLogStagePush(stage_load));
-  PetscCall(PetscTime(&start_timer));
-  PetscCall(loadModelInputs(&iparams.common, &dm, &conductivity, &materials_id, &receivers));
-  PetscCall(setupInversionSources(iparams.common.inputFile, &iparams));
-  PetscCall(PetscTime(&end_timer));
-  PetscCall(PetscLogStagePop());
-  timers[1] = end_timer - start_timer;
-
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
-
-  /* ---------------------------------------------------------------- */
-  /* Setup grid for finite element computations                       */
-  /* ---------------------------------------------------------------- */
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 5);
-#endif
-
-  PetscCall(PetscLogStagePush(stage_grid));
-  PetscCall(PetscTime(&start_timer));
-  PetscCall(setupCsemGrid(iparams.common, &dm, &grid));
-  PetscCall(PetscTime(&end_timer));
-  PetscCall(PetscLogStagePop());
-  timers[2] = end_timer - start_timer;
-
-  PetscCall(logGridSummary(iparams.common, dm, &grid));
-  PetscCall(logInversionSummary(&iparams));
-
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
-
-  /* ---------------------------------------------------------------- */
-  /* Run inversion                                                    */
-  /* ---------------------------------------------------------------- */
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 7);
-#endif
-
-  PetscCall(PetscLogStagePush(stage_solve));
-  PetscCall(runCsemInversion(&iparams, dm, &grid, conductivity, materials_id, receivers, &stats));
-  PetscCall(PetscLogStagePop());
-
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
-
-  /* ---------------------------------------------------------------- */
-  /* Print output, timers and footer                                  */
-  /* ---------------------------------------------------------------- */
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 9);
-#endif
+  /* L-BFGS inversion */
+  PetscCall(beginPhase(&run, PHASE_SOLVE));
+  PetscCall(runCsemInversion(&imParams, dm, &grid, conductivity, materialsId, receivers, &stats));
+  PetscCall(endPhase(&run, PHASE_SOLVE));
 
   {
     char outFile[PETSC_MAX_PATH_LEN];
-    PetscCall(buildOutputPath(&iparams.common, ".h5", outFile, sizeof(outFile)));
+    PetscCall(buildOutputPath(&imParams.common, ".h5", outFile, sizeof(outFile)));
     PetscCall(logSection(comm, "Solve"));
-    PetscCall(logKVStr(comm, "Solver", stats.solver));
-    PetscCall(logKVf(comm, "Linear solves", "%s (forward + adjoint)", formatGroupedInt(stats.numSolves)));
-    PetscCall(logKVStr(comm, "Status", stats.failReason == 0 ? "converged" : KSPConvergedReasons[stats.failReason]));
+    PetscCall(logKvStr(comm, "Solver", stats.solver));
+    PetscCall(logKvf(comm, "Linear solves", "%s (forward + adjoint)", formatGroupedInt(stats.numSolves)));
+    PetscCall(logKvStr(comm, "Status", stats.failReason == 0 ? "converged" : KSPConvergedReasons[stats.failReason]));
     PetscCall(logSection(comm, "Inversion output"));
-    PetscCall(logKVStr(comm, "Output file", outFile));
-    PetscCall(logKVStr(comm, "Datasets written", "conductivity, log_perturbation, rms_history"));
-    PetscCall(logKVInt(comm, "VTU snapshots", stats.numSnapshots));
+    PetscCall(logKvStr(comm, "Output file", outFile));
+    PetscCall(logKvStr(comm, "Datasets written", "conductivity, log_perturbation, rms_history"));
+    PetscCall(logKvInt(comm, "VTU snapshots", stats.numSnapshots));
   }
   {
-    const char *const   labels[] = {"Load + grid", "Setup", "Assembly", "Linear solve", "Gradient + L-BFGS", "Output"};
-    const PetscLogDouble times[]  = {timers[0] + timers[1] + timers[2], stats.tSetup, stats.tAssembly,
-                                     stats.tSolver, stats.tGradient, stats.tOutput};
-    PetscCall(printTimers(labels, times, 6));
+    const char *const    labels[] = {"Load + grid", "Setup", "Assembly", "Linear solve", "Gradient + L-BFGS", "Output"};
+    const PetscLogDouble times[]  = {setupTime(&run), stats.tSetup, stats.tAssembly, stats.tSolver, stats.tGradient, stats.tOutput};
+    PetscCall(printRunSummary(labels, times, 6));
   }
-  PetscCall(printFooter());
 
-#ifdef USE_EXTRAE
-  Extrae_event(1000, 0);
-#endif
-
-  /* ---------------------------------------------------------------- */
-  /* Free memory                                                      */
-  /* ---------------------------------------------------------------- */
-  PetscCall(DMDestroy(&grid.H1dm));
+  /* Free memory */
+  PetscCall(destroyGrid(&grid));
   PetscCall(DMDestroy(&dm));
   PetscCall(VecDestroy(&conductivity));
-  PetscCall(VecDestroy(&materials_id));
+  PetscCall(VecDestroy(&materialsId));
   PetscCall(VecDestroy(&receivers));
 
-  /* ---------------------------------------------------------------- */
-  /* PETSc finalize                                                   */
-  /* ---------------------------------------------------------------- */
   PetscCall(PetscFinalize());
   return 0;
 }

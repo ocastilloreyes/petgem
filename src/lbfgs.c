@@ -5,382 +5,245 @@
  *
  * Description:
  * Limited-Memory BFGS optimizer (Nocedal 1980) used by the CSEM
- * inverse kernel.
+ * inverse kernel. References: Nocedal & Wright, "Numerical Optimization", Ch. 7.
  */
-
-/*
- * Notes:
- * The optimizer is intentionally generic in its callback signature
- * (InversionObjGradFn) but currently couples to InversionContext for
- * two things: VTU snapshot dispatch on accepted steps and the one-line
- * iter summary that pulls RMS / regularization terms from the most
- * recent objective evaluation.
- *
- */
-
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
 
 #include <petsc.h>
 
 #include "common.h"
-#include "inversion.h"
+#include "lbfgs.h"
 
-/**
- * @brief Prints one row of the L-BFGS table and resets the per-row counters.
- *
- * Columns: iteration, cumulative objective/gradient evaluations, RMS, the
- * Tikhonov term λΦm, the relative gradient norm tested against gtol, the
- * accepted step ("-" on row 0), the min-max KSP iterations of the solves
- * since the previous row, and the wall time since the previous row.
- *
- * @param[in]     comm    Communicator to print on.
- * @param[in,out] ictx    Inversion context (per-row KSP counters reset).
- * @param[in]     iter    Iteration index (0 = initial model).
- * @param[in]     grel    ||g|| / max(1, ||X||).
- * @param[in]     stp     Accepted step length (ignored on row 0).
- * @param[in,out] tRow    Time of the previous row; updated to now.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
- */
-static PetscErrorCode printIterationRow(MPI_Comm comm, InversionContext *ictx, PetscInt iter,
-                                        PetscReal grel, PetscReal stp, PetscLogDouble *tRow)
-{
+const char *const LbfgsReasons[] = {"CONVERGED_GRTOL", "CONVERGED_RMSTOL",    "CONVERGED_RMS_STALL",
+                                    "DIVERGED_MAXITS", "DIVERGED_LS_FAILURE", "DIVERGED_NAN"};
+
+/* Armijo sufficient-decrease parameter */
+#define LBFGS_ARMIJO_C1 1e-4
+
+/* Circular buffer of (s, y) pairs: s = X_{k+1} - X_k, y = G_{k+1} - G_k, rho = 1 / (y^T s). */
+typedef struct {
+  PetscInt   memory;
+  PetscInt   bound; /* stored pairs (<= memory) */
+  PetscInt   ptr;   /* next slot */
+  Vec       *S, *Y;
+  PetscReal *rho, *alpha;
+} LbfgsHistory;
+
+static PetscErrorCode createHistory(Vec X, PetscInt memory, LbfgsHistory *h) {
   PetscFunctionBeginUser;
-
-  PetscLogDouble now;
-  char           its[32], step[16];
-
-  PetscCall(PetscTime(&now));
-  if (ictx->kspItsMaxRow == 0 && ictx->kspItsMinRow == PETSC_INT_MAX) {
-    PetscCall(PetscStrncpy(its, "-", sizeof(its)));
-  } else if (ictx->kspItsMinRow == ictx->kspItsMaxRow) {
-    PetscCall(PetscSNPrintf(its, sizeof(its), "%" PetscInt_FMT, ictx->kspItsMaxRow));
-  } else {
-    PetscCall(PetscSNPrintf(its, sizeof(its), "%" PetscInt_FMT "-%" PetscInt_FMT, ictx->kspItsMinRow, ictx->kspItsMaxRow));
-  }
-  if (iter == 0) {
-    PetscCall(PetscStrncpy(step, "-", sizeof(step)));
-  } else {
-    snprintf(step, sizeof(step), "%.3g", (double)stp);
-  }
-
-  PetscCall(PetscPrintf(comm, "   %4" PetscInt_FMT " %5" PetscInt_FMT " %9.4f %10.3e %10.3e %8s %9s %8.1f\n",
-                        iter, ictx->iterCount, (double)ictx->lastRMS, (double)ictx->lastRegTerm,
-                        (double)grel, step, its, (double)(now - *tRow)));
-
-  ictx->kspItsMinRow = PETSC_INT_MAX;
-  ictx->kspItsMaxRow = 0;
-  *tRow              = now;
-
+  h->memory = memory;
+  h->bound  = 0;
+  h->ptr    = 0;
+  PetscCall(VecDuplicateVecs(X, memory, &h->S));
+  PetscCall(VecDuplicateVecs(X, memory, &h->Y));
+  PetscCall(PetscMalloc2(memory, &h->rho, memory, &h->alpha));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/**
- * @brief Limited-Memory BFGS optimizer (Nocedal 1980).
- *
- * Implements the two-loop recursion for H·g approximation with a
- * backtracking Armijo line search. Designed to work with complex
- * PetscScalar. All optimization variables are stored with zero imaginary part, so
- * VecDot/VecAXPY on them reduce to standard real operations.
- *
- * Two early-stop modes are supported when the caller maintains an RMS
- * value via `rmsPtr`:
- *   - Absolute: stop when *rmsPtr ≤ rmsTol.
- *   - Adaptive plateau: stop when the relative drop is below
- *     `-im_rms_rtol` for `-im_rms_stall_window` consecutive
- *     iterations (default 1e-3 / 3 iters).
- *
- * References: Nocedal & Wright, "Numerical Optimization", Ch. 7
- *  
- * @param[in]     objgrad    Objective/gradient callback.
- * @param[in]     ctx        Opaque context passed to objgrad (an
- *                           InversionContext * in current usage).
- * @param[in,out] X          Initial iterate; final iterate on return.
- * @param[in]     M          L-BFGS memory size.
- * @param[in]     maxIter    Maximum number of iterations.
- * @param[in]     gtol       Gradient-norm convergence tolerance.
- * @param[in]     rmsPtr     Optional pointer to a caller-updated RMS value.
- * @param[in]     rmsTol     RMS early-stop threshold (≤0 disables).
- * @param[out]    numIters   Number of iterations performed.
- * @param[out]    reasonStr  Human-readable convergence/stop reason.
- *
- * @return PetscErrorCode PETSC_SUCCESS on success,
- *         or a PETSc error code otherwise.
- */
-PetscErrorCode lbfgsOptimize(InversionObjGradFn objgrad, void *ctx,
-                             Vec X, PetscInt M, PetscInt maxIter,
-                             PetscReal gtol,
-                             const PetscReal *rmsPtr, PetscReal rmsTol,
-                             PetscInt *numIters, const char **reasonStr)
-{
+static PetscErrorCode destroyHistory(LbfgsHistory *h) {
+  PetscFunctionBeginUser;
+  PetscCall(VecDestroyVecs(h->memory, &h->S));
+  PetscCall(VecDestroyVecs(h->memory, &h->Y));
+  PetscCall(PetscFree2(h->rho, h->alpha));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode realDot(Vec a, Vec b, PetscReal *v) {
+  PetscFunctionBeginUser;
+  PetscScalar dot;
+  PetscCall(VecDot(a, b, &dot));
+  *v = PetscRealPart(dot);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* d = -H G by the two-loop recursion. */
+static PetscErrorCode searchDirection(LbfgsHistory *h, Vec G, Vec d) {
+  PetscFunctionBeginUser;
+  const PetscInt M = h->memory;
+
+  PetscCall(VecCopy(G, d));
+  for (PetscInt i = 0; i < h->bound; i++) {
+    const PetscInt idx = (h->ptr - 1 - i + M) % M;
+    PetscReal      sd  = 0.0;
+    PetscCall(realDot(h->S[idx], d, &sd));
+    h->alpha[idx] = h->rho[idx] * sd;
+    PetscCall(VecAXPY(d, -h->alpha[idx], h->Y[idx]));
+  }
+  if (h->bound > 0) {
+    const PetscInt last = (h->ptr - 1 + M) % M;
+    PetscReal      sy = 0.0, yy = 0.0;
+    PetscCall(realDot(h->S[last], h->Y[last], &sy));
+    PetscCall(realDot(h->Y[last], h->Y[last], &yy));
+    PetscCall(VecScale(d, sy / yy));
+  }
+  for (PetscInt i = h->bound - 1; i >= 0; i--) {
+    const PetscInt idx = (h->ptr - 1 - i + M) % M;
+    PetscReal      yd  = 0.0;
+    PetscCall(realDot(h->Y[idx], d, &yd));
+    PetscCall(VecAXPY(d, h->alpha[idx] - h->rho[idx] * yd, h->S[idx]));
+  }
+  PetscCall(VecScale(d, -1.0));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* Stores the accepted pair when it satisfies the curvature condition y^T s > 0. */
+static PetscErrorCode updateHistory(LbfgsHistory *h, Vec X, Vec Xnew, Vec G, Vec Gnew, PetscReal ys, MPI_Comm comm) {
+  PetscFunctionBeginUser;
+  if (ys <= 1e-30) {
+    PetscCall(PetscPrintf(comm, "   L-BFGS: skipping update (y^T s = %g); keeping history.\n", (double)ys));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+  PetscCall(VecCopy(Xnew, h->S[h->ptr]));
+  PetscCall(VecAXPY(h->S[h->ptr], -1.0, X));
+  PetscCall(VecCopy(Gnew, h->Y[h->ptr]));
+  PetscCall(VecAXPY(h->Y[h->ptr], -1.0, G));
+  h->rho[h->ptr] = 1.0 / ys;
+  h->ptr         = (h->ptr + 1) % h->memory;
+  h->bound       = PetscMin(h->bound + 1, h->memory);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* Backtracking Armijo search along d from (X, f) with slope gTd; *ok is false when it fails. */
+static PetscErrorCode lineSearch(const LbfgsProblem *problem, Vec X, PetscReal f, Vec d, PetscReal gTd, PetscReal *stp, Vec Xnew,
+                                 PetscReal *fnew, Vec Gnew, PetscReal *rms, PetscInt *numEvals, PetscBool *ok) {
+  PetscFunctionBeginUser;
+  *ok = PETSC_FALSE;
+  for (PetscInt ls = 0; ls < LBFGS_MAX_LINE_SEARCH; ls++) {
+    PetscCall(VecCopy(X, Xnew));
+    PetscCall(VecAXPY(Xnew, *stp, d));
+    PetscCall(problem->objgrad(problem->ctx, Xnew, fnew, Gnew, rms));
+    (*numEvals)++;
+    if (!PetscIsNanReal(*fnew) && *fnew <= f + LBFGS_ARMIJO_C1 * *stp * gTd) {
+      *ok = PETSC_TRUE;
+      break;
+    }
+    *stp *= 0.5;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode gradientRatio(Vec G, Vec X, PetscReal *ratio) {
+  PetscFunctionBeginUser;
+  PetscReal gnorm, xnorm;
+  PetscCall(VecNorm(G, NORM_2, &gnorm));
+  PetscCall(VecNorm(X, NORM_2, &xnorm));
+  *ratio = gnorm / PetscMax(1.0, xnorm);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode logExit(MPI_Comm comm, const LbfgsOptions *opts, const LbfgsResult *result, PetscReal rms, PetscReal gradRatio) {
+  PetscFunctionBeginUser;
+  char detail[128];
+
+  switch (result->reason) {
+  case LBFGS_CONVERGED_RMSTOL:
+    PetscCall(PetscSNPrintf(detail, sizeof(detail), "RMS %.4f <= %s", (double)rms, formatCompactReal(opts->rmsTol)));
+    break;
+  case LBFGS_CONVERGED_GRTOL:
+    PetscCall(PetscSNPrintf(detail, sizeof(detail), "|g|/|x| %.3e <= %s", (double)gradRatio, formatCompactReal(opts->gtol)));
+    break;
+  case LBFGS_CONVERGED_RMS_STALL:
+    PetscCall(PetscSNPrintf(detail, sizeof(detail), "RMS drop < %s for %" PetscInt_FMT " iterations, RMS %.4f",
+                            formatCompactReal(opts->rmsRelTol), opts->rmsStallWindow, (double)rms));
+    break;
+  case LBFGS_DIVERGED_LS_FAILURE:
+    PetscCall(PetscSNPrintf(detail, sizeof(detail), "no sufficient decrease after %d trial steps", LBFGS_MAX_LINE_SEARCH));
+    break;
+  case LBFGS_DIVERGED_NAN:
+    PetscCall(PetscStrncpy(detail, "NaN in objective or gradient", sizeof(detail)));
+    break;
+  case LBFGS_DIVERGED_MAXITS:
+    PetscCall(PetscStrncpy(detail, "max iterations reached", sizeof(detail)));
+    break;
+  }
+  PetscCall(PetscPrintf(comm, "\n"));
+  PetscCall(logKvStr(comm, "Exit reason", LbfgsReasons[result->reason]));
+  PetscCall(logKvStr(comm, "Stopping test", detail));
+  PetscCall(logKvInt(comm, "Iterations", result->numIters));
+  PetscCall(logKvInt(comm, "Evaluations", result->numEvals));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode lbfgsOptimize(const LbfgsProblem *problem, const LbfgsOptions *opts, Vec X, LbfgsResult *result) {
   PetscFunctionBeginUser;
 
-  MPI_Comm          comm  = PetscObjectComm((PetscObject)X);
-  InversionContext *ictx  = (InversionContext *)ctx;
-  const PetscInt    maxLs = 20;   /* max line search steps */
-  PetscLogDouble    tRow;
-  PetscCall(PetscTime(&tRow));
+  MPI_Comm     comm = PetscObjectComm((PetscObject)X);
+  LbfgsHistory hist;
+  Vec          G, d, Xnew, Gnew;
+  PetscReal    f, fnew, rms, prevRms, gnorm, gradRatio;
+  PetscInt     stallCount = 0;
 
-  /* Allocate work vectors */
-  Vec G;          /* current gradient */
-  Vec d;          /* search direction */
-  Vec Xnew, Gnew; /* trial point and gradient */
   PetscCall(VecDuplicate(X, &G));
   PetscCall(VecDuplicate(X, &d));
   PetscCall(VecDuplicate(X, &Xnew));
   PetscCall(VecDuplicate(X, &Gnew));
+  PetscCall(createHistory(X, opts->memory, &hist));
 
-  /* L-BFGS memory: s[i] = X_{k+1} - X_k, y[i] = G_{k+1} - G_k. VecDuplicateVecs creates the array of Vec handles AND the Vecs in a
-   * single call - one round-trip instead of an explicit per-slot loop. */
-  Vec *S, *Y;
-  PetscReal *rho;       /* rho[i] = 1 / (y_i^T s_i) */
-  PetscReal *alpha;     /* workspace for two-loop recursion */
-  PetscCall(VecDuplicateVecs(X, M, &S));
-  PetscCall(VecDuplicateVecs(X, M, &Y));
-  PetscCall(PetscMalloc1(M, &rho));
-  PetscCall(PetscMalloc1(M, &alpha));
+  result->numIters = 0;
+  result->numEvals = 1;
+  result->reason   = LBFGS_DIVERGED_MAXITS;
 
-  /* Evaluate initial objective and gradient */
-  PetscReal f;
-  PetscCall(objgrad(X, &f, G, ctx));
-
-  PetscReal gnorm, xnorm;
+  PetscCall(problem->objgrad(problem->ctx, X, &f, G, &rms));
   PetscCall(VecNorm(G, NORM_2, &gnorm));
-  PetscCall(VecNorm(X, NORM_2, &xnorm));
-  xnorm = PetscMax(1.0, xnorm);
+  PetscCall(gradientRatio(G, X, &gradRatio));
+  PetscCall(problem->monitor(problem->ctx, 0, gradRatio, 0.0));
+  prevRms = rms;
+  if (gradRatio <= opts->gtol) result->reason = LBFGS_CONVERGED_GRTOL;
 
-  /* Header row */
-  PetscCall(PetscPrintf(comm, "   %4s %5s %9s %12s %10s %8s %9s %8s\n",
-                        "Iter", "Evals", "RMS", "λΦm", "|g|/|x|", "Step", "KSP its", "t (s)"));
-  PetscCall(printIterationRow(comm, ictx, 0, gnorm / xnorm, 0.0, &tRow));
+  for (PetscInt iter = 0; iter < opts->maxIter && result->reason == LBFGS_DIVERGED_MAXITS; iter++) {
+    PetscReal gTd = 0.0, gnewTd = 0.0, stp = 1.0;
+    PetscBool ok;
 
-  const PetscReal rmsRelTol      = ictx->iparams->rmsRelTol;
-  const PetscInt  rmsStallWindow = ictx->iparams->rmsStallWindow;
-
-  /* Convergence check before iteration */
-  if (gnorm / xnorm <= gtol) {
-    *numIters  = 0;
-    *reasonStr = "CONVERGED_GRTOL";
-    goto cleanup;
-  }
-
-  /* Adaptive RMS-plateau stop: in addition to the absolute rmsTol, stop when the data misfit stops improving (relative drop below 
-   * rmsRelTol for `rmsStallWindow` consecutive iterations). This is model-adaptive - it derives the stopping point from the RMS 
-   * history itself rather than a fixed threshold - so a case that plateaus above rmsTol stops once it has converged instead of grinding
-   * to maxIter and overfitting. Disable with -im_rms_rtol 0.
-   *
-   * Both knobs are parsed with every other im.csem option in readimParams (so they appear under -help and can be set from the params 
-   * file); read them from iparams rather than re-querying the options database here. */
-  PetscReal prevRms     = (rmsPtr) ? *rmsPtr : PETSC_INFINITY;
-  PetscInt  rmsStallCnt = 0;
-
-  /* L-BFGS main loop */
-  PetscInt bound = 0;   /* number of stored pairs (up to M) */
-  PetscInt ptr   = 0;   /* circular buffer pointer */
-  *reasonStr = "DIVERGED_MAXITS";
-
-  for (PetscInt iter = 0; iter < maxIter; iter++) {
-
-    /* Two-loop recursion: compute d = -H_k * G */
-    PetscCall(VecCopy(G, d));     /* q = G */
-
-    /* First loop (backward over stored pairs) */
-    for (PetscInt j = 0; j < bound; j++) {
-      PetscInt idx = (ptr - 1 - j + M) % M;
-      PetscScalar dotval;
-      PetscCall(VecDot(S[idx], d, &dotval));
-      alpha[idx] = rho[idx] * PetscRealPart(dotval);
-      PetscCall(VecAXPY(d, -alpha[idx], Y[idx]));
-    }
-
-    /* Scale by gamma = s^T y / (y^T y) for the most recent pair */
-    if (bound > 0) {
-      PetscInt last = (ptr - 1 + M) % M;
-      PetscScalar sys, yty;
-      PetscCall(VecDot(S[last], Y[last], &sys));
-      PetscCall(VecDot(Y[last], Y[last], &yty));
-      PetscReal gamma = PetscRealPart(sys) / PetscRealPart(yty);
-      PetscCall(VecScale(d, gamma));
-    }
-
-    /* Second loop (forward over stored pairs) */
-    for (PetscInt j = bound - 1; j >= 0; j--) {
-      PetscInt idx = (ptr - 1 - j + M) % M;
-      PetscScalar dotval;
-      PetscCall(VecDot(Y[idx], d, &dotval));
-      PetscReal beta = rho[idx] * PetscRealPart(dotval);
-      PetscCall(VecAXPY(d, alpha[idx] - beta, S[idx]));
-    }
-
-    /* d = -H*G (negate) */
-    PetscCall(VecScale(d, -1.0));
-
-    /* Backtracking Armijo line search */
-    PetscScalar gTd_scalar;
-    PetscCall(VecDot(G, d, &gTd_scalar));
-    PetscReal gTd = PetscRealPart(gTd_scalar);
-
+    PetscCall(searchDirection(&hist, G, d));
+    PetscCall(realDot(G, d, &gTd));
     if (gTd >= 0.0) {
-      /* Not a descent direction - fall back to steepest descent */
       PetscCall(PetscPrintf(comm, "   L-BFGS: positive curvature detected; resetting to steepest descent.\n"));
       PetscCall(VecCopy(G, d));
       PetscCall(VecScale(d, -1.0));
-      PetscCall(VecDot(G, d, &gTd_scalar));
-      gTd = PetscRealPart(gTd_scalar);
-      bound = 0;
-      ptr   = 0;
+      PetscCall(realDot(G, d, &gTd));
+      hist.bound = 0;
+      hist.ptr   = 0;
+    }
+    if (iter == 0 && hist.bound == 0) stp = 1.0 / gnorm;
+
+    PetscCall(lineSearch(problem, X, f, d, gTd, &stp, Xnew, &fnew, Gnew, &rms, &result->numEvals, &ok));
+    if (!ok) {
+      result->reason   = LBFGS_DIVERGED_LS_FAILURE;
+      result->numIters = iter + 1;
+      break;
     }
 
-    /* Initial step size: 1.0 for L-BFGS, 1/||G|| for first (steepest descent) */
-    PetscReal stp = 1.0;
-    if (iter == 0 && bound == 0) {
-      stp = 1.0 / gnorm;
-    }
-
-    PetscReal fnew;
-    PetscReal c1 = 1e-4;       /* Armijo sufficient decrease parameter */
-    PetscBool lsOk = PETSC_FALSE;
-
-    for (PetscInt ls = 0; ls < maxLs; ls++) {
-      /* Xnew = X + stp * d */
-      PetscCall(VecCopy(X, Xnew));
-      PetscCall(VecAXPY(Xnew, stp, d));
-
-      PetscCall(objgrad(Xnew, &fnew, Gnew, ctx));
-
-      if (!PetscIsNanReal(fnew) && fnew <= f + c1 * stp * gTd) {
-        lsOk = PETSC_TRUE;
-        break;
-      }
-      stp *= 0.5;
-    }
-
-    if (!lsOk) {
-      *reasonStr = "DIVERGED_LS_FAILURE";
-      *numIters  = iter + 1;
-      goto cleanup;
-    }
-
-    /* Store s_k = Xnew - X, y_k = Gnew - G */
-    /* Check curvature BEFORE writing to S[ptr]/Y[ptr], so that a rejected pair does not corrupt the circular buffer.
-       ys = (Gnew - G)^T (Xnew - X) = stp * (Gnew^T d - G^T d) */
-    PetscScalar gnewTd_scalar;
-    PetscCall(VecDot(Gnew, d, &gnewTd_scalar));
-    PetscReal ys = stp * (PetscRealPart(gnewTd_scalar) - gTd);
-
-    if (ys > 1e-30) {
-      PetscCall(VecCopy(Xnew, S[ptr]));
-      PetscCall(VecAXPY(S[ptr], -1.0, X));    /* S[ptr] = Xnew - X */
-      PetscCall(VecCopy(Gnew, Y[ptr]));
-      PetscCall(VecAXPY(Y[ptr], -1.0, G));    /* Y[ptr] = Gnew - G */
-      rho[ptr] = 1.0 / ys;
-      ptr   = (ptr + 1) % M;
-      bound = PetscMin(bound + 1, M);
-    } else {
-      /* Curvature condition not met: skip storing this pair and keep the
-       * existing history rather than resetting to steepest descent. */
-      PetscCall(PetscPrintf(comm, "   L-BFGS: skipping update (y^T s = %g); keeping history.\n", (double)ys));
-    }
-
-    /* Accept step */
+    /* y^T s = stp (Gnew^T d - G^T d) */
+    PetscCall(realDot(Gnew, d, &gnewTd));
+    PetscCall(updateHistory(&hist, X, Xnew, G, Gnew, stp * (gnewTd - gTd), comm));
     PetscCall(VecCopy(Xnew, X));
     PetscCall(VecCopy(Gnew, G));
-    f = fnew;
+    f                = fnew;
+    result->numIters = iter + 1;
 
-    /* VTU snapshot (accepted steps only; the final one is written by runCsemInversion) */
-    ictx->acceptedIter++;
-    if (ictx->iparams->snapshotInterval > 0 && ictx->acceptedIter % ictx->iparams->snapshotInterval == 0) {
-      PetscLogDouble ts0, ts1;
-      PetscCall(PetscTime(&ts0));
-      PetscCall(writeInversionSnapshotVTU(ictx, ictx->acceptedIter));
-      PetscCall(PetscTime(&ts1));
-      ictx->tOutput += ts1 - ts0;
-      ictx->numSnapshots++;
-    }
-
-    /* Convergence check */
     PetscCall(VecNorm(G, NORM_2, &gnorm));
-    PetscCall(VecNorm(X, NORM_2, &xnorm));
-    xnorm = PetscMax(1.0, xnorm);
-
-    PetscCall(printIterationRow(comm, ictx, iter + 1, gnorm / xnorm, stp, &tRow));
+    PetscCall(gradientRatio(G, X, &gradRatio));
+    PetscCall(problem->monitor(problem->ctx, iter + 1, gradRatio, stp));
 
     if (PetscIsNanReal(gnorm) || PetscIsNanReal(f)) {
-      *reasonStr = "DIVERGED_NAN";
-      *numIters  = iter + 1;
-      goto cleanup;
-    }
-
-    if (gnorm / xnorm <= gtol) {
-      *numIters  = iter + 1;
-      *reasonStr = "CONVERGED_GRTOL";
-      goto cleanup;
-    }
-
-    /* Stop when the data misfit drops to the noise-level threshold */
-    if (rmsPtr && rmsTol > 0.0 && *rmsPtr <= rmsTol) {
-      *numIters  = iter + 1;
-      *reasonStr = "CONVERGED_RMSTOL";
-      goto cleanup;
-    }
-
-    /* Adaptive RMS-plateau exit: stop once the misfit stops improving for `rmsStallWindow` consecutive iterations (relative drop < rmsRelTol).
-     * Prevents over-iterating / overfitting when the absolute rmsTol is unreachable for this model. */
-    if (rmsPtr && rmsRelTol > 0.0) {
-      PetscReal denom = PetscMax(prevRms, PETSC_SMALL);
-      PetscReal rel   = (prevRms - *rmsPtr) / denom;   /* fractional drop */
-      
-      if (rel < rmsRelTol) {
-        rmsStallCnt++;
-      }
-      else {
-        rmsStallCnt = 0;
-      } 
-                       
-      prevRms = *rmsPtr;
-      if (rmsStallCnt >= rmsStallWindow) {
-        *numIters  = iter + 1;
-        *reasonStr = "CONVERGED_RMS_STALL";
-        goto cleanup;
-      }
+      result->reason = LBFGS_DIVERGED_NAN;
+    } else if (gradRatio <= opts->gtol) {
+      result->reason = LBFGS_CONVERGED_GRTOL;
+    } else if (opts->rmsTol > 0.0 && rms <= opts->rmsTol) {
+      result->reason = LBFGS_CONVERGED_RMSTOL;
+    } else if (opts->rmsRelTol > 0.0) {
+      const PetscReal drop = (prevRms - rms) / PetscMax(prevRms, PETSC_SMALL);
+      stallCount           = (drop < opts->rmsRelTol) ? stallCount + 1 : 0;
+      prevRms              = rms;
+      if (stallCount >= opts->rmsStallWindow) result->reason = LBFGS_CONVERGED_RMS_STALL;
     }
   }
 
-  *numIters = maxIter;
+  PetscCall(logExit(comm, opts, result, rms, gradRatio));
 
-cleanup:
-  {
-    char detail[128];
-    if (!strcmp(*reasonStr, "CONVERGED_RMSTOL")) {
-      PetscCall(PetscSNPrintf(detail, sizeof(detail), "RMS %.4f <= %s", (double)*rmsPtr, formatCompactReal(rmsTol)));
-    } else if (!strcmp(*reasonStr, "CONVERGED_GRTOL")) {
-      PetscCall(PetscSNPrintf(detail, sizeof(detail), "|g|/|x| %.3e <= %s", (double)(gnorm / xnorm), formatCompactReal(gtol)));
-    } else if (!strcmp(*reasonStr, "CONVERGED_RMS_STALL")) {
-      PetscCall(PetscSNPrintf(detail, sizeof(detail), "RMS drop < %s for %" PetscInt_FMT " iterations, RMS %.4f",
-                              formatCompactReal(rmsRelTol), rmsStallWindow, (double)*rmsPtr));
-    } else if (!strcmp(*reasonStr, "DIVERGED_LS_FAILURE")) {
-      PetscCall(PetscSNPrintf(detail, sizeof(detail), "no sufficient decrease after %" PetscInt_FMT " trial steps", maxLs));
-    } else if (!strcmp(*reasonStr, "DIVERGED_NAN")) {
-      PetscCall(PetscStrncpy(detail, "NaN in objective or gradient", sizeof(detail)));
-    } else {
-      PetscCall(PetscSNPrintf(detail, sizeof(detail), "max iterations reached"));
-    }
-    PetscCall(PetscPrintf(comm, "\n"));
-    PetscCall(logKVStr(comm, "Exit reason", *reasonStr));
-    PetscCall(logKVStr(comm, "Stopping test", detail));
-    PetscCall(logKVInt(comm, "Iterations", *numIters));
-    PetscCall(logKVInt(comm, "Evaluations", ictx->iterCount));
-  }
-  PetscCall(VecDestroyVecs(M, &S));
-  PetscCall(VecDestroyVecs(M, &Y));
-  PetscCall(PetscFree(rho));
-  PetscCall(PetscFree(alpha));
+  PetscCall(destroyHistory(&hist));
   PetscCall(VecDestroy(&G));
   PetscCall(VecDestroy(&d));
   PetscCall(VecDestroy(&Xnew));
   PetscCall(VecDestroy(&Gnew));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }

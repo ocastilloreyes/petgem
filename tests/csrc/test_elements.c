@@ -16,7 +16,7 @@
  *   - the De Rham identity Ke . G == 0 (the discrete gradient lies in the
  *     kernel of the curl-curl stiffness);
  *   - a positively oriented, non-degenerate cell Jacobian;
- *   - tetrahedronXYZToReference inverts x = v0 + J^T r, the frame of
+ *   - tetrahedronXyzToReference inverts x = v0 + J^T r, the frame of
  *     evaluateNedelecBasis.
  *
  * Usage: test_elements <order>   (order in 1..6).  Exit 0 iff all checks pass.
@@ -27,24 +27,26 @@
 #include "petgem_test.h"
 #include <petsc.h>
 
-static PetscReal **alloc2d(PetscInt r, PetscInt c)
-{
+static PetscReal **alloc2d(PetscInt r, PetscInt c) {
   PetscReal **m, *flat;
   PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(r, &m));
   PetscCallAbort(PETSC_COMM_SELF, PetscCalloc1(r * c, &flat));
   for (PetscInt i = 0; i < r; i++) m[i] = flat + i * c;
   return m;
 }
-static void free2d(PetscReal **m) { PetscCallAbort(PETSC_COMM_SELF, PetscFree(m[0])); PetscCallAbort(PETSC_COMM_SELF, PetscFree(m)); }
 
-static void check_cell(PetscInt order, const PetscReal coords[12], const char *tag)
-{
+static void free2d(PetscReal **m) {
+  PetscCallAbort(PETSC_COMM_SELF, PetscFree(m[0]));
+  PetscCallAbort(PETSC_COMM_SELF, PetscFree(m));
+}
+
+static void check_cell(PetscInt order, const PetscReal coords[12], const char *tag) {
   const PetscInt dof = order * (order + 2) * (order + 3) / 2;
   const PetscInt nH1 = (order + 1) * (order + 2) * (order + 3) / 6;
 
   /* computeElementalMatrices / buildDiscreteGradientMatrix read only fem.order
    * (dof counts are derived internally); the rest is zeroed for cleanliness. */
-  FEMSpace fem;
+  FemSpace fem;
   PetscCallAbort(PETSC_COMM_SELF, PetscMemzero(&fem, sizeof(fem)));
   fem.order = order;
 
@@ -59,12 +61,7 @@ static void check_cell(PetscInt order, const PetscReal coords[12], const char *t
 
   /* Quadrature. */
   Quadrature3D quad;
-  PetscCallAbort(PETSC_COMM_SELF, computeNum3DQuadraturePoints(order, &quad));
-  PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(quad.numPoints, &quad.points));
-  for (PetscInt q = 0; q < quad.numPoints; q++)
-    PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(NUM_DIMENSIONS, &quad.points[q]));
-  PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(quad.numPoints, &quad.weights));
-  PetscCallAbort(PETSC_COMM_SELF, compute3DQuadraturePoints(&quad));
+  PetscCallAbort(PETSC_COMM_SELF, createQuadrature3D(order, &quad));
 
   PetscReal **Me = alloc2d(dof, dof);
   PetscReal **Ke = alloc2d(dof, dof);
@@ -75,7 +72,7 @@ static void check_cell(PetscInt order, const PetscReal coords[12], const char *t
 
   /* Finiteness + symmetry + scale. */
   PetscReal meMax = 0, keMax = 0;
-  int meSym = 1, keSym = 1, finite = 1;
+  int       meSym = 1, keSym = 1, finite = 1;
   for (PetscInt i = 0; i < dof; i++)
     for (PetscInt j = 0; j < dof; j++) {
       if (!isfinite(Me[i][j]) || !isfinite(Ke[i][j])) finite = 0;
@@ -92,18 +89,24 @@ static void check_cell(PetscInt order, const PetscReal coords[12], const char *t
   /* Definiteness by sampling: x^T Me x > 0 (SPD), x^T Ke x >= 0 (SPSD). */
   PetscReal *x;
   PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(dof, &x));
-  unsigned int seed = 12345u + (unsigned)order;
-  int meSPD = 1, keSPSD = 1;
-  for (int s = 0; s < 8; s++) {
-    for (PetscInt i = 0; i < dof; i++) { seed = seed*1103515245u + 12345u; x[i] = ((seed >> 16) & 0x7fff) / 16383.5 - 1.0; }
+  unsigned int seed  = 12345u + (unsigned)order;
+  int          meSpd = 1, keSpsd = 1;
+  for (int i = 0; i < 8; i++) {
+    for (PetscInt j = 0; j < dof; j++) {
+      seed = seed * 1103515245u + 12345u;
+      x[j] = ((seed >> 16) & 0x7fff) / 16383.5 - 1.0;
+    }
     PetscReal qm = 0, qk = 0;
-    for (PetscInt i = 0; i < dof; i++)
-      for (PetscInt j = 0; j < dof; j++) { qm += x[i]*Me[i][j]*x[j]; qk += x[i]*Ke[i][j]*x[j]; }
-    if (qm <= 1e-13 * meMax) meSPD = 0;
-    if (qk < -1e-9 * (keMax + 1.0)) keSPSD = 0;
+    for (PetscInt j = 0; j < dof; j++)
+      for (PetscInt k = 0; k < dof; k++) {
+        qm += x[j] * Me[j][k] * x[k];
+        qk += x[j] * Ke[j][k] * x[k];
+      }
+    if (qm <= 1e-13 * meMax) meSpd = 0;
+    if (qk < -1e-9 * (keMax + 1.0)) keSpsd = 0;
   }
-  PT_CHECK(meSPD, "[%s] order=%d: Me not positive definite (sampled)", tag, (int)order);
-  PT_CHECK(keSPSD, "[%s] order=%d: Ke not positive semidefinite (sampled)", tag, (int)order);
+  PT_CHECK(meSpd, "[%s] order=%d: Me not positive definite (sampled)", tag, (int)order);
+  PT_CHECK(keSpsd, "[%s] order=%d: Ke not positive semidefinite (sampled)", tag, (int)order);
   PetscCallAbort(PETSC_COMM_SELF, PetscFree(x));
 
   /* De Rham: Ke . G == 0 (columns of G span the curl-kernel). */
@@ -114,37 +117,35 @@ static void check_cell(PetscInt order, const PetscReal coords[12], const char *t
       for (PetscInt k = 0; k < dof; k++) v += Ke[i][k] * G[k][j];
       kgMax = PetscMax(kgMax, fabs(v));
     }
-  PT_CHECK(kgMax < 1e-8 * (keMax + 1.0), "[%s] order=%d: ||Ke.G||_max = %.3e (expected ~0, keMax=%.3e)",
-           tag, (int)order, kgMax, keMax);
+  PT_CHECK(kgMax < 1e-8 * (keMax + 1.0), "[%s] order=%d: ||Ke.G||_max = %.3e (expected ~0, keMax=%.3e)", tag, (int)order, kgMax, keMax);
 
-  /* tetrahedronXYZToReference(v0 + J^T r) == r */
+  /* tetrahedronXyzToReference(v0 + J^T r) == r */
   const PetscReal refPoints[4][3] = {{0.25, 0.25, 0.25}, {0.1, 0.2, 0.3}, {0.6, 0.1, 0.05}, {0.0, 0.3, 0.3}};
-  for (int k = 0; k < 4; k++) {
+  for (int i = 0; i < 4; i++) {
     PetscReal x[3], r[3];
     for (int d = 0; d < 3; d++)
-      x[d] = coords[d] + refPoints[k][0] * (coords[3 + d] - coords[d]) + refPoints[k][1] * (coords[6 + d] - coords[d]) +
-             refPoints[k][2] * (coords[9 + d] - coords[d]);
-    PetscCallAbort(PETSC_COMM_SELF, tetrahedronXYZToReference(coords, x, r));
+      x[d] = coords[d] + refPoints[i][0] * (coords[3 + d] - coords[d]) + refPoints[i][1] * (coords[6 + d] - coords[d]) +
+             refPoints[i][2] * (coords[9 + d] - coords[d]);
+    PetscCallAbort(PETSC_COMM_SELF, tetrahedronXyzToReference(coords, x, r));
     for (int d = 0; d < 3; d++)
-      PT_CLOSE(r[d], refPoints[k][d], 1e-12, "[%s] order=%d: tetrahedronXYZToReference point %d component %d = %.15g, expected %.15g",
-               tag, (int)order, k, d, r[d], refPoints[k][d]);
+      PT_CLOSE(r[d], refPoints[i][d], 1e-12, "[%s] order=%d: tetrahedronXyzToReference point %d component %d = %.15g, expected %.15g", tag,
+               (int)order, i, d, r[d], refPoints[i][d]);
   }
 
-  free2d(Me); free2d(Ke); free2d(G);
-  for (PetscInt q = 0; q < quad.numPoints; q++) PetscCallAbort(PETSC_COMM_SELF, PetscFree(quad.points[q]));
-  PetscCallAbort(PETSC_COMM_SELF, PetscFree(quad.points));
-  PetscCallAbort(PETSC_COMM_SELF, PetscFree(quad.weights));
+  free2d(Me);
+  free2d(Ke);
+  free2d(G);
+  PetscCallAbort(PETSC_COMM_SELF, destroyQuadrature3D(&quad));
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
   PetscInt order = (argc > 1) ? atoi(argv[1]) : 1;
 
-  const PetscReal refTet[12]   = {0,0,0, 1,0,0, 0,1,0, 0,0,1};
-  const PetscReal skewTet[12]  = {0.2,0.1,-0.3, 1.4,0.0,0.1, 0.3,1.7,0.2, -0.1,0.4,2.1};
+  const PetscReal refTet[12]  = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+  const PetscReal skewTet[12] = {0.2, 0.1, -0.3, 1.4, 0.0, 0.1, 0.3, 1.7, 0.2, -0.1, 0.4, 2.1};
 
-  check_cell(order, refTet,  "reference");
+  check_cell(order, refTet, "reference");
   check_cell(order, skewTet, "skewed");
 
   int rc = pt_report("test_elements");
