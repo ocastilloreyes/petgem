@@ -44,19 +44,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build release Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/dockerfile.release
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:${{ steps.get_version.outputs.VERSION_TAG }}
-          build-args: |
-            BUILDER_IMAGE=ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest

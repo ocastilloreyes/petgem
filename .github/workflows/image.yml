@@ -42,7 +42,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./docker/dockerfile.develop
+          file: ./docker/Dockerfile
           push: true
           tags: ${{ env.DOCKER_IMAGE }}
           cache-from: type=gha

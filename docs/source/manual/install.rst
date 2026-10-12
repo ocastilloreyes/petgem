@@ -32,24 +32,28 @@ explicit error if ``PETSC_DIR`` does not point at a PETSc installation.
 
 Docker
 ------
-``docker/dockerfile.develop`` builds the development image: PETSc (complex
-scalars), Gmsh, Extrae, and the Python stack. The repository is mounted, not
-copied:
+``docker/Dockerfile`` builds the image: PETSc (complex scalars), Gmsh,
+Extrae, and the Python stack. CI publishes it as
+``ghcr.io/ocastilloreyes/petgem-ci-env:latest``. The repository is mounted,
+not copied:
 
 .. code-block:: bash
 
    git clone https://github.com/ocastilloreyes/petgem.git
    cd petgem
 
-   docker build -t petgem-env -f docker/dockerfile.develop .
+   docker pull ghcr.io/ocastilloreyes/petgem-ci-env:latest
+   docker tag ghcr.io/ocastilloreyes/petgem-ci-env:latest petgem-env
    docker run --rm -it -u $(id -u):$(id -g) -v $(pwd):/workspace -w /workspace petgem-env bash
 
    # inside the container
    make
 
-``docker/dockerfile.release`` builds a runtime image on top of the development
-one, with the four binaries in ``/opt/petgem/bin`` and the Python layer in
-``/opt/petgem/utils``.
+To build the image locally instead of pulling it:
+
+.. code-block:: bash
+
+   docker build -t petgem-env -f docker/Dockerfile .
 
 See :doc:`quickstart` for a first run.
 

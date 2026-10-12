@@ -7,8 +7,8 @@
        </div>
    </div>
 
-.. image:: https://img.shields.io/github/actions/workflow/status/ocastilloreyes/petgem/ci-develop.yml?branch=develop
-   :target: https://github.com/ocastilloreyes/petgem/actions
+.. image:: https://img.shields.io/github/actions/workflow/status/ocastilloreyes/petgem/ci-develop.yml?branch=develop&label=CI
+   :target: https://github.com/ocastilloreyes/petgem/actions/workflows/ci-develop.yml
    :alt: CI Status
 
 .. image:: https://readthedocs.org/projects/petgem/badge/?version=latest
@@ -16,16 +16,16 @@
    :alt: Documentation Status
 
 .. image:: https://img.shields.io/github/license/ocastilloreyes/petgem
-   :target: https://opensource.org/licenses/BSD-3-Clause
+   :target: https://github.com/ocastilloreyes/petgem/blob/develop/LICENSE.rst
    :alt: License: BSD 3-Clause
 
 .. image:: https://img.shields.io/github/v/release/ocastilloreyes/petgem
    :target: https://github.com/ocastilloreyes/petgem/releases
    :alt: Latest release
 
-.. image:: https://img.shields.io/github/v/tag/ocastilloreyes/petgem?label=docker%20image&logo=docker&sort=semver
+.. image:: https://img.shields.io/badge/docker-petgem--ci--env%3Alatest-blue?logo=docker
    :target: https://github.com/ocastilloreyes/petgem/pkgs/container/petgem-ci-env
-   :alt: Docker image version
+   :alt: Docker image
 
 **PETGEM** is a parallel code for 3D frequency-domain electromagnetic
 modeling with high-order Nédélec (edge) finite elements, orders 1 to 6, on
@@ -50,7 +50,7 @@ Dependencies
 - Python 3 with ``numpy``, ``h5py`` and ``meshio``; ``matplotlib`` for the
   example scripts, ``pytest`` for the tests
 
-The Docker image in ``docker/dockerfile.develop`` contains all of them.
+The Docker image built from ``docker/Dockerfile`` contains all of them.
 
 Quick start
 -----------
@@ -59,7 +59,8 @@ Quick start
    git clone https://github.com/ocastilloreyes/petgem.git
    cd petgem
 
-   docker build -t petgem-env -f docker/dockerfile.develop .
+   docker pull ghcr.io/ocastilloreyes/petgem-ci-env:latest
+   docker tag ghcr.io/ocastilloreyes/petgem-ci-env:latest petgem-env
    docker run --rm -it -u $(id -u):$(id -g) -v $(pwd):/workspace -w /workspace petgem-env bash
 
    # inside the container
