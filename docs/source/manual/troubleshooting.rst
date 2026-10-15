@@ -46,6 +46,12 @@ BDDC is not being configured
 is ``MATIS``. Set ``-dm_mat_type is`` together with ``-pc_type bddc``. See
 :doc:`solver`.
 
+``Cannot find /observed/<component>``
+*************************************
+A component named in ``-im_data_components`` is not in the bundle. Add its
+file to ``-observed_filename`` (``component:file``) and rebuild the bundle.
+See :doc:`inverse_modeling`.
+
 ``-im_observed_mode fm_native`` aborts
 ***************************************
 ``fm_native`` reads the observed data from an ``fm.csem`` output file, which

@@ -3,7 +3,9 @@
 Runs im.csem for two L-BFGS iterations on the im_csem_block conductive-block model at
 order 1 with two frequencies (1 and 10 Hz), direct LU (MUMPS), on 2 ranks, and
 checks the RMS history, the norm of the recovered log-perturbation and the
-iteration counters against reference/im_golden.json (rtol 1e-8).
+iteration counters against reference/im_golden.json (rtol 1e-8), and that the
+predicted Ex reproduces the reported RMS against the observed data and the
+gradient-norm history has one entry per accepted iteration.
 
 ``build_bundle.sh`` builds tests/im/input.h5.
 """
@@ -51,9 +53,26 @@ def test_im_reduced(im_run, h5py_mod):
         dx = np.asarray(f["log_perturbation"])[:, 0]
         assert "conductivity" in f
         attrs = {key: f.attrs[key] for key in ("convergence_reason", "num_iterations", "num_objgrad_evaluations")}
+        gnorm = np.asarray(f["grad_norm_history"])[:, 0]
+        pre = np.asarray(f["predicted_Ex"])
+        rms_pre = float(np.ravel(f.attrs["rms_predicted"])[0])
+    with h5py_mod.File(str(BUNDLE), "r") as f:
+        obs = np.asarray(f["observed/Ex"])
+        err = float(f["observed"].attrs["error_level"])
 
     np.testing.assert_allclose(rms, GOLDEN["rms_history"], rtol=RTOL)
     assert np.linalg.norm(dx) == pytest.approx(GOLDEN["log_perturbation_norm"], rel=RTOL)
     assert _text(attrs["convergence_reason"]) == GOLDEN["convergence_reason"]
     assert int(np.ravel(attrs["num_iterations"])[0]) == GOLDEN["num_iterations"]
     assert int(np.ravel(attrs["num_objgrad_evaluations"])[0]) == GOLDEN["num_objgrad_evaluations"]
+
+    # one gradient norm per accepted iteration, plus the starting model
+    assert gnorm.shape == (GOLDEN["num_iterations"] + 1,)
+    assert np.all(np.isfinite(gnorm)) and np.all(gnorm > 0)
+
+    # predicted Ex of the recovered model: (numFreqs, numReceivers, re/im)
+    assert pre.shape == obs.shape + (2,)
+    pre = pre[..., 0] + 1j * pre[..., 1]
+    rms = np.sqrt(np.mean(np.abs((obs - pre) / (err * np.abs(obs)))**2) / 2)
+    assert rms == pytest.approx(rms_pre, rel=1e-10)
+    assert np.isclose(rms_pre, GOLDEN["rms_history"], rtol=1e-6).any()

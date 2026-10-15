@@ -2,12 +2,12 @@
 Overview
 ========
 
-**PETGEM** has three kernels built on the same Nédélec finite-element core:
+**PETGEM** has four kernels built on the same Nédélec finite-element core:
 
-- ``fm.csem`` - CSEM forward modeling (:doc:`forward_modeling`).
-- ``im.csem`` - CSEM inversion of a per-material conductivity model
-  (:doc:`inverse_modeling`).
+- ``fm.csem`` - frequency-domain CSEM forward modeling (:doc:`forward_modeling`).
+- ``fm.tdcsem`` - time-domain CSEM forward modeling (:doc:`td_modeling`).
 - ``fm.mt`` - MT forward modeling (:doc:`mt_modeling`).
+- ``im.csem`` - frequency-domain CSEM inversion (:doc:`inverse_modeling`).
 
 Each kernel is a binary in ``build/``. The ``petgem`` dispatcher runs the same
 code, selected by a subcommand or by ``-mode``:
@@ -32,10 +32,11 @@ Every run follows the same steps:
 4. Run the kernel with ``-options_file``.
 5. Read the output HDF5 (see :doc:`python_api`).
 
-The bundle holds everything specific to the case: mesh, per-cell
-conductivity, polynomial order, receivers, and the sources (CSEM), frequency
-(MT) or observed data (inversion). The parameter file holds the solver and
-run options. Both formats are described in :doc:`formats`.
+The bundle holds the data of the case: mesh, per-cell conductivity,
+polynomial order and receivers, plus the sources (CSEM), the frequency (MT),
+the waveform (time-domain CSEM) or the observed data (inversion). The
+parameter file holds the solver and run options. Both formats are described in
+:doc:`formats`.
 
 Preprocessing
 -------------
@@ -61,6 +62,9 @@ rejects those of the other modes:
        ``-error_level``)
    * - ``fm.mt``
      - ``-mt_frequency_filename``
+   * - ``fm.tdcsem``
+     - ``-source_filename`` (7 fields per row), ``-tdcsem_waveform_filename``,
+       ``-tdcsem_t_end``
 
 ``-output_vtk model.vtu`` also writes the conductivity model for ParaView.
 ``python3 utils/preprocess.py -h`` lists every argument.
@@ -98,8 +102,8 @@ overrides it, so one bundle can be run at any order.
 Example cases
 -------------
 The cases in ``examples/`` share one layout: ``geometry/``, ``survey/``,
-``configs/``, ``scripts/``, ``reference/``. Generated files go to
-``outputs/``, which is git-ignored.
+``configs/``, ``scripts/`` and, when the reference is a data file,
+``reference/``. Generated files go to ``outputs/``, which is git-ignored.
 
 .. list-table::
    :header-rows: 1
@@ -124,3 +128,6 @@ The cases in ``examples/`` share one layout: ``geometry/``, ``survey/``,
    * - ``examples/fm_mt_hill``
      - ``fm.mt``
      - Trapezoidal hill with two reference solutions (:doc:`mt_examples`)
+   * - ``examples/fm_tdcsem_halfspace``
+     - ``fm.tdcsem``
+     - Half-space with an analytical solution (:doc:`td_examples`)

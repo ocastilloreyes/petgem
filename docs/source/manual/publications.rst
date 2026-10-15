@@ -4,20 +4,20 @@
 Publications
 ============
 
-Here you will find our research contributions related to **PETGEM** development as well as applications and literature reviews in the field.
+Publications on the development of **PETGEM**, its applications and reviews of the field.
 
 
 Principal papers to be cited
 ----------------------------
 
-If you are using **PETGEM** or our related research in your work, please cite the following key publications:
+If you use **PETGEM** in your work, please cite:
 
 
 - Castillo-Reyes, O., Modesto, D., Queralt, P., Marcuello, A., Ledo, J., Amor-Martin, A., de la Puente, J., García-Castillo, L.E. **3D magnetotelluric modeling using high-order tetrahedral Nédélec elements on massively parallel computing platforms.** Computers & Geosciences. `DOI: 10.1016/j.cageo.2021.105030 <https://doi.org/10.1016/j.cageo.2021.105030>`_
 
-- Castillo-Reyes, O., de la Puente, García-Castillo, L.E., Cela, J.M. **Parallel 3D marine controlled-source electromagnetic modeling using high-order tetrahedral Nédélec elements.** Geophysical Journal International. `DOI: 10.1093/gji/ggz285 <https://doi.org/10.1093/gji/ggz285>`_
+- Castillo-Reyes, O., de la Puente, J., García-Castillo, L.E., Cela, J.M. **Parallel 3D marine controlled-source electromagnetic modeling using high-order tetrahedral Nédélec elements.** Geophysical Journal International. `DOI: 10.1093/gji/ggz285 <https://doi.org/10.1093/gji/ggz285>`_
 
-- Castillo-Reyes, O., de la Puente, Cela, J.M. **PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements.** Computers & Geosciences. `DOI: 10.1016/j.cageo.2018.07.005 <https://doi.org/10.1016/j.cageo.2018.07.005>`_
+- Castillo-Reyes, O., de la Puente, J., Cela, J.M. **PETGEM: A parallel code for 3D CSEM forward modeling using edge finite elements.** Computers & Geosciences. `DOI: 10.1016/j.cageo.2018.07.005 <https://doi.org/10.1016/j.cageo.2018.07.005>`_
 
 BibTeX
 ******

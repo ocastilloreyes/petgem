@@ -6,7 +6,8 @@ The kernels solve a complex-symmetric system (see :doc:`method`) with PETSc,
 so any ``KSP``/``PC`` option can go in the parameter file or on the command
 line. ``fm.csem`` and ``fm.mt`` solve all their right-hand sides in one call
 (transmitters, or the two MT polarizations). ``im.csem`` reuses one solver for
-the forward and adjoint solves of each frequency.
+the forward and adjoint solves of each frequency. ``fm.tdcsem`` sets up one
+solver per time step size and reuses it for every step of that size.
 
 BDDC (iterative)
 ----------------
@@ -23,7 +24,8 @@ BDDC:
    -pc_bddc_monolithic
 
 ``im.csem`` adds ``-ksp_rtol 1.0e-10``, because the adjoint solution enters the
-gradient.
+gradient. ``fm.tdcsem`` with BDDC also needs ``-ksp_rtol 1.0e-10``: with
+``1e-8`` the solver error accumulates over the time steps.
 
 When the operator is ``MATIS`` (``-dm_mat_type is``), **PETGEM** sets the
 preconditioner to ``PCBDDC`` and passes it the discrete gradient :math:`G` of
@@ -33,8 +35,8 @@ any other matrix type this step is skipped, so ``-pc_type bddc`` needs
 
 Direct solve (MUMPS)
 --------------------
-The ``fm.mt`` parameter file uses a direct solve, and any kernel accepts the
-same block:
+The ``fm.mt`` and ``fm.tdcsem`` parameter files use a direct solve, and any
+kernel accepts the same block:
 
 .. code-block::
 

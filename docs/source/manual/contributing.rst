@@ -6,7 +6,7 @@ Conventions for working on **PETGEM**'s code and documentation.
 
 Building
 --------
-``make`` builds the four binaries; see :doc:`install` for the build options
+``make`` builds the five binaries; see :doc:`install` for the build options
 (``USE_EXTRAE``, ``USE_INTEL``, ``V=1``, ``NO_COLOR``). Objects are rebuilt when
 a header they include changes. Run ``make help`` for the target list.
 
@@ -52,7 +52,7 @@ layer or on lower ones:
    * - 6
      - Application
      - ``runtime`` (PETSc start-up, timed phases, Extrae events, common report
-       sections), the kernels ``fm_csem``, ``fm_mt``, ``im_csem``, the
+       sections), the kernels ``fm_csem``, ``fm_mt``, ``im_csem``, ``td_fm_csem``, the
        dispatcher ``petgem`` and the ``*_main`` entry points
 
 ``csem`` and ``mt`` are independent of each other. ``tests/unit/test_layers.py``
@@ -71,7 +71,8 @@ Generic input and output lives in ``io.c``; the physics-specific part lives in
 - ``PetgemParams`` holds the parameters common to all kernels (input bundle,
   output directory and stem, polynomial order). It is parsed by
   ``readPetgemParams()``. ``fm.csem`` and ``fm.mt`` use it directly (``fm.mt``
-  adds ``MtParams``, parsed by ``readMtParams()``); ``im.csem`` embeds one as
+  adds ``MtParams``, parsed by ``readMtParams()``; ``fm.tdcsem`` adds the
+  ``-tdcsem_*`` options); ``im.csem`` embeds one as
   ``ImParams.common`` and extends it with the inversion-only controls, which
   ``readImParams()`` parses.
 - Every inversion option is ``-im_*``.

@@ -44,7 +44,7 @@ typedef struct {
   /** Objective f, gradient G and data RMS at X. */
   PetscErrorCode (*objgrad)(void *ctx, Vec X, PetscReal *f, Vec G, PetscReal *rms);
   /** Called after the initial evaluation (iter 0) and after every accepted step. */
-  PetscErrorCode (*monitor)(void *ctx, PetscInt iter, PetscReal gradRatio, PetscReal step);
+  PetscErrorCode (*monitor)(void *ctx, PetscInt iter, PetscReal gnorm, PetscReal gradRatio, PetscReal step);
   void *ctx;
 } LbfgsProblem;
 

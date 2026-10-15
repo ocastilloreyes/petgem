@@ -10,7 +10,7 @@ recovered body sits shallower than the truth.
 
 Produced on the current `geometry/mesh.geo` (58022 cells, 374144 DOFs at order
 2) with the PCBDDC iterative solver (`configs/solver_bddc.txt`) on **112 MPI
-tasks** (one node), in 01:13:12.
+tasks** (one node), in 01:08:10.
 
 The domain decomposition is part of the configuration: the L-BFGS path follows
 the preconditioned solves, so reproduce these metrics at 112 tasks.
@@ -42,19 +42,19 @@ consistent with how the inversion weights the misfit. The value is computed by
 
 | quantity | value |
 |---|---|
-| initial RMS | 11.795 |
-| final RMS | 1.0499 |
-| iterations | 94 accepted L-BFGS steps (105 objective-gradient evaluations) |
+| initial RMS | 11.058 |
+| final RMS | 1.0498 |
+| iterations | 91 accepted L-BFGS steps (99 objective-gradient evaluations) |
 | termination | `CONVERGED_RMSTOL` (reached the RMS = 1.05 target) |
 
-The 105 evaluations are the initial one at the starting model plus 104
-line-search trials, of which 94 were accepted and 10 rejected: 1.117 evaluations
+The 99 evaluations are the initial one at the starting model plus 98
+line-search trials, of which 91 were accepted and 7 rejected: 1.088 evaluations
 per accepted step. Each evaluation issues `2 x n_freq` = 14 linear solves
-(forward and adjoint share the KSP), so the run performed 1470 solves.
+(forward and adjoint share the KSP), so the run performed 1386 solves.
 
 RMS decreases monotonically over the **accepted** L-BFGS steps. The
 `/rms_history` dataset in `responses_im_p2.h5` is not monotone, because it
-records every objective-gradient evaluation, including the ten line-search
+records every objective-gradient evaluation, including the seven line-search
 trials that were rejected. `responses_im_p2.h5` stores both counters separately -
 `num_iterations` (accepted steps) and `num_objgrad_evaluations` (length of
 `rms_history`) - and `analyze_inversion.py` prints them on separate lines.
@@ -64,20 +64,20 @@ trials that were rejected. `responses_im_p2.h5` stores both counters separately 
 | quantity | value | true |
 |---|---|---|
 | background resistivity | 100 Ω·m | 100 |
-| peak (minimum) resistivity | 9.00 Ω·m | 10 |
-| conductor centroid | (-1.6, -1.0, -166.4) m | (0, 0, -200) |
-| lateral offset | 1.8 m | 0 |
-| vertical offset | +33.6 m (shallower than true) | 0 |
-| conductor volume (ρ < 30 Ω·m) | 4.35 × 10⁶ m³ | 8.0 × 10⁶ |
+| peak (minimum) resistivity | 11.00 Ω·m | 10 |
+| conductor centroid | (0.2, -3.1, -163.4) m | (0, 0, -200) |
+| lateral offset | 3.1 m | 0 |
+| vertical offset | +36.6 m (shallower than true) | 0 |
+| conductor volume (ρ < 30 Ω·m) | 3.71 × 10⁶ m³ | 8.0 × 10⁶ |
 | fraction inside the true box | 72 % | - |
 
 Each entry carries its definition. The peak is the minimum cell resistivity
 anywhere in the earth, a single-cell extremum rather than an average over the
 body. The centroid is weighted by cell volume / cell resistivity over the cells
 with ρ < 30 Ω·m, and both offsets follow from it. The volume is the sum of those
-same cells, 54 % of the true 8 × 10⁶ m³. "Fraction inside the true box" is the
+same cells, 46 % of the true 8 × 10⁶ m³. "Fraction inside the true box" is the
 share of the recovered volume that falls within the true cube, so the overlap
-with the true body is 0.72 × 4.35 × 10⁶ / 8 × 10⁶ ≈ 39 %.
+with the true body is 0.72 × 3.71 × 10⁶ / 8 × 10⁶ ≈ 33 %.
 
 The inversion fits the data to the noise floor and recovers a conductor of the
 correct magnitude at the correct lateral position. The shallow bias and reduced

@@ -34,18 +34,19 @@ unstructured tetrahedral meshes. It is written in C on top of
 `Universitat Politècnica de Catalunya (UPC) <https://www.ac.upc.edu/en?set_language=en>`_
 and the `Barcelona Supercomputing Center (BSC) <https://www.bsc.es/es/discover-bsc/organisation/scientific-structure/geophysical-applications>`_.
 
-It provides three kernels:
+It provides four kernels:
 
-- ``fm.csem`` - CSEM forward modeling
-- ``im.csem`` - CSEM inversion (L-BFGS, adjoint-state gradients)
+- ``fm.csem`` - CSEM forward modeling (frecuency domain)
+- ``fm.tdcsem`` - CSEM forward modeling (time domain)
 - ``fm.mt`` - MT forward modeling
+- ``im.csem`` - CSEM inverse modeling (frequency domain, L-BFGS, adjoint-state gradients)
 
 and a ``petgem`` dispatcher that runs any of them. A small Python package in
 ``utils/`` builds the HDF5 input files and reads the results.
 
 Dependencies
 ------------
-- PETSc with **complex scalars**, MPI, MUMPS and HDF5, plus ``petsc4py``
+- `PETSc <https://petsc.org/>`_ with **complex scalars**, MPI, MUMPS and HDF5, plus ``petsc4py``
 - `Gmsh <http://gmsh.info/>`_
 - Python 3 with ``numpy``, ``h5py`` and ``meshio``; ``matplotlib`` for the
   example scripts, ``pytest`` for the tests
@@ -78,7 +79,7 @@ https://petgem.readthedocs.io/en/latest/index.html
 
 Citing PETGEM
 -------------
-If you use **PETGEM** in your research, please cite:
+If you use **PETGEM** for CSEM forward modeling in your research, please cite:
 
 - Castillo-Reyes, O., de la Puente, J., García-Castillo, L. E., Cela, J.M. (2019).
   *Parallel 3-D marine controlled-source electromagnetic modelling using high-order
@@ -89,7 +90,7 @@ If you use **PETGEM** in your research, please cite:
   code for 3D CSEM forward modeling using edge finite elements*. Computers &
   Geosciences, 119, 123–136. https://doi.org/10.1016/j.cageo.2018.07.005
 
-For MT modeling, also cite:
+If you use **PETGEM** for MT forward modeling in your research, please cite:
 
 - Castillo-Reyes, O., Modesto, D., Queralt, P., Marcuello, A., Ledo, J.,
   Amor-Martin, A., de la Puente, J., García-Castillo, L.E. (2022). *3D

@@ -5,7 +5,7 @@
 #
 # This script builds the reduced im_csem_block bundle (order 1, 1 and 10 Hz):
 # forward bundles on the true model, fm.csem with MUMPS, noisy observations
-# and the inverse bundle.
+# of Ex, Hy and Zxy, and the inverse bundle.
 #
 # Usage (from the repository root):
 #   bash tests/im/build_bundle.sh [OUT]
@@ -42,7 +42,7 @@ for F in $FREQS; do
       -dm_mat_type aij -ksp_type preonly -pc_type lu -pc_factor_mat_solver_type mumps >/dev/null
 done
 python3 "$ROOT_DIR/utils/make_observed.py" -case_dir "$WORK" -pattern "responses_fm_f{freq}_p1.h5" \
-    -freqs "${FREQS// /,}" -seed 7 -error_level 0.01 -output_filename observed.h5 >/dev/null
+    -freqs "${FREQS// /,}" -seed 7 -error_level 0.01 -components Ex,Hy,Zxy -output_filename observed.h5 >/dev/null
 python3 "$ROOT_DIR/utils/preprocess.py" -mode im.csem -order 1 -case_dir "$WORK" \
     -mesh_filename geometry/mesh.msh -receiver_filename survey/receivers.txt \
     -im_source_filename survey/sources_im_test.txt -observed_filename observed.h5 -error_level 0.01 \

@@ -15,19 +15,19 @@
     "rms_true_model": 0.994
   },
   "convergence": {
-    "initial_rms": 11.795,
-    "final_rms": 1.0499,
-    "iterations": 94,
-    "objgrad_evaluations": 105,
+    "initial_rms": 11.058,
+    "final_rms": 1.0498,
+    "iterations": 91,
+    "objgrad_evaluations": 99,
     "termination": "CONVERGED_RMSTOL"
   },
   "recovered_model": {
     "background_ohm_m": 100.0,
-    "min_resistivity_ohm_m": 9.00,
-    "anomaly_centroid_m": [-1.6, -1.0, -166.4],
-    "lateral_offset_m": 1.8,
-    "vertical_offset_m": 33.6,
-    "conductor_volume_m3": 4.353e6,
+    "min_resistivity_ohm_m": 11.00,
+    "anomaly_centroid_m": [0.2, -3.1, -163.4],
+    "lateral_offset_m": 3.1,
+    "vertical_offset_m": 36.6,
+    "conductor_volume_m3": 3.711e6,
     "fraction_in_true_box": 0.72
   },
   "conductor_threshold_ohm_m": 30.0,

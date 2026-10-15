@@ -1,6 +1,6 @@
-=========================
-Forward modeling examples
-=========================
+==============================
+Frequency-domain CSEM examples
+==============================
 
 Marine CSEM model (``examples/fm_csem_marine``)
 -----------------------------------------------

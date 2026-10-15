@@ -147,21 +147,21 @@ From `reference/reference_metrics.json` (112 MPI tasks, BDDC):
 | quantity                      | value                               |
 |-------------------------------|-------------------------------------|
 | RMS of the true model         | 0.994                               |
-| initial RMS                   | 11.795                              |
-| **final RMS**                 | **1.0499**                          |
-| termination                   | `CONVERGED_RMSTOL`, 94 L-BFGS steps |
+| initial RMS                   | 11.058                              |
+| **final RMS**                 | **1.0498**                          |
+| termination                   | `CONVERGED_RMSTOL`, 91 L-BFGS steps |
 | background resistivity        | 100 Ω·m                             |
-| minimum recovered resistivity | 9.00 Ω·m (true 10)                  |
-| conductor lateral offset      | 1.8 m                               |
-| conductor vertical offset     | +33.6 m (shallower than true)       |
-| conductor volume (ρ < 30 Ω·m) | 4.35 × 10⁶ m³ (true 8.0 × 10⁶)      |
+| minimum recovered resistivity | 11.00 Ω·m (true 10)                 |
+| conductor lateral offset      | 3.1 m                               |
+| conductor vertical offset     | +36.6 m (shallower than true)       |
+| conductor volume (ρ < 30 Ω·m) | 3.71 × 10⁶ m³ (true 8.0 × 10⁶)      |
 
 `analyze_inversion.py` reports **PASS** when the run is within the tolerances
 of the JSON file. The L-BFGS path depends on the domain decomposition, so
 compare at 112 tasks.
 
-The 94 accepted steps took 105 objective-gradient evaluations; the other 10
-were rejected line-search trials. `/rms_history` in `responses_im_p2.h5` has
+The 99 objective-gradient evaluations are the initial one, the 91 accepted
+steps and 7 rejected line-search trials. `/rms_history` in `responses_im_p2.h5` has
 one entry per evaluation, so it is not monotone. The file stores both counts
 (`num_iterations`, `num_objgrad_evaluations`).
 
@@ -172,7 +172,7 @@ almost flat above 10 Hz, which limits the depth resolution.
 ### Convergence record
 
 `reference/lbfgs_log.txt` has one row per accepted step (evaluations, RMS,
-`λΦm`, `|g|/|x|`, step length, KSP iterations, wall time).
+`λΦm`, `|g|`, `|g|/|x|`, step length, KSP iterations, wall time).
 `reference/rms_history.txt` has one row per evaluation. Both are taken from a
 finished run:
 

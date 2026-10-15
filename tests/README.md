@@ -1,6 +1,6 @@
 # PETGEM test suite
 
-Verification tests for the kernels **`fm.csem`**, **`fm.mt`** and **`im.csem`**. The
+Verification tests for the kernels **`fm.csem`**, **`fm.mt`**, **`im.csem`** and **`fm.tdcsem`**. The
 production sources are never modified by the suite: the C harnesses link
 against them and the end-to-end tests drive the built binaries.
 
@@ -14,7 +14,9 @@ against them and the end-to-end tests drive the built binaries.
 | 6 | Order of accuracy (MMS) | 1, 3, 6 | `build/mms` (`make mms`) vs golden errors |
 | MT | Boundary tools, 1D field, boundary RHS | 1–6 | C harnesses `test_boundary.c`, `test_mt1d.c`, `test_mt_rhs.c` |
 | MT | Half-space | 2 | `fm.mt` on 1 and 3 ranks |
+| TD-CSEM | Half-space step-on | 1–2 | `fm.tdcsem` vs empymod (order 2); 1 and 3 ranks (order 1) |
 | IM | Reduced im_csem_block inversion | 1 | `im.csem`, 2 L-BFGS iterations vs `im/reference/im_golden.json` (rtol 1e-8) |
+| IM | Data components | 1 | `im.csem -im_gradient_check` on Hy and Ex+Zxy (central differences, error ~ eps²); 1 L-BFGS iteration on Zxy |
 
 Levels 1–3 cover every order cheaply. Levels 4–5 stop at order 3 because
 orders 1, 2 and 3 already exercise every DOF class (edge, face, interior);
@@ -33,7 +35,9 @@ tests/
 ├── mms/                   level 6: MMS program (mms.c, mms.h), mesh.geo, inputs, build_bundle.sh,
 │                          regen_golden.sh, reference/mms_golden.json
 ├── mt/                    MT half-space: mesh.geo, inputs, build_bundle.sh
-├── im/                    reduced im_csem_block inversion: build_bundle.sh, reference/im_golden.json
+├── im/                    reduced im_csem_block inversion (Ex, Hy, Zxy data): build_bundle.sh, reference/im_golden.json
+├── tdcsem/                TD-CSEM half-space: mesh.geo, inputs, build_bundle.sh, make_reference.py,
+│                          reference/empymod_golden.json
 └── extrae/                Extrae trace configuration
 ```
 
@@ -79,6 +83,9 @@ PETGEM_FM_MT=build/fm.mt pytest tests/mt
 
 bash tests/im/build_bundle.sh
 PETGEM_IM_CSEM=build/im.csem pytest tests/im
+
+bash tests/tdcsem/build_bundle.sh
+PETGEM_FM_TDCSEM=build/fm.tdcsem pytest tests/tdcsem
 
 pytest                                              # everything available
 ```

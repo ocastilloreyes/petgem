@@ -5,26 +5,37 @@ PETGEM's documentation
 ######################
 
 **PETGEM** (Parallel Edge-element Toolkit for General Electromagnetic Modeling)
-is an open-source code for 3D forward and inverse modeling in the frequency
-domain. It discretizes the electric field with high-order Nédélec (edge) finite
-elements of polynomial order 1 to 6 on unstructured tetrahedral meshes, and is
-written in C on top of `PETSc <https://petsc.org/release/>`_ and MPI.
+is an open-source code for 3D electromagnetic modeling. It solves the CSEM
+forward problem in the frequency and time domains, the MT forward problem and
+the frequency-domain CSEM inverse problem. The electric field is discretized
+with high-order Nédélec (edge) finite elements of polynomial order 1 to 6 on
+unstructured tetrahedral meshes. **PETGEM** is written in C on top of
+`PETSc <https://petsc.org/release/>`_ and MPI.
 
-The repository builds three kernels and a dispatcher:
+The repository provides four kernels and a dispatcher:
 
-- ``fm.csem`` - forward modeling: computes the CSEM response of a given
+- ``fm.csem`` - Frequency-domain CSEM forward modeling:
+  computes the electric and magnetic fields of dipole sources for a given
   conductivity model.
-- ``im.csem`` - inverse modeling: recovers a per-material conductivity model
-  from observed data with L-BFGS and adjoint-state gradients.
-- ``fm.mt`` - MT forward modeling: computes the magnetotelluric response
-  (impedance, apparent resistivity, phase, tipper) of a given conductivity
-  model.
-- ``petgem`` - a dispatcher that selects a kernel
-  (``petgem fm.csem`` / ``petgem im.csem`` / ``petgem fm.mt``).
 
-Pre- and post-processing are handled by a small Python package under ``utils/``
-(importable as ``petgem``), which assembles the HDF5 input bundle the kernels
-read.
+- ``fm.tdcsem`` - Time-domain CSEM forward modeling:
+  computes the transient response of a given conductivity model to a source
+  waveform.
+
+- ``fm.mt`` - Magnetotelluric (MT) forward modeling:
+  computes the MT response of a given conductivity model: impedance, apparent
+  resistivity, phase and tipper.
+
+- ``im.csem`` - CSEM inverse modeling:
+  estimates the subsurface conductivity from observed data with L-BFGS and
+  adjoint-state gradients.
+
+- ``petgem`` - Dispatcher:
+  runs any kernel through one command (``petgem fm.csem``,
+  ``petgem fm.tdcsem``, ``petgem fm.mt`` or ``petgem im.csem``).
+
+A small Python package under ``utils/`` (importable as ``petgem``) prepares the
+HDF5 input bundle that the kernels read and reads their results.
 
 More information
 ----------------
@@ -46,6 +57,10 @@ More information
 
    manual/forward_modeling
    manual/examples
+   manual/td_modeling
+   manual/td_examples
+   manual/mt_modeling
+   manual/mt_examples
 
 .. toctree::
    :maxdepth: 2
@@ -53,13 +68,6 @@ More information
 
    manual/inverse_modeling
    manual/inverse_examples
-
-.. toctree::
-   :maxdepth: 2
-   :caption: MT modeling:
-
-   manual/mt_modeling
-   manual/mt_examples
 
 .. toctree::
    :maxdepth: 2

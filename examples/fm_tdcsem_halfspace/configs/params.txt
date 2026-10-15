@@ -1,0 +1,16 @@
+# fm.tdcsem forward config - half-space example of Cai et al. (2017),
+# Section 5.1. Time window, BDF2 with step doubling and direct solver (MUMPS LU
+# on the AIJ operator). The input bundle and the output stem are given on the
+# command line by scripts/run_fm.slurm.
+
+-tdcsem_t_end        1.0
+-tdcsem_dt0          5.0e-8
+-tdcsem_atsd_steps   25
+-tdcsem_atsd_rtol    1.0e-2
+-tdcsem_scheme       bdf2
+
+-dm_mat_type                 aij
+-ksp_type                    preonly
+-pc_type                     lu
+-pc_factor_mat_solver_type   mumps
+-mat_mumps_icntl_14          80

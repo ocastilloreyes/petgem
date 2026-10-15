@@ -35,9 +35,17 @@ Preprocessing
 
 .. autofunction:: petgem.readSourcesText
 
+.. autofunction:: petgem.readObservedData
+
+.. autofunction:: petgem.parseObservedSpec
+
 .. autofunction:: petgem.readObservedDataH5
 
 .. autofunction:: petgem.readInvExDat
+
+.. autofunction:: petgem.readTdSourcesText
+
+.. autofunction:: petgem.readTdWaveformText
 
 Reading results
 ---------------
@@ -46,6 +54,8 @@ Reading results
 .. autofunction:: petgem.readResponses
 
 .. autofunction:: petgem.readAllResponses
+
+.. autofunction:: petgem.readTdResponses
 
 .. autofunction:: petgem.readVectorH5
 

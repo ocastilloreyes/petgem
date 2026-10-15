@@ -20,6 +20,10 @@ Mode-specific arguments (validated by runPreprocessing):
     -mode fm.mt    requires -mt_frequency_filename
                      forbids  -source_filename, -im_source_filename,
                               -observed_filename
+    -mode fm.tdcsem  requires -source_filename (7 fields per row, no frequency),
+                              -tdcsem_waveform_filename, -tdcsem_t_end
+                     forbids  -im_source_filename, -observed_filename,
+                              -mt_frequency_filename
 
 Shared arguments (all modes):
     -order, -case_dir, -mesh_filename, -receiver_filename, -sigma_file
@@ -59,6 +63,19 @@ Usage examples:
         -mt_frequency_filename mt_frequency.txt \\
         -sigma_file sigmas.txt \\
         [-output_vtk model.vtu]
+
+    # Time-domain CSEM forward modeling
+    python3 utils/preprocess.py \\
+        -mode fm.tdcsem \\
+        -order 1 \\
+        -case_dir examples/<case> \\
+        -mesh_filename mesh_p1.msh \\
+        -receiver_filename receivers.txt \\
+        -source_filename sources.txt \\
+        -tdcsem_waveform_filename waveform.txt \\
+        -tdcsem_t_end 1.0 \\
+        -sigma_file sigmas.txt \\
+        [-output_vtk model.vtu]
 """
 import os
 import sys
@@ -86,6 +103,8 @@ def main():
         observed_filename=args.observed_filename,
         error_level=args.error_level,
         mt_frequency_filename=args.mt_frequency_filename,
+        tdcsem_waveform_filename=args.tdcsem_waveform_filename,
+        tdcsem_t_end=args.tdcsem_t_end,
         output_vtk=args.output_vtk,
         dm_view=args.dm_view is not None,
     )

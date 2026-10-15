@@ -3,7 +3,7 @@ Testing
 =======
 
 The `pytest <https://docs.pytest.org/>`_ suite under ``tests/`` covers the
-three kernels. The C harnesses link against the unchanged ``src/`` files, and
+four kernels. The C harnesses link against the unchanged ``src/`` files, and
 the end-to-end tests run the built binaries. ``tests/README.md`` lists the
 files and the exact checks.
 
@@ -53,6 +53,15 @@ Test levels
      - Reduced ``im_csem_block`` inversion
      - 1
      - ``im.csem``, 2 L-BFGS iterations against a golden
+   * - IM
+     - Data components
+     - 1
+     - ``im.csem -im_gradient_check`` on ``Hy`` and ``Ex,Zxy``; 1 L-BFGS
+       iteration on ``Zxy``
+   * - TD
+     - Half-space step-on response
+     - 1-2
+     - ``fm.tdcsem`` against empymod (order 2), 1 and 3 ranks (order 1)
 
 Levels 4 and 5 stop at order 3: orders 1, 2 and 3 already have edge, face and
 interior DOFs, and higher orders only add more of the same. Level 6 runs the
@@ -84,6 +93,10 @@ Running
    bash tests/im/build_bundle.sh
    PETGEM_IM_CSEM=build/im.csem pytest tests/im
 
+   # Time-domain CSEM half-space
+   bash tests/tdcsem/build_bundle.sh
+   PETGEM_FM_TDCSEM=build/fm.tdcsem pytest tests/tdcsem
+
 A bare ``pytest`` runs everything available. Tests whose toolchain, binary or
 bundle is missing are skipped. Without the ``PETGEM_*`` variables the binaries
 are looked up in ``build/``, the current directory and ``PATH``.
@@ -102,6 +115,10 @@ Tolerances
   :math:`\phi_{xy} = 135^\circ`, :math:`\phi_{yx} = -45^\circ` within 0.5°.
 - The reduced inversion matches its golden RMS history and model norm to
   ``rtol = 1e-8``.
+- The gradient check differs from the adjoint by less than ``1e-6`` at
+  :math:`\varepsilon = 10^{-3}`, and the difference falls at least 50 times
+  from :math:`\varepsilon = 10^{-2}`. One L-BFGS iteration on ``Zxy`` lowers
+  the RMS.
 
 Every test that solves a system uses a direct MUMPS solve, so none depends
 on iterative convergence.
@@ -117,6 +134,6 @@ Continuous integration
 ----------------------
 ``.github/workflows/ci-develop.yml`` builds the binaries and the MMS program
 in the CI image and runs ``tests-fm-csem.yml`` (harnesses, levels 4-6),
-``tests-fm-mt.yml`` (MT half-space) and ``tests-im-csem.yml`` (reduced
-inversion). Documentation
+``tests-fm-mt.yml`` (MT half-space), ``tests-im-csem.yml`` (reduced
+inversion) and ``tests-fm-tdcsem.yml`` (time-domain CSEM half-space). Documentation
 jobs run only when the docs or sources change.

@@ -16,16 +16,18 @@ endif
 FM_TARGET := build/fm.csem
 IM_TARGET := build/im.csem
 MT_TARGET := build/fm.mt
+TD_TARGET := build/fm.tdcsem
 PT_TARGET := build/petgem
 MMS_TARGET := build/mms
 ifeq ($(USE_EXTRAE),1)
     FM_TARGET := build/fm.csem.extrae
     IM_TARGET := build/im.csem.extrae
     MT_TARGET := build/fm.mt.extrae
+    TD_TARGET := build/fm.tdcsem.extrae
     PT_TARGET := build/petgem.extrae
 endif
 
-TARGET := $(FM_TARGET) $(IM_TARGET) $(MT_TARGET) $(PT_TARGET)
+TARGET := $(FM_TARGET) $(IM_TARGET) $(MT_TARGET) $(TD_TARGET) $(PT_TARGET)
 
 # -----------------------------------------------------------------------------
 # Build all targets by default
@@ -140,14 +142,16 @@ SHARED_SRCS := src/common.c \
                src/receiver_interp.c \
                src/csem.c
 
-# Kernel sources. fm_csem.c, im_csem.c and fm_mt.c define runForward,
-# runInverse and runMtForward; the *_main.c files only provide main().
+# Kernel sources. fm_csem.c, im_csem.c, fm_mt.c and td_fm_csem.c define
+# runForward, runInverse, runMtForward and runTdCsemForward; the *_main.c
+# files only provide main().
 INV_SRCS := src/inversion.c src/inversion_io.c src/inversion_smoother.c src/lbfgs.c
 
 FM_SRCS := src/fm_csem.c src/fm_csem_main.c $(SHARED_SRCS)
 IM_SRCS := src/im_csem.c src/im_csem_main.c $(INV_SRCS) $(SHARED_SRCS)
 MT_SRCS := src/fm_mt.c src/fm_mt_main.c src/mt.c $(SHARED_SRCS)
-PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c src/fm_mt.c src/mt.c $(INV_SRCS) $(SHARED_SRCS)
+TD_SRCS := src/td_fm_csem.c src/td_fm_csem_main.c $(SHARED_SRCS)
+PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c src/fm_mt.c src/td_fm_csem.c src/mt.c $(INV_SRCS) $(SHARED_SRCS)
 
 # MMS verification program (tests/mms), not part of 'all'
 MMS_SRCS := tests/mms/mms.c
@@ -156,6 +160,7 @@ MMS_SRCS := tests/mms/mms.c
 FM_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(FM_SRCS))
 IM_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(IM_SRCS))
 MT_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(MT_SRCS))
+TD_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(TD_SRCS))
 PT_OBJS := $(patsubst src/%.c,$(OBJDIR)/%.o,$(PT_SRCS))
 MMS_OBJS := $(OBJDIR)/mms.o $(patsubst src/%.c,$(OBJDIR)/%.o,$(SHARED_SRCS))
 
@@ -164,7 +169,7 @@ MMS_OBJS := $(OBJDIR)/mms.o $(patsubst src/%.c,$(OBJDIR)/%.o,$(SHARED_SRCS))
 # reorder alphabetically; this recursive uniq preserves first-occurrence
 # order so the indices are monotonic for a serial `make`.
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
-ALL_OBJS := $(call uniq,$(FM_OBJS) $(IM_OBJS) $(MT_OBJS) $(PT_OBJS))
+ALL_OBJS := $(call uniq,$(FM_OBJS) $(IM_OBJS) $(MT_OBJS) $(TD_OBJS) $(PT_OBJS))
 NOBJS := $(words $(ALL_OBJS))
 
 # -----------------------------------------------------------------------------
@@ -185,6 +190,7 @@ _preamble:
 $(FM_TARGET): $(FM_OBJS)
 $(IM_TARGET): $(IM_OBJS)
 $(MT_TARGET): $(MT_OBJS)
+$(TD_TARGET): $(TD_OBJS)
 $(PT_TARGET): $(PT_OBJS)
 $(MMS_TARGET): $(MMS_OBJS)
 $(TARGET) $(MMS_TARGET): | build
@@ -282,7 +288,8 @@ help:              ## Show this help message
 	@echo "  $(C_DIM)build/fm.csem$(C_RESET)   CSEM forward kernel"
 	@echo "  $(C_DIM)build/im.csem$(C_RESET)   CSEM inverse kernel"
 	@echo "  $(C_DIM)build/fm.mt$(C_RESET)     MT forward kernel"
-	@echo "  $(C_DIM)build/petgem$(C_RESET)    unified dispatcher: ./petgem fm.csem | im.csem | fm.mt"
+	@echo "  $(C_DIM)build/fm.tdcsem$(C_RESET) time-domain CSEM forward kernel"
+	@echo "  $(C_DIM)build/petgem$(C_RESET)    unified dispatcher: ./petgem fm.csem | im.csem | fm.mt | fm.tdcsem"
 	@echo ""
 	@echo "$(C_BOLD)Build options$(C_RESET) (set with 'make <target> OPTION=1'):"
 	@echo "  USE_INTEL=1     force Intel MPI compiler flags (auto-detected from \$$(PCC))"

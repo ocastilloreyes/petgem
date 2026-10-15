@@ -69,11 +69,36 @@ PetscErrorCode createCellScalarDm(DM dm, DM *cellDm);
  *                            line-search trials that were rejected, so the RMS
  *                            history it indexes is not monotone.
  * @param[in] reasonStr       Human-readable convergence/stop reason.
+ * @param[in] gradNorms       ||g|| per accepted iteration (entry 0 = initial model).
+ * @param[in] numGradNorms    Entries in @p gradNorms: accepted steps + 1.
+ * @param[in] dPre            Predicted data of the recovered model, component-major
+ *                            numComponents x numFreqs x numReceivers (read on rank 0 only).
+ * @param[in] numReceivers    Number of receivers.
+ * @param[in] rmsPre          Data RMS of @p dPre.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
 PetscErrorCode writeInversionResults(const ImParams *imParams, DM dmConductivity, Vec conductivity, Vec X, const PetscReal *allRms,
-                                     PetscInt numIters, PetscInt numEvals, const char *reasonStr);
+                                     PetscInt numIters, PetscInt numEvals, const char *reasonStr, const PetscReal *gradNorms,
+                                     PetscInt numGradNorms, const PetscScalar *dPre, PetscInt numReceivers, PetscReal rmsPre);
+
+/**
+ * @brief Writes the gradient check to {output_dir}/{output_filename}.h5.
+ *
+ * Datasets gradient_check_eps, gradient_check_fd (central difference of the
+ * data misfit) and gradient_check_adjoint (adjoint directional derivative).
+ *
+ * @param[in] imParams  Inversion parameters (output path, components).
+ * @param[in] comm      Communicator.
+ * @param[in] eps       Step sizes (rank 0).
+ * @param[in] fd        Central differences (rank 0).
+ * @param[in] adjoint   Adjoint directional derivative, repeated per step (rank 0).
+ * @param[in] n         Number of steps.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ */
+PetscErrorCode writeGradientCheck(const ImParams *imParams, MPI_Comm comm, const PetscReal *eps, const PetscReal *fd,
+                                  const PetscReal *adjoint, PetscInt n);
 
 #endif /* INVERSION_INTERNAL_H */

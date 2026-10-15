@@ -87,15 +87,15 @@ surface. Receivers cover ``x, y`` in ``[-200, 200]`` m at 20 m spacing.
    * - RMS of the true model
      - 0.994
    * - Initial / final RMS
-     - 11.795 / 1.0499
+     - 11.058 / 1.0498
    * - Termination
-     - ``CONVERGED_RMSTOL`` after 94 steps (105 evaluations)
+     - ``CONVERGED_RMSTOL`` after 91 steps (99 evaluations)
    * - Minimum recovered resistivity
-     - 9.00 Ω·m (true 10)
+     - 11.00 Ω·m (true 10)
    * - Lateral / vertical offset of the conductor
-     - 1.8 m / +33.6 m (shallower)
+     - 3.1 m / +36.6 m (shallower)
    * - Conductor volume (ρ < 30 Ω·m)
-     - 4.35 × 10⁶ m³ (true 8.0 × 10⁶)
+     - 3.71 × 10⁶ m³ (true 8.0 × 10⁶)
 
 The conductor is found at the right place and resistivity, but shallow and
 smaller than the truth. Source and receivers lie on the surface, so the
@@ -117,16 +117,16 @@ Four 200 m cubes at 100 to 300 m depth with 100 m gaps: two conductors
    * - RMS of the true model
      - 0.9864
    * - Initial / final RMS
-     - 7.0604 / 1.0491
+     - 6.1086 / 1.0494
    * - Termination
-     - ``CONVERGED_RMSTOL`` after 105 steps (112 evaluations)
+     - ``CONVERGED_RMSTOL`` after 90 steps (96 evaluations)
    * - Conductors C1 / C2, mean resistivity
-     - 28.3 / 25.7 Ω·m (true 10)
+     - 32.1 / 29.5 Ω·m (true 10)
    * - Resistors R1 / R2, mean resistivity
-     - 178.5 / 178.2 Ω·m (true 1000)
+     - 167.7 / 164.4 Ω·m (true 1000)
    * - Wrong-sign cells inside the true bodies
      - 0 of 6330
 
 All four bodies come back with the right sign and position. The conductors
 recover more of their contrast than the resistors. The step count is not
-reproducible to the unit: expect 100 to 115 steps.
+reproducible to the unit: two runs took 91 and 90 steps.

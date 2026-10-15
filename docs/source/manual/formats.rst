@@ -4,8 +4,9 @@ Data formats
 
 This page documents the files **PETGEM** reads and writes: the text and HDF5
 inputs consumed by ``utils/preprocess.py``, the input bundle it produces, and
-the files written by ``fm.csem``, ``im.csem`` and ``fm.mt``. The HDF5 files use PETSc's viewer
-layout; the Python readers in :doc:`python_api` return NumPy arrays.
+the files written by ``fm.csem``, ``fm.tdcsem``, ``fm.mt`` and ``im.csem``.
+The HDF5 files use PETSc's viewer layout; the Python readers in
+:doc:`python_api` return NumPy arrays.
 
 Conductivity table (``sigmas.txt``)
 -----------------------------------
@@ -49,9 +50,29 @@ also accepted and converted to the same representation on read:
 Fields are: frequency (Hz), position ``x y z`` (m), ``current`` (A), ``length``
 (m), ``dip_angle`` and ``azimuth_angle`` (degrees).
 
-Forward modeling (``-source_filename``) uses a single frequency shared by all
+Frequency-domain forward modeling (``-source_filename``) uses a single frequency shared by all
 transmitters; inverse modeling (``-im_source_filename``) carries one row per
 ``(frequency, dipole)`` pair.
+
+Time-domain modeling (``-mode fm.tdcsem``) takes 7 fields per row, without the
+frequency:
+
+.. code-block::
+
+   x_pos y_pos z_pos current length dip_angle azimuth_angle
+   ...
+
+Source waveform (``-tdcsem_waveform_filename``, time-domain only)
+-----------------------------------------------------------------
+Two columns, time (s) and the current normalized by the transmitter current;
+``#`` comments are allowed. Times increase strictly and the first value of
+``s`` is 0.
+
+.. code-block::
+
+   # t (s)  s(t)
+   0.0     0.0
+   1.0e-6  1.0
 
 MT frequency (``-mt_frequency_filename``, MT only)
 --------------------------------------------------
@@ -77,30 +98,42 @@ Observed data (``-observed_filename``, inverse only)
 The inversion target, in **either** of two forms (``preprocess.py`` selects by
 file extension):
 
+Each entry of ``-observed_filename`` is ``file`` or ``component:file``, the
+component being one of ``Ex``, ``Ey``, ``Ez``, ``Hx``, ``Hy``, ``Hz``, ``Zxx``,
+``Zxy``, ``Zyx``, ``Zyy`` (:math:`Z_{ij} = E_i/H_j`). NaN marks a missing
+datum.
+
 **HDF5** (``.h5`` / ``.hdf5``)
 
-- ``/Ex`` - complex ``[N_freq, N_recv]`` dataset (``complex128``, stored as an
-  ``{r, i}`` compound). Row order matches the inverse source frequencies;
-  column order matches the receiver list.
+- ``/<component>`` - complex ``[N_freq, N_recv]`` dataset (``complex128``,
+  stored as an ``{r, i}`` compound), one per component. Row order matches the
+  inverse source frequencies; column order matches the receiver list. All
+  components present are read unless the entry names one.
 - ``/frequencies`` - the frequency of each row (Hz).
 - optional root attribute ``error_level`` - the relative noise level.
 
-**Raw text** (MATLAB-style ``invEx.dat``), parsed inline - one row per
-frequency:
+**Raw text** (MATLAB-style ``invEx.dat``), parsed inline - one component,
+one row per frequency:
 
 .. code-block::
 
-   freq_label  Re(Ex_1) Im(Ex_1)  Re(Ex_2) Im(Ex_2)  ...  Re(Ex_N) Im(Ex_N)
+   freq_label  Re(d_1) Im(d_1)  Re(d_2) Im(d_2)  ...  Re(d_N) Im(d_N)
 
 The leading label is dropped (frequencies come from the inverse sources); the
-noise level is supplied with ``-error_level``, or left to the kernel default.
+component is ``Ex`` unless the entry names another; the noise level is
+supplied with ``-error_level``, or left to the kernel default.
+
+.. code-block:: bash
+
+   python3 utils/preprocess.py -mode im.csem ... \
+       -observed_filename ex:observed_ex.dat zxy:observed_zxy.dat -error_level 0.05
 
 Input bundle (``-input_filename``, default ``input.h5``)
 --------------------------------------------------------
 ``utils/preprocess.py`` writes a single HDF5 bundle that the kernel reads in
 full. All modes share the same skeleton - mesh, model, order, and receivers;
 CSEM runs add ``/sources``, inverse runs also ``/observed`` and ``/im_meta``,
-and MT runs ``/mt``.
+MT runs ``/mt``, and time-domain runs ``/sources`` and ``/tdcsem``.
 
 .. list-table::
    :header-rows: 1
@@ -123,19 +156,23 @@ and MT runs ``/mt``.
      - all
      - Receiver positions, flattened ``[N_recv * 3]``
    * - ``/sources/*``
-     - fm, im
+     - fm, im, td
      - Transmitters, as separate Vecs: ``freq``, ``position`` (flattened),
        ``current``, ``length``, ``dipAngle``, ``azimuthAngle`` - one entry each
-       per transmitter
-   * - ``/observed/Ex``
+       per transmitter. ``freq`` is 0 in time-domain bundles
+   * - ``/observed/<component>``
      - inverse
-     - Observed field; the ``@error_level`` attribute holds the relative noise level
+     - Observed data, one dataset per component; the ``@error_level``
+       attribute of ``/observed`` holds the relative noise level
    * - ``/im_meta/fixed_materials``
      - inverse
      - 0-based material ids held fixed (int32)
    * - ``/mt/freq``
      - mt
      - Frequency (length-1 Vec)
+   * - ``/tdcsem/time``, ``/tdcsem/waveform``
+     - td
+     - Waveform sample times (s) and normalized current
 
 ``petgem.readBundle(path)`` reads a CSEM bundle and returns ``receivers``
 (``[N_recv, 3]``), ``order``, ``frequency`` (of the first transmitter) and
@@ -155,7 +192,7 @@ provenance attributes on the root group:
    * - ``petgem_version``
      - Version of the code that produced the file
    * - ``simulation_type``
-     - ``fm.csem``, ``im.csem`` or ``fm.mt`` - which kernel wrote it
+     - ``fm.csem``, ``im.csem``, ``fm.mt`` or ``fm.tdcsem`` - which kernel wrote it
    * - ``input_filename``
      - Path of the input bundle (which carries the mesh, model, and geometry)
    * - ``order``
@@ -219,6 +256,35 @@ Additional root attributes: ``frequency``, ``num_receivers``.
 The phase follows the :math:`e^{-i\omega t}` convention with :math:`z` up (a
 half-space gives ``phi_xy = 135``, ``phi_yx = -45``); see :doc:`method`.
 
+Time-domain responses (``fm.tdcsem``)
+*************************************
+Fields at every computed time step. Each field is a PETSc Vec with block size
+``N_times``, stored as an ``[N_recv, N_times]`` dataset (with a trailing
+real/imaginary axis on complex builds; the imaginary part is zero).
+
+Layout::
+
+    /                              root attrs (shared provenance block above)
+    /times                         sample times (s), length N_times
+    /sources/src1/                 per-source attrs
+    /sources/src1/fields/Ex        [N_recv, N_times]
+    /sources/src1/fields/Ey
+    /sources/src1/fields/Ez
+    /sources/src1/fields/dBxdt     dB/dt = -curl E (T/s)
+    /sources/src1/fields/dBydt
+    /sources/src1/fields/dBzdt
+    /sources/src2/                 (one such group per transmitter)
+    ...
+
+Additional root attributes: ``num_sources``, ``num_times``.
+
+Per-source attributes (``/sources/src{k}``, ``k`` 1-based): ``x_pos``,
+``y_pos``, ``z_pos``, ``current``, ``length``, ``dip_angle``,
+``azimuth_angle``.
+
+``petgem.readTdResponses(path, source=k)`` returns the times and the six
+fields of transmitter ``k`` as real arrays (see :doc:`python_api`).
+
 Inversion results (``im.csem``)
 *******************************
 Layout::
@@ -227,14 +293,33 @@ Layout::
     /conductivity                  recovered model, 3 components per cell
     /log_perturbation              model parameter vector
     /rms_history                   RMS misfit, one entry per objgrad evaluation
+    /grad_norm_history             gradient norm, one entry per accepted iteration
+    /predicted_<component>         each fitted component of the recovered model, (num_frequencies, num_receivers)
 
 Additional root attributes: ``num_frequencies``, ``lambda``, ``error_level``,
-``num_iterations``, ``num_objgrad_evaluations``, ``convergence_reason``.
+``num_iterations``, ``num_objgrad_evaluations``, ``convergence_reason``,
+``data_components``, ``rms_predicted``.
+
+``/predicted_<component>`` comes from one extra forward solve per frequency on
+the recovered model, after the optimization. Rows follow the order of the
+sources, columns the order of the receivers, as in ``/observed/<component>``.
+``rms_predicted`` is the RMS of all of them against the observed data.
 
 ``num_iterations`` counts accepted L-BFGS steps. ``num_objgrad_evaluations``
 counts objective-gradient evaluations and is the length of ``/rms_history``;
 it is larger because it includes rejected line-search trials, so
 ``/rms_history`` is not monotone.
+``/grad_norm_history`` has one entry per accepted step, plus one for the
+starting model. It is the Euclidean norm of the gradient with respect to the
+model parameters; the run log prints it as ``|g|``, next to the ratio
+``|g|/|x|`` used by ``-im_gtol``.
+
+With ``-im_gradient_check`` the file holds only the check, one entry per
+step, and the root attribute ``data_components``::
+
+    /gradient_check_eps            step sizes in log(rho)
+    /gradient_check_fd             central difference of the data misfit
+    /gradient_check_adjoint        adjoint directional derivative
 
 With ``-im_snapshot_interval N`` the kernel also writes the model every N
 accepted steps, and the last accepted step, to ``snapshots/`` under the output

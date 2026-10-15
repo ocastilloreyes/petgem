@@ -5,14 +5,14 @@
  *
  * Description:
  * Unified PETGEM entry point. Runs the kernel named by a positional
- * subcommand or by the -mode option: fm.csem, im.csem or fm.mt, the same
+ * subcommand or by the -mode option: fm.csem, im.csem, fm.mt or fm.tdcsem, the same
  * names as the standalone binaries.
  */
 
 /*
  * Usage:
- *   ./petgem fm.csem|im.csem|fm.mt -options_file ...
- *   ./petgem -mode fm.csem|im.csem|fm.mt -options_file ...
+ *   ./petgem fm.csem|im.csem|fm.mt|fm.tdcsem -options_file ...
+ *   ./petgem -mode fm.csem|im.csem|fm.mt|fm.tdcsem -options_file ...
  * The positional form takes precedence.
  */
 
@@ -32,6 +32,7 @@ static const struct {
     {"fm.csem", runForward, "CSEM forward modeling"},
     {"im.csem", runInverse, "CSEM inverse modeling"},
     {"fm.mt", runMtForward, "MT forward modeling"},
+    {"fm.tdcsem", runTdCsemForward, "Time-domain CSEM forward modeling"},
 };
 
 #define NUM_KERNELS ((int)(sizeof(kernels) / sizeof(kernels[0])))
@@ -48,18 +49,18 @@ static KernelMain findKernel(const char *s) {
 static void printUsage(const char *progname) {
   printf("Usage:\n");
   for (int i = 0; i < NUM_KERNELS; i++) {
-    printf("  %s %-8s [petsc options...]   # %s\n", progname, kernels[i].name, kernels[i].summary);
+    printf("  %s %-9s [petsc options...]   # %s\n", progname, kernels[i].name, kernels[i].summary);
   }
   printf("  %s -mode <kernel> [petsc options...]\n"
          "  %s --version\n"
          "\n"
-         "Kernel names match the standalone binaries (fm.csem, im.csem, fm.mt).\n"
+         "Kernel names match the standalone binaries (fm.csem, im.csem, fm.mt, fm.tdcsem).\n"
          "Pass -options_file <file.txt> for the usual params input.\n",
          progname, progname);
 }
 
 static int unknownKernel(const char *progname, const char *what, const char *name) {
-  fprintf(stderr, "PETGEM: unknown %s '%s' (expected fm.csem, im.csem or fm.mt)\n", what, name);
+  fprintf(stderr, "PETGEM: unknown %s '%s' (expected fm.csem, im.csem, fm.mt or fm.tdcsem)\n", what, name);
   printUsage(progname);
   return 2;
 }

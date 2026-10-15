@@ -41,7 +41,7 @@ Reference JSON schema (only the keys this tool reads)::
         ]
       },
       "conductor_threshold_ohm_m": 30.0,     # rho below this = recovered conductor
-      "resistor_threshold_ohm_m": 300.0,     # rho above this = recovered resistor
+      "resistor_threshold_ohm_m": 250.0,     # rho above this = recovered resistor
       "tolerances": {
         "final_rms_max": 1.05,
         "background_ohm_m_pct": 2.0,
@@ -146,7 +146,7 @@ def main():
                  "single anomaly, so use examples/im_csem_block/scripts/analyze_inversion.py instead.")
     bodies = tm["bodies"]
     thr_cond = ref.get("conductor_threshold_ohm_m", 30.0)
-    thr_res = ref.get("resistor_threshold_ohm_m", 300.0)
+    thr_res = ref.get("resistor_threshold_ohm_m", 250.0)
     tol = ref.get("tolerances", {})
     btol = tol.get("bodies", {})
 

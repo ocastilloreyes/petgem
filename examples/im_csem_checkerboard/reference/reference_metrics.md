@@ -11,7 +11,7 @@ therefore means the recovered body sits shallower than the truth.
 
 Produced on the current `geometry/mesh.geo` (57276 cells, 355502 DOFs at order
 2) with the PCBDDC iterative solver (`configs/solver_bddc.txt`) on **112 MPI
-tasks** (one node), in 00:57:28.
+tasks** (one node), in 00:45:32.
 
 The domain decomposition is part of the configuration: the L-BFGS path follows
 the preconditioned solves, so reproduce these metrics at 112 tasks.
@@ -89,33 +89,23 @@ Table 2 of the paper, as set in `configs/params_im.txt`:
 | error level | 1 % |
 | regularization factor λ | 0.1 |
 | target RMS threshold | 1.05 |
-| maximum iterations | 150 (Table 2 says 80; see below) |
+| maximum iterations | 150 (Table 2 says 120) |
 
 ## Convergence
 
 | quantity | value |
 |---|---|
-| initial RMS | 7.0604 |
-| final RMS | 1.0491 |
-| iterations | 105 accepted L-BFGS steps (112 objective-gradient evaluations) |
+| initial RMS | 6.1086 |
+| final RMS | 1.0494 |
+| iterations | 90 accepted L-BFGS steps (96 objective-gradient evaluations) |
 | termination | `CONVERGED_RMSTOL` (reached the RMS = 1.05 target) |
-| wall time | 00:57:28 on 112 MPI tasks (32.8 s per step) |
+| wall time | 00:45:32 on 112 MPI tasks (30.4 s per step) |
 
 Each evaluation issues `2 x n_freq` = 14 linear solves (forward and adjoint
-share the KSP), so the run performed 1568 solves at 2.20 s each.
-
-**Table 2 of the paper caps the run at 80 iterations and reports 38; this kernel
-needs 105.** At a cap of 80 the run exits `DIVERGED_MAXITS` at RMS 1.1145 with
-the misfit still descending 0.4 % per step, so `configs/params_im.txt` sets 150.
-The discrepancy is not the regularization - the Section 2 gradient smoother is
-implemented and active (`src/inversion_smoother.c`: vertex-star adjacency,
-normalised 1/distance weights, forward then reverse sweep, no diagonal
-self-term, matching eq. 15) - so it lies in the optimisation path. Open.
+share the KSP), so the run performed 1344 solves at 2.03 s each.
 
 **The step count is not reproducible to the unit.** Two runs from the same
-bundle on 112 tasks agree to four decimals through iteration 20, then drift to
-about 1 % in RMS by iteration 70: round-off non-determinism in the MPI
-reductions of the iterative solver, amplified by L-BFGS. Expect 100-115 steps.
+bundle on 112 tasks took 91 and 90 steps.
 
 `num_iterations` (accepted L-BFGS steps) and `num_objgrad_evaluations` (length
 of `/rms_history`) are two different counters, and conflating them is the
@@ -129,47 +119,45 @@ recovered model holds air at 1e8 and BG at 100.0000 exactly.
 
 | body | true ρ | peak ρ | mean ρ | contrast | centroid | lat. offset | vert. offset | volume | in box |
 |---|---|---|---|---|---|---|---|---|---|
-| C1 | 10 Ω·m | 4.84 | 28.3 | 55 % | (147, −158, −157) | 8.3 m | +43.1 m | 3.57 × 10⁶ m³ | 94 % |
-| C2 | 10 Ω·m | 2.96 | 25.7 | 59 % | (−156, 173, −164) | 23.4 m | +36.5 m | 4.50 × 10⁶ m³ | 84 % |
-| R1 | 1000 Ω·m | 363.7 | 178.5 | 25 % | (174, 220, −173) | 73.7 m | +27.4 m | 2.86 × 10⁵ m³ | 95 % |
-| R2 | 1000 Ω·m | 360.6 | 178.2 | 25 % | (−145, −156, −149) | 7.8 m | +50.6 m | 3.19 × 10⁵ m³ | 100 % |
+| C1 | 10 Ω·m | 7.25 | 32.1 | 49 % | (137, −158, −148) | 15.2 m | +51.7 m | 3.12 × 10⁶ m³ | 91 % |
+| C2 | 10 Ω·m | 7.01 | 29.5 | 53 % | (−151, 173, −160) | 22.8 m | +40.3 m | 4.13 × 10⁶ m³ | 84 % |
+| R1 | 1000 Ω·m | 291.1 | 167.7 | 22 % | (164, 164, −147) | 20.0 m | +53.0 m | 4.67 × 10⁵ m³ | 100 % |
+| R2 | 1000 Ω·m | 335.2 | 164.4 | 22 % | (−136, −151, −135) | 14.2 m | +65.1 m | 6.33 × 10⁵ m³ | 100 % |
 
 Definitions, as the analyzer computes them. **"Peak"** is the extremum of cell
 resistivity inside the body's quadrant - the minimum for a conductor, the
-maximum for a resistor - a single-cell value, and for the conductors it
-*overshoots* past the true 10 Ω·m. **"Mean"** is the volume-weighted geometric
+maximum for a resistor - a single-cell value. **"Mean"** is the volume-weighted geometric
 mean over the true body box and is what actually describes the body, so it is
 the quantity the amplitude tolerance is set on. **"Contrast"** is the fraction
 of the true |log₁₀(ρ_body/ρ_background)| that the mean represents. The centroid
 is weighted by cell volume × contrast (1/ρ for a conductor, ρ for a resistor)
-over the cells that cross the detection threshold, and both offsets follow from
-it. The volume is the sum of those same cells. "In box" is the share of that
+over the cells that cross the detection threshold (ρ < 30 Ω·m for a conductor,
+ρ > 250 Ω·m for a resistor), and both offsets follow from it. The volume is the sum of those same cells. "In box" is the share of that
 volume falling inside the true cube.
 
 ### Cross-contamination: none
 
 Of the 6330 cells inside the four true boxes, **zero** have the wrong sign - no
 resistive cell in a conductor, no conductive cell in a resistor. Outside the
-boxes, only 75 conductive and 1 resistive cell are anomalous, and all of them
-lie 104-148 m from their own body centre; a cube corner is at 173 m, so that is
+boxes, only 76 conductive and no resistive cells are anomalous, and all of them
+lie 104-146 m from their own body centre; a cube corner is at 173 m, so that is
 the smearing halo, not an artifact elsewhere in the model.
 
 ### Amplitude: the expected asymmetry
 
-The conductors recover 55-59 % of their true log-contrast, the resistors 25 % -
+The conductors recover 49-53 % of their true log-contrast, the resistors 22 % -
 a factor 2.3. This is physics, not a solver deficiency: a CSEM field is far more
-sensitive to a conductor than to a resistor of the same contrast. Between step 80
-(RMS 1.1315) and step 105 (RMS 1.0491) the body means change by 11-14 %.
+sensitive to a conductor than to a resistor of the same contrast.
 
 The depth profile shows the same limitation and the shallow bias, as volume-
-weighted mean ρ in each body column (|x−x_c| ≤ 100, |y−y_c| ≤ 100):
+weighted geometric mean ρ in each body column (|x−x_c| ≤ 100, |y−y_c| ≤ 100):
 
 | band | C1 | C2 | R1 | R2 |
 |---|---|---|---|---|
-| z ∈ [−100, 0] | 80.1 | 83.3 | 107.7 | 110.2 |
-| **z ∈ [−200, −100]** | **18.9** | **16.6** | **201.7** | **213.9** |
-| z ∈ [−300, −200] | 42.5 | 41.4 | 158.1 | 147.2 |
-| z ∈ [−400, −300] | 56.6 | 56.7 | 121.6 | 114.6 |
+| z ∈ [−100, 0] | 77.1 | 81.4 | 111.3 | 114.6 |
+| **z ∈ [−200, −100]** | **22.4** | **20.3** | **201.2** | **198.8** |
+| z ∈ [−300, −200] | 46.2 | 44.3 | 139.7 | 134.8 |
+| z ∈ [−400, −300] | 56.3 | 54.3 | 116.7 | 114.7 |
 
 The anomaly concentrates in the upper half of the true body and decays below
 it - source and receivers both sit on the air/earth interface at a 4 km offset,
@@ -193,7 +181,7 @@ three further questions. All three are answered by the run above.
    opposite one, a volume much larger than the truth with a low in-box fraction.
 
 What the case does *not* demonstrate is amplitude recovery. The conductors come
-back at 55-59 % of their true log-contrast and the resistors at 25 %, so any
+back at 49-53 % of their true log-contrast and the resistors at 22 %, so any
 claim that the inversion "recovers the amplitude" of these bodies is not
 supported by these numbers. The location and the sign are recovered; the
 magnitude is not, and the 2.3x conductor/resistor asymmetry is the expected
@@ -206,8 +194,8 @@ be compared step by step and not only on its final metrics:
 
 | file | content |
 |---|---|
-| `lbfgs_log.txt` | one row per accepted step with RMS, objective `F`, regularization term, |g| and step length, plus the exit reason. 106 rows, iteration 0 (the starting model) to 105. |
-| `rms_history.txt` | the 112 entries of `/rms_history`, one per objective-gradient evaluation, including the 6 rejected line-search trials. Not monotone, while the accepted steps are. |
+| `lbfgs_log.txt` | one row per accepted step with evaluations, RMS, regularization term, \|g\|, \|g\|/\|x\|, step length, KSP iterations and wall time, plus the exit reason. 91 rows, iteration 0 (the starting model) to 90. |
+| `rms_history.txt` | the 96 entries of `/rms_history`, one per objective-gradient evaluation, including the 5 rejected line-search trials. Not monotone, while the accepted steps are. |
 
 ## Regenerating this file
 

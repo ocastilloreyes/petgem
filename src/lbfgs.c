@@ -185,7 +185,7 @@ PetscErrorCode lbfgsOptimize(const LbfgsProblem *problem, const LbfgsOptions *op
   PetscCall(problem->objgrad(problem->ctx, X, &f, G, &rms));
   PetscCall(VecNorm(G, NORM_2, &gnorm));
   PetscCall(gradientRatio(G, X, &gradRatio));
-  PetscCall(problem->monitor(problem->ctx, 0, gradRatio, 0.0));
+  PetscCall(problem->monitor(problem->ctx, 0, gnorm, gradRatio, 0.0));
   prevRms = rms;
   if (gradRatio <= opts->gtol) result->reason = LBFGS_CONVERGED_GRTOL;
 
@@ -222,7 +222,7 @@ PetscErrorCode lbfgsOptimize(const LbfgsProblem *problem, const LbfgsOptions *op
 
     PetscCall(VecNorm(G, NORM_2, &gnorm));
     PetscCall(gradientRatio(G, X, &gradRatio));
-    PetscCall(problem->monitor(problem->ctx, iter + 1, gradRatio, stp));
+    PetscCall(problem->monitor(problem->ctx, iter + 1, gnorm, gradRatio, stp));
 
     if (PetscIsNanReal(gnorm) || PetscIsNanReal(f)) {
       result->reason = LBFGS_DIVERGED_NAN;

@@ -8,7 +8,10 @@ from petsc4py import PETSc
 
 
 # Kernel names, identical to the binaries and to the petgem subcommands.
-KERNELS = ("fm.csem", "im.csem", "fm.mt")
+KERNELS = ("fm.csem", "im.csem", "fm.mt", "fm.tdcsem")
+
+# Data components fitted by im.csem (Zij = Ei / Hj), as in -im_data_components.
+DATA_COMPONENTS = ("Ex", "Ey", "Ez", "Hx", "Hy", "Hz", "Zxx", "Zxy", "Zyx", "Zyy")
 
 
 def checkMode(mode):
@@ -30,7 +33,8 @@ def parsePreprocessingArgs():
     parser.add_argument("-mode",              choices=KERNELS,
                         default="fm.csem",
                         help="Kernel the bundle is for: 'fm.csem' (CSEM forward), "
-                             "'im.csem' (CSEM inverse) or 'fm.mt' (MT forward). "
+                             "'im.csem' (CSEM inverse), 'fm.mt' (MT forward) or "
+                             "'fm.tdcsem' (time-domain CSEM forward). "
                              "Default: fm.csem")
     parser.add_argument("-order",              type=int, required=True, dest="order",
                         help="Polynomial order (1..6), stored in the bundle as /order")
@@ -47,26 +51,41 @@ def parsePreprocessingArgs():
                         help="Forward sources text file inside case_dir, one "
                              "frequency for all rows: 8 fields per row "
                              "'freq x y z current length dip azimuth', or a "
-                             "frequency line followed by 7-field rows. Required "
-                             "with -mode fm.csem, rejected otherwise.")
+                             "frequency line followed by 7-field rows. With -mode "
+                             "fm.tdcsem: 7 fields per row 'x y z current length dip "
+                             "azimuth'. Required with -mode fm.csem and fm.tdcsem, "
+                             "rejected otherwise.")
     parser.add_argument("-im_source_filename", type=str, default=None,
                         help="Multi-frequency sources text file inside case_dir, "
                              "required when -mode im.csem. Format: one row per "
                              "(freq, dipole) pair with 8 fields: "
                              "'freq x y z current length dip azimuth'. "
                              "Embedded into the bundle under /sources/*.")
-    parser.add_argument("-observed_filename", type=str, default=None,
-                        help="Observed-data file inside case_dir, required when "
-                             "-mode im.csem. Either an HDF5 (.h5/.hdf5) with "
-                             "/Ex [N_freq, N_recv] complex128 ({r,i} compound), "
-                             "OR a raw MATLAB-style invEx.dat text file (parsed "
-                             "inline - no separate conversion step). Embedded "
-                             "into the bundle under /observed/Ex.")
+    parser.add_argument("-observed_filename", type=str, nargs="+", default=None,
+                        help="Observed-data file(s) inside case_dir, required when "
+                             "-mode im.csem. Each entry is 'file' or "
+                             "'component:file' (component one of "
+                             f"{', '.join(DATA_COMPONENTS)}). An HDF5 (.h5/.hdf5) "
+                             "holds /<component> [N_freq, N_recv] complex128 "
+                             "({r,i} compound) datasets, all of them read unless "
+                             "a component is given; a raw MATLAB-style "
+                             "invEx.dat text file is Ex unless a component is "
+                             "given. NaN marks a missing datum. Embedded into "
+                             "the bundle under /observed/<component>.")
     parser.add_argument("-mt_frequency_filename", type=str, default=None,
                         help="MT frequency text file inside case_dir, required "
                              "when -mode fm.mt. Format: one frequency (Hz); '#' "
                              "comments allowed. Embedded into the bundle under "
                              "/mt/freq.")
+    parser.add_argument("-tdcsem_waveform_filename", type=str, default=None,
+                        help="Source waveform text file inside case_dir, required "
+                             "when -mode fm.tdcsem. Format: two columns 't s(t)', "
+                             "time (s) and current normalized by the source "
+                             "current; s must start at 0. Embedded into the bundle "
+                             "under /tdcsem/time and /tdcsem/waveform.")
+    parser.add_argument("-tdcsem_t_end", type=float, default=None,
+                        help="Final time (s), required when -mode fm.tdcsem. "
+                             "Written into the params file as -tdcsem_t_end.")
     parser.add_argument("-error_level", type=float, default=None,
                         help="Amplitude-relative noise level written to the "
                              "bundle's /observed @error_level (inverse mode). "
@@ -240,14 +259,15 @@ def readInvExDat(path):
 
     Format (one row per frequency)::
 
-        freq_label  Re(Ex_1) Im(Ex_1)  Re(Ex_2) Im(Ex_2)  ...  Re(Ex_N) Im(Ex_N)
+        freq_label  Re(d_1) Im(d_1)  Re(d_2) Im(d_2)  ...  Re(d_N) Im(d_N)
 
     The leading frequency label is dropped (the bundle's frequencies come
     from the inversion sources file); the remaining Re/Im pairs build the
-    ``[N_freq, N_recv]`` complex array.  Returns ``(Ex, None)`` to mirror
-    :func:`readObservedDataH5` - a raw .dat carries no error-level attribute,
-    so the noise level is supplied separately (``-error_level`` /
-    ``-im_error_level``) or left to the kernel default.
+    ``[N_freq, N_recv]`` complex array.  The file carries one data component
+    (``Ex`` unless :func:`readObservedData` is told otherwise) and no error
+    level, so the noise level is supplied separately (``-error_level`` /
+    ``-im_error_level``) or left to the kernel default.  NaN marks a missing
+    datum.
     """
     data = np.loadtxt(path, comments="#", ndmin=2)
     values = data[:, 1:]                       # drop the freq label column
@@ -259,45 +279,79 @@ def readInvExDat(path):
     return ex.astype(np.complex128), None
 
 
-def readObservedDataH5(path):
+def readObservedDataH5(path, component=None):
     """Read an observed-data HDF5 file (e.g. written by utils/make_observed.py).
 
-    Returns (Ex, error_level) where Ex is the [N_freq, N_recv] complex128
-    ndarray stored at /Ex and error_level is the amplitude-relative noise
-    level used to synthesize it (None if the source file has no
-    `error_level` attribute).  The compound HDF5 type {r: float64,
+    Returns (data, error_level) where data maps each component name of
+    :data:`DATA_COMPONENTS` found at the file root (only `component` when
+    given) to its [N_freq, N_recv] complex128 ndarray, and error_level is the
+    amplitude-relative noise level used to synthesize it (None if the source
+    file has no `error_level` attribute).  The compound HDF5 type {r: float64,
     i: float64} is materialized as complex128 by h5py.
     """
+    names = (component,) if component else DATA_COMPONENTS
+    data = {}
     with h5py.File(path, "r") as f:
-        if "Ex" not in f:
-            raise KeyError(f"{path}: missing /Ex dataset")
-        data = np.asarray(f["Ex"])
-        # `error_level` may sit on the file root or on the /Ex dataset.
+        for name in names:
+            if name in f:
+                data[name] = np.asarray(f[name])
+        if not data:
+            raise KeyError(f"{path}: no /{' or /'.join(names)} dataset")
+        # `error_level` may sit on the file root or on a component dataset.
         error_level = None
-        for holder in (f, f["Ex"]):
+        for holder in (f, *(f[name] for name in data)):
             if "error_level" in holder.attrs:
                 error_level = float(holder.attrs["error_level"])
                 break
-    if data.ndim != 2:
-        raise ValueError(f"{path}: /Ex must be 2-D, got shape {data.shape}")
-    if not np.iscomplexobj(data):
-        # File may store as compound-real; coerce to complex.
-        data = data.astype(np.complex128)
+    for name, values in data.items():
+        if values.ndim != 2:
+            raise ValueError(f"{path}: /{name} must be 2-D, got shape {values.shape}")
+        if not np.iscomplexobj(values):
+            # File may store as compound-real; coerce to complex.
+            data[name] = values.astype(np.complex128)
     return data, error_level
 
 
-def writeInversionPayload(filename, observed_Ex,
+def parseObservedSpec(spec):
+    """Split an observed-data entry 'component:file' into (component, file).
+
+    The component is matched case-insensitively against
+    :data:`DATA_COMPONENTS`; an entry without a known prefix gives
+    (None, spec).
+    """
+    head, sep, tail = spec.partition(":")
+    if sep:
+        for name in DATA_COMPONENTS:
+            if head.lower() == name.lower():
+                return name, tail
+    return None, spec
+
+
+def readObservedData(path, component=None):
+    """Observed data of one file, HDF5 or ``invEx.dat`` text.
+
+    Returns (data, error_level, kind): data maps component names to
+    [N_freq, N_recv] complex128 arrays, kind describes the file format.
+    """
+    if path.lower().endswith((".h5", ".hdf5")):
+        data, error_level = readObservedDataH5(path, component)
+        return data, error_level, "HDF5"
+    values, error_level = readInvExDat(path)
+    return {component or "Ex": values}, error_level, "invEx.dat (text)"
+
+
+def writeInversionPayload(filename, observed,
                           error_level=None, fixed_materials=()):
     """Append the inverse-only payload to an existing PETGEM bundle.
 
     Called after writePetgemInputFile, which already wrote the unified
     /sources group (per-entry frequency) shared by both modes. This adds
     only the data that has no forward counterpart. Uses h5py to append
-    because /observed/Ex is an HDF5 compound complex128 - easier to express
-    directly than via the PETSc viewer.
+    because /observed/<component> is an HDF5 compound complex128 - easier to
+    express directly than via the PETSc viewer.
 
     Bundle additions:
-        /observed/Ex                          (HDF5 compound complex128)
+        /observed/<component>                 (HDF5 compound complex128, one per component)
         /observed @error_level                (HDF5 group attribute, float64; omitted if None)
         /im_meta/fixed_materials             (int32[], 0-based material ids; omitted if empty)
 
@@ -305,10 +359,11 @@ def writeInversionPayload(filename, observed_Ex,
     ----------
     filename : str
         Bundle path (writes append-mode).
-    observed_Ex : ndarray (N_freq, N_recv), complex
-        Per (freq, receiver) observed Ex.
+    observed : dict of str to ndarray (N_freq, N_recv), complex
+        Per (freq, receiver) observed data of each component of
+        :data:`DATA_COMPONENTS`.
     error_level : float or None
-        Amplitude-relative noise level used to synthesize observed_Ex.
+        Amplitude-relative noise level used to synthesize the data.
         Stored as a group attribute on /observed; consumed by the C
         kernel (overridable with -im_error_level).  Skipped when None.
     fixed_materials : iterable of int
@@ -317,7 +372,6 @@ def writeInversionPayload(filename, observed_Ex,
         C kernel (overridable with -im_fixed_materials).  Skipped when
         empty.
     """
-    ex  = np.asarray(observed_Ex, dtype=np.complex128)
     fixed_arr = np.asarray(sorted(set(int(i) for i in fixed_materials)),
                            dtype=np.int32)
 
@@ -329,7 +383,8 @@ def writeInversionPayload(filename, observed_Ex,
         obs = f.create_group("/observed")
         # Compound complex128 ({r,i} float64) - matches what
         # loadObservedData reads via the raw H5 API.
-        obs.create_dataset("Ex", data=ex)
+        for name, values in observed.items():
+            obs.create_dataset(name, data=np.asarray(values, dtype=np.complex128))
         if error_level is not None:
             obs.attrs["error_level"] = float(error_level)
 
@@ -344,6 +399,51 @@ def readMtFrequencyText(path):
     if len(values) != 1 or values[0] <= 0.0:
         raise ValueError(f"{path}: expected one positive frequency (Hz), got {values}")
     return values[0]
+
+
+def readTdSourcesText(path):
+    """Parse a time-domain transmitter file into an ``(N, 8)`` array.
+
+    One row per transmitter with 7 fields ``x y z current length dip azimuth``;
+    the frequency column of the result is 0.
+    """
+    data_lines = _readTokens(path)
+    if not data_lines:
+        raise ValueError(f"{path}: no source rows found")
+    rows = []
+    for toks in data_lines:
+        if len(toks) != 7:
+            raise ValueError(
+                f"{path}: expected 7 fields per source row "
+                f"(x y z current length dip azimuth), got {len(toks)}: {toks}")
+        rows.append([0.0] + [float(tok) for tok in toks])
+    return np.asarray(rows, dtype=float)
+
+
+def readTdWaveformText(path):
+    """Read a source waveform: two columns ``t s(t)``, '#' comments allowed.
+
+    Returns ``(time, waveform)``. Times must increase strictly and s(t0) = 0.
+    """
+    rows = [[float(tok) for tok in toks] for toks in _readTokens(path, commas=True)]
+    if len(rows) < 2 or any(len(row) != 2 for row in rows):
+        raise ValueError(f"{path}: expected at least 2 rows of 't s(t)'")
+    data = np.asarray(rows, dtype=float)
+    if np.any(np.diff(data[:, 0]) <= 0.0):
+        raise ValueError(f"{path}: times must increase strictly")
+    if data[0, 1] != 0.0:
+        raise ValueError(f"{path}: the waveform must start at 0 (got {data[0, 1]})")
+    return data[:, 0], data[:, 1]
+
+
+def writeTdPayload(filename, time, waveform):
+    """Append the waveform (/tdcsem/time, /tdcsem/waveform) to an existing bundle."""
+    viewer = PETSc.ViewerHDF5().create(filename, "a")
+    viewer.pushGroup("/tdcsem")
+    _writeArrayAsVec(viewer, time, "time")
+    _writeArrayAsVec(viewer, waveform, "waveform")
+    viewer.popGroup()
+    viewer.destroy()
 
 
 def writeMtPayload(filename, frequency):
@@ -514,6 +614,7 @@ _SOLVER_BLOCK = {
     "fm.csem": _ITERATIVE_SOLVER_BLOCK,
     "im.csem": _ITERATIVE_SOLVER_BLOCK + "-ksp_rtol 1.0e-10\n",
     "fm.mt":   _DIRECT_SOLVER_BLOCK,
+    "fm.tdcsem": _DIRECT_SOLVER_BLOCK,
 }
 
 # Inversion tuning block (im.csem only). Every option is -im_*, matching the
@@ -532,17 +633,18 @@ _IM_TUNING_BLOCK = (
 
 
 def writeParamsFile(mode, output_dir, output_filename, input_filename,
-                    params_filename):
+                    params_filename, tdcsem_t_end=None):
     """Emit the PETSc options file for any kernel.
 
     The mode selects the solver block (BDDC for ``fm.csem`` and ``im.csem``,
-    MUMPS for ``fm.mt``) and, for ``im.csem``, adds the inversion block. The
+    MUMPS for ``fm.mt`` and ``fm.tdcsem``), for ``im.csem`` adds the inversion
+    block and for ``fm.tdcsem`` the final time. The
     polynomial order is not written: the kernels read ``/order`` from the
     bundle.
 
     Parameters
     ----------
-    mode : {'fm.csem', 'im.csem', 'fm.mt'}
+    mode : {'fm.csem', 'im.csem', 'fm.mt', 'fm.tdcsem'}
         Kernel name (see KERNELS).
     output_dir : str
         Case/output directory; also where the params file is written.
@@ -552,6 +654,8 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
         Bundle written by writePetgemInputFile, fed back as -input_filename.
     params_filename : str
         Name of the params file to emit inside output_dir.
+    tdcsem_t_end : float or None
+        Final time (s), ``fm.tdcsem`` only.
     """
     if mode not in _SOLVER_BLOCK:
         raise ValueError(f"writeParamsFile: unknown mode {mode!r} "
@@ -561,6 +665,7 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
         f"-input_filename {output_dir}/{input_filename}\n"
         + _SOLVER_BLOCK[mode]
         + (_IM_TUNING_BLOCK if mode == "im.csem" else "")
+        + (f"-tdcsem_t_end {tdcsem_t_end!r}\n" if mode == "fm.tdcsem" else "")
         + f"-output_dir {output_dir}/\n"
         + f"-output_filename {output_filename}\n"
     )
@@ -633,6 +738,7 @@ _MODE_INPUTS = {
     "fm.csem": {"source_filename"},
     "im.csem": {"im_source_filename", "observed_filename"},
     "fm.mt":   {"mt_frequency_filename"},
+    "fm.tdcsem": {"source_filename", "tdcsem_waveform_filename"},
 }
 
 
@@ -646,6 +752,7 @@ def runPreprocessing(*, mode, order, case_dir,
                      observed_filename=None,
                      error_level=None,
                      mt_frequency_filename=None,
+                     tdcsem_waveform_filename=None, tdcsem_t_end=None,
                      output_vtk=None, dm_view=False):
     """Build the input bundle and the parameter file for one kernel run.
 
@@ -657,7 +764,7 @@ def runPreprocessing(*, mode, order, case_dir,
 
     Parameters
     ----------
-    mode : {'fm.csem', 'im.csem', 'fm.mt'}
+    mode : {'fm.csem', 'im.csem', 'fm.mt', 'fm.tdcsem'}
         Kernel the bundle is for.
     order : int
         Polynomial order, stored as ``/order``. It also sets the output stem
@@ -667,7 +774,8 @@ def runPreprocessing(*, mode, order, case_dir,
     mesh_filename, receiver_filename : str
         Mesh and receiver table.
     source_filename : str or None
-        Forward sources (``fm.csem`` only). Must hold a single frequency.
+        Forward sources (``fm.csem`` and ``fm.tdcsem``). For ``fm.csem`` it
+        must hold a single frequency; ``fm.tdcsem`` rows carry no frequency.
     sigma_x, sigma_y, sigma_z : array_like
         Per-material conductivity, indexed by 0-based material id.
     fixed_materials : iterable of int
@@ -677,13 +785,18 @@ def runPreprocessing(*, mode, order, case_dir,
     im_source_filename : str or None
         Multi-frequency sources, one row per (frequency, dipole)
         (``im.csem`` only).
-    observed_filename : str or None
-        Observed ``Ex``, HDF5 or ``invEx.dat`` text (``im.csem`` only).
+    observed_filename : str, list of str or None
+        Observed data, entries ``file`` or ``component:file``, HDF5 or
+        ``invEx.dat`` text (``im.csem`` only).
     error_level : float or None
         Relative noise level; overrides the one stored in an HDF5
         observed-data file.
     mt_frequency_filename : str or None
         MT frequency file (``fm.mt`` only).
+    tdcsem_waveform_filename : str or None
+        Source waveform ``t s(t)`` (``fm.tdcsem`` only).
+    tdcsem_t_end : float or None
+        Final time (s), written into the parameter file (``fm.tdcsem`` only).
     output_vtk : str or None
         Also write the conductivity and material ids to this VTU file.
     dm_view : bool
@@ -703,12 +816,16 @@ def runPreprocessing(*, mode, order, case_dir,
     given = {"source_filename": source_filename,
              "im_source_filename": im_source_filename,
              "observed_filename": observed_filename,
-             "mt_frequency_filename": mt_frequency_filename}
+             "mt_frequency_filename": mt_frequency_filename,
+             "tdcsem_waveform_filename": tdcsem_waveform_filename}
     for name, value in given.items():
         if name in _MODE_INPUTS[mode] and value is None:
             raise ValueError(f"runPreprocessing: -{name} is required when mode='{mode}'")
         if name not in _MODE_INPUTS[mode] and value is not None:
             raise ValueError(f"runPreprocessing: -{name} is not valid with mode='{mode}'")
+    if (mode == "fm.tdcsem") != (tdcsem_t_end is not None):
+        raise ValueError("runPreprocessing: -tdcsem_t_end is required with mode='fm.tdcsem' "
+                         "and not valid otherwise")
 
     sigma_x = np.asarray(sigma_x, dtype=float)
     sigma_y = np.asarray(sigma_y, dtype=float)
@@ -728,8 +845,12 @@ def runPreprocessing(*, mode, order, case_dir,
     output_petgem_filename      = f"responses_p{order}"
     output_vtk_filename         = inCase(output_vtk)
     input_im_sources_filename   = inCase(im_source_filename)
-    input_observed_filename     = inCase(observed_filename)
+    if isinstance(observed_filename, str):
+        observed_filename = [observed_filename]
+    observed_specs = [parseObservedSpec(spec) for spec in (observed_filename or [])]
+    observed_specs = [(comp, inCase(path)) for comp, path in observed_specs]
     input_mt_frequency_filename = inCase(mt_frequency_filename)
+    input_td_waveform_filename  = inCase(tdcsem_waveform_filename)
 
     print("====================================================")
     print(f" PETGEM INPUT PREPROCESSING ({mode})")
@@ -738,13 +859,16 @@ def runPreprocessing(*, mode, order, case_dir,
     print(f"  Case directory         : {case_dir}")
     print(f"  Mesh file              : {input_mesh_filename}")
     print(f"  Receivers file         : {input_receivers_filename}")
-    if mode == "fm.csem":
+    if mode in ("fm.csem", "fm.tdcsem"):
         print(f"  Sources file           : {input_sources_filename}")
+    if mode == "fm.tdcsem":
+        print(f"  Waveform file          : {input_td_waveform_filename}")
     if mode == "fm.mt":
         print(f"  MT frequency file      : {input_mt_frequency_filename}")
     if mode == "im.csem":
         print(f"  IM sources file        : {input_im_sources_filename}")
-        print(f"  Observed data file     : {input_observed_filename}")
+        for comp, path in observed_specs:
+            print(f"  Observed data file     : {path}" + (f"  ({comp})" if comp else ""))
     print(f"  Output bundle          : {output_filename}")
     print(f"\n  Number of materials    : {len(sigma_x)}")
 
@@ -754,9 +878,13 @@ def runPreprocessing(*, mode, order, case_dir,
     _require_input_file(input_receivers_filename, "Receivers file")
     if mode == "fm.csem":
         _require_input_file(input_sources_filename, "Sources file")
+    elif mode == "fm.tdcsem":
+        _require_input_file(input_sources_filename, "Sources file")
+        _require_input_file(input_td_waveform_filename, "Waveform file")
     elif mode == "im.csem":
         _require_input_file(input_im_sources_filename, "Inverse sources file")
-        _require_input_file(input_observed_filename, "Observed-data file")
+        for _, path in observed_specs:
+            _require_input_file(path, "Observed-data file")
     else:
         _require_input_file(input_mt_frequency_filename, "MT frequency file")
 
@@ -823,6 +951,13 @@ def runPreprocessing(*, mode, order, case_dir,
         print("\nReading MT frequency")
         mt_frequency = readMtFrequencyText(input_mt_frequency_filename)
         print(f"  Frequency (Hz)          : {mt_frequency}")
+    elif mode == "fm.tdcsem":
+        print("\nReading sources and waveform")
+        sources8 = readTdSourcesText(input_sources_filename)
+        td_time, td_waveform = readTdWaveformText(input_td_waveform_filename)
+        print(f"  Transmitters            : {sources8.shape[0]}")
+        print(f"  Waveform samples        : {td_time.size} ({td_time[0]} .. {td_time[-1]} s)")
+        print(f"  Final time (s)          : {tdcsem_t_end}")
     else:
         src_path = input_sources_filename if mode == "fm.csem" else input_im_sources_filename
         print("\nReading sources")
@@ -848,57 +983,64 @@ def runPreprocessing(*, mode, order, case_dir,
                          output_vtk=output_vtk_filename)
     if mode == "fm.mt":
         writeMtPayload(output_filename, mt_frequency)
+    if mode == "fm.tdcsem":
+        writeTdPayload(output_filename, td_time, td_waveform)
     print(f"  Output file: {output_filename}")
     if output_vtk_filename:
         print(f"  VTU view  : {output_vtk_filename}")
 
-    # 6b. Inverse-only payload: append /observed/Ex and /im_meta.
+    # 6b. Inverse-only payload: append /observed/<component> and /im_meta.
     # (The sources already live in the unified /sources group above.)
     if mode == "im.csem":
         print("\nReading observed data")
-        # Accept either a prebuilt HDF5 (.h5/.hdf5) or a raw MATLAB-style
+        # Each file is a prebuilt HDF5 (.h5/.hdf5) or a raw MATLAB-style
         # invEx.dat text file - the .dat is parsed inline, so no separate
         # convert-to-HDF5 step is needed.
-        if input_observed_filename.lower().endswith((".h5", ".hdf5")):
-            observed_Ex, file_error_level = readObservedDataH5(input_observed_filename)
-            src_kind = "HDF5"
-        else:
-            observed_Ex, file_error_level = readInvExDat(input_observed_filename)
-            src_kind = "invEx.dat (text)"
+        observed, file_error_level = {}, None
+        for comp, path in observed_specs:
+            data, level, src_kind = readObservedData(path, comp)
+            for name in data:
+                if name in observed:
+                    raise ValueError(f"Observed component {name} given twice ({path})")
+            observed.update(data)
+            if file_error_level is None:
+                file_error_level = level
+            print(f"  Observed source         : {src_kind}  ({', '.join(data)})")
         # -error_level on the CLI overrides the file's attribute (and is the
         # only way to set it for a raw .dat).
         observed_error_level = error_level if error_level is not None else file_error_level
-        print(f"  Observed source         : {src_kind}")
-        print(f"  Observed Ex shape       : {observed_Ex.shape}  (N_freq, N_recv)")
+        for name, values in observed.items():
+            print(f"  Observed {name:<3} shape      : {values.shape}  (N_freq, N_recv)")
         print(f"  Error level             : "
               f"{observed_error_level if observed_error_level is not None else '(absent, kernel default)'}")
 
         n_freq_src = sources8.shape[0]
-        n_freq_obs = observed_Ex.shape[0]
-        if n_freq_src != n_freq_obs:
-            raise ValueError(
-                f"Mismatch between source rows ({n_freq_src}) and "
-                f"observed Ex frequencies ({n_freq_obs})"
-            )
-        if observed_Ex.shape[1] != receivers_arr.shape[0]:
-            raise ValueError(
-                f"Observed Ex N_recv={observed_Ex.shape[1]} disagrees with "
-                f"receivers count {receivers_arr.shape[0]}"
-            )
+        for name, values in observed.items():
+            if values.shape[0] != n_freq_src:
+                raise ValueError(
+                    f"Mismatch between source rows ({n_freq_src}) and "
+                    f"observed {name} frequencies ({values.shape[0]})"
+                )
+            if values.shape[1] != receivers_arr.shape[0]:
+                raise ValueError(
+                    f"Observed {name} N_recv={values.shape[1]} disagrees with "
+                    f"receivers count {receivers_arr.shape[0]}"
+                )
 
         print("\nEmbedding inverse payload into bundle")
         if fixed_materials:
             print(f"  Fixed material IDs       : {list(fixed_materials)} (from sigmas.txt)")
-        writeInversionPayload(output_filename, observed_Ex,
+        writeInversionPayload(output_filename, observed,
                               error_level=observed_error_level,
                               fixed_materials=fixed_materials)
-        print(f"  Wrote /observed/Ex, /im_meta/fixed_materials "
+        written = ", ".join(f"/observed/{name}" for name in observed)
+        print(f"  Wrote {written}, /im_meta/fixed_materials "
               f"into {output_filename}")
 
     # 7. Params file (one writer for every mode; mode selects the solver block)
     print("\nGenerating PETGEM parameter file")
     writeParamsFile(mode, case_dir, output_petgem_filename,
-                    input_filename, params_filename)
+                    input_filename, params_filename, tdcsem_t_end=tdcsem_t_end)
     print(f"  Params file: {os.path.join(case_dir, params_filename)}")
 
     print("\n====================================================")
@@ -1025,6 +1167,30 @@ def readAllResponses(filename):
         'num_sources': num_sources,
         'sources':     sources,
     }
+
+
+def readTdResponses(filename, source=1):
+    """Read the time series of one transmitter from an ``fm.tdcsem`` output file.
+
+    Returns a dict with ``times`` (N_t,) and ``Ex, Ey, Ez, dBxdt, dBydt, dBzdt``
+    as real (N_t, N_recv) arrays, plus the ``source`` and ``provenance``
+    attributes.
+    """
+    import h5py
+
+    src_group = f"/sources/src{int(source)}"
+    out = {}
+    with h5py.File(filename, 'r') as f:
+        if src_group not in f:
+            raise KeyError(f"{filename}: missing group {src_group!r}")
+        times = np.asarray(f['times'])
+        out['times'] = times[:, 0] if times.ndim == 2 else times
+        for name in ('Ex', 'Ey', 'Ez', 'dBxdt', 'dBydt', 'dBzdt'):
+            a = np.asarray(f[f"{src_group}/fields/{name}"])
+            out[name] = a[..., 0] if a.ndim == 3 else a
+        out['source']     = {key: _decodeH5Attr(value) for key, value in f[src_group].attrs.items()}
+        out['provenance'] = {key: _decodeH5Attr(value) for key, value in f.attrs.items()}
+    return out
 
 
 def compareMagnitude(computed, reference):

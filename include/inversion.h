@@ -22,6 +22,9 @@
 
 /** @brief simulation_type tag of im.csem products. */
 #define PETGEM_SIM_IM "im.csem"
+
+/** @brief Max number of step sizes of the gradient check. */
+#define IM_MAX_GRADIENT_CHECK_STEPS 8
 #include <petsc.h>
 #include <petscdmplex.h>
 #include <petscksp.h>
@@ -35,18 +38,52 @@ typedef struct {
 } ImCsemSource;
 
 /**
+ * @brief Data component fitted by the inversion.
+ *
+ * Ex..Hz are field components at the receivers; Zij = Ei / Hj is the ratio
+ * of two of them for the same source. Names (imDataComponentNames) are the
+ * dataset suffixes of /observed/<name> and predicted_<name>.
+ */
+typedef enum {
+  IM_DATA_EX,
+  IM_DATA_EY,
+  IM_DATA_EZ,
+  IM_DATA_HX,
+  IM_DATA_HY,
+  IM_DATA_HZ,
+  IM_DATA_ZXX,
+  IM_DATA_ZXY,
+  IM_DATA_ZYX,
+  IM_DATA_ZYY,
+  IM_NUM_DATA_COMPONENTS
+} ImDataComponent;
+
+/** @brief Dataset names of the data components, indexed by ImDataComponent. */
+extern const char *const imDataComponentNames[IM_NUM_DATA_COMPONENTS];
+
+/**
+ * @brief Receiver fields of a data component.
+ *
+ * @param[in]  comp         Data component.
+ * @param[out] numerator    Field of a linear component, or Ei of Zij.
+ * @param[out] denominator  Hj of Zij, or NUM_RECEIVER_FIELDS for a linear component.
+ */
+void imDataComponentFields(ImDataComponent comp, ReceiverField *numerator, ReceiverField *denominator);
+
+/**
  * @brief Observed-data source mode for the inverse kernel.
  *
  * Selects which schema loadObservedDataset() reads the [numFreqs x
- * numReceivers] Ex misfit data from:
+ * numReceivers] data of each component from:
  *
- *  - OBS_EXTERNAL : the bundle's /observed/Ex compound-complex dataset
- *                   (the post-noise external observed data; default).
+ *  - OBS_EXTERNAL : the bundle's /observed/<component> compound-complex
+ *                   datasets (the post-noise external observed data; default).
  *  - OBS_FM_NATIVE: an fm.csem responses HDF5 file's native per-source
- *                   /sources/src{k}/fields/Ex Vecs (source k -> frequency
- *                   row k). Lets a forward run feed the inverse kernel
- *                   directly, without the Python reshape step (noise, if
- *                   wanted, must already be baked into that file).
+ *                   /sources/src{k}/fields/{Ex..Hz} Vecs (source k -> frequency
+ *                   row k), from which ratio components are formed. Lets a
+ *                   forward run feed the inverse kernel directly, without the
+ *                   Python reshape step (noise, if wanted, must already be
+ *                   baked into that file).
  */
 typedef enum { OBS_EXTERNAL = 0, OBS_FM_NATIVE = 1 } ObservedDataMode;
 
@@ -108,6 +145,15 @@ typedef struct {
    *  "use the unified bundle (common.inputFile)"; for OBS_FM_NATIVE it is the
    *  fm.csem responses HDF5 file. Set by -im_observed_file. */
   char observedFile[PETSC_MAX_PATH_LEN]; /**< Observed-data file (empty = bundle). */
+
+  /** Fitted data components, from -im_data_components (default Ex). */
+  PetscInt        numComponents;                      /**< Number of components. */
+  ImDataComponent components[IM_NUM_DATA_COMPONENTS]; /**< Component list, no repeats. */
+
+  /** -im_gradient_check: compare the adjoint gradient with central differences and stop. */
+  PetscBool gradientCheck;                           /**< Run the gradient check instead of the inversion. */
+  PetscInt  numCheckSteps;                           /**< Number of step sizes. */
+  PetscReal checkSteps[IM_MAX_GRADIENT_CHECK_STEPS]; /**< Step sizes in log(rho), -im_gradient_check_eps. */
 } ImParams;
 
 /**
@@ -130,15 +176,13 @@ typedef struct {
 } NeighborGraph;
 
 /**
- * @brief Per-frequency data and solver, built once and reused by every evaluation.
+ * @brief Per-frequency data, built once and reused by every evaluation.
  */
 typedef struct {
-  PetscScalar iwmu; /**< i omega mu. */
-  Vec         B;    /**< Source right-hand side (global, on dm). */
-  Vec         dObs; /**< Observed Ex at the receivers (sequential). */
-  Vec         W;    /**< Data weights 1 / (|dObs| errorLevel) (sequential). */
-  Mat         A;    /**< A_f = K - i omega mu Ms, refilled every evaluation. */
-  KSP         ksp;  /**< Solver bound to A (forward and adjoint solves). */
+  PetscScalar iwmu;                         /**< i omega mu. */
+  Vec         B;                            /**< Source right-hand side (global, on dm). */
+  Vec         dObs[IM_NUM_DATA_COMPONENTS]; /**< Observed data per fitted component (sequential). */
+  Vec         W[IM_NUM_DATA_COMPONENTS];    /**< Data weights 1 / (|dObs| errorLevel), 0 for missing data (sequential). */
 } InversionFrequency;
 
 /**
@@ -162,6 +206,7 @@ typedef struct {
   Vec                                  notFixedMaskLocal;  /**< Same mask, local. */
 
   PetscReal         *allRms;       /**< RMS per evaluation. */
+  PetscReal         *gradNorms;    /**< ||g|| per accepted iteration (0 = initial model). */
   PetscReal          lastRms;      /**< RMS of the last evaluation. */
   PetscReal          lastRegTerm;  /**< Tikhonov term of the last evaluation. */
   PetscInt           numEvals;     /**< Objective-gradient evaluations. */
@@ -177,16 +222,20 @@ typedef struct {
   PetscInt           numSnapshots; /**< VTU snapshots written. */
 
   /* Workspace */
-  Quadrature3D        quad3d;    /**< 3D quadrature rule. */
-  PetscReal         **Me, **Ke;  /**< Elemental matrices (numDofInCell^2). */
-  Vec                 x, nB, nx; /**< Forward solution, adjoint RHS, adjoint solution (global, on dm). */
-  Vec                 ExRecv;    /**< Ex at the receivers (parallel). */
-  Vec                 adjSrc;    /**< Weighted residual W^2 conj(dObs - Ex) (parallel, like ExRecv). */
-  Mat                 K;         /**< Curl-curl stiffness (sigma-independent). */
-  Mat                 Ms;        /**< Sigma-weighted mass matrix, refilled every evaluation. */
-  Mat                 G;         /**< Discrete gradient for PCBDDC. */
-  PetscInt            numFreqs;  /**< Number of frequencies. */
-  InversionFrequency *freq;      /**< Per-frequency data and solvers. */
+  Quadrature3D        quad3d;                      /**< 3D quadrature rule. */
+  PetscReal         **Me, **Ke;                    /**< Elemental matrices (numDofInCell^2). */
+  Vec                 x, nB, nx;                   /**< Forward solution, adjoint RHS, adjoint solution (global, on dm). */
+  Vec                 recv[NUM_RECEIVER_FIELDS];   /**< Fields at the receivers, H divided by i omega mu; NULL if unused (parallel). */
+  Vec                 adjSrc[NUM_RECEIVER_FIELDS]; /**< Adjoint source per field, J^T W^2 conj(dObs - d) (parallel, like recv). */
+  Vec                 dPre;                        /**< Predicted data of one component (parallel, like recv). */
+  PetscInt            numData;                     /**< Real data count: 2 x observed values that are not missing. */
+  Mat                 K;                           /**< Curl-curl stiffness (sigma-independent). */
+  Mat                 Ms;                          /**< Sigma-weighted mass matrix, refilled every evaluation. */
+  Mat                 G;                           /**< Discrete gradient for PCBDDC. */
+  Mat                 A;                           /**< A_f = K - i omega mu Ms, refilled for every frequency. */
+  KSP                 ksp;                         /**< Solver bound to A (forward and adjoint solves of every frequency). */
+  PetscInt            numFreqs;                    /**< Number of frequencies. */
+  InversionFrequency *freq;                        /**< Per-frequency data and solvers. */
 } InversionContext;
 
 /* ------------------------------------------------------------------ */
@@ -245,14 +294,15 @@ PetscErrorCode logInversionSummary(const ImParams *imParams);
 /**
  * @brief Observed-data abstraction entry point used by the inverse kernel.
  *
- * Reads /observed/Ex of the bundle (OBS_EXTERNAL) or the per-source
- * /sources/src{k}/fields/Ex of an fm.csem responses file (OBS_FM_NATIVE),
+ * Reads /observed/<component> of the bundle (OBS_EXTERNAL) or the per-source
+ * /sources/src{k}/fields of an fm.csem responses file (OBS_FM_NATIVE) for every
+ * fitted component, NaN marking missing data,
  * from imParams->observedFile or, when empty, imParams->common.inputFile. Every
  * rank receives the full array.
  *
- * @param[in]  imParams       Inversion parameters (mode, file, numFreqs, bundle).
+ * @param[in]  imParams       Inversion parameters (mode, file, numFreqs, components, bundle).
  * @param[in]  numReceivers  Number of receivers (columns).
- * @param[out] dObs          Observed Ex, row-major numFreqs x numReceivers (caller frees).
+ * @param[out] dObs          Observed data, component-major numComponents x numFreqs x numReceivers (caller frees).
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */

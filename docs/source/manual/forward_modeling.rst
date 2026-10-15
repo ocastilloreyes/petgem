@@ -1,6 +1,6 @@
-================
-Forward modeling
-================
+==============================
+Frequency-domain CSEM modeling
+==============================
 
 ``fm.csem`` computes the electric and magnetic fields of one or more dipole
 transmitters at a set of receivers, for a 3D conductivity model at a single

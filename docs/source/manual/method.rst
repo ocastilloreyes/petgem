@@ -14,10 +14,10 @@ field :math:`E`, with a constant magnetic permeability :math:`\mu = \mu_0`
 
 .. math::
 
-   \nabla \times \nabla \times E \;-\; i\,\omega\,\mu\,\sigma\, E \;=\; f,
+   \nabla \times \nabla \times E \;-\; i\,\omega\,\mu\,\sigma\, E \;=\; F,
 
-where :math:`\omega = 2\pi f` is the angular frequency. For CSEM, homogeneous
-Dirichlet boundary conditions :math:`n \times E = 0` are imposed on the domain
+where :math:`\omega` is the angular frequency and :math:`F` the source term.
+For CSEM, homogeneous Dirichlet boundary conditions :math:`n \times E = 0` are imposed on the domain
 boundary (``PETGEM_BC_PEC`` in ``setupNedelecGrid``).
 
 The field is discretized with **Nédélec (edge) vector finite elements** of
@@ -132,22 +132,115 @@ half-space gives :math:`\phi_{xy} = 135^\circ` and :math:`\phi_{yx} = -45^\circ`
 references in the first-quadrant convention use
 :math:`\mathrm{mod}(-\phi, 180^\circ)`.
 
+Time-domain CSEM forward problem
+--------------------------------
+``fm.tdcsem`` follows Cai et al. (2017, *J. Appl. Geophys.* 145, 133-143),
+without their hybrid boundary condition. In the quasi-static limit the electric field satisfies
+
+.. math::
+
+   \nabla \times \nabla \times E(t) + \mu\,\sigma\,\frac{\partial E}{\partial t}
+   = -\mu\,\frac{\partial J_s}{\partial t},
+
+with :math:`n \times E = 0` on the boundary and :math:`E(0) = 0`. The same
+Nédélec discretization gives :math:`K e + \mu M_\sigma\,\dot e = -\mu\,\dot b`,
+with the dipole term :math:`b_j = N_j(x_s)\cdot p\,s(t)`, where :math:`s(t)`
+is the normalized source waveform. With time step :math:`\Delta t`, each
+step solves
+
+.. math::
+
+   \left(K + \frac{a_0\,\mu}{\Delta t} M_\sigma\right) e^{n}
+   = -\frac{\mu}{\Delta t} M_\sigma \left(a_1 e^{n-1} + a_2 e^{n-2}\right)
+     - \frac{\mu}{\Delta t}\left(a_0 s(t_n) + a_1 s(t_{n-1}) + a_2 s(t_{n-2})\right) b_p,
+   \qquad b_{p,j} = N_j(x_s)\cdot p ,
+
+with :math:`(a_0, a_1, a_2) = (3/2, -2, 1/2)` for the second-order backward
+differentiation formula (BDF2, default) and :math:`(1, -1, 0)` for backward
+Euler (``-tdcsem_scheme be``). Before the first step :math:`e = 0` and
+:math:`s = 0`.
+
+:math:`K` and :math:`M_\sigma` are assembled once (``assembleMaxwellOperator``
+and ``refillMassMatrix``). The operator is real; on a complex PETSc build the solution
+has a zero imaginary part.
+
+The time step is adapted by step doubling. After ``-tdcsem_atsd_steps`` steps
+at :math:`\Delta t`, one step of :math:`2\Delta t` is compared with the two
+steps of :math:`\Delta t` that cover the same interval; the doubling is
+accepted when
+
+.. math::
+
+   \|e_{2\Delta t} - e_{\Delta t}\| \le r\,\|e(t + 2\Delta t) - e(t)\|,
+
+with :math:`r` = ``-tdcsem_atsd_rtol`` and the norm taken over all degrees of
+freedom and sources. The solution carried forward is always the
+:math:`\Delta t` one. The BDF2 step of :math:`2\Delta t` uses :math:`e(t)`
+and :math:`e(t - 2\Delta t)`. A rejected :math:`2\Delta t` operator is kept
+for the next trial. At the receivers, :math:`E` is interpolated and
+:math:`\partial B/\partial t = -\nabla\times E`.
+
+Charge correction
+*****************
+With the discrete gradient :math:`G` (:math:`K G = 0`), the semi-discrete
+equation and :math:`e(0) = 0` give the discrete charge conservation
+
+.. math::
+
+   G^T \left(M_\sigma\, e(t) + s(t)\, b_p\right) = 0,
+
+the discrete form of :math:`\nabla\cdot(\sigma E) = -\nabla\cdot J_s`.
+After every solve the kernel adds a gradient,
+:math:`e \leftarrow e + G_i\,\phi`, with
+
+.. math::
+
+   \left(G_i^T M_\sigma G_i\right)\phi = -G_i^T\left(M_\sigma\, e + s(t_n)\, b_p\right),
+
+where :math:`G_i` is :math:`G` restricted to the interior nodes
+(:math:`\phi = 0` on the boundary). :math:`G_i^T M_\sigma G_i` is set up once
+and solved with CG and GAMG (``rtol 1e-10``).
+
 Inverse problem
 ---------------
-``im.csem`` recovers a conductivity model :math:`m` - one value per invertible
-material - by minimizing a regularized data-misfit functional combining the
-difference between observed and predicted responses (weighted by the relative
-data-error level, ``-im_error_level``) with a Tikhonov term of weight
-:math:`\lambda` (``-im_lambda``) that penalizes departure from the starting
-model.
+``im.csem`` inverts for the log-resistivity of every cell. The unknown is
+the perturbation :math:`x = \log\rho - \log\rho_0` with respect to the
+starting model :math:`\rho_0`, and the objective is
 
-The gradient is assembled by the **adjoint-state method**: each iteration
-performs forward and adjoint solves per frequency, avoiding formation of the
-full Jacobian. The model is updated with a **limited-memory BFGS (L-BFGS)**
-scheme (``-im_lbfgs_memory``, ``-im_max_iter``). An optional neighbor
-smoother acts on the gradient (``-im_diag_weight``); materials flagged as
-fixed are excluded from the update. Options are listed in
-:doc:`inverse_modeling`.
+.. math::
+
+   \Phi(x) = \frac{1}{N_d}\sum_{c,f,r} \left|w_{cfr}\left(d^{\mathrm{obs}}_{cfr} - d_{cfr}(x)\right)\right|^2
+            + \frac{\lambda}{N}\,\|x\|^2,
+   \qquad w_{cfr} = \frac{1}{\epsilon\,|d^{\mathrm{obs}}_{cfr}|},
+
+where :math:`c` runs over the fitted components (``-im_data_components``),
+:math:`f` over the frequencies, :math:`r` over the receivers,
+:math:`N_d` counts the real and imaginary parts of the data that are not
+missing,
+:math:`N` is the number of cells, :math:`\epsilon` the relative data error
+(``-im_error_level``) and :math:`\lambda` the Tikhonov weight
+(``-im_lambda``). The regularization term penalizes departure from the
+starting model.
+
+The predicted data are field components at the receivers,
+:math:`E_i = Q_{E_i} e` and :math:`H_j = Q_{H_j} e / (i\omega\mu)`, or their
+ratio :math:`Z_{ij} = E_i/H_j`, with :math:`Q` the receiver interpolation
+operators and :math:`e` the solution. The adjoint source of a ratio is
+
+.. math::
+
+   J^T a = Q_{E_i}^T \frac{a}{H_j} - Q_{H_j}^T \frac{a\,E_i}{i\omega\mu\,H_j^2},
+   \qquad a = w^2\,\overline{\left(d^{\mathrm{obs}} - Z_{ij}\right)},
+
+and the sources of all fitted components add up.
+
+The gradient is computed with the **adjoint-state method**: one forward and
+one adjoint solve per frequency, whatever the number of components, without
+forming the Jacobian. The model is
+updated with **limited-memory BFGS (L-BFGS)** (``-im_lbfgs_memory``,
+``-im_max_iter``). An optional neighbor smoother acts on the gradient
+(``-im_diag_weight``), and the cells of fixed materials are excluded from the
+update. Options are listed in :doc:`inverse_modeling`.
 
 Verification
 ------------

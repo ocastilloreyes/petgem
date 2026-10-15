@@ -10,7 +10,8 @@ must be listed here, so a new file has to be placed in a layer explicitly.
     4  physics        csem, mt
     5  inversion      inversion, inversion_internal, inversion_io,
                       inversion_smoother, lbfgs
-    6  application    runtime, kernels, fm_csem, fm_mt, im_csem, petgem, *_main
+    6  application    runtime, kernels, fm_csem, fm_mt, im_csem, td_fm_csem, petgem,
+                      *_main
 """
 import re
 
@@ -25,8 +26,8 @@ LAYERS = [
     ["assembly", "solver", "receiver_interp"],
     ["csem", "mt"],
     ["inversion", "inversion_internal", "inversion_io", "inversion_smoother", "lbfgs"],
-    ["runtime", "kernels", "fm_csem", "fm_mt", "im_csem", "petgem",
-     "fm_csem_main", "fm_mt_main", "im_csem_main"],
+    ["runtime", "kernels", "fm_csem", "fm_mt", "im_csem", "td_fm_csem", "petgem",
+     "fm_csem_main", "fm_mt_main", "im_csem_main", "td_fm_csem_main"],
 ]
 LAYER = {module: level for level, modules in enumerate(LAYERS) for module in modules}
 

@@ -69,6 +69,14 @@ def fm_mt_binary() -> Path:
     return path
 
 
+@pytest.fixture(scope="session")
+def fm_tdcsem_binary() -> Path:
+    path = lib.find_binary("fm.tdcsem", "PETGEM_FM_TDCSEM")
+    if path is None:
+        pytest.skip("fm.tdcsem binary not found (set PETGEM_FM_TDCSEM or build build/fm.tdcsem)")
+    return path
+
+
 class FmRun:
     """Result of one fm.csem run on the unit cube."""
     def __init__(self, order, returncode, stdout, responses):

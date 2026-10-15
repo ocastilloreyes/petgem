@@ -47,6 +47,10 @@ OPTIONAL  (inversion control; defaults in brackets)\n\
   -im_snapshot_interval <n>  Write VTU every N steps (0=off)   [0]\n\
   -im_observed_mode <m>      external | fm_native     [external]\n\
   -im_observed_file <f>      Observed-data file (req. fm_native)\n\
+  -im_data_components <l>    Fitted data, comma-separated:\n\
+                             Ex Ey Ez Hx Hy Hz Zxx Zxy Zyx Zyy  [Ex]\n\
+  -im_gradient_check         Check the adjoint gradient and stop\n\
+  -im_gradient_check_eps <l> Check step sizes   [1e-1,1e-2,1e-3,1e-4]\n\
 \n\
  Every inversion option is -im_* (matching this kernel and the\n\
  `petgem im.csem` subcommand).\n\
@@ -54,6 +58,7 @@ OPTIONAL  (inversion control; defaults in brackets)\n\
 EXAMPLES\n\
   mpirun -n 56 ./im.csem -options_file params_p1.txt -output_dir out/\n\
   mpirun -n 56 ./im.csem -options_file params.txt -im_max_iter 120 -im_lambda 0.05\n\
+  mpirun -n 56 ./im.csem -options_file params.txt -im_data_components Ex,Zxy\n\
 \n\
 UNIFIED BINARY\n\
   mpirun -n 56 ./petgem im.csem -options_file params_p1.txt\n\
@@ -118,8 +123,17 @@ int runInverse(int argc, char **argv) {
     PetscCall(logKvStr(comm, "Status", stats.failReason == 0 ? "converged" : KSPConvergedReasons[stats.failReason]));
     PetscCall(logSection(comm, "Inversion output"));
     PetscCall(logKvStr(comm, "Output file", outFile));
-    PetscCall(logKvStr(comm, "Datasets written", "conductivity, log_perturbation, rms_history"));
-    PetscCall(logKvInt(comm, "VTU snapshots", stats.numSnapshots));
+    if (imParams.gradientCheck) {
+      PetscCall(logKvStr(comm, "Datasets written", "gradient_check_eps, gradient_check_fd, gradient_check_adjoint"));
+    } else {
+      char datasets[256] = "conductivity, log_perturbation, rms_history, grad_norm_history";
+      for (PetscInt i = 0; i < imParams.numComponents; i++) {
+        PetscCall(PetscStrlcat(datasets, ", predicted_", sizeof(datasets)));
+        PetscCall(PetscStrlcat(datasets, imDataComponentNames[imParams.components[i]], sizeof(datasets)));
+      }
+      PetscCall(logKvStr(comm, "Datasets written", datasets));
+      PetscCall(logKvInt(comm, "VTU snapshots", stats.numSnapshots));
+    }
   }
   {
     const char *const    labels[] = {"Load + grid", "Setup", "Assembly", "Linear solve", "Gradient + L-BFGS", "Output"};
