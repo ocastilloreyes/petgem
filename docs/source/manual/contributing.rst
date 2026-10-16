@@ -106,7 +106,8 @@ Breathe; the Python API with autodoc.
 
 .. code-block:: bash
 
-   make docs        # output: docs/build/html/index.html
+   # Build the documentation
+   make docs
 
 ``make docs`` runs ``scripts/auto_doc/prepare_docs.sh`` (clean, Doxygen XML,
 API ``.rst`` generation) and then Sphinx. Read the Docs runs the same script as

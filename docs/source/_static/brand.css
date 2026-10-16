@@ -1,0 +1,44 @@
+/* PETGEM brand colours (Logo_petgem/00_PETGEM_Manual_de_Aplicacion_Final.pdf) */
+:root {
+    --petgem-green: #1DB681;
+    --petgem-blue: #3E5AA9;
+    --petgem-bg1: #180E35;
+    --petgem-bg2: #0F416A;
+    --petgem-gradient: linear-gradient(90deg, var(--petgem-green), var(--petgem-blue));
+}
+
+/* Sidebar logo */
+.wy-side-nav-search > a img.logo,
+.wy-side-nav-search .wy-dropdown > a img.logo {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+}
+
+/* Gradient line under the sidebar header and the mobile top bar */
+.wy-side-nav-search,
+.wy-nav-top {
+    border-bottom: 4px solid transparent;
+    border-image: var(--petgem-gradient) 1;
+}
+
+.wy-nav-top {
+    background: var(--petgem-bg1);
+}
+
+/* Sidebar section captions */
+.wy-menu-vertical p.caption,
+.wy-menu-vertical p.caption .caption-text {
+    color: var(--petgem-green);
+}
+
+/* Links */
+.wy-nav-content a,
+.wy-nav-content a:visited,
+.wy-nav-content a code {
+    color: var(--petgem-blue);
+}
+
+.wy-nav-content a:hover {
+    color: var(--petgem-bg2);
+}

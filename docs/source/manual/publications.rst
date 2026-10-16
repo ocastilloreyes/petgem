@@ -1,4 +1,4 @@
-.. _publications: 
+.. _publications:
 
 ============
 Publications
@@ -83,10 +83,10 @@ Publications where **PETGEM** or related methods are applied to real-world geoph
 - Rulff, P., Deleersnyder, W., Castillo-Reyes, O., Carrizo Mascarell, M., King, J. **An evaluation of computational methods in electromagnetic geophysics and their potential for groundwater system imaging.** EGU General Assembly 2025. `DOI: 10.5194/egusphere-egu25-5895 <https://doi.org/10.5194/egusphere-egu25-5895>`_
 
 - Castillo-Reyes, O., Ledesma-Prol, R.M., Corbo-Camargo, F., Rojas, O. **Geothermal resources in Latin-America and their exploration using electromagnetic methods.** Geothermal Energy. `DOI: 10.1186/s40517-024-00314-5 <https://doi.org/10.1186/s40517-024-00314-5>`_
-   
+
 - Castillo-Reyes, O., Queralt, P., Piñas-Varas, P., Ledo, J., Rojas, O. **Electromagnetic subsurface imaging in the presence of metallic structures: A review of numerical strategies.**  Surveys in Geophysics. `DOI: 10.1007/s10712-024-09855-7 <https://doi.org/10.1007/s10712-024-09855-7>`_
-   
+
 - Rulff, P., Castillo-Reyes, O., Koyan, P., Martin, T., Deleersnyder, W., Carrizo Mascarell, M. **Geoelectrical and electromagnetic imaging methods applied to groundwater systems: recent advances and future potentials.**  EGU General Assembly 2024. `DOI: 10.5194/egusphere-egu24-654 <https://doi.org/10.5194/egusphere-egu24-654>`_
-   
+
 
 - Castillo-Reyes, O., Hu, X., Wang, B., Wang, Y., Guo, Z. **Electromagnetic imaging and deep learning for transition to renewable energies: a technology review.** Frontiers in Earth Science. `DOI: 10.3389/feart.2023.1159910 <https://doi.org/10.3389/feart.2023.1159910>`_

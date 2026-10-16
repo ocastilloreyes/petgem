@@ -600,7 +600,6 @@ _ITERATIVE_SOLVER_BLOCK = (
     "-pc_type bddc\n"
     "-pc_bddc_use_deluxe_scaling 1\n"
     "-pc_bddc_coarse_pc_type lu\n"
-    "-pc_bddc_monolithic\n"
 )
 
 _DIRECT_SOLVER_BLOCK = (

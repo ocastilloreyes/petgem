@@ -2,10 +2,22 @@
 MT examples
 ===========
 
+Half-space (``tests/mt``)
+-------------------------
+A 100 Ω·m half-space under air at 10 Hz on a compact box (±1 km laterally,
+2 km of air, skin depth ≈ 1.6 km), used by the test suite (see
+:doc:`testing`). With ``-mt_1d_equation h`` the boundary field is the exact 1D
+magnetic field of the model, and ``fm.mt`` returns
+:math:`\rho_{xy} = \rho_{yx} = 100` Ω·m and :math:`|\phi| = 45^\circ` to within
+0.01 % and 0.05° at order 2. On this compact box the default 1D
+equation by `Castillo-Reyes et al. (2022)`_
+gives 173-188 Ω·m; moving the lateral boundaries to about five skin depths
+brings it to 0.3 % and 0.6°.
+
 Trapezoidal hill (``examples/fm_mt_hill``)
 ------------------------------------------
-The 3D trapezoidal hill of Nam et al. (2007), used in Castillo-Reyes et al.
-(2022), Section 3.1: a 100 Ω·m half-space with a 450 m high hill (top
+The 3D trapezoidal hill used in `Castillo-Reyes et al.
+(2022)`_: a 100 Ω·m half-space with a 450 m high hill (top
 450 × 450 m, base 2000 × 2000 m) under air (``1e8`` Ω·m), at 2 Hz. The 41
 stations lie along ``y = 0``, ``x = -2000 … 2000`` m, 2.1 m below the surface.
 The domain is the cube ``[-L, L]^3`` with ``L = 2000 + nskin·3500`` m, i.e. the
@@ -13,8 +25,9 @@ boundaries are ``nskin`` skin depths away from the survey.
 
 The case ships two references at 2 Hz:
 
-- ``reference/emmi3d/`` - an independent 3D solution (EMMI3D).
-- ``reference/petgem_2022.h5`` - the responses published in the paper, for
+- ``reference/emmi3d/`` - an independent 3D solution (`EMMI3D`_).
+- ``reference/petgem_2022.h5`` - the responses published by
+  `Castillo-Reyes et al. (2022)`_, for
   ``p = 1, 2`` and ``nskin = 1, 2, 4, 6, 8, 10``.
 
 Running
@@ -23,31 +36,31 @@ From the repository root:
 
 .. code-block:: bash
 
+   # Build PETGEM
    make
 
-   # 1. Input bundle: order 2, 4 skin depths, mesh from geometry/mesh.geo.
-   #    A third argument sets hmin (m) or gives an existing Gmsh mesh instead.
+   # Build the mesh and the bundle
    bash examples/fm_mt_hill/scripts/build_bundles.sh 2 4
 
-   # 2. Forward solve.
+   # Run the simulation
    (cd examples/fm_mt_hill && mpirun -n 4 ../../build/fm.mt -options_file configs/params.txt \
        -input_filename outputs/input_p2_n4.h5 -output_dir outputs/ \
        -output_filename responses_p2_n4)
 
-   # 3. Compare with the references and plot.
+   # Post-process the results
    python3 examples/fm_mt_hill/scripts/postprocess.py -order 2
 
 ``postprocess.py`` reads every ``outputs/responses_p<order>_n<nskin>.h5``
 present, prints the median misfit in apparent resistivity (%) and phase (deg)
 against both references, writes ``outputs/figure_p<order>.png``, and passes
-when every run with ``nskin >= 4`` is within 2 % and 1° of EMMI3D. Phases are
+when every run with ``nskin >= 4`` is within 2 % and 1° of `EMMI3D`_. Phases are
 compared in the first-quadrant convention of the references,
 :math:`\phi = \mathrm{mod}(-\phi_{\mathrm{fm.mt}}, 180^\circ)`.
 
 Results
 *******
-Runs on MareNostrum 5 (112 MPI tasks, MUMPS) with the meshes of the paper and
-the default 1D equation (``paper``). Median misfit against EMMI3D:
+Runs on MareNostrum 5 (112 MPI tasks, MUMPS) with the meshes and the default 1D
+equation by `Castillo-Reyes et al. (2022)`_. Median misfit against `EMMI3D`_:
 
 .. list-table::
    :header-rows: 1
@@ -94,23 +107,25 @@ With ``nskin = 10``, ``fm.mt`` and the published responses differ by at most
 both orders. With small domains the boundary error appears mostly in the phase
 (about 6° low at ``nskin = 1``) and vanishes as the boundaries move away.
 
-Half-space (``tests/mt``)
--------------------------
-A 100 Ω·m half-space under air at 10 Hz on a compact box (±1 km laterally,
-2 km of air, skin depth ≈ 1.6 km), used by the test suite (see
-:doc:`testing`). With ``-mt_1d_equation h`` the boundary field is the exact 1D
-magnetic field of the model, and ``fm.mt`` returns
-:math:`\rho_{xy} = \rho_{yx} = 100` Ω·m and :math:`|\phi| = 45^\circ` to within
-0.01 % and 0.05° at order 2. On this compact box the default ``paper`` equation
-gives 173-188 Ω·m; moving the lateral boundaries to about five skin depths
-brings it to 0.3 % and 0.6°.
+.. figure:: /_static/images/mt_hill_p2.png
+   :alt: Apparent resistivity and phase of fm.mt and EMMI3D along the profile
+   :align: center
+   :width: 95%
+
+   Apparent resistivity and phase along ``y = 0`` at order 2, for
+   ``nskin = 1`` to ``10``, against `EMMI3D`_.
 
 References
 ----------
-- Nam, M.J., Kim, H.J., Song, Y., Lee, T.J., Son, J.S., Suh, J.H., 2007. 3D
-  magnetotelluric modelling including surface topography. Geophysical
+- Nam, M.J., Kim, H.J., Song, Y., Lee, T.J., Son, J.S., Suh, J.H., 2007. `3D
+  magnetotelluric modelling including surface topography
+  <https://doi.org/10.1111/j.1365-2478.2007.00614.x>`__. Geophysical
   Prospecting 55, 277–287.
 - Castillo-Reyes, O., Modesto, D., Queralt, P., Marcuello, A., Ledo, J.,
-  Amor-Martin, A., de la Puente, J., García-Castillo, L.E., 2022. 3D
+  Amor-Martin, A., de la Puente, J., García-Castillo, L.E., 2022. `3D
   magnetotelluric modeling using high-order tetrahedral Nédélec elements on
-  massively parallel computing platforms. Computers & Geosciences 160, 105030.
+  massively parallel computing platforms
+  <https://doi.org/10.1016/j.cageo.2021.105030>`__. Computers & Geosciences 160, 105030.
+
+.. _Castillo-Reyes et al. (2022): https://doi.org/10.1016/j.cageo.2021.105030
+.. _EMMI3D: https://doi.org/10.1093/gji/ggt066

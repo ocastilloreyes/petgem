@@ -2,18 +2,19 @@
 Quickstart
 ==========
 
-This page runs the ``examples/fm_csem_marine`` marine CSEM case and checks the result
+This page runs the ``examples/fm_csem_marine`` case and checks the result
 against its reference. You need PETSc with complex scalars, Gmsh and the
 Python packages (see :doc:`install`); the Docker image has all of them.
 
 .. code-block:: bash
 
+   # Build PETGEM
    make
 
-   # Mesh + input bundle (outputs/mesh.msh, outputs/input.h5)
+   # Build the mesh and the bundle
    bash examples/fm_csem_marine/scripts/build_bundles.sh 1
 
-   # Forward solve
+   # Run the simulation
    (cd examples/fm_csem_marine && mpirun -n 4 ../../build/fm.csem -options_file configs/params.txt)
 
    # Compare |Ex| with the reference
@@ -32,13 +33,18 @@ fixes to ``responses_p1``:
 
 .. code-block:: bash
 
+   # Build the bundle at order 2
    bash examples/fm_csem_marine/scripts/build_bundles.sh 2
+
+   # Run the simulation
    (cd examples/fm_csem_marine && mpirun -n 4 ../../build/fm.csem -options_file configs/params.txt \
        -output_filename responses_p2)
+
+   # Post-process the results
    python3 examples/fm_csem_marine/scripts/postprocess.py
 
 Next steps
 ----------
 - :doc:`overview` - workflow, bundle and kernel options
-- :doc:`examples` - the forward cases in detail
+- :doc:`fd_examples` - the frequency-domain CSEM cases in detail
 - :doc:`solver` - choosing the linear solver

@@ -21,7 +21,6 @@ BDDC:
    -pc_type bddc
    -pc_bddc_use_deluxe_scaling 1
    -pc_bddc_coarse_pc_type lu
-   -pc_bddc_monolithic
 
 ``im.csem`` adds ``-ksp_rtol 1.0e-10``, because the adjoint solution enters the
 gradient. ``fm.tdcsem`` with BDDC also needs ``-ksp_rtol 1.0e-10``: with
@@ -50,9 +49,11 @@ switched on the command line or with a second options file:
 
 .. code-block:: bash
 
+   # Switch to MUMPS on the command line
    mpirun -n 4 build/fm.csem -options_file params.txt \
        -dm_mat_type aij -ksp_type preonly -pc_type lu -pc_factor_mat_solver_type mumps
 
+   # Switch to MUMPS with a second options file
    mpirun -n 4 build/im.csem -options_file configs/params_im.txt \
        -options_file configs/solver_mumps.txt
 

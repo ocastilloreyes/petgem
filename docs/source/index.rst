@@ -22,7 +22,7 @@ The repository provides four kernels and a dispatcher:
   computes the transient response of a given conductivity model to a source
   waveform.
 
-- ``fm.mt`` - Magnetotelluric (MT) forward modeling:
+- ``fm.mt`` - MT forward modeling:
   computes the MT response of a given conductivity model: impedance, apparent
   resistivity, phase and tipper.
 
@@ -55,8 +55,8 @@ More information
    :maxdepth: 2
    :caption: Forward modeling:
 
-   manual/forward_modeling
-   manual/examples
+   manual/fd_modeling
+   manual/fd_examples
    manual/td_modeling
    manual/td_examples
    manual/mt_modeling

@@ -21,12 +21,13 @@ Common setup
 - One x-directed electric dipole at ``(0, -4000, 0)`` m, unit current and
   length.
 - 441 receivers on a 21 × 21 surface grid.
-- Frequencies 1, 10, 50, 100, 300, 800 and 1500 Hz; basis order 2.
+- Frequencies 1, 10, 50, 100, 300, 800 and 1500 Hz.
 - 1 % Gaussian noise on the real and imaginary parts of :math:`E_x`, with a
   fixed seed stored in ``observed.h5``.
 - Inversion from a uniform 100 Ω·m model with :math:`\lambda = 0.1`. Only the
   ``INVERT`` region is updated; air and background are fixed in
   ``survey/sigmas_im.txt``.
+- Second-order basis functions (:math:`p=2`).
 
 Each case has two meshes built from one ``geometry/mesh.geo``:
 ``mesh.msh`` (``AIR``, ``BG``, ``INVERT``) for the inversion and
@@ -41,16 +42,17 @@ From the repository root (shown for ``im_csem_block``; ``im_csem_checkerboard`` 
 
 .. code-block:: bash
 
+   # Build PETGEM
    make
 
-   # Forward model of the true model: 7 bundles, 7 solves
+   # Simulate the true model
    bash examples/im_csem_block/scripts/build_bundles.sh fm
    (cd examples/im_csem_block && sbatch scripts/run_fm.slurm)
 
-   # Stack the responses and add noise -> outputs/observed.h5
+   # Build the observed data
    bash examples/im_csem_block/scripts/make_observations.sh
 
-   # Inversion
+   # Run the inversion
    bash examples/im_csem_block/scripts/build_bundles.sh im
    (cd examples/im_csem_block && sbatch scripts/run_im.slurm)
 
@@ -58,6 +60,9 @@ From the repository root (shown for ``im_csem_block``; ``im_csem_checkerboard`` 
    python3 examples/im_csem_block/scripts/analyze_inversion.py \
        -run_dir examples/im_csem_block/outputs \
        -reference examples/im_csem_block/reference/reference_metrics.json
+
+   # Plot the RMS history and the model sections
+   python3 examples/shared/postprocessing_im.py examples/im_csem_block
 
 Each script stops if the products of the previous stage are missing. Without
 SLURM, run the ``mpirun`` line from the ``.slurm`` script directly. The jobs
@@ -91,7 +96,7 @@ surface. Receivers cover ``x, y`` in ``[-200, 200]`` m at 20 m spacing.
    * - Termination
      - ``CONVERGED_RMSTOL`` after 91 steps (99 evaluations)
    * - Minimum recovered resistivity
-     - 11.00 Ω·m (true 10)
+     - 11.00 Ω·m (true 10 Ω·m)
    * - Lateral / vertical offset of the conductor
      - 3.1 m / +36.6 m (shallower)
    * - Conductor volume (ρ < 30 Ω·m)
@@ -100,6 +105,27 @@ surface. Receivers cover ``x, y`` in ``[-200, 200]`` m at 20 m spacing.
 The conductor is found at the right place and resistivity, but shallow and
 smaller than the truth. Source and receivers lie on the surface, so the
 airwave dominates the data and the depth resolution is limited.
+
+.. figure:: /_static/images/im_block_rms.png
+   :alt: RMS misfit of every objective-gradient evaluation
+   :align: center
+   :width: 60%
+
+   RMS misfit of every objective-gradient evaluation. Dotted lines: target
+   RMS (1.05, black) and RMS of the true model (0.994, gray).
+
+.. figure:: /_static/images/im_block_section.png
+   :alt: Recovered resistivity, section ``y = 0``
+   :align: center
+   :width: 60%
+
+   Recovered resistivity at the last step (iteration 91), section ``y = 0``. Dashed
+   lines: true bodies.
+
+   .. image:: /_static/images/im_section_colorbar.png
+      :alt: Color scale, log10 of the resistivity from 1 to 3
+      :align: center
+      :width: 100%
 
 Checkerboard (``examples/im_csem_checkerboard``)
 ------------------------------------------------
@@ -128,5 +154,25 @@ Four 200 m cubes at 100 to 300 m depth with 100 m gaps: two conductors
      - 0 of 6330
 
 All four bodies come back with the right sign and position. The conductors
-recover more of their contrast than the resistors. The step count is not
-reproducible to the unit: two runs took 91 and 90 steps.
+recover more of their contrast than the resistors.
+
+.. figure:: /_static/images/im_checkerboard_rms.png
+   :alt: RMS misfit of every objective-gradient evaluation
+   :align: center
+   :width: 60%
+
+   RMS misfit of every objective-gradient evaluation. Dotted lines: target
+   RMS (1.05, black) and RMS of the true model (0.9864, gray).
+
+.. figure:: /_static/images/im_checkerboard_section.png
+   :alt: Recovered resistivity, section ``z = -200`` m
+   :align: center
+   :width: 60%
+
+   Recovered resistivity at the last step (iteration 90), section ``z = -200`` m. Dashed
+   lines: true bodies.
+
+   .. image:: /_static/images/im_section_colorbar.png
+      :alt: Color scale, log10 of the resistivity from 1 to 3
+      :align: center
+      :width: 100%

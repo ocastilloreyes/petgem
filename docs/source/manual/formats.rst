@@ -125,6 +125,7 @@ supplied with ``-error_level``, or left to the kernel default.
 
 .. code-block:: bash
 
+   # Build the input bundle
    python3 utils/preprocess.py -mode im.csem ... \
        -observed_filename ex:observed_ex.dat zxy:observed_zxy.dat -error_level 0.05
 
@@ -192,7 +193,7 @@ provenance attributes on the root group:
    * - ``petgem_version``
      - Version of the code that produced the file
    * - ``simulation_type``
-     - ``fm.csem``, ``im.csem``, ``fm.mt`` or ``fm.tdcsem`` - which kernel wrote it
+     - ``fm.csem``, ``fm.tdcsem``, ``fm.mt`` or ``im.csem`` - which kernel wrote it
    * - ``input_filename``
      - Path of the input bundle (which carries the mesh, model, and geometry)
    * - ``order``
@@ -207,8 +208,8 @@ provenance attributes on the root group:
 
 Each kernel adds its own attributes, listed below.
 
-Forward responses (``fm.csem``)
-*******************************
+Frequency-domain CSEM responses (``fm.csem``)
+*********************************************
 Layout::
 
     /                              root attrs (shared provenance block above)
@@ -233,31 +234,8 @@ Per-source attributes (``/sources/src{k}``, ``k`` 1-based): ``frequency``,
 ``k`` with its attributes; ``petgem.readAllResponses(path)`` returns all of
 them (see :doc:`python_api`).
 
-MT responses (``fm.mt``)
-************************
-Fields of both polarizations and the MT transfer functions at the receivers.
-Every dataset is a complex PETSc Vec of length ``N_recv``; apparent resistivity
-and phase are real values stored in the real part.
-
-Layout::
-
-    /                              root attrs (shared provenance block above)
-    /polarizations/x/fields/Ex     x-polarization fields: Ex Ey Ez Hx Hy Hz
-    ...
-    /polarizations/y/fields/Ex     y-polarization fields: Ex Ey Ez Hx Hy Hz
-    ...
-    /impedance/xx                  Z_xx  (also xy, yx, yy)
-    /apparent_resistivity/xx       rho_xx in Ohm.m  (also xy, yx, yy)
-    /phase/xx                      phi_xx in degrees, atan2(Im Z, Re Z)  (also xy, yx, yy)
-    /tipper/x                      T_x  (also y)
-
-Additional root attributes: ``frequency``, ``num_receivers``.
-
-The phase follows the :math:`e^{-i\omega t}` convention with :math:`z` up (a
-half-space gives ``phi_xy = 135``, ``phi_yx = -45``); see :doc:`method`.
-
-Time-domain responses (``fm.tdcsem``)
-*************************************
+Time-domain CSEM responses (``fm.tdcsem``)
+******************************************
 Fields at every computed time step. Each field is a PETSc Vec with block size
 ``N_times``, stored as an ``[N_recv, N_times]`` dataset (with a trailing
 real/imaginary axis on complex builds; the imaginary part is zero).
@@ -284,6 +262,29 @@ Per-source attributes (``/sources/src{k}``, ``k`` 1-based): ``x_pos``,
 
 ``petgem.readTdResponses(path, source=k)`` returns the times and the six
 fields of transmitter ``k`` as real arrays (see :doc:`python_api`).
+
+MT responses (``fm.mt``)
+************************
+Fields of both polarizations and the MT transfer functions at the receivers.
+Every dataset is a complex PETSc Vec of length ``N_recv``; apparent resistivity
+and phase are real values stored in the real part.
+
+Layout::
+
+    /                              root attrs (shared provenance block above)
+    /polarizations/x/fields/Ex     x-polarization fields: Ex Ey Ez Hx Hy Hz
+    ...
+    /polarizations/y/fields/Ex     y-polarization fields: Ex Ey Ez Hx Hy Hz
+    ...
+    /impedance/xx                  Z_xx  (also xy, yx, yy)
+    /apparent_resistivity/xx       rho_xx in Ohm.m  (also xy, yx, yy)
+    /phase/xx                      phi_xx in degrees, atan2(Im Z, Re Z)  (also xy, yx, yy)
+    /tipper/x                      T_x  (also y)
+
+Additional root attributes: ``frequency``, ``num_receivers``.
+
+The phase follows the :math:`e^{-i\omega t}` convention with :math:`z` up (a
+half-space gives ``phi_xy = 135``, ``phi_yx = -45``); see :doc:`method`.
 
 Inversion results (``im.csem``)
 *******************************

@@ -53,7 +53,12 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
-html_logo = "_static/petgem_logo.png"
+html_logo = "_static/brand/01_AF_PETGEM_Logo_No_Claim_Gradient.svg"
+html_theme_options = {
+    "logo_only": True,
+    "style_nav_header_background": "#180E35",
+}
+html_css_files = ["brand.css"]
 
 # Breathe configuration
 breathe_projects = {

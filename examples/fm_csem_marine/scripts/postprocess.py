@@ -77,6 +77,8 @@ def main():
     responses_path = os.path.join(args.case_dir, responses_name)
     responses = petgem.readResponses(responses_path)
     Ex        = responses['Ex']
+    # Order of the run that wrote the responses
+    run_order = int(responses['provenance'].get('order', order))
 
     ref = np.array(petgem.readVectorH5(reference_path, 'reference')).ravel()
 
@@ -88,16 +90,16 @@ def main():
     print(f"  Relative L2 error : {metrics['rel_l2']:.6e}")
     print(f"  MAPE (%)          : {metrics['mape']:.6e}")
 
-    fig_name = args.figure_filename or f"outputs/figure_p{order}.png"
+    fig_name = args.figure_filename or f"outputs/figure_p{run_order}.png"
     fig_path = os.path.join(args.case_dir, fig_name)
     matplotlib.rcParams['font.family'] = 'Serif'
     plt.figure(figsize=(8, 4))
     plt.semilogy(x_coords, np.abs(ref), label='Reference', linewidth=2)
     plt.semilogy(x_coords, np.abs(Ex),  label='PETGEM',    linewidth=2,
                  marker='o', linestyle='', markersize=6)
-    plt.xlabel('Offset (m)')
+    plt.xlabel('x (m)')
     plt.ylabel('|Ex| (V/m)')
-    plt.title(f'{CASE_NAME} - order={order}')
+    plt.title(f'{CASE_NAME} - order={run_order}')
     plt.legend()
     plt.savefig(fig_path, dpi=300)
 

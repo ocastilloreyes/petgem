@@ -27,14 +27,14 @@ Parameter file
 .. code-block::
 
    -input_filename <case_dir>/<input_filename>
+   -output_dir <case_dir>/
+   -output_filename responses_p<order>
+
    -dm_mat_type is
    -ksp_type fgmres
    -pc_type bddc
    -pc_bddc_use_deluxe_scaling 1
    -pc_bddc_coarse_pc_type lu
-   -pc_bddc_monolithic
-   -output_dir <case_dir>/
-   -output_filename responses_p<order>
 
 The kernel takes only the common options listed in :doc:`overview`; the rest
 of the file configures PETSc (see :doc:`solver`).
@@ -43,6 +43,7 @@ Running
 -------
 .. code-block:: bash
 
+   # Run the simulation
    mpirun -n 4 build/fm.csem -options_file params.txt
 
 Output

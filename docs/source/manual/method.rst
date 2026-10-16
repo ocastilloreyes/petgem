@@ -5,9 +5,9 @@ Numerical formulation
 This page states the discretization implemented by the kernels. For the
 derivation and for validation studies, see :doc:`publications`.
 
-Forward problem
----------------
-**PETGEM** solves the frequency-domain CSEM problem for the **total** electric
+Frequency-domain CSEM forward problem
+-------------------------------------
+``fm.csem`` solves the frequency-domain CSEM problem for the **total** electric
 field :math:`E`, with a constant magnetic permeability :math:`\mu = \mu_0`
 (``MU`` in ``include/constants.h``) and a diagonal conductivity tensor
 :math:`\sigma = \mathrm{diag}(\sigma_x, \sigma_y, \sigma_z)`:
@@ -65,77 +65,14 @@ Alongside :math:`K` and :math:`M_\sigma`, the assembly builds the **discrete
 gradient matrix** :math:`G`, mapping the order-:math:`p` :math:`H^1` (nodal)
 space into the order-:math:`p` Nédélec space, so that
 :math:`\nabla \phi_k = \sum_i G_{ik} N_i` exactly and :math:`K G = 0`. This
-matrix spans the curl-kernel of the Nédélec space; it is handed to the BDDC
-preconditioner (see :doc:`solver`) and is checked by the test suite (the de
-Rham identity :math:`K_e G_e = 0` per cell).
-
-MT forward problem
-------------------
-``fm.mt`` follows Castillo-Reyes et al. (2022). There is no source in the
-domain; the excitation enters through a natural boundary condition. With the
-bilinear form of the operator above,
-
-.. math::
-
-   a(E, v) = \int_\Omega (\nabla\times v)\cdot(\nabla\times E)
-             - i\,\omega\,\mu\,\sigma\, v\cdot E \, d\Omega,
-   \qquad
-   l(v) = -i\,\omega\,\mu \int_\Gamma v\cdot\left(n\times\hat{H}\right) d\Gamma,
-
-the total field solves :math:`a(E, v) = l(v)` for all test functions, with no
-constrained boundary DOFs (``PETGEM_BC_NATURAL``). The matrix is the same
-:math:`A` assembled by ``assembleMaxwellOperator``; the right-hand side is the
-boundary integral, assembled by ``assembleMtBoundaryRhs`` (``src/mt.c``) with a
-triangle quadrature on every boundary face.
-
-The domain is an axis-aligned box with faces :math:`\Gamma_1` (top) to
-:math:`\Gamma_6` (bottom). The imposed field is
-:math:`\hat{H} = (0, H(z), 0)` for the x-polarization and
-:math:`\hat{H} = (H(z), 0, 0)` for the y-polarization; both are solved together
-as two right-hand sides. :math:`H(z)` is the solution of a 1D problem on the
-conductivity profile :math:`\sigma(z)` of the lateral faces, with
-:math:`H(z_{\max}) = 1` and :math:`H(z_{\min}) = 0`:
-
-.. math::
-
-   H'' + i\,\omega\,\mu\,\sigma(z)\, H = 0
-   \quad\text{(default, Eq. 11 of the paper)}, \qquad
-   (\rho H')' + i\,\omega\,\mu\, H = 0, \;\; \rho = 1/\sigma
-   \quad (\texttt{-mt\_1d\_equation h}).
-
-Both are solved with linear finite elements, with nodes at every interface of
-the profile. Within a layer the two equations coincide; they differ in the
-interface condition (:math:`H'` continuous, or :math:`\rho H'` continuous) and
-therefore in the air, where the second gives the nearly constant magnetic field
-of a plane wave. For a 1D model the second equation makes the boundary data
-exact on the lateral and top faces, so the response does not depend on the
-lateral extent of the box (the bottom must still be deep enough for
-:math:`H(z_{\min}) = 0`); the first needs boundaries several skin depths away
-from the survey, as studied in the paper.
-
-At each receiver, :math:`E` and :math:`H = \nabla\times E/(i\omega\mu)` of
-both polarizations give the impedance tensor and the tipper,
-
-.. math::
-
-   Z = \begin{pmatrix} E_x^{(1)} & E_x^{(2)} \\ E_y^{(1)} & E_y^{(2)} \end{pmatrix}
-       \begin{pmatrix} H_x^{(1)} & H_x^{(2)} \\ H_y^{(1)} & H_y^{(2)} \end{pmatrix}^{-1},
-   \qquad
-   T = \begin{pmatrix} H_z^{(1)} & H_z^{(2)} \end{pmatrix}
-       \begin{pmatrix} H_x^{(1)} & H_x^{(2)} \\ H_y^{(1)} & H_y^{(2)} \end{pmatrix}^{-1},
-
-and the apparent resistivity and phase
-:math:`\rho_{ij} = |Z_{ij}|^2/(\omega\mu)`,
-:math:`\phi_{ij} = \mathrm{atan2}(\mathrm{Im}\,Z_{ij}, \mathrm{Re}\,Z_{ij})`
-in degrees. With the :math:`e^{-i\omega t}` convention and :math:`z` up, a
-half-space gives :math:`\phi_{xy} = 135^\circ` and :math:`\phi_{yx} = -45^\circ`;
-references in the first-quadrant convention use
-:math:`\mathrm{mod}(-\phi, 180^\circ)`.
+matrix spans the curl-kernel of the Nédélec space. The discrete gradient matrix
+is handed to the BDDC preconditioner (see :doc:`solver`) and is checked by
+the test suite (the de Rham identity :math:`K_e G_e = 0` per cell).
 
 Time-domain CSEM forward problem
 --------------------------------
-``fm.tdcsem`` follows Cai et al. (2017, *J. Appl. Geophys.* 145, 133-143),
-without their hybrid boundary condition. In the quasi-static limit the electric field satisfies
+``fm.tdcsem`` follows the quasi-static approximation, in which the electric
+field satisfies
 
 .. math::
 
@@ -201,8 +138,74 @@ where :math:`G_i` is :math:`G` restricted to the interior nodes
 (:math:`\phi = 0` on the boundary). :math:`G_i^T M_\sigma G_i` is set up once
 and solved with CG and GAMG (``rtol 1e-10``).
 
-Inverse problem
----------------
+MT forward problem
+------------------
+``fm.mt`` solves the MT problem for the **total** electric field :math:`E`,
+with the same equation, magnetic permeability and conductivity tensor as the
+frequency-domain CSEM problem, following `Castillo-Reyes et al. (2022)`_.
+There is no source in the domain (:math:`F = 0`). The excitation enters
+through a natural boundary condition. With the bilinear form of the operator
+of the frequency-domain CSEM problem,
+
+.. math::
+
+   a(E, v) = \int_\Omega (\nabla\times v)\cdot(\nabla\times E)
+             - i\,\omega\,\mu\,\sigma\, v\cdot E \, d\Omega,
+   \qquad
+   l(v) = -i\,\omega\,\mu \int_\Gamma v\cdot\left(n\times\hat{H}\right) d\Gamma,
+
+the total field solves :math:`a(E, v) = l(v)` for all test functions, with no
+constrained boundary DOFs (``PETGEM_BC_NATURAL``). The matrix is the same
+:math:`A` assembled by ``assembleMaxwellOperator``; the right-hand side is the
+boundary integral, assembled by ``assembleMtBoundaryRhs`` (``src/mt.c``) with a
+triangle quadrature on every boundary face.
+
+The domain is an axis-aligned box with faces :math:`\Gamma_1` (top) to
+:math:`\Gamma_6` (bottom). The imposed field is
+:math:`\hat{H} = (0, H(z), 0)` for the x-polarization and
+:math:`\hat{H} = (H(z), 0, 0)` for the y-polarization; both are solved together
+as two right-hand sides. :math:`H(z)` is the solution of a 1D problem on the
+conductivity profile :math:`\sigma(z)` of the lateral faces, with
+:math:`H(z_{\max}) = 1` and :math:`H(z_{\min}) = 0`:
+
+.. math::
+
+   H'' + i\,\omega\,\mu\,\sigma(z)\, H = 0
+   \quad\text{(default)}, \qquad
+   (\rho H')' + i\,\omega\,\mu\, H = 0, \;\; \rho = 1/\sigma
+   \quad (\texttt{-mt\_1d\_equation h}).
+
+Both are solved with linear finite elements, with nodes at every interface of
+the profile. Within a layer the two equations coincide; they differ in the
+interface condition (:math:`H'` continuous, or :math:`\rho H'` continuous) and
+therefore in the air, where the second gives the nearly constant magnetic field
+of a plane wave. For a 1D model the second equation makes the boundary data
+exact on the lateral and top faces, so the response does not depend on the
+lateral extent of the box (the bottom must still be deep enough for
+:math:`H(z_{\min}) = 0`). The first needs boundaries several skin depths away
+from the survey, as studied by `Castillo-Reyes et al. (2022)`_.
+
+At each receiver, :math:`E` and :math:`H = \nabla\times E/(i\omega\mu)` of
+both polarizations give the impedance tensor and the tipper,
+
+.. math::
+
+   Z = \begin{pmatrix} E_x^{(1)} & E_x^{(2)} \\ E_y^{(1)} & E_y^{(2)} \end{pmatrix}
+       \begin{pmatrix} H_x^{(1)} & H_x^{(2)} \\ H_y^{(1)} & H_y^{(2)} \end{pmatrix}^{-1},
+   \qquad
+   T = \begin{pmatrix} H_z^{(1)} & H_z^{(2)} \end{pmatrix}
+       \begin{pmatrix} H_x^{(1)} & H_x^{(2)} \\ H_y^{(1)} & H_y^{(2)} \end{pmatrix}^{-1},
+
+and the apparent resistivity and phase
+:math:`\rho_{ij} = |Z_{ij}|^2/(\omega\mu)`,
+:math:`\phi_{ij} = \mathrm{atan2}(\mathrm{Im}\,Z_{ij}, \mathrm{Re}\,Z_{ij})`
+in degrees. With the :math:`e^{-i\omega t}` convention and :math:`z` up, a
+half-space gives :math:`\phi_{xy} = 135^\circ` and :math:`\phi_{yx} = -45^\circ`;
+references in the first-quadrant convention use
+:math:`\mathrm{mod}(-\phi, 180^\circ)`.
+
+Frequency-domain CSEM inverse problem
+-------------------------------------
 ``im.csem`` inverts for the log-resistivity of every cell. The unknown is
 the perturbation :math:`x = \log\rho - \log\rho_0` with respect to the
 starting model :math:`\rho_0`, and the objective is
@@ -284,6 +287,9 @@ quadrature rule, and ``-mms_drop_mass`` runs a negative control in which the
 forcing is incomplete and the error does not converge.
 
 The definitions live in ``tests/mms/mms.h`` and are mirrored in
-``data/test1/mms_reference.py``; ``data/test1/verify_c_reference.sh`` checks the
+``data/test1/mms_reference.py``. ``data/test1/verify_c_reference.sh`` checks the
 two against each other. See ``data/test1/README.md`` for the design and the
 verification protocol, and :doc:`testing`.
+
+.. _Castillo-Reyes et al. (2022): https://doi.org/10.1016/j.cageo.2021.105030
+.. _Cai et al. (2017): https://doi.org/10.1016/j.jappgeo.2017.08.005

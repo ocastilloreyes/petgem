@@ -9,8 +9,8 @@ same discretization and solver as ``fm.csem``. There is no source inside the
 domain; the excitation enters through a boundary condition built from a 1D
 field (see :doc:`method`).
 
-Domain requirements
--------------------
+Scope
+-----
 - The domain must be an **axis-aligned box**. Every boundary face is assigned
   to one of the six box faces (top, bottom and four lateral faces); the kernel
   stops if a boundary face is not on the bounding box.
@@ -38,7 +38,7 @@ Kernel options
 ``fm.mt`` takes the common options of :doc:`overview` and:
 
 - ``-mt_1d_equation <paper|h>`` - equation of the 1D boundary field.
-  ``paper`` (default) is Eq. (11) of Castillo-Reyes et al. (2022),
+  ``paper`` (default) is Eq. (11) of `Castillo-Reyes et al. (2022)`_,
   :math:`H'' + i\omega\mu\sigma H = 0`; ``h`` is
   :math:`(\rho H')' + i\omega\mu H = 0`. See :doc:`method`.
 - ``-mt_1d_refine <n>`` - the 1D element size is the smallest 3D edge length
@@ -62,6 +62,7 @@ Running
 -------
 .. code-block:: bash
 
+   # Run the simulation
    mpirun -n 4 build/fm.mt -options_file params.txt
 
 Output
@@ -69,3 +70,5 @@ Output
 ``<output_dir>/<output_filename>.h5`` holds the fields of both polarizations
 and the impedance, apparent resistivity, phase and tipper at every receiver.
 The layout is in :doc:`formats`, and a full example in :doc:`mt_examples`.
+
+.. _Castillo-Reyes et al. (2022): https://doi.org/10.1016/j.cageo.2021.105030

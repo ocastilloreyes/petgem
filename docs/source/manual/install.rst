@@ -12,6 +12,7 @@ Requirements
 
   .. code-block:: bash
 
+     # Configure PETSc with complex scalars
      ./configure --with-cc=gcc --with-cxx=g++ --with-fc=gfortran \
                  --download-mpich --download-fblaslapack \
                  --with-scalar-type=complex --download-mumps --download-scalapack \
@@ -39,20 +40,25 @@ not copied:
 
 .. code-block:: bash
 
+   # Get the code
    git clone https://github.com/ocastilloreyes/petgem.git
    cd petgem
 
+   # Get the image
    docker pull ghcr.io/ocastilloreyes/petgem-ci-env:latest
    docker tag ghcr.io/ocastilloreyes/petgem-ci-env:latest petgem-env
+
+   # Start a container with the repository mounted
    docker run --rm -it -u $(id -u):$(id -g) -v $(pwd):/workspace -w /workspace petgem-env bash
 
-   # inside the container
+   # Build PETGEM inside the container
    make
 
 To build the image locally instead of pulling it:
 
 .. code-block:: bash
 
+   # Build the image
    docker build -t petgem-env -f docker/Dockerfile .
 
 See :doc:`quickstart` for a first run.
@@ -61,10 +67,10 @@ Building
 --------
 ``make`` builds all five binaries into ``build/``:
 
-- ``build/fm.csem`` - CSEM forward kernel
-- ``build/im.csem`` - CSEM inverse kernel
-- ``build/fm.mt`` - MT forward kernel
+- ``build/fm.csem`` - frequency-domain CSEM forward kernel
 - ``build/fm.tdcsem`` - time-domain CSEM forward kernel
+- ``build/fm.mt`` - MT forward kernel
+- ``build/im.csem`` - CSEM inverse kernel
 - ``build/petgem`` - dispatcher
 
 With ``USE_EXTRAE=1`` the binaries are suffixed ``.extrae``
@@ -80,7 +86,7 @@ Makefile targets
    * - Target
      - Description
    * - ``all`` (default)
-     - Build ``fm.csem``, ``im.csem``, ``fm.mt``, ``fm.tdcsem``, and ``petgem``
+     - Build ``fm.csem``, ``fm.tdcsem``, ``fm.mt``, ``im.csem`` and ``petgem``
    * - ``clean``
      - Remove ``build/`` and object files
    * - ``docs``
@@ -116,10 +122,12 @@ next to them, so no install step is required:
 
 .. code-block:: bash
 
+   # Run a helper script from the clone
    python3 utils/preprocess.py -mode fm.csem ...
 
 To import the package as ``petgem`` from your own scripts:
 
 .. code-block:: bash
 
+   # Install the Python package
    pip install -e .

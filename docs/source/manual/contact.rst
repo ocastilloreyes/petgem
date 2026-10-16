@@ -5,7 +5,7 @@ Contact
 Maintainers
 -----------
 - Octavio Castillo-Reyes (`octavio.castillo@upc.edu <mailto:octavio.castillo@upc.edu>`__ and `octavio.castillo@bsc.es <mailto:octavio.castillo@bsc.es>`__)
-  
+
 Collaborators
 -------------
 - Kunpeng Wang. Key Laboratory of Earth Exploration and Information Technology of Ministry of Education, Chengdu University of Technology

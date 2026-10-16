@@ -4,18 +4,17 @@ Time-domain CSEM examples
 
 Half-space (``examples/fm_tdcsem_halfspace``)
 ---------------------------------------------
-The half-space model of Cai et al. (2017), Section 5.1: a 500 Ω·m earth under
+The half-space model of `Cai et al. (2017)`_, Section 5.1: a 500 Ω·m earth under
 air (``1e8`` Ω·m), excited by an x-directed electric dipole at
 ``(-1000, 0, 0)`` m with the unit-area Gaussian pulse of their Fig. 3
 (center ``0.5`` µs, standard deviation ``0.1`` µs, samples every ``5e-8`` s).
 The receivers are inline on the surface at offsets 1000 and 2000 m. The
-response is computed from 0 to 1 s with BDF2 (second-order backward
-differentiation formula), an initial time step of ``5e-8`` s and a doubling
+response is computed from 0 to 1 s with BDF2, an initial time step of ``5e-8`` s and a doubling
 trial every 25 steps.
-The domain is the 50 × 50 × 50 km cube of the paper with
+The domain is the 50 × 50 × 50 km cube of `Cai et al. (2017)`_ with
 :math:`n \times E = 0` on its boundary.
 
-The reference is the analytical impulse response of the paper, Eq. (A.8),
+The reference is the analytical impulse response of `Cai et al. (2017)`_, Eq. (A.8),
 for :math:`t > 0`:
 
 .. math::
@@ -29,19 +28,20 @@ From the repository root:
 
 .. code-block:: bash
 
+   # Build PETGEM
    make
 
-   # 1. Input bundle: order 2, mesh from geometry/mesh.geo.
+   # Build the mesh and the bundle
    bash examples/fm_tdcsem_halfspace/scripts/build_bundles.sh 2
 
-   # 2. Forward solve (MUMPS, configs/params.txt).
+   # Run the simulation
    (cd examples/fm_tdcsem_halfspace && mpirun -n 4 ../../build/fm.tdcsem -options_file configs/params.txt \
        -input_filename outputs/input_p2.h5 -output_dir outputs/ \
        -output_filename responses_p2)
-   #    or on a cluster:
+   # Or run it on a cluster
    (cd examples/fm_tdcsem_halfspace && sbatch scripts/run_fm.slurm)
 
-   # 3. Compare with Eq. (A.8) and plot.
+   # Post-process the results
    python3 examples/fm_tdcsem_halfspace/scripts/postprocess.py -order 2
 
 ``postprocess.py`` compares :math:`E_x` with Eq. (A.8) from the peak of the
@@ -75,5 +75,17 @@ median / max (%):
      - 0.31 / 2.34
 
 From 0.05 s the response departs from Eq. (A.8): -1.3 % at 0.1 s, +3 % at
-0.5 s and -51 % at 1 s. Cai et al. (2017), Fig. 6, show the same late-time
+0.5 s and -51 % at 1 s. `Cai et al. (2017)`_, Fig. 6, show the same late-time
 departure for this domain with the Dirichlet boundary condition.
+
+.. figure:: /_static/images/td_halfspace_p2.png
+   :alt: Inline Ex of fm.tdcsem and of Eq. (A.8) at offsets 1000 and 2000 m
+   :align: center
+   :width: 85%
+
+   :math:`|E_x|` computed by ``fm.tdcsem`` at order 2 and Eq. (A.8) of
+   `Cai et al. (2017)`_. Before :math:`t_{\mathrm{peak}}` the response follows
+   the Gaussian pulse, which the impulse response of Eq. (A.8) does not
+   include.
+
+.. _Cai et al. (2017): https://doi.org/10.1016/j.jappgeo.2017.08.005

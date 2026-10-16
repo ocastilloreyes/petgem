@@ -40,6 +40,7 @@ Generating a mesh
 -----------------
 .. code-block:: bash
 
+   # Build the mesh
    gmsh -3 examples/fm_csem_marine/geometry/mesh.geo -o examples/fm_csem_marine/outputs/mesh.msh
 
 Pass the ``.msh`` to ``utils/preprocess.py`` with ``-mesh_filename``.
@@ -56,6 +57,7 @@ same ``-mesh_filename`` argument; no separate script or flag is needed:
 
 .. code-block:: bash
 
+   # Build the input bundle from a VTK mesh
    python3 utils/preprocess.py \
        -mode fm.csem -order 1 \
        -case_dir ${CASE_DIR} \

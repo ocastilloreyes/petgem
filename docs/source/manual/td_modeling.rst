@@ -7,8 +7,8 @@ the electric field :math:`E(t)` and :math:`\partial B/\partial t` at the
 receivers, for one or more electric dipoles driven by a common source waveform.
 It uses the same discretization, boundary condition and dipole source as
 ``fm.csem``. The field is advanced in time with the second-order backward
-differentiation formula (BDF2) or backward Euler, and the time step is adapted
-by step doubling (see :doc:`method`).
+differentiation scheme (BDF2) or backward Euler, and the time step is
+increased by step doubling (see :doc:`method`).
 
 Scope
 -----
@@ -48,6 +48,7 @@ Besides the mesh, ``sigmas.txt`` and the receiver table,
 
 .. code-block:: bash
 
+   # Build the input bundle and the parameter file
    python3 utils/preprocess.py -mode fm.tdcsem -order 2 -case_dir <dir> \
        -mesh_filename mesh.msh -receiver_filename receivers.txt \
        -source_filename sources.txt -tdcsem_waveform_filename waveform.txt \
@@ -78,18 +79,21 @@ time:
 .. code-block::
 
    -input_filename <case_dir>/<input_filename>
+   -output_dir <case_dir>/
+   -output_filename responses_p<order>
+
    -dm_mat_type aij
    -ksp_type preonly
    -pc_type lu
    -pc_factor_mat_solver_type mumps
    -tdcsem_t_end <t_end>
-   -output_dir <case_dir>/
-   -output_filename responses_p<order>
+
 
 Running
 -------
 .. code-block:: bash
 
+   # Run the simulation
    mpirun -n 4 build/fm.tdcsem -options_file params.txt
 
 The kernel prints a ``Time steps`` table with one row per block of
@@ -125,5 +129,8 @@ step; the layout is in :doc:`formats`. Read it with ``petgem.readTdResponses``
    t, ex = r["times"], r["Ex"]        # ex[j, n]: receiver j at time t[n]
 
 The half-space test in ``tests/tdcsem`` (see :doc:`testing`) is a complete
-case with an empymod reference, and :doc:`td_examples` reproduces the
-half-space model of Cai et al. (2017).
+case with an `empymod`_ reference, and :doc:`td_examples` reproduces the
+half-space model of `Cai et al. (2017)`_.
+
+.. _Cai et al. (2017): https://doi.org/10.1016/j.jappgeo.2017.08.005
+.. _empymod: https://doi.org/10.1190/geo2016-0626.1

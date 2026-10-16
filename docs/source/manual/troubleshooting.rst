@@ -12,6 +12,7 @@ stops with this message when it is empty or points at a directory without
 
 .. code-block:: bash
 
+   # Build with an explicit PETSc installation
    make PETSC_DIR=/path/to/petsc PETSC_ARCH=arch-linux-c-opt
 
 The Docker image sets both (see :doc:`install`).

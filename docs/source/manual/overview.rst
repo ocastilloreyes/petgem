@@ -4,7 +4,7 @@ Overview
 
 **PETGEM** has four kernels built on the same Nédélec finite-element core:
 
-- ``fm.csem`` - frequency-domain CSEM forward modeling (:doc:`forward_modeling`).
+- ``fm.csem`` - frequency-domain CSEM forward modeling (:doc:`fd_modeling`).
 - ``fm.tdcsem`` - time-domain CSEM forward modeling (:doc:`td_modeling`).
 - ``fm.mt`` - MT forward modeling (:doc:`mt_modeling`).
 - ``im.csem`` - frequency-domain CSEM inversion (:doc:`inverse_modeling`).
@@ -14,7 +14,10 @@ code, selected by a subcommand or by ``-mode``:
 
 .. code-block:: bash
 
+   # Select the kernel with a subcommand
    petgem fm.csem -options_file params.txt
+
+   # Select the kernel with -mode
    petgem -mode fm.csem -options_file params.txt
 
 The kernel name is used unchanged everywhere: binaries, dispatcher
@@ -42,6 +45,7 @@ Preprocessing
 -------------
 .. code-block:: bash
 
+   # Build the input bundle and the parameter file
    python3 utils/preprocess.py -mode <kernel> -order <p> -case_dir <dir> \
        -mesh_filename <mesh> -receiver_filename <receivers> -sigma_file <sigmas> \
        [mode-specific inputs] [-input_filename input.h5] [-params_filename params.txt]
@@ -57,14 +61,14 @@ rejects those of the other modes:
      - Required inputs
    * - ``fm.csem``
      - ``-source_filename``
-   * - ``im.csem``
-     - ``-im_source_filename``, ``-observed_filename`` (and optionally
-       ``-error_level``)
-   * - ``fm.mt``
-     - ``-mt_frequency_filename``
    * - ``fm.tdcsem``
      - ``-source_filename`` (7 fields per row), ``-tdcsem_waveform_filename``,
        ``-tdcsem_t_end``
+   * - ``fm.mt``
+     - ``-mt_frequency_filename``
+   * - ``im.csem``
+     - ``-im_source_filename``, ``-observed_filename`` (and optionally
+       ``-error_level``)
 
 ``-output_vtk model.vtu`` also writes the conductivity model for ParaView.
 ``python3 utils/preprocess.py -h`` lists every argument.
@@ -112,12 +116,18 @@ The cases in ``examples/`` share one layout: ``geometry/``, ``survey/``,
    * - Case
      - Kernel
      - Content
-   * - ``examples/fm_csem_marine``
-     - ``fm.csem``
-     - Marine CSEM model with a thin resistive layer (:doc:`examples`)
    * - ``examples/fm_csem_unit_cube``
      - ``fm.csem``
-     - Homogeneous unit cube used by the test suite (:doc:`examples`)
+     - Homogeneous unit cube used by the test suite (:doc:`fd_examples`)
+   * - ``examples/fm_csem_marine``
+     - ``fm.csem``
+     - Marine CSEM model with a thin resistive layer (:doc:`fd_examples`)
+   * - ``examples/fm_tdcsem_halfspace``
+     - ``fm.tdcsem``
+     - Half-space time-domain CSEM with an analytical solution (:doc:`td_examples`)
+   * - ``examples/fm_mt_hill``
+     - ``fm.mt``
+     - MT trapezoidal hill with two reference solutions (:doc:`mt_examples`)
    * - ``examples/im_csem_block``
      - ``im.csem``
      - Conductive block recovered from synthetic data
@@ -125,9 +135,3 @@ The cases in ``examples/`` share one layout: ``geometry/``, ``survey/``,
    * - ``examples/im_csem_checkerboard``
      - ``im.csem``
      - Two conductive and two resistive blocks (:doc:`inverse_examples`)
-   * - ``examples/fm_mt_hill``
-     - ``fm.mt``
-     - Trapezoidal hill with two reference solutions (:doc:`mt_examples`)
-   * - ``examples/fm_tdcsem_halfspace``
-     - ``fm.tdcsem``
-     - Half-space with an analytical solution (:doc:`td_examples`)

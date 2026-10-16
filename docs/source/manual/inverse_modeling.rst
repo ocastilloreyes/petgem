@@ -115,13 +115,8 @@ Parameter file
 .. code-block::
 
    -input_filename <case_dir>/<input_filename>
-   -dm_mat_type is
-   -ksp_type fgmres
-   -pc_type bddc
-   -pc_bddc_use_deluxe_scaling 1
-   -pc_bddc_coarse_pc_type lu
-   -pc_bddc_monolithic
-   -ksp_rtol 1.0e-10
+   -output_dir <case_dir>/
+   -output_filename responses_p<order>
    -im_max_iter                150
    -im_lbfgs_memory            2
    -im_lambda                  0.1
@@ -129,8 +124,12 @@ Parameter file
    -im_gtol                    1.0e-5
    -im_rms_tol                 1.05
    -im_snapshot_interval       1
-   -output_dir <case_dir>/
-   -output_filename responses_p<order>
+   -dm_mat_type is
+   -ksp_type fgmres
+   -pc_type bddc
+   -pc_bddc_use_deluxe_scaling 1
+   -pc_bddc_coarse_pc_type lu
+   -ksp_rtol 1.0e-10
 
 ``-im_error_level`` and ``-im_fixed_materials`` are left out because their
 values come from the bundle. To use MUMPS instead of BDDC, see
@@ -140,7 +139,10 @@ Running
 -------
 .. code-block:: bash
 
+   # Run the inversion
    mpirun -n 4 build/im.csem -options_file params.txt -im_max_iter 30
+
+   # Run the inversion with several components
    mpirun -n 4 build/im.csem -options_file params.txt -im_data_components Ex,Zxy
 
 The bundle may hold more components than the run fits; only those named by
@@ -172,5 +174,6 @@ run.
 
 .. code-block:: bash
 
+   # Check the gradient
    mpirun -n 4 build/im.csem -options_file params.txt -im_data_components Zxy \
        -im_gradient_check -im_gradient_check_eps 1e-2,1e-3

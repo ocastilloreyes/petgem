@@ -61,7 +61,7 @@ Test levels
    * - TD
      - Half-space step-on response
      - 1-2
-     - ``fm.tdcsem`` against empymod (order 2), 1 and 3 ranks (order 1)
+     - ``fm.tdcsem`` against `empymod`_ (order 2), 1 and 3 ranks (order 1)
 
 Levels 4 and 5 stop at order 3: orders 1, 2 and 3 already have edge, face and
 interior DOFs, and higher orders only add more of the same. Level 6 runs the
@@ -127,8 +127,11 @@ The goldens are regenerated only after an intended change of the results:
 
 .. code-block:: bash
 
-   bash examples/fm_csem_unit_cube/scripts/regen_golden.sh  # levels 4-5
-   bash tests/mms/regen_golden.sh                           # level 6
+   # Regenerate the goldens of levels 4-5
+   bash examples/fm_csem_unit_cube/scripts/regen_golden.sh
+
+   # Regenerate the goldens of level 6
+   bash tests/mms/regen_golden.sh
 
 Continuous integration
 ----------------------
@@ -137,3 +140,5 @@ in the CI image and runs ``tests-fm-csem.yml`` (harnesses, levels 4-6),
 ``tests-fm-mt.yml`` (MT half-space), ``tests-im-csem.yml`` (reduced
 inversion) and ``tests-fm-tdcsem.yml`` (time-domain CSEM half-space). Documentation
 jobs run only when the docs or sources change.
+
+.. _empymod: https://doi.org/10.1190/geo2016-0626.1

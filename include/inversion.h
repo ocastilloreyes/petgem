@@ -42,7 +42,7 @@ typedef struct {
  *
  * Ex..Hz are field components at the receivers; Zij = Ei / Hj is the ratio
  * of two of them for the same source. Names (imDataComponentNames) are the
- * dataset suffixes of /observed/<name> and predicted_<name>.
+ * dataset suffixes of /observed/\<name\> and predicted_\<name\>.
  */
 typedef enum {
   IM_DATA_EX,
@@ -76,7 +76,7 @@ void imDataComponentFields(ImDataComponent comp, ReceiverField *numerator, Recei
  * Selects which schema loadObservedDataset() reads the [numFreqs x
  * numReceivers] data of each component from:
  *
- *  - OBS_EXTERNAL : the bundle's /observed/<component> compound-complex
+ *  - OBS_EXTERNAL : the bundle's /observed/\<component\> compound-complex
  *                   datasets (the post-noise external observed data; default).
  *  - OBS_FM_NATIVE: an fm.csem responses HDF5 file's native per-source
  *                   /sources/src{k}/fields/{Ex..Hz} Vecs (source k -> frequency
@@ -294,7 +294,7 @@ PetscErrorCode logInversionSummary(const ImParams *imParams);
 /**
  * @brief Observed-data abstraction entry point used by the inverse kernel.
  *
- * Reads /observed/<component> of the bundle (OBS_EXTERNAL) or the per-source
+ * Reads /observed/\<component\> of the bundle (OBS_EXTERNAL) or the per-source
  * /sources/src{k}/fields of an fm.csem responses file (OBS_FM_NATIVE) for every
  * fitted component, NaN marking missing data,
  * from imParams->observedFile or, when empty, imParams->common.inputFile. Every
