@@ -1,6 +1,7 @@
 .. image:: docs/source/_static/brand/01_AF_PETGEM_Full_Logo_Gradient.svg
    :alt: PETGEM - Parallel Edge-element Toolkit for General Electromagnetic Modeling
    :width: 600px
+   :align: center
 
 .. image:: https://img.shields.io/github/actions/workflow/status/ocastilloreyes/petgem/ci-develop.yml?branch=develop&label=CI
    :target: https://github.com/ocastilloreyes/petgem/actions/workflows/ci-develop.yml
@@ -10,7 +11,7 @@
    :target: https://petgem.readthedocs.io/en/latest/index.html
    :alt: Documentation Status
 
-.. image:: https://img.shields.io/github/license/ocastilloreyes/petgem
+.. image:: https://img.shields.io/badge/license-BSD--3--Clause-blue
    :target: https://github.com/ocastilloreyes/petgem/blob/develop/LICENSE.rst
    :alt: License: BSD 3-Clause
 

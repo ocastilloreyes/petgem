@@ -8,6 +8,11 @@
 }
 
 /* Sidebar logo */
+.wy-side-nav-search > a,
+.wy-side-nav-search .wy-dropdown > a {
+    display: block;
+}
+
 .wy-side-nav-search > a img.logo,
 .wy-side-nav-search .wy-dropdown > a img.logo {
     width: 100%;
