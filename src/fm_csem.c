@@ -37,6 +37,16 @@ REQUIRED\n\
 OPTIONAL\n\
   -order <1..6>              Override bundle basis order.\n\
 \n\
+CASED WELLS\n\
+  -petgem_edge_conductance_file <txt>\n\
+                             Conductance on mesh edges, one segment per\n\
+                             row: x0 y0 z0 x1 y1 z1 sigmaA (m, S m).\n\
+  -petgem_bddc_spd           BDDC on K + w mu sigma M with an adaptive\n\
+                             coarse space and a gradient-space correction.\n\
+  -petgem_bddc_spd_floor <S/m>\n\
+                             Conductivity floor of the BDDC matrix (0.1).\n\
+  -petgem_grad_<opt>         Solver of the gradient space (MUMPS LU).\n\
+\n\
 EXAMPLES\n\
   mpirun -n 96 ./fm.csem -options_file params.txt\n\
 \n\
@@ -55,7 +65,7 @@ int runForward(int argc, char **argv) {
   PetgemParams  params;
   Grid          grid;
   CsemSourceSet sources = {0, 0, NULL};
-  Mat           A, B, X, G;
+  Mat           A, Abddc, B, X, G;
   IS            primalVertices = NULL;
   PetscScalar   constFactor;
   SolveInfo     solveInfo;
@@ -92,13 +102,15 @@ int runForward(int argc, char **argv) {
   PetscCall(beginPhase(&run, PHASE_ASSEMBLY));
   PetscCall(assembleCsemRhs(sources, dm, &grid, constFactor, &B));
   PetscCall(assembleMaxwellOperator(dm, &grid, conductivity, constFactor, &A, NULL, &G));
+  PetscCall(addEdgeConductanceFromOptions(dm, &grid, constFactor, A));
+  PetscCall(assembleBddcOperatorFromOptions(dm, &grid, conductivity, constFactor, A, &Abddc));
   PetscCall(endPhase(&run, PHASE_ASSEMBLY));
   PetscCall(logAssembly(comm, A, sources.numSources));
 
   /* Solve */
   PetscCall(beginPhase(&run, PHASE_SOLVE));
   PetscCall(setupPrimalVerticesFromOptions(dm, A, conductivity, &primalVertices));
-  PetscCall(solveMaxwellSystem(dm, A, B, G, grid.fem.order, primalVertices, &X, &solveInfo));
+  PetscCall(solveMaxwellSystem(dm, A, Abddc, B, G, grid.fem.order, primalVertices, &X, &solveInfo));
   PetscCall(endPhase(&run, PHASE_SOLVE));
   PetscCall(logSolve(comm, &solveInfo));
 
@@ -112,6 +124,7 @@ int runForward(int argc, char **argv) {
   /* Free memory */
   PetscCall(ISDestroy(&primalVertices));
   PetscCall(MatDestroy(&G));
+  PetscCall(MatDestroy(&Abddc));
   PetscCall(MatDestroy(&A));
   PetscCall(MatDestroy(&B));
   PetscCall(MatDestroy(&X));

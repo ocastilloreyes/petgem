@@ -115,4 +115,43 @@ PetscErrorCode assembleMaxwellOperator(const DM dm, const Grid *grid, const Vec 
 PetscErrorCode refillMassMatrix(const DM dm, const Grid *grid, const Vec conductivity, const Quadrature3D *quadrature3D, PetscReal **Me,
                                 PetscReal **Ke, Mat Ms);
 
+/**
+ * @brief Adds line conductance (sigma x area) on mesh edges to the operator.
+ *
+ * Off unless -petgem_edge_conductance_file <txt> is given. Each row of the file
+ * is a straight segment "x0 y0 z0 x1 y1 z1 sigmaA" (m, S·m); every mesh edge
+ * lying on a segment gets -constFactor * sigmaA * int_e (Ni·t)(Nj·t) dl
+ * (hierarchical conductivity of Weiss, 2017).
+ *
+ * @param[in]     dm           DMPlex mesh and H(curl) discretization.
+ * @param[in]     grid         Finite-element grid descriptor.
+ * @param[in]     constFactor  iωμ, as in assembleMaxwellOperator.
+ * @param[in,out] A            Assembled operator.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode addEdgeConductanceFromOptions(const DM dm, const Grid *grid, const PetscScalar constFactor, Mat A);
+
+/**
+ * @brief Assembles the operator for the BDDC matrix of solveMaxwellSystem.
+ *
+ * Off unless -petgem_bddc_spd is given. The operator is assembled as @p A,
+ * with the conductivity raised to -petgem_bddc_spd_floor <S/m> (default 0.1)
+ * and the edge conductance of addEdgeConductanceFromOptions. With a floor of 0
+ * it is @p A itself.
+ *
+ * @param[in]  dm            DMPlex mesh and H(curl) discretization.
+ * @param[in]  grid          Finite-element grid descriptor.
+ * @param[in]  conductivity  Per-cell conductivity Vec.
+ * @param[in]  constFactor   iωμ, as in assembleMaxwellOperator.
+ * @param[in]  A             Assembled operator.
+ * @param[out] Abddc         Operator for the BDDC matrix, or NULL when the option is off.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode assembleBddcOperatorFromOptions(const DM dm, const Grid *grid, const Vec conductivity, const PetscScalar constFactor,
+                                               const Mat A, Mat *Abddc);
+
 #endif

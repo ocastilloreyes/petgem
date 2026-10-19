@@ -107,7 +107,7 @@ int runMtForward(int argc, char **argv) {
 
   /* Solve */
   PetscCall(beginPhase(&run, PHASE_SOLVE));
-  PetscCall(solveMaxwellSystem(dm, A, B, G, grid.fem.order, NULL, &X, &solveInfo));
+  PetscCall(solveMaxwellSystem(dm, A, NULL, B, G, grid.fem.order, NULL, &X, &solveInfo));
   PetscCall(endPhase(&run, PHASE_SOLVE));
   PetscCall(logSolve(comm, &solveInfo));
 
