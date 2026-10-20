@@ -4,6 +4,12 @@
 PETGEM's documentation
 ######################
 
+.. raw:: latex
+
+   \chapter*{Introduction}
+   \addcontentsline{toc}{chapter}{Introduction}
+   \markboth{Introduction}{Introduction}
+
 **PETGEM** (Parallel Edge-element Toolkit for General Electromagnetic Modeling)
 is an open-source code for 3D electromagnetic modeling. It solves the CSEM
 forward problem in the frequency and time domains, the MT forward problem and
@@ -37,11 +43,14 @@ The repository provides four kernels and a dispatcher:
 A small Python package under ``utils/`` (importable as ``petgem``) prepares the
 HDF5 input bundle that the kernels read and reads their results.
 
-More information
-----------------
+.. rubric:: More information
 
 - `PETGEM GitHub repository <https://github.com/ocastilloreyes/petgem/>`_
 - See our publication list at :ref:`publications`
+
+.. raw:: latex
+
+   \part{Getting started}
 
 .. toctree::
    :maxdepth: 2
@@ -50,6 +59,10 @@ More information
    manual/install
    manual/quickstart
    manual/overview
+
+.. raw:: latex
+
+   \part{Forward modeling}
 
 .. toctree::
    :maxdepth: 2
@@ -62,12 +75,20 @@ More information
    manual/mt_modeling
    manual/mt_examples
 
+.. raw:: latex
+
+   \part{Inverse modeling}
+
 .. toctree::
    :maxdepth: 2
    :caption: Inverse modeling:
 
    manual/inverse_modeling
    manual/inverse_examples
+
+.. raw:: latex
+
+   \part{Reference}
 
 .. toctree::
    :maxdepth: 2
@@ -81,12 +102,20 @@ More information
    manual/python_api
    api/index
 
+.. raw:: latex
+
+   \part{Development}
+
 .. toctree::
    :maxdepth: 2
    :caption: Development:
 
    manual/testing
    manual/contributing
+
+.. raw:: latex
+
+   \part{About}
 
 .. toctree::
    :maxdepth: 1
@@ -96,8 +125,9 @@ More information
    manual/contact
 
 
-Indices and tables
-==================
+.. only:: html
 
-* :ref:`genindex`
-* :ref:`search`
+   .. rubric:: Indices and tables
+
+   * :ref:`genindex`
+   * :ref:`search`

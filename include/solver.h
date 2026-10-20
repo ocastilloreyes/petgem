@@ -5,8 +5,7 @@
  *
  * Description:
  * Linear solves of the Maxwell system: KSP setup, PCBDDC with the discrete
- * gradient, BDDC on the SPD auxiliary matrix with a gradient-space correction,
- * and the optional BDDC primal vertices.
+ * gradient, and the optional BDDC primal vertices.
  */
 
 #ifndef SOLVER_H
@@ -32,28 +31,21 @@ typedef struct {
  * capture the curl kernel for H(curl) problems. G is the high-order discrete
  * gradient G: Nédélec_order -> P_order H1 from assembleMaxwellOperator.
  *
- * When Abddc is provided, PCBDDC is built on the SPD part of Abddc
- * (K + omega mu sigma M) with an adaptive coarse space, and combined
- * multiplicatively with the gradient-space correction G (G^T P G)^-1 G^T, P the
- * SPD part of A. The solver of G^T P G takes the prefix petgem_grad_ (MUMPS LU
- * by default).
- *
- * @param[in]  dm     DMPlex mesh; its communicator drives the parallel solve.
- * @param[in]  A      System matrix (H(curl) FEM operator).
- * @param[in]  Abddc  Operator for the BDDC matrix (assembleBddcOperatorFromOptions), or NULL.
- * @param[in]  B      Right-hand side matrix, one column per source.
- * @param[in]  G      Discrete-gradient hint for PCBDDC; may be NULL when A is
- *                    not of type MATIS.
+ * @param[in]  dm    DMPlex mesh; its communicator drives the parallel solve.
+ * @param[in]  A     System matrix (H(curl) FEM operator).
+ * @param[in]  B     Right-hand side matrix, one column per source.
+ * @param[in]  G     Discrete-gradient hint for PCBDDC; may be NULL when A is
+ *                   not of type MATIS.
  * @param[in]  order  Nédélec basis order (registered with the gradient in PCBDDC).
  * @param[in]  primalVertices  Optional PCBDDC primal vertices (may be NULL).
- * @param[out] X      Solution matrix, created internally (caller destroys).
- * @param[out] info   Iterations, converged reason and solver name.
+ * @param[out] X     Solution matrix, created internally (caller destroys).
+ * @param[out] info  Iterations, converged reason and solver name.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
-PetscErrorCode solveMaxwellSystem(const DM dm, const Mat A, const Mat Abddc, const Mat B, const Mat G, const PetscInt order,
-                                  IS primalVertices, Mat *X, SolveInfo *info);
+PetscErrorCode solveMaxwellSystem(const DM dm, const Mat A, const Mat B, const Mat G, const PetscInt order, IS primalVertices, Mat *X,
+                                  SolveInfo *info);
 
 /**
  * @brief Returns the solver name of a configured KSP: the PC type, or the

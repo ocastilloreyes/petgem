@@ -62,7 +62,6 @@ def main():
 
     index = API_RST_DIR / "index.rst"
     index.write_text("C API reference\n===============\n\n"
-                     "Generated from the Doxygen comments of the public headers in ``include/``.\n\n"
                      ".. toctree::\n   :maxdepth: 1\n\n"
                      + "".join(f"   {page}\n" for page, *_ in PAGES))
     print(f"Generated: {index}")

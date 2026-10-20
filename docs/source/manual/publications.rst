@@ -6,7 +6,6 @@ Publications
 
 Publications on the development of **PETGEM**, its applications and reviews of the field.
 
-
 Principal papers to be cited
 ----------------------------
 

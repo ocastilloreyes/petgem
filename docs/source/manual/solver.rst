@@ -62,8 +62,6 @@ The inversion examples ship both blocks as ``configs/solver_bddc.txt`` and
 ``-dm_mat_type`` is given.
 
 A direct solve does not depend on the number of ranks, which is why the test
-suite uses it. With BDDC the iteration count, and so the result of an
-unconverged solve, can change with the rank count and the order.
 
 PETGEM-specific options
 -----------------------

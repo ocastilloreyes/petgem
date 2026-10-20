@@ -47,8 +47,8 @@ Preprocessing
 
 .. autofunction:: petgem.readTdWaveformText
 
-Reading results
----------------
+Postprocessing
+--------------
 .. autofunction:: petgem.readBundle
 
 .. autofunction:: petgem.readResponses

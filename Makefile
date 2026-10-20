@@ -272,9 +272,17 @@ sphinx_html:                                            ## Build HTML Sphinx doc
 	@echo "$(C_DOC)[DOC]$(C_RESET) building Sphinx HTML"
 	$(Q)LC_ALL=C.UTF-8 LANG=C.UTF-8 $(SPHINX_BUILD_CMD) -b html $(SPHINX_SOURCE_DIR) $(SPHINX_BUILD_DIR)/html
 
+docs_pdf: docs_prep sphinx_pdf                          ## Generate PDF documentation (Doxygen + Sphinx LaTeX)
+	@echo "$(C_DOC)==>$(C_RESET) $(C_BOLD)PDF ready$(C_RESET): $(SPHINX_BUILD_DIR)/latex/petgem.pdf"
+
+sphinx_pdf:                                             ## Build PDF Sphinx documentation (needs xelatex + latexmk)
+	@$(SPHINX_PY) -c 'import sphinx' 2>/dev/null || { echo "$(C_CLEAN)[DOC]$(C_RESET) ERROR: Sphinx not installed (pip install -r docs/requirements.txt)"; exit 1; }
+	@echo "$(C_DOC)[DOC]$(C_RESET) building Sphinx PDF"
+	$(Q)LC_ALL=C.UTF-8 LANG=C.UTF-8 $(SPHINX_BUILD_CMD) -M latexpdf $(SPHINX_SOURCE_DIR) $(SPHINX_BUILD_DIR)
+
 clean_doc:                                              ## Clean documentation output
 	@echo "$(C_CLEAN)[CLEAN]$(C_RESET) removing generated documentation"
-	@rm -rf $(SPHINX_OUT)/* docs/doxygen/* docs/source/api/* docs/source/readme/* docs/build/html
+	@rm -rf $(SPHINX_OUT)/* docs/doxygen/* docs/source/api/* docs/source/readme/* docs/build/html docs/build/latex
 
 # -----------------------------------------------------------------------------
 # Help
@@ -302,4 +310,4 @@ help:              ## Show this help message
 # Phony targets - these never correspond to files, so always run regardless
 # of any same-named file in the tree.
 # -----------------------------------------------------------------------------
-.PHONY: all mms _preamble clean help docs docs_prep sphinx_html clean_doc
+.PHONY: all mms _preamble clean help docs docs_prep sphinx_html docs_pdf sphinx_pdf clean_doc
