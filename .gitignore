@@ -17,8 +17,8 @@ examples/*/outputs/
 
 # Local working directories, kept out of the distribution
 data/
-Cicero_models
-Logo_petgem
+td_fm_csem_paper/
+electric_field_formulations_comparative_paper/
 
 # Run-time artifacts dropped at the repo root
 petgem*.err

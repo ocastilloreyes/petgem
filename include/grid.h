@@ -132,7 +132,7 @@ PetscErrorCode logGridSummary(const char *inputFile, const DM dm, const Grid *gr
  *
  * @param[in]  dm           DMPlex mesh.
  * @param[in]  position     Query point coordinates (x, y, z).
- * @param[out] pointInCell  Index of the containing cell (or a not-found marker).
+ * @param[out] pointInCell  Index of the containing cell on the lowest rank that locates the point, -1 elsewhere.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */

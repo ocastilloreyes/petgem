@@ -81,7 +81,8 @@ def parsePreprocessingArgs():
                         help="Source waveform text file inside case_dir, required "
                              "when -mode fm.tdcsem. Format: two columns 't s(t)', "
                              "time (s) and current normalized by the source "
-                             "current; s must start at 0. Embedded into the bundle "
+                             "current; a nonzero first value (step-off) starts "
+                             "from the DC field. Embedded into the bundle "
                              "under /tdcsem/time and /tdcsem/waveform.")
     parser.add_argument("-tdcsem_t_end", type=float, default=None,
                         help="Final time (s), required when -mode fm.tdcsem. "
@@ -423,7 +424,8 @@ def readTdSourcesText(path):
 def readTdWaveformText(path):
     """Read a source waveform: two columns ``t s(t)``, '#' comments allowed.
 
-    Returns ``(time, waveform)``. Times must increase strictly and s(t0) = 0.
+    Returns ``(time, waveform)``. Times must increase strictly. A nonzero s(t0)
+    (step-off) starts fm.tdcsem from the DC field of s(t0).
     """
     rows = [[float(tok) for tok in toks] for toks in _readTokens(path, commas=True)]
     if len(rows) < 2 or any(len(row) != 2 for row in rows):
@@ -431,8 +433,6 @@ def readTdWaveformText(path):
     data = np.asarray(rows, dtype=float)
     if np.any(np.diff(data[:, 0]) <= 0.0):
         raise ValueError(f"{path}: times must increase strictly")
-    if data[0, 1] != 0.0:
-        raise ValueError(f"{path}: the waveform must start at 0 (got {data[0, 1]})")
     return data[:, 0], data[:, 1]
 
 
@@ -613,7 +613,7 @@ _SOLVER_BLOCK = {
     "fm.csem": _ITERATIVE_SOLVER_BLOCK,
     "im.csem": _ITERATIVE_SOLVER_BLOCK + "-ksp_rtol 1.0e-10\n",
     "fm.mt":   _DIRECT_SOLVER_BLOCK,
-    "fm.tdcsem": _DIRECT_SOLVER_BLOCK,
+    "fm.tdcsem": _DIRECT_SOLVER_BLOCK.replace("-pc_type lu", "-pc_type cholesky") + "-mat_mumps_icntl_20 10\n",
 }
 
 # Inversion tuning block (im.csem only). Every option is -im_*, matching the
@@ -636,8 +636,9 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
     """Emit the PETSc options file for any kernel.
 
     The mode selects the solver block (BDDC for ``fm.csem`` and ``im.csem``,
-    MUMPS for ``fm.mt`` and ``fm.tdcsem``), for ``im.csem`` adds the inversion
-    block and for ``fm.tdcsem`` the final time. The
+    MUMPS LU for ``fm.mt``, MUMPS Cholesky with distributed right-hand sides
+    for ``fm.tdcsem``), for ``im.csem`` adds the inversion block and for
+    ``fm.tdcsem`` the final time. The
     polynomial order is not written: the kernels read ``/order`` from the
     bundle.
 

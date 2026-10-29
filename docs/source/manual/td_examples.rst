@@ -10,7 +10,7 @@ air (``1e8`` Ω·m), excited by an x-directed electric dipole at
 (center ``0.5`` µs, standard deviation ``0.1`` µs, samples every ``5e-8`` s).
 The receivers are inline on the surface at offsets 1000 and 2000 m. The
 response is computed from 0 to 1 s with BDF2, an initial time step of ``5e-8`` s and a doubling
-trial every 25 steps.
+trial every 50 steps.
 The domain is the 50 × 50 × 50 km cube of `Cai et al. (2017)`_ with
 :math:`n \times E = 0` on its boundary.
 
@@ -53,8 +53,8 @@ prints the median relative misfit per receiver and per decade, writes
 
 Results
 *******
-On MareNostrum 5 (56 MPI tasks, MUMPS) the order 2 run (552 080 DOFs) takes
-552 time steps and 6 min. Relative misfit of :math:`E_x` against Eq. (A.8),
+On MareNostrum 5 (56 MPI tasks, MUMPS Cholesky) the order 2 run (552 080 DOFs)
+takes 961 time steps, 19 operator setups and 5 min. Relative misfit of :math:`E_x` against Eq. (A.8),
 median / max (%):
 
 .. list-table::
@@ -67,15 +67,15 @@ median / max (%):
      - [t_peak, 0.3] s
    * - 1000
      - 2.5e-4
-     - 0.19 / 0.48
-     - 0.28 / 2.31
+     - 0.04 / 0.31
+     - 0.08 / 2.09
    * - 2000
      - 1.0e-3
-     - 0.13 / 0.46
-     - 0.31 / 2.34
+     - 0.02 / 0.21
+     - 0.10 / 2.12
 
-From 0.05 s the response departs from Eq. (A.8): -1.3 % at 0.1 s, +3 % at
-0.5 s and -51 % at 1 s. `Cai et al. (2017)`_, Fig. 6, show the same late-time
+From 0.01 s the response departs from Eq. (A.8): -1.1 % at 0.1 s, +3.5 % at
+0.5 s and -50 % at 1 s. `Cai et al. (2017)`_, Fig. 6, show the same late-time
 departure for this domain with the Dirichlet boundary condition.
 
 .. figure:: /_static/images/td_halfspace_p2.png

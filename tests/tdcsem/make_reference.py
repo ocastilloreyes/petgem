@@ -1,8 +1,8 @@
 """Writes reference/empymod_golden.json for the fm.tdcsem half-space test.
 
-empymod step-on response (signal=1 for E, signal=0 times mu0 for dB/dt) of the
-model in mesh.geo, sigmas.txt, sources.txt and receivers.txt. Ex keeps the
-empymod sign; dBy/dt is negated.
+empymod step-on (signal=1) and step-off (signal=-1) Ex and dBy/dt (signal=0
+times mu0) of the model in mesh.geo, sigmas.txt, sources.txt and
+receivers.txt. Ex keeps the empymod sign; dBy/dt is negated.
 
 Usage (needs empymod):
     python3 tests/tdcsem/make_reference.py
@@ -30,6 +30,7 @@ golden = {
     "offsets": OFFSETS,
     "Ex": [response(x, 11, 1).tolist() for x in OFFSETS],
     "dBydt": [(-MU0 * response(x, 51, 0)).tolist() for x in OFFSETS],
+    "Ex_off": [response(x, 11, -1).tolist() for x in OFFSETS],
 }
 out = Path(__file__).resolve().parent / "reference" / "empymod_golden.json"
 out.write_text(json.dumps(golden, indent=1) + "\n")

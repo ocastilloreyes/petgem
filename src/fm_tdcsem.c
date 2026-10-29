@@ -1,5 +1,5 @@
 /*
- * Filename: td_fm_csem.c
+ * Filename: fm_tdcsem.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
  * Date: 2026-10-12
  *
@@ -12,14 +12,17 @@
  * Notes:
  * BDF2 (second-order backward differentiation formula, default) or backward
  * Euler discretization of curl curl E + mu sigma dE/dt = -mu dJs/dt with
- * adaptive time step doubling (Cai et al., 2017, Eqs. 5-14). With D = Ms E + s <N, p> and coefficients
- * a = (3/2, -2, 1/2) for BDF2, (1, -1, 0) for backward Euler:
+ * adaptive time step doubling (Cai et al., 2017, Eqs. 5-14). With
+ * D = Ms E + s <N, p> and coefficients a = (3/2, -2, 1/2) for BDF2,
+ * (1, -1, 0) for backward Euler:
  *   K E(t) + mu/dt (a0 D(t) + a1 D(t-dt) + a2 D(t-2dt)) = 0
- * A doubling to 2dt is accepted when ||E_2dt - E_dt|| <= rtol ||E(t+2dt) - E(t)||;
- * the BDF2 trial step uses E(t) and E(t-2dt).
- * After every solve, E += G phi with (G^T Ms G) phi = -G^T (Ms E + s(t) <N, p>),
- * phi = 0 on the boundary nodes.
- * Zero initial field, PEC boundary.
+ * A doubling to 2dt is accepted when
+ *   ||E_2dt - E_dt||_K <= rtol ||E(t+2dt) - E(t)||_K,
+ * with ||X||_K^2 = sum_i x_i^T K x_i over the sources; the BDF2 trial step
+ * uses E(t) and E(t-2dt).
+ * Initial field: zero for s(t0) = 0; otherwise the DC field E = Gi phi with
+ * (Gi^T Ms Gi) phi = -s(t0) Gi^T <N, p>, phi = 0 on the boundary nodes.
+ * Charge residual: ||Gi^T (Ms E + s(t) <N, p>)|| / ||Gi^T <N, p>||. PEC boundary.
  */
 
 /* PETSc libraries */
@@ -44,6 +47,7 @@
 /** @brief Time integration scheme. */
 typedef enum { TD_SCHEME_BDF2, TD_SCHEME_BE } TdScheme;
 
+/** @brief Option values of -tdcsem_scheme, in TdScheme order. */
 static const char *const tdSchemeNames[] = {"bdf2", "be"};
 
 /**
@@ -66,21 +70,24 @@ typedef struct {
  */
 typedef struct {
   PetscReal dt;  /**< Time step (s). */
-  Mat       A;   /**< Backward Euler operator. */
-  KSP       ksp; /**< Solver bound to A, set up once. */
+  Mat       A;   /**< Time-step operator. */
+  KSP       ksp; /**< Solver bound to A. */
 } TdStepper;
 
 /**
- * @brief Charge correction: nodal operator L = Gi^T Ms Gi and its KSP.
+ * @brief Discrete charge: Gi, the nodal operator L = Gi^T Ms Gi of the DC field
+ *        and its KSP, and the charge residual.
  */
 typedef struct {
-  Mat      Gi;  /**< Discrete gradient restricted to the interior nodal columns. */
-  Mat      L;   /**< Gi^T Ms Gi, identity on the boundary nodes. */
-  KSP      ksp; /**< CG + GAMG on L, set up once. */
-  Vec      h;   /**< Work Vec on the H(curl) space. */
-  Vec      rhs; /**< Nodal right-hand side. */
-  Vec      phi; /**< Nodal correction potential. */
-  PetscInt its; /**< KSP iterations over all corrections. */
+  Mat        Gi;      /**< Discrete gradient restricted to the interior nodal columns. */
+  Mat        L;       /**< Gi^T Ms Gi, identity on the boundary nodes (step-off only). */
+  KSP        ksp;     /**< Solver bound to L, MUMPS Cholesky by default (step-off only). */
+  Vec        h;       /**< Work Vec on the H(curl) space. */
+  Vec        rhs;     /**< Nodal right-hand side. */
+  Vec        phi;     /**< Nodal potential. */
+  PetscInt   its;     /**< KSP iterations of the DC field. */
+  PetscReal *srcNorm; /**< ||Gi^T <N, p>|| per source. */
+  PetscReal  resMax;  /**< Largest charge residual of the run. */
 } TdCharge;
 
 /**
@@ -88,7 +95,8 @@ typedef struct {
  */
 typedef struct {
   PetscInt numSteps;    /**< Accepted time steps. */
-  PetscInt numSetups;   /**< Operators assembled and set up. */
+  PetscInt numSetups;   /**< Operators set up. */
+  PetscInt numCreated;  /**< Operators created (symbolic setup). */
   PetscInt numDoubled;  /**< Accepted doubling trials. */
   PetscInt numRejected; /**< Rejected doubling trials. */
   PetscInt its;         /**< KSP iterations over all solves. */
@@ -99,9 +107,8 @@ typedef struct {
  * @brief Counters at the start of the current row of the time-step table.
  */
 typedef struct {
-  PetscInt       its;       /**< TdStats.its at the row start. */
-  PetscInt       chargeIts; /**< TdCharge.its at the row start. */
-  PetscLogDouble tWall;     /**< Wall-clock time at the row start. */
+  PetscInt       its;   /**< TdStats.its at the row start. */
+  PetscLogDouble tWall; /**< Wall-clock time at the row start. */
 } TdMonitor;
 
 /**
@@ -141,9 +148,12 @@ OPTIONAL  (defaults in brackets)\n\
   -order <1..6>              Override bundle basis order.\n\
   -tdcsem_dt0 <s>            Initial time step  [smallest waveform\n\
                              sample spacing]\n\
-  -tdcsem_atsd_steps <n>     Steps before a doubling trial   [100]\n\
+  -tdcsem_atsd_steps <n>     Steps before a doubling trial    [50]\n\
   -tdcsem_atsd_rtol <r>      Doubling tolerance, 0 = fixed  [1e-2]\n\
   -tdcsem_scheme <s>         bdf2 | be                    [bdf2]\n\
+  -tdcsem_dc_ksp_*, -tdcsem_dc_pc_*\n\
+                             DC field solver (step-off)\n\
+                             [preonly, cholesky, mumps]\n\
 \n\
 EXAMPLES\n\
   mpirun -n 96 ./fm.tdcsem -options_file params.txt\n\
@@ -152,7 +162,15 @@ UNIFIED BINARY\n\
   mpirun -n 96 ./petgem fm.tdcsem -options_file params.txt\n\
 \n" PETGEM_HELP_FOOTER;
 
-/* Reads the -tdcsem_* options. */
+/**
+ * @brief Reads the -tdcsem_* options and sets the coefficients of the scheme.
+ *
+ * The options are checked unless -help is given.
+ *
+ * @param[out] td  Time-stepping options; the waveform is filled by loadTdSettings().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode readTdParams(TdParams *td) {
   PetscFunctionBeginUser;
 
@@ -161,7 +179,7 @@ static PetscErrorCode readTdParams(TdParams *td) {
 
   td->tEnd      = 0.0;
   td->dt0       = 0.0;
-  td->atsdSteps = 100;
+  td->atsdSteps = 50;
   td->atsdRtol  = 1.0e-2;
 
   PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
@@ -194,21 +212,42 @@ static PetscErrorCode readTdParams(TdParams *td) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Copies the real part of a serial Vec into a new array. */
+/**
+ * @brief Copies the real part of a serial Vec into a new array.
+ *
+ * @param[in]  v    Serial Vec.
+ * @param[out] n    Number of entries.
+ * @param[out] out  Array of n entries; the caller frees it.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode copyRealArray(Vec v, PetscInt *n, PetscReal **out) {
   PetscFunctionBeginUser;
+
   const PetscScalar *a;
+
   PetscCall(VecGetSize(v, n));
   PetscCall(PetscMalloc1(*n, out));
   PetscCall(VecGetArrayRead(v, &a));
   for (PetscInt i = 0; i < *n; i++) (*out)[i] = PetscRealPart(a[i]);
   PetscCall(VecRestoreArrayRead(v, &a));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /**
- * @brief Loads the transmitters (/sources, frequency unused) and the waveform
- *        (/tdcsem/time, /tdcsem/waveform) from the bundle.
+ * @brief Loads the transmitters and the source waveform from the bundle.
+ *
+ * Reads /sources (the frequency is not used) and /tdcsem/time,
+ * /tdcsem/waveform, checks that the sample times are strictly increasing and
+ * that -tdcsem_t_end is after the first sample, and sets the initial time
+ * step to the smallest sample spacing when -tdcsem_dt0 is not given.
+ *
+ * @param[in]     params   PETGEM parameters (input bundle).
+ * @param[out]    sources  Transmitter set; sourceArray is allocated here.
+ * @param[in,out] td       Time-stepping options; time and waveform are allocated here.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 static PetscErrorCode loadTdSettings(const PetgemParams *params, CsemSourceSet *sources, TdParams *td) {
   PetscFunctionBeginUser;
@@ -222,13 +261,13 @@ static PetscErrorCode loadTdSettings(const PetgemParams *params, CsemSourceSet *
 
   PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, params->inputFile, FILE_MODE_READ, &viewer));
   PetscCall(PetscViewerHDF5PushGroup(viewer, "/sources"));
-  for (PetscInt k = 0; k < 5; k++) {
-    PetscCall(loadSerialVec(viewer, names[k], &v));
-    PetscCall(copyRealArray(v, &n, &cols[k]));
+  for (PetscInt i = 0; i < 5; i++) {
+    PetscCall(loadSerialVec(viewer, names[i], &v));
+    PetscCall(copyRealArray(v, &n, &cols[i]));
     PetscCall(VecDestroy(&v));
-    if (k == 0) numSources = n / width[0];
-    PetscCheck(n == numSources * width[k], PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED,
-               "%s: /sources/%s has %" PetscInt_FMT " entries, expected %" PetscInt_FMT, params->inputFile, names[k], n / width[k],
+    if (i == 0) numSources = n / width[0];
+    PetscCheck(n == numSources * width[i], PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED,
+               "%s: /sources/%s has %" PetscInt_FMT " entries, expected %" PetscInt_FMT, params->inputFile, names[i], n / width[i],
                numSources);
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
@@ -247,15 +286,15 @@ static PetscErrorCode loadTdSettings(const PetgemParams *params, CsemSourceSet *
   sources->freq       = 0.0;
   sources->numSources = numSources;
   PetscCall(PetscMalloc1(numSources, &sources->sourceArray));
-  for (PetscInt i = 0; i < numSources; i++) {
-    CsemSource *s = &sources->sourceArray[i];
-    for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) s->position[d] = cols[0][3 * i + d];
-    s->current      = cols[1][i];
-    s->length       = cols[2][i];
-    s->dipAngle     = cols[3][i];
-    s->azimuthAngle = cols[4][i];
+  for (PetscInt j = 0; j < numSources; j++) {
+    CsemSource *s = &sources->sourceArray[j];
+    for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) s->position[d] = cols[0][NUM_DIMENSIONS * j + d];
+    s->current      = cols[1][j];
+    s->length       = cols[2][j];
+    s->dipAngle     = cols[3][j];
+    s->azimuthAngle = cols[4][j];
   }
-  for (PetscInt k = 0; k < 5; k++) PetscCall(PetscFree(cols[k]));
+  for (PetscInt i = 0; i < 5; i++) PetscCall(PetscFree(cols[i]));
 
   PetscCheck(n == td->numSamples, PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED,
              "%s: /tdcsem/waveform has %" PetscInt_FMT " samples, /tdcsem/time has %" PetscInt_FMT, params->inputFile, n, td->numSamples);
@@ -265,9 +304,6 @@ static PetscErrorCode loadTdSettings(const PetgemParams *params, CsemSourceSet *
     PetscCheck(td->time[i] > td->time[i - 1], PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED,
                "%s: /tdcsem/time is not strictly increasing at sample %" PetscInt_FMT, params->inputFile, i);
   }
-  PetscCheck(td->waveform[0] == 0.0, PETSC_COMM_SELF, PETSC_ERR_SUP,
-             "%s: waveform starts at %g; only a zero initial current is supported (no step-off)", params->inputFile,
-             (double)td->waveform[0]);
   PetscCheck(td->tEnd > td->time[0], PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
              "-tdcsem_t_end = %g is not after the first waveform sample %g", (double)td->tEnd, (double)td->time[0]);
 
@@ -279,6 +315,13 @@ static PetscErrorCode loadTdSettings(const PetgemParams *params, CsemSourceSet *
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Frees the waveform arrays of the time-stepping options.
+ *
+ * @param[in,out] td  Time-stepping options.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode destroyTdParams(TdParams *td) {
   PetscFunctionBeginUser;
   PetscCall(PetscFree(td->time));
@@ -286,7 +329,14 @@ static PetscErrorCode destroyTdParams(TdParams *td) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Prints the "CSEM source(s)" and "Time stepping" sections of the run report. */
+/**
+ * @brief Prints the "CSEM source(s)" and "Time stepping" sections of the run report.
+ *
+ * @param[in] sources  Transmitter set.
+ * @param[in] td       Time-stepping options and waveform.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode logTdSetup(const CsemSourceSet *sources, const TdParams *td) {
   PetscFunctionBeginUser;
 
@@ -310,6 +360,11 @@ static PetscErrorCode logTdSetup(const CsemSourceSet *sources, const TdParams *t
   PetscCall(logKvf(comm, "Waveform window (s)", "%s .. %s", formatReal(td->time[0]), formatReal(td->time[td->numSamples - 1])));
   PetscCall(logKvReal(comm, "Final time (s)", td->tEnd));
   PetscCall(logKvReal(comm, "Initial time step (s)", td->dt0));
+  if (td->waveform[0] != 0.0) {
+    PetscCall(logKvf(comm, "Initial field", "DC field x %s", formatReal(td->waveform[0])));
+  } else {
+    PetscCall(logKvStr(comm, "Initial field", "zero"));
+  }
   if (td->atsdRtol > 0.0) {
     PetscCall(logKvf(comm, "Step doubling", "trial every %" PetscInt_FMT " steps, rtol %s", td->atsdSteps, formatReal(td->atsdRtol)));
   } else {
@@ -319,37 +374,69 @@ static PetscErrorCode logTdSetup(const CsemSourceSet *sources, const TdParams *t
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Prints the "Solve" section of the run report. */
+/**
+ * @brief Prints the "Solve" section of the run report.
+ *
+ * @param[in] comm    Communicator of the report.
+ * @param[in] stats   Time-stepping counters.
+ * @param[in] charge  Discrete charge (DC iterations, largest charge residual).
+ * @param[in] dt      Last time step (s).
+ * @param[in] t       Last time (s).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode logTdSolve(MPI_Comm comm, const TdStats *stats, const TdCharge *charge, PetscReal dt, PetscReal t) {
   PetscFunctionBeginUser;
   PetscCall(logSection(comm, "Solve"));
   PetscCall(logKvStr(comm, "Solver", stats->solver));
   PetscCall(logKvInt(comm, "Time steps", stats->numSteps));
-  PetscCall(logKvInt(comm, "Operator setups", stats->numSetups));
+  PetscCall(logKvf(comm, "Operator setups", "%" PetscInt_FMT " (%" PetscInt_FMT " new)", stats->numSetups, stats->numCreated));
   PetscCall(logKvf(comm, "Doublings (acc / rej)", "%" PetscInt_FMT " / %" PetscInt_FMT, stats->numDoubled, stats->numRejected));
   PetscCall(logKvReal(comm, "Last time step (s)", dt));
   PetscCall(logKvReal(comm, "Last time (s)", t));
   PetscCall(logKvInt(comm, "KSP iterations", stats->its));
-  PetscCall(logKvInt(comm, "Charge KSP iterations", charge->its));
+  if (charge->ksp) PetscCall(logKvInt(comm, "DC KSP iterations", charge->its));
+  PetscCall(logKvf(comm, "Max charge residual", "%.3e", (double)charge->resMax));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Prints the header of the time-step table and starts the first row. */
-static PetscErrorCode beginTdMonitor(MPI_Comm comm, const TdStats *stats, const TdCharge *charge, TdMonitor *mon) {
+/**
+ * @brief Prints the header of the time-step table and starts the first row.
+ *
+ * @param[in]  comm   Communicator of the report.
+ * @param[in]  stats  Time-stepping counters.
+ * @param[out] mon    Counters at the start of the first row.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode beginTdMonitor(MPI_Comm comm, const TdStats *stats, TdMonitor *mon) {
   PetscFunctionBeginUser;
   PetscCall(logSection(comm, "Time steps"));
   PetscCall(PetscPrintf(comm, "   %6s %11s %11s %10s %8s %8s %10s %8s\n", "Steps", "t (s)", "dt (s)", "Doubling", "Result", "KSP its",
-                        "Charge its", "Wall (s)"));
-  mon->its       = stats->its;
-  mon->chargeIts = charge->its;
+                        "Charge res", "Wall (s)"));
+  mon->its = stats->its;
   PetscCall(PetscTime(&mon->tWall));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Prints one row of the time-step table; ratio < 0 means no doubling trial. */
-static PetscErrorCode logTdStep(MPI_Comm comm, const TdStats *stats, const TdCharge *charge, PetscReal t, PetscReal dt, PetscReal ratio,
-                                const char *result, TdMonitor *mon) {
+/**
+ * @brief Prints one row of the time-step table and starts the next one.
+ *
+ * @param[in]     comm    Communicator of the report.
+ * @param[in]     stats   Time-stepping counters.
+ * @param[in]     t       Time at the end of the row (s).
+ * @param[in]     dt      Time step of the row (s).
+ * @param[in]     ratio   ||E_2dt - E_dt||_K / ||E(t+2dt) - E(t)||_K of the doubling trial; < 0 when there is no trial.
+ * @param[in]     result  Result of the doubling trial: "accepted", "rejected" or "-".
+ * @param[in]     res     Charge residual at t.
+ * @param[in,out] mon     Counters at the start of the row.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode logTdStep(MPI_Comm comm, const TdStats *stats, PetscReal t, PetscReal dt, PetscReal ratio, const char *result,
+                                PetscReal res, TdMonitor *mon) {
   PetscFunctionBeginUser;
+
   PetscLogDouble now;
   char           trial[16];
 
@@ -358,16 +445,23 @@ static PetscErrorCode logTdStep(MPI_Comm comm, const TdStats *stats, const TdCha
   else
     PetscCall(PetscSNPrintf(trial, sizeof(trial), "%.3e", (double)ratio));
   PetscCall(PetscTime(&now));
-  PetscCall(PetscPrintf(comm, "   %6" PetscInt_FMT " %11.4e %11.4e %10s %8s %8" PetscInt_FMT " %10" PetscInt_FMT " %8.1f\n",
-                        stats->numSteps, (double)t, (double)dt, trial, result, stats->its - mon->its, charge->its - mon->chargeIts,
-                        (double)(now - mon->tWall)));
-  mon->its       = stats->its;
-  mon->chargeIts = charge->its;
-  mon->tWall     = now;
+  PetscCall(PetscPrintf(comm, "   %6" PetscInt_FMT " %11.4e %11.4e %10s %8s %8" PetscInt_FMT " %10.3e %8.1f\n", stats->numSteps, (double)t,
+                        (double)dt, trial, result, stats->its - mon->its, (double)res, (double)(now - mon->tWall)));
+  mon->its   = stats->its;
+  mon->tWall = now;
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* s(t) by linear interpolation; constant outside the sampled window. */
+/**
+ * @brief Normalized source current s(t), by linear interpolation of the
+ *        waveform samples; constant outside the sampled window.
+ *
+ * @param[in] td  Time-stepping options and waveform.
+ * @param[in] t   Time (s).
+ *
+ * @return PetscReal s(t).
+ */
 static PetscReal evaluateWaveform(const TdParams *td, PetscReal t) {
   PetscInt lo = 0, hi = td->numSamples - 1;
 
@@ -384,8 +478,17 @@ static PetscReal evaluateWaveform(const TdParams *td, PetscReal t) {
 }
 
 /**
- * @brief Assembles K and G (constFactor 0) and the sigma-weighted mass matrix Ms
- *        on the pattern of K.
+ * @brief Assembles the curl-curl matrix K, the discrete gradient G and the
+ *        conductivity-weighted mass matrix Ms on the pattern of K.
+ *
+ * @param[in]  dm            DMPlex carrying the H(curl) section.
+ * @param[in]  grid          Grid filled by setupCsemGrid().
+ * @param[in]  conductivity  Per-cell conductivity.
+ * @param[out] K             Curl-curl matrix.
+ * @param[out] Ms            Conductivity-weighted mass matrix.
+ * @param[out] G             Discrete gradient.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 static PetscErrorCode assembleTdOperators(const DM dm, const Grid *grid, const Vec conductivity, Mat *K, Mat *Ms, Mat *G) {
   PetscFunctionBeginUser;
@@ -407,7 +510,16 @@ static PetscErrorCode assembleTdOperators(const DM dm, const Grid *grid, const V
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Column-space Vec of G: 0 on the boundary nodal dofs, 1 elsewhere. */
+/**
+ * @brief Mask of the interior nodal dofs.
+ *
+ * @param[in]  dm    DMPlex carrying the "Boundary" label.
+ * @param[in]  grid  Grid with the nodal space H1dm.
+ * @param[in]  G     Discrete gradient.
+ * @param[out] mask  Vec on the column space of G: 0 on the boundary nodal dofs, 1 elsewhere.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode buildInteriorNodeMask(const DM dm, const Grid *grid, Mat G, Vec *mask) {
   PetscFunctionBeginUser;
 
@@ -443,11 +555,22 @@ static PetscErrorCode buildInteriorNodeMask(const DM dm, const Grid *grid, Mat G
 }
 
 /**
- * @brief Builds L = Gi^T Ms Gi (identity on the boundary nodes) and sets up its KSP.
+ * @brief Builds the discrete gradient Gi restricted to the interior nodes and,
+ *        for a step-off, the nodal operator L = Gi^T Ms Gi of the DC field.
  *
- * Solver: CG + GAMG, rtol 1e-10.
+ * L is the identity on the boundary nodes. Its KSP is MUMPS Cholesky by
+ * default, with options prefix tdcsem_dc_.
+ *
+ * @param[in]  dm      DMPlex carrying the "Boundary" label.
+ * @param[in]  grid    Grid with the nodal space H1dm.
+ * @param[in]  Ms      Conductivity-weighted mass matrix.
+ * @param[in]  G       Discrete gradient.
+ * @param[in]  solve   PETSC_TRUE to build L and its KSP (step-off).
+ * @param[out] charge  Discrete charge.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-static PetscErrorCode setupTdCharge(const DM dm, const Grid *grid, Mat Ms, Mat G, TdCharge *charge) {
+static PetscErrorCode setupTdCharge(const DM dm, const Grid *grid, Mat Ms, Mat G, PetscBool solve, TdCharge *charge) {
   PetscFunctionBeginUser;
 
   Mat       MsAij;
@@ -458,6 +581,15 @@ static PetscErrorCode setupTdCharge(const DM dm, const Grid *grid, Mat Ms, Mat G
   PetscCall(buildInteriorNodeMask(dm, grid, G, &mask));
   PetscCall(MatDuplicate(G, MAT_COPY_VALUES, &charge->Gi));
   PetscCall(MatDiagonalScale(charge->Gi, NULL, mask));
+  PetscCall(MatCreateVecs(charge->Gi, &charge->phi, NULL));
+  PetscCall(VecDuplicate(charge->phi, &charge->rhs));
+  PetscCall(MatCreateVecs(Ms, NULL, &charge->h));
+  charge->its    = 0;
+  charge->resMax = 0.0;
+  if (!solve) {
+    PetscCall(VecDestroy(&mask));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
 
   PetscCall(PetscObjectTypeCompare((PetscObject)Ms, MATIS, &isIs));
   if (isIs) {
@@ -476,22 +608,29 @@ static PetscErrorCode setupTdCharge(const DM dm, const Grid *grid, Mat Ms, Mat G
   PetscCall(MatDiagonalSet(charge->L, boundary, ADD_VALUES));
   PetscCall(VecDestroy(&boundary));
   PetscCall(VecDestroy(&mask));
+  PetscCall(MatSetOption(charge->L, MAT_SYMMETRIC, PETSC_TRUE));
 
   PetscCall(KSPCreate(PetscObjectComm((PetscObject)G), &charge->ksp));
   PetscCall(KSPSetOperators(charge->ksp, charge->L, charge->L));
-  PetscCall(KSPSetType(charge->ksp, KSPCG));
+  PetscCall(KSPSetType(charge->ksp, KSPPREONLY));
   PetscCall(KSPGetPC(charge->ksp, &pc));
-  PetscCall(PCSetType(pc, PCGAMG));
-  PetscCall(KSPSetTolerances(charge->ksp, 1.0e-10, PETSC_CURRENT, PETSC_CURRENT, PETSC_CURRENT));
+  PetscCall(PCSetType(pc, PCCHOLESKY));
+  PetscCall(PCFactorSetMatSolverType(pc, MATSOLVERMUMPS));
+  PetscCall(KSPSetErrorIfNotConverged(charge->ksp, PETSC_TRUE));
+  PetscCall(KSPSetOptionsPrefix(charge->ksp, "tdcsem_dc_"));
+  PetscCall(KSPSetFromOptions(charge->ksp));
   PetscCall(KSPSetUp(charge->ksp));
-
-  PetscCall(MatCreateVecs(charge->L, &charge->phi, &charge->rhs));
-  PetscCall(MatCreateVecs(Ms, NULL, &charge->h));
-  charge->its = 0;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Destroys the objects of the discrete charge.
+ *
+ * @param[in,out] charge  Discrete charge.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode destroyTdCharge(TdCharge *charge) {
   PetscFunctionBeginUser;
   PetscCall(MatDestroy(&charge->Gi));
@@ -500,15 +639,76 @@ static PetscErrorCode destroyTdCharge(TdCharge *charge) {
   PetscCall(VecDestroy(&charge->h));
   PetscCall(VecDestroy(&charge->rhs));
   PetscCall(VecDestroy(&charge->phi));
+  PetscCall(PetscFree(charge->srcNorm));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /**
- * @brief E += Gi phi with L phi = -Gi^T (Ms E + s <N, p>), for every source.
+ * @brief Charge residual max_i ||Gi^T (Ms E_i + s <N, p>_i)|| / ||Gi^T <N, p>_i||
+ *        over the sources i, with <N, p> = -B0 / mu.
  *
- * <N, p> = -B0 / mu.
+ * Updates the largest charge residual of the run.
+ *
+ * @param[in,out] charge  Discrete charge.
+ * @param[in]     Ms      Conductivity-weighted mass matrix.
+ * @param[in]     B0      Dipole term -mu <N, p>, one column per source.
+ * @param[in]     s       Normalized source current s(t).
+ * @param[in]     E       Electric field, one column per source.
+ * @param[out]    res     Charge residual.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-static PetscErrorCode applyTdCharge(TdCharge *charge, Mat Ms, Mat B0, PetscReal s, Mat E) {
+static PetscErrorCode computeTdChargeResidual(TdCharge *charge, Mat Ms, Mat B0, PetscReal s, Mat E, PetscReal *res) {
+  PetscFunctionBeginUser;
+
+  PetscInt numRhs;
+
+  PetscCall(MatGetSize(E, NULL, &numRhs));
+  if (!charge->srcNorm) {
+    PetscCall(PetscMalloc1(numRhs, &charge->srcNorm));
+    for (PetscInt i = 0; i < numRhs; i++) {
+      Vec b;
+      PetscCall(MatDenseGetColumnVecRead(B0, i, &b));
+      PetscCall(MatMultTranspose(charge->Gi, b, charge->rhs));
+      PetscCall(MatDenseRestoreColumnVecRead(B0, i, &b));
+      PetscCall(VecNorm(charge->rhs, NORM_2, &charge->srcNorm[i]));
+      charge->srcNorm[i] /= MU;
+    }
+  }
+  *res = 0.0;
+  for (PetscInt i = 0; i < numRhs; i++) {
+    Vec       x, b;
+    PetscReal r;
+    PetscCall(MatDenseGetColumnVecRead(E, i, &x));
+    PetscCall(MatMult(Ms, x, charge->h));
+    PetscCall(MatDenseRestoreColumnVecRead(E, i, &x));
+    if (s != 0.0) {
+      PetscCall(MatDenseGetColumnVecRead(B0, i, &b));
+      PetscCall(VecAXPY(charge->h, -s / MU, b));
+      PetscCall(MatDenseRestoreColumnVecRead(B0, i, &b));
+    }
+    PetscCall(MatMultTranspose(charge->Gi, charge->h, charge->rhs));
+    PetscCall(VecNorm(charge->rhs, NORM_2, &r));
+    if (charge->srcNorm[i] > 0.0) *res = PetscMax(*res, r / charge->srcNorm[i]);
+  }
+  charge->resMax = PetscMax(charge->resMax, *res);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief DC field E = Gi phi with L phi = -s Gi^T <N, p> for every source,
+ *        with <N, p> = -B0 / mu.
+ *
+ * @param[in,out] charge  Discrete charge with L and its KSP.
+ * @param[in]     Ms      Conductivity-weighted mass matrix.
+ * @param[in]     B0      Dipole term -mu <N, p>, one column per source.
+ * @param[in]     s       Normalized source current s(t0).
+ * @param[out]    E       DC field, one column per source.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode computeTdDcField(TdCharge *charge, Mat Ms, Mat B0, PetscReal s, Mat E) {
   PetscFunctionBeginUser;
 
   PetscInt           numRhs, its;
@@ -517,34 +717,43 @@ static PetscErrorCode applyTdCharge(TdCharge *charge, Mat Ms, Mat B0, PetscReal 
   PetscCall(MatGetSize(E, NULL, &numRhs));
   for (PetscInt i = 0; i < numRhs; i++) {
     Vec x, b;
-    PetscCall(MatDenseGetColumnVec(E, i, &x));
-    PetscCall(MatMult(Ms, x, charge->h));
-    if (s != 0.0) {
-      PetscCall(MatDenseGetColumnVecRead(B0, i, &b));
-      PetscCall(VecAXPY(charge->h, -s / MU, b));
-      PetscCall(MatDenseRestoreColumnVecRead(B0, i, &b));
-    }
-    PetscCall(MatMultTranspose(charge->Gi, charge->h, charge->rhs));
-    PetscCall(VecScale(charge->rhs, -1.0));
+    PetscCall(MatDenseGetColumnVecRead(B0, i, &b));
+    PetscCall(MatMultTranspose(charge->Gi, b, charge->rhs));
+    PetscCall(MatDenseRestoreColumnVecRead(B0, i, &b));
+    PetscCall(VecScale(charge->rhs, s / MU));
     PetscCall(KSPSolve(charge->ksp, charge->rhs, charge->phi));
     PetscCall(KSPGetIterationNumber(charge->ksp, &its));
     PetscCall(KSPGetConvergedReason(charge->ksp, &reason));
-    PetscCheck(reason > 0, PetscObjectComm((PetscObject)Ms), PETSC_ERR_NOT_CONVERGED, "Charge correction failed: %s",
-               KSPConvergedReasons[reason]);
+    PetscCheck(reason > 0, PetscObjectComm((PetscObject)Ms), PETSC_ERR_NOT_CONVERGED, "DC field failed: %s", KSPConvergedReasons[reason]);
     charge->its += its;
-    PetscCall(MatMultAdd(charge->Gi, charge->phi, x, x));
-    PetscCall(MatDenseRestoreColumnVec(E, i, &x));
+    PetscCall(MatDenseGetColumnVecWrite(E, i, &x));
+    PetscCall(MatMult(charge->Gi, charge->phi, x));
+    PetscCall(MatDenseRestoreColumnVecWrite(E, i, &x));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /**
- * @brief Forms A = K + (a0 mu/dt) Ms and sets up its KSP (factorization or BDDC).
+ * @brief Forms A = K + (a0 mu/dt) Ms and sets up its KSP (symbolic and numeric
+ *        setup).
+ *
+ * @param[in]     K               Curl-curl matrix.
+ * @param[in]     Ms              Conductivity-weighted mass matrix.
+ * @param[in]     G               Discrete gradient (PCBDDC only).
+ * @param[in]     order           Basis order (PCBDDC only).
+ * @param[in]     primalVertices  Primal dofs of PCBDDC, or NULL.
+ * @param[in]     a0              Coefficient of D(t) of the scheme.
+ * @param[in]     dt              Time step (s).
+ * @param[out]    stepper         Operator and KSP.
+ * @param[in,out] stats           Time-stepping counters.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 static PetscErrorCode createTdStepper(Mat K, Mat Ms, Mat G, PetscInt order, IS primalVertices, PetscReal a0, PetscReal dt,
                                       TdStepper *stepper, TdStats *stats) {
   PetscFunctionBeginUser;
+
   stepper->dt = dt;
   PetscCall(MatDuplicate(K, MAT_COPY_VALUES, &stepper->A));
   PetscCall(MatAXPY(stepper->A, a0 * MU / dt, Ms, SAME_NONZERO_PATTERN));
@@ -554,9 +763,43 @@ static PetscErrorCode createTdStepper(Mat K, Mat Ms, Mat G, PetscInt order, IS p
   PetscCall(KSPSetFromOptions(stepper->ksp));
   PetscCall(KSPSetUp(stepper->ksp));
   stats->numSetups++;
+  stats->numCreated++;
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Refills A = K + (a0 mu/dt) Ms on its pattern and sets up its KSP again
+ *        (numeric factorization only).
+ *
+ * @param[in]     K        Curl-curl matrix.
+ * @param[in]     Ms       Conductivity-weighted mass matrix.
+ * @param[in]     a0       Coefficient of D(t) of the scheme.
+ * @param[in]     dt       Time step (s).
+ * @param[in,out] stepper  Operator and KSP.
+ * @param[in,out] stats    Time-stepping counters.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode refillTdStepper(Mat K, Mat Ms, PetscReal a0, PetscReal dt, TdStepper *stepper, TdStats *stats) {
+  PetscFunctionBeginUser;
+
+  stepper->dt = dt;
+  PetscCall(MatCopy(K, stepper->A, SAME_NONZERO_PATTERN));
+  PetscCall(MatAXPY(stepper->A, a0 * MU / dt, Ms, SAME_NONZERO_PATTERN));
+  PetscCall(KSPSetUp(stepper->ksp));
+  stats->numSetups++;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Destroys the operator and the KSP of a time step.
+ *
+ * @param[in,out] stepper  Operator and KSP.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode destroyTdStepper(TdStepper *stepper) {
   PetscFunctionBeginUser;
   PetscCall(KSPDestroy(&stepper->ksp));
@@ -566,14 +809,60 @@ static PetscErrorCode destroyTdStepper(TdStepper *stepper) {
 }
 
 /**
- * @brief One step from t to t + dt for every source.
+ * @brief ||X||_K = (sum_i x_i^T K x_i)^(1/2) over the columns x_i of X.
  *
- * R = -(mu/dt) Ms (a1 E(t) + a2 E(t-dt)) + (a0 s(t+dt) + a1 s(t) + a2 s(t-dt))/dt B0,
- * with B0 = -mu <N, p>; solves A Enext = R, then applies the charge correction.
- * E1 = E(t-dt) is unused for backward Euler.
+ * @param[in]  K    Curl-curl matrix.
+ * @param[in]  X    Dense matrix, one column per source.
+ * @param[out] nrm  ||X||_K.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
-static PetscErrorCode advanceTdStep(const TdStepper *stepper, TdCharge *charge, Mat Ms, Mat B0, const TdParams *td, PetscReal t, Mat E0,
-                                    Mat E1, Mat Enext, Mat R, TdStats *stats) {
+static PetscErrorCode normTdCurl(Mat K, Mat X, PetscReal *nrm) {
+  PetscFunctionBeginUser;
+
+  PetscInt    numRhs;
+  PetscScalar dot;
+  PetscReal   sum = 0.0;
+  Vec         w;
+
+  PetscCall(MatGetSize(X, NULL, &numRhs));
+  PetscCall(MatCreateVecs(K, NULL, &w));
+  for (PetscInt i = 0; i < numRhs; i++) {
+    Vec x;
+    PetscCall(MatDenseGetColumnVecRead(X, i, &x));
+    PetscCall(MatMult(K, x, w));
+    PetscCall(VecDot(w, x, &dot));
+    PetscCall(MatDenseRestoreColumnVecRead(X, i, &x));
+    sum += PetscRealPart(dot);
+  }
+  PetscCall(VecDestroy(&w));
+  *nrm = PetscSqrtReal(PetscMax(sum, 0.0));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief One time step from t to t + dt for every source.
+ *
+ * Solves A Enext = R with
+ *   R = -(mu/dt) Ms (a1 E(t) + a2 E(t-dt)) + (a0 s(t+dt) + a1 s(t) + a2 s(t-dt))/dt B0,
+ * and B0 = -mu <N, p>. E1 is not used by backward Euler.
+ *
+ * @param[in]     stepper  Operator and KSP of the time step dt.
+ * @param[in]     Ms       Conductivity-weighted mass matrix.
+ * @param[in]     B0       Dipole term -mu <N, p>, one column per source.
+ * @param[in]     td       Time-stepping options and waveform.
+ * @param[in]     t        Current time (s).
+ * @param[in]     E0       E(t), one column per source.
+ * @param[in]     E1       E(t-dt), one column per source.
+ * @param[out]    Enext    E(t+dt), one column per source.
+ * @param[out]    R        Work matrix for the right-hand sides.
+ * @param[in,out] stats    Time-stepping counters.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode advanceTdStep(const TdStepper *stepper, Mat Ms, Mat B0, const TdParams *td, PetscReal t, Mat E0, Mat E1, Mat Enext,
+                                    Mat R, TdStats *stats) {
   PetscFunctionBeginUser;
 
   const PetscReal    dt = stepper->dt;
@@ -603,13 +892,22 @@ static PetscErrorCode advanceTdStep(const TdStepper *stepper, TdCharge *charge, 
   PetscCheck(reason > 0, PetscObjectComm((PetscObject)Ms), PETSC_ERR_NOT_CONVERGED, "Time step at t = %g s (dt = %g s) failed: %s",
              (double)(t + dt), (double)dt, KSPConvergedReasons[reason]);
   stats->its += its;
-  PetscCall(applyTdCharge(charge, Ms, B0, evaluateWaveform(td, t + dt), Enext));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /**
- * @brief Builds the receiver interpolation; fields are dB/dt in the H slots.
+ * @brief Builds the receiver interpolation and the empty time series.
+ *
+ * The magnetic slots of the receiver fields hold dB/dt.
+ *
+ * @param[in]  sources    Transmitter set.
+ * @param[in]  dm         DMPlex carrying the H(curl) section.
+ * @param[in]  grid       Grid filled by setupCsemGrid().
+ * @param[in]  receivers  Receiver coordinates.
+ * @param[out] out        Receiver interpolation and time series.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 static PetscErrorCode setupTdOutput(const CsemSourceSet sources, const DM dm, const Grid *grid, Vec receivers, TdOutput *out) {
   PetscFunctionBeginUser;
@@ -629,7 +927,15 @@ static PetscErrorCode setupTdOutput(const CsemSourceSet sources, const DM dm, co
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Appends E and dB/dt = -curl E at the receivers for time t. */
+/**
+ * @brief Appends E and dB/dt = -curl E at the receivers to the time series.
+ *
+ * @param[in,out] out  Receiver interpolation and time series.
+ * @param[in]     E    Electric field, one column per source.
+ * @param[in]     t    Time (s).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode recordTdSample(TdOutput *out, Mat E, PetscReal t) {
   PetscFunctionBeginUser;
 
@@ -661,7 +967,7 @@ static PetscErrorCode recordTdSample(TdOutput *out, Mat E, PetscReal t) {
 }
 
 /**
- * @brief Writes the time series to a SINGLE HDF5 response file.
+ * @brief Writes the time series to a single HDF5 response file.
  *
  *   /                      root attrs: provenance, num_sources, num_times
  *   /times                 sample times (s)
@@ -669,6 +975,12 @@ static PetscErrorCode recordTdSample(TdOutput *out, Mat E, PetscReal t) {
  *                                 dip_angle, azimuth_angle
  *   /sources/src{k}/fields Ex, Ey, Ez, dBxdt, dBydt, dBzdt, one row per
  *                          receiver and one column per time
+ *
+ * @param[in] params   PETGEM parameters (output directory and stem).
+ * @param[in] sources  Transmitter set.
+ * @param[in] out      Receiver interpolation and time series.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
  */
 static PetscErrorCode writeTdOutput(const PetgemParams *params, const CsemSourceSet sources, const TdOutput *out) {
   PetscFunctionBeginUser;
@@ -695,7 +1007,7 @@ static PetscErrorCode writeTdOutput(const PetgemParams *params, const CsemSource
   PetscCall(PetscObjectSetName((PetscObject)v, "times"));
   PetscCall(VecGetArray(v, &a));
   if (rank == 0)
-    for (PetscInt n = 0; n < nt; n++) a[n] = out->times[n];
+    for (PetscInt j = 0; j < nt; j++) a[j] = out->times[j];
   PetscCall(VecRestoreArray(v, &a));
   PetscCall(VecView(v, viewer));
   PetscCall(VecDestroy(&v));
@@ -716,7 +1028,7 @@ static PetscErrorCode writeTdOutput(const PetgemParams *params, const CsemSource
       PetscCall(PetscObjectSetName((PetscObject)v, name));
       PetscCall(VecGetArray(v, &a));
       for (PetscInt r = 0; r < out->numLocal; r++) {
-        for (PetscInt n = 0; n < nt; n++) a[r * nt + n] = out->history[n * stride + (i * NUM_RECEIVER_FIELDS + comp) * out->numLocal + r];
+        for (PetscInt j = 0; j < nt; j++) a[r * nt + j] = out->history[j * stride + (i * NUM_RECEIVER_FIELDS + comp) * out->numLocal + r];
       }
       PetscCall(VecRestoreArray(v, &a));
       PetscCall(VecView(v, viewer));
@@ -736,9 +1048,17 @@ static PetscErrorCode writeTdOutput(const PetgemParams *params, const CsemSource
   }
 
   PetscCall(PetscViewerDestroy(&viewer));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Destroys the receiver interpolation and frees the time series.
+ *
+ * @param[in,out] out  Receiver interpolation and time series.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
 static PetscErrorCode destroyTdOutput(TdOutput *out) {
   PetscFunctionBeginUser;
   PetscCall(destroyReceiverFields(out->fields));
@@ -821,19 +1141,25 @@ int runTdCsemForward(int argc, char **argv) {
   /* Time stepping with adaptive step doubling */
   PetscCall(beginPhase(&run, PHASE_SOLVE));
   PetscCall(setupPrimalVerticesFromOptions(dm, K, conductivity, &primalVertices));
-  PetscCall(setupTdCharge(dm, &grid, Ms, G, &charge));
+  PetscCall(setupTdCharge(dm, &grid, Ms, G, (PetscBool)(td.waveform[0] != 0.0), &charge));
   PetscCall(createTdStepper(K, Ms, G, grid.fem.order, primalVertices, td.a[0], td.dt0, &current, &stats));
   t       = td.time[0];
   tSource = td.time[td.numSamples - 1];
+  /* Step-off: start from the DC field of s(t0), steady for t < t0 */
+  if (td.waveform[0] != 0.0) {
+    PetscCall(computeTdDcField(&charge, Ms, B0, td.waveform[0], E));
+    PetscCall(MatCopy(E, E1, SAME_NONZERO_PATTERN));
+    PetscCall(MatCopy(E, E2, SAME_NONZERO_PATTERN));
+  }
   PetscCall(recordTdSample(&out, E, t));
-  PetscCall(beginTdMonitor(comm, &stats, &charge, &monitor));
+  PetscCall(beginTdMonitor(comm, &stats, &monitor));
   while (t < td.tEnd) {
     const PetscReal dt     = current.dt;
-    PetscReal       ratio  = -1.0;
+    PetscReal       ratio  = -1.0, res;
     const char     *result = "-";
 
-    for (PetscInt k = 0; k < td.atsdSteps && t < td.tEnd; k++) {
-      PetscCall(advanceTdStep(&current, &charge, Ms, B0, &td, t, E, E1, Enext, R, &stats));
+    for (PetscInt i = 0; i < td.atsdSteps && t < td.tEnd; i++) {
+      PetscCall(advanceTdStep(&current, Ms, B0, &td, t, E, E1, Enext, R, &stats));
       swap = E2, E2 = E1, E1 = E, E = Enext, Enext = swap;
       t += current.dt;
       stats.numSteps++;
@@ -844,25 +1170,31 @@ int runTdCsemForward(int argc, char **argv) {
     if (td.atsdRtol > 0.0 && t >= tSource && t + 2.0 * current.dt <= td.tEnd) {
       PetscReal diff, norm;
 
-      if (!trial.ksp) PetscCall(createTdStepper(K, Ms, G, grid.fem.order, primalVertices, td.a[0], 2.0 * current.dt, &trial, &stats));
-      PetscCall(advanceTdStep(&trial, &charge, Ms, B0, &td, t, E, E2, Etrial, R, &stats));
-      for (PetscInt k = 0; k < 2; k++) {
-        PetscCall(advanceTdStep(&current, &charge, Ms, B0, &td, t, E, E1, Enext, R, &stats));
+      if (!trial.ksp) {
+        PetscCall(createTdStepper(K, Ms, G, grid.fem.order, primalVertices, td.a[0], 2.0 * current.dt, &trial, &stats));
+      } else if (trial.dt != 2.0 * current.dt) {
+        PetscCall(refillTdStepper(K, Ms, td.a[0], 2.0 * current.dt, &trial, &stats));
+      }
+      PetscCall(advanceTdStep(&trial, Ms, B0, &td, t, E, E2, Etrial, R, &stats));
+      for (PetscInt i = 0; i < 2; i++) {
+        PetscCall(advanceTdStep(&current, Ms, B0, &td, t, E, E1, Enext, R, &stats));
         swap = E2, E2 = E1, E1 = E, E = Enext, Enext = swap;
         t += current.dt;
         stats.numSteps++;
         PetscCall(recordTdSample(&out, E, t));
       }
       PetscCall(MatAXPY(Etrial, -1.0, E, SAME_NONZERO_PATTERN));
-      PetscCall(MatNorm(Etrial, NORM_FROBENIUS, &diff));
+      PetscCall(normTdCurl(K, Etrial, &diff));
       PetscCall(MatCopy(E, Enext, SAME_NONZERO_PATTERN));
       PetscCall(MatAXPY(Enext, -1.0, E2, SAME_NONZERO_PATTERN));
-      PetscCall(MatNorm(Enext, NORM_FROBENIUS, &norm));
+      PetscCall(normTdCurl(K, Enext, &norm));
       ratio = diff / norm;
       if (diff <= td.atsdRtol * norm) {
-        PetscCall(destroyTdStepper(&current));
+        TdStepper spare = current;
+
+        /* The replaced operator is refilled as the next trial */
         current = trial;
-        trial   = (TdStepper){0};
+        trial   = spare;
         swap = E1, E1 = E2, E2 = swap;
         stats.numDoubled++;
         result = "accepted";
@@ -871,7 +1203,8 @@ int runTdCsemForward(int argc, char **argv) {
         result = "rejected";
       }
     }
-    PetscCall(logTdStep(comm, &stats, &charge, t, dt, ratio, result, &monitor));
+    PetscCall(computeTdChargeResidual(&charge, Ms, B0, evaluateWaveform(&td, t), E, &res));
+    PetscCall(logTdStep(comm, &stats, t, dt, ratio, result, res, &monitor));
   }
   PetscCall(getSolverName(current.ksp, stats.solver, sizeof(stats.solver)));
   PetscCall(endPhase(&run, PHASE_SOLVE));

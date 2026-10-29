@@ -1,10 +1,10 @@
 /*
- * Filename: td_fm_csem_main.c
+ * Filename: fm_tdcsem_main.c
  * Author: Octavio Castillo Reyes (UPC/BSC)
  * Date: 2026-10-12
  *
  * Description:
- * Entry point of the fm.tdcsem binary; the kernel lives in src/td_fm_csem.c.
+ * Entry point of the fm.tdcsem binary; the kernel lives in src/fm_tdcsem.c.
  */
 
 #include "kernels.h"

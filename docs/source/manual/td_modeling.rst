@@ -12,9 +12,10 @@ increased by step doubling (see :doc:`method`).
 
 Scope
 -----
-- The initial field is zero, so the waveform must start at zero current
-  (impulse, Gaussian pulse, step-on or any waveform that starts from rest).
-  Step-off waveforms are not supported yet.
+- The initial field is set by the first waveform value :math:`s(t_0)`. With
+  :math:`s(t_0) = 0` (impulse, Gaussian pulse, step-on) the field starts from
+  rest. With :math:`s(t_0) \neq 0` (step-off, ramp-off) it starts from the DC
+  field of the current :math:`s(t_0)`.
 - The boundary condition is :math:`n \times E = 0`, as in ``fm.csem``. The
   domain must be large enough for the field to vanish at the boundary over the
   simulated time window.
@@ -34,15 +35,23 @@ Besides the mesh, ``sigmas.txt`` and the receiver table,
 
 - ``-tdcsem_waveform_filename`` - the source waveform, two columns ``t s(t)``:
   the time (s) and the current divided by the transmitter current. Times must
-  increase strictly and the first value of ``s`` must be 0. Between samples
-  ``s`` is interpolated linearly; after the last sample it keeps the last
-  value. For example, a step-on reached by a 1 µs ramp:
+  increase strictly. Between samples ``s`` is interpolated linearly; before
+  the first sample and after the last one it keeps the first and last values.
+  For example, a step-on reached by a 1 µs ramp:
 
   .. code-block::
 
      # t (s)  s(t)
      0.0     0.0
      1.0e-6  1.0
+
+  and a step-off with a 1 µs ramp:
+
+  .. code-block::
+
+     # t (s)  s(t)
+     0.0     1.0
+     1.0e-6  0.0
 
 - ``-tdcsem_t_end`` - final time (s), written into the parameter file.
 
@@ -62,19 +71,24 @@ Kernel options
 - ``-tdcsem_dt0 <s>`` - initial time step. Default: the smallest spacing of
   the waveform samples.
 - ``-tdcsem_atsd_steps <n>`` - number of steps at a fixed time step before
-  each doubling trial. Default: 100.
+  each doubling trial. Default: 50.
 - ``-tdcsem_atsd_rtol <r>`` - tolerance of the doubling trial; ``0`` keeps the
   time step fixed. Default: ``1e-2``.
 - ``-tdcsem_scheme <bdf2|be>`` - time integration scheme. Default: ``bdf2``.
+- ``-tdcsem_dc_ksp_*``, ``-tdcsem_dc_pc_*`` - solver of the DC field of a
+  step-off (see :doc:`method`). Default: MUMPS Cholesky
+  (``preonly``, ``cholesky``).
 
 The time step is not doubled before the last waveform sample. The operator of
 each time step size is set up once (one factorization with a direct solver)
-and reused for every step of that size.
+and reused for every step of that size. The symbolic setup is done for the
+first two operators only; the operator replaced by an accepted doubling is
+refilled as the next trial operator (numeric setup only).
 
 Parameter file
 --------------
-``preprocess.py -mode fm.tdcsem`` writes a direct-solver file with the final
-time:
+``preprocess.py -mode fm.tdcsem`` writes a direct-solver file (MUMPS
+Cholesky, distributed dense right-hand sides) with the final time:
 
 .. code-block::
 
@@ -84,8 +98,9 @@ time:
 
    -dm_mat_type aij
    -ksp_type preonly
-   -pc_type lu
+   -pc_type cholesky
    -pc_factor_mat_solver_type mumps
+   -mat_mumps_icntl_20 10
    -tdcsem_t_end <t_end>
 
 
@@ -100,20 +115,26 @@ The kernel prints a ``Time steps`` table with one row per block of
 ``-tdcsem_atsd_steps`` steps. Each row gives, at the end of the block:
 
 - the step count, the time and the time step used;
-- the doubling test :math:`\|E_{2\Delta t} - E_{\Delta t}\| / \|E - E_0\|`
+- the doubling test :math:`\|E_{2\Delta t} - E_{\Delta t}\|_K / \|E - E_0\|_K`
+  (curl-curl norm, see :doc:`method`)
   and whether the doubling was accepted;
-- the KSP and charge-correction iterations and the wall time of the block.
+- the KSP iterations;
+- the charge residual
+  :math:`\max_i \|G_i^T(M_\sigma e_i + s\,b_{p,i})\| / \|G_i^T b_{p,i}\|`
+  over the sources (see :doc:`method`);
+- the wall time of the block.
 
 .. code-block::
 
     Time steps:
-       Steps       t (s)      dt (s)   Doubling   Result  KSP its Charge its Wall (s)
-          27  2.7000e-05  1.0000e-06  5.524e-03 accepted       28        391      1.3
-          54  8.1000e-05  2.0000e-06  2.688e-03 accepted       28        392      1.3
+       Steps       t (s)      dt (s)   Doubling   Result  KSP its Charge res Wall (s)
+          27  2.7000e-05  1.0000e-06  5.664e-03 accepted       28  1.793e-16      7.7
+          54  8.1000e-05  2.0000e-06  2.372e-03 accepted       28  1.305e-16      8.0
          ...
 
-The final report gives the number of time steps, operator setups and accepted
-and rejected doublings.
+The final report gives the number of time steps, operator setups, accepted
+and rejected doublings, the DC-field solver iterations of a step-off and the largest
+charge residual of the run.
 
 Output
 ------

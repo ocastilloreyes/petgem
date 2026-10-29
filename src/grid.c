@@ -137,9 +137,10 @@ PetscErrorCode destroyGrid(Grid *grid) {
  * the point is contained in at least one process. If the point is not found globally,
  * the function raises a PETSc error.
  *
- * @note The search is performed collectively across all MPI processes using
- *       `MPI_Allreduce` with logical OR to ensure the point exists somewhere in the domain.
- *       Each process may return -1 if it does not own the point.
+ * @note The search is performed collectively across all MPI processes. A point
+ *       on a face, edge or vertex shared by cells of several processes is
+ *       returned only by the lowest rank that locates it; every other process
+ *       returns -1.
  * @note A PETSc error is raised if the point is not located on any process.
  * @note This function allocates a temporary Vec for point coordinates and a PetscSF
  *       for the search, both of which are destroyed before returning.
@@ -154,8 +155,7 @@ PetscErrorCode locatePoint(const DM dm, const PetscReal *position, PetscInt *poi
   PetscScalar       *inputPointCoordinates;
   const PetscSFNode *pointCell;
   const PetscInt    *pointFound;
-  PetscBool          pointFoundGlobal = PETSC_FALSE;
-  PetscBool          pointFoundLocal;
+  PetscMPIInt        rank, size, owner;
 
   *pointInCell = -1;
 
@@ -176,13 +176,14 @@ PetscErrorCode locatePoint(const DM dm, const PetscReal *position, PetscInt *poi
     *pointInCell = pointCell[i].index;
   }
 
-  /* Perform validation (at least one MPI task must found the point). Each process sets its local flag */
-  pointFoundLocal = (*pointInCell < 0) ? PETSC_FALSE : PETSC_TRUE;
-
-  /* Gather all local flags to the master process */
-  PetscCallMPI(MPI_Allreduce(&pointFoundLocal, &pointFoundGlobal, 1, MPI_C_BOOL, MPI_LOR, PetscObjectComm((PetscObject)dm)));
-  PetscCheck(pointFoundGlobal, PetscObjectComm((PetscObject)dm), PETSC_ERR_ARG_WRONG, "Point (%g, %g, %g) is outside the mesh.",
+  /* Lowest rank that located the point (size when none did) */
+  PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)dm), &rank));
+  PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)dm), &size));
+  owner = (*pointInCell < 0) ? size : rank;
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, &owner, 1, MPI_INT, MPI_MIN, PetscObjectComm((PetscObject)dm)));
+  PetscCheck(owner < size, PetscObjectComm((PetscObject)dm), PETSC_ERR_ARG_WRONG, "Point (%g, %g, %g) is outside the mesh.",
              (double)position[0], (double)position[1], (double)position[2]);
+  if (rank != owner) *pointInCell = -1;
 
   /* Free memory */
   PetscCall(VecDestroy(&pointCoordinates));

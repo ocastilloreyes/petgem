@@ -79,7 +79,8 @@ field satisfies
    \nabla \times \nabla \times E(t) + \mu\,\sigma\,\frac{\partial E}{\partial t}
    = -\mu\,\frac{\partial J_s}{\partial t},
 
-with :math:`n \times E = 0` on the boundary and :math:`E(0) = 0`. The same
+with :math:`n \times E = 0` on the boundary and :math:`E(t_0)` the initial
+field (zero, or the DC field of a step-off, see below). The same
 Nédélec discretization gives :math:`K e + \mu M_\sigma\,\dot e = -\mu\,\dot b`,
 with the dipole term :math:`b_j = N_j(x_s)\cdot p\,s(t)`, where :math:`s(t)`
 is the normalized source waveform. With time step :math:`\Delta t`, each
@@ -94,8 +95,8 @@ step solves
 
 with :math:`(a_0, a_1, a_2) = (3/2, -2, 1/2)` for the second-order backward
 differentiation formula (BDF2, default) and :math:`(1, -1, 0)` for backward
-Euler (``-tdcsem_scheme be``). Before the first step :math:`e = 0` and
-:math:`s = 0`.
+Euler (``-tdcsem_scheme be``). Before the first step :math:`e` and :math:`s`
+keep their initial values :math:`e(t_0)` and :math:`s(t_0)`.
 
 :math:`K` and :math:`M_\sigma` are assembled once (``assembleMaxwellOperator``
 and ``refillMassMatrix``). The operator is real; on a complex PETSc build the solution
@@ -108,35 +109,45 @@ accepted when
 
 .. math::
 
-   \|e_{2\Delta t} - e_{\Delta t}\| \le r\,\|e(t + 2\Delta t) - e(t)\|,
+   \|e_{2\Delta t} - e_{\Delta t}\|_K \le r\,\|e(t + 2\Delta t) - e(t)\|_K,
 
-with :math:`r` = ``-tdcsem_atsd_rtol`` and the norm taken over all degrees of
-freedom and sources. The solution carried forward is always the
-:math:`\Delta t` one. The BDF2 step of :math:`2\Delta t` uses :math:`e(t)`
+with :math:`r` = ``-tdcsem_atsd_rtol`` and
+:math:`\|x\|_K^2 = \sum_i x_i^T K x_i` over the sources. Gradient fields
+are in the null space of :math:`K` and do not enter the test. The solution
+carried forward is always the :math:`\Delta t` one. The BDF2 step of :math:`2\Delta t` uses :math:`e(t)`
 and :math:`e(t - 2\Delta t)`. A rejected :math:`2\Delta t` operator is kept
-for the next trial. At the receivers, :math:`E` is interpolated and
+for the next trial; after an accepted doubling, the replaced operator is
+refilled with :math:`K + a_0\mu/(4\Delta t)\,M_\sigma` as the next trial.
+At the receivers, :math:`E` is interpolated and
 :math:`\partial B/\partial t = -\nabla\times E`.
 
-Charge correction
-*****************
+Charge conservation
+*******************
 With the discrete gradient :math:`G` (:math:`K G = 0`), the semi-discrete
-equation and :math:`e(0) = 0` give the discrete charge conservation
+equation and a charge-free initial field give the discrete charge conservation
 
 .. math::
 
    G^T \left(M_\sigma\, e(t) + s(t)\, b_p\right) = 0,
 
 the discrete form of :math:`\nabla\cdot(\sigma E) = -\nabla\cdot J_s`.
-After every solve the kernel adds a gradient,
-:math:`e \leftarrow e + G_i\,\phi`, with
+:math:`G_i` is :math:`G` restricted to the interior nodes. The kernel reports
+the residual :math:`\max_i \|G_i^T(M_\sigma e_i + s\,b_{p,i})\| / \|G_i^T b_{p,i}\|`
+over the sources.
+
+Step-off
+********
+When :math:`s(t_0) \neq 0`, the source is taken as steady before :math:`t_0`.
+The DC field is curl-free, :math:`e(t_0) = G_i\,\phi`, and satisfies the
+charge conservation above:
 
 .. math::
 
-   \left(G_i^T M_\sigma G_i\right)\phi = -G_i^T\left(M_\sigma\, e + s(t_n)\, b_p\right),
+   \left(G_i^T M_\sigma G_i\right)\phi = -s(t_0)\,G_i^T b_p ,
 
-where :math:`G_i` is :math:`G` restricted to the interior nodes
-(:math:`\phi = 0` on the boundary). :math:`G_i^T M_\sigma G_i` is set up once
-and solved with CG and GAMG (``rtol 1e-10``).
+with :math:`\phi = 0` on the boundary nodes, factorized once (MUMPS Cholesky
+by default) and solved for every source. The time stepping then starts with
+:math:`e(t_0 - \Delta t) = e(t_0 - 2\Delta t) = e(t_0)`.
 
 MT forward problem
 ------------------

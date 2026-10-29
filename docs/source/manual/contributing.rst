@@ -52,7 +52,7 @@ layer or on lower ones:
    * - 6
      - Application
      - ``runtime`` (PETSc start-up, timed phases, Extrae events, common report
-       sections), the kernels ``fm_csem``, ``fm_mt``, ``im_csem``, ``td_fm_csem``, the
+       sections), the kernels ``fm_csem``, ``fm_mt``, ``im_csem``, ``fm_tdcsem``, the
        dispatcher ``petgem`` and the ``*_main`` entry points
 
 ``csem`` and ``mt`` are independent of each other. ``tests/unit/test_layers.py``

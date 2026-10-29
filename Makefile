@@ -142,7 +142,7 @@ SHARED_SRCS := src/common.c \
                src/receiver_interp.c \
                src/csem.c
 
-# Kernel sources. fm_csem.c, im_csem.c, fm_mt.c and td_fm_csem.c define
+# Kernel sources. fm_csem.c, im_csem.c, fm_mt.c and fm_tdcsem.c define
 # runForward, runInverse, runMtForward and runTdCsemForward; the *_main.c
 # files only provide main().
 INV_SRCS := src/inversion.c src/inversion_io.c src/inversion_smoother.c src/lbfgs.c
@@ -150,8 +150,8 @@ INV_SRCS := src/inversion.c src/inversion_io.c src/inversion_smoother.c src/lbfg
 FM_SRCS := src/fm_csem.c src/fm_csem_main.c $(SHARED_SRCS)
 IM_SRCS := src/im_csem.c src/im_csem_main.c $(INV_SRCS) $(SHARED_SRCS)
 MT_SRCS := src/fm_mt.c src/fm_mt_main.c src/mt.c $(SHARED_SRCS)
-TD_SRCS := src/td_fm_csem.c src/td_fm_csem_main.c $(SHARED_SRCS)
-PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c src/fm_mt.c src/td_fm_csem.c src/mt.c $(INV_SRCS) $(SHARED_SRCS)
+TD_SRCS := src/fm_tdcsem.c src/fm_tdcsem_main.c $(SHARED_SRCS)
+PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c src/fm_mt.c src/fm_tdcsem.c src/mt.c $(INV_SRCS) $(SHARED_SRCS)
 
 # MMS verification program (tests/mms), not part of 'all'
 MMS_SRCS := tests/mms/mms.c
