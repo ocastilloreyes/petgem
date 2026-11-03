@@ -23,6 +23,8 @@
   <img src="docs/source/_static/brand/07_PETGEM_Gradient_Bar_Thin.png" alt="" width="100%" height="4">
 </p>
 
+<div align="justify">
+
 **PETGEM** (Parallel Edge-element Toolkit for General Electromagnetic Modeling)
 is an open-source code for 3D electromagnetic modeling. It solves the CSEM
 forward problem in the frequency and time domains, the MT forward problem and
@@ -110,6 +112,8 @@ Additional publications can be found in the documentation and on
 ## License
 
 BSD 3-Clause. See [LICENSE.rst](LICENSE.rst).
+
+</div>
 
 <p align="center">
   <img src="docs/source/_static/brand/03_PETGEM_Lines_Gradient.png" alt="" width="100%">

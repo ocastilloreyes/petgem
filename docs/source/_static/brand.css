@@ -47,3 +47,17 @@
 .wy-nav-content a:hover {
     color: var(--petgem-bg2);
 }
+
+/* Justified body text */
+.rst-content p,
+.rst-content li,
+.rst-content dd {
+    text-align: justify;
+    hyphens: auto;
+}
+
+.rst-content .wy-table td p,
+.rst-content table.docutils td p {
+    text-align: left;
+    hyphens: manual;
+}
