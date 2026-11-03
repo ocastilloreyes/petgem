@@ -16,7 +16,6 @@
 <p align="center">
   <a href="https://petgem.readthedocs.io/en/latest/index.html"><b>Documentation</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a> ·
-  <a href="https://github.com/ocastilloreyes/petgem/tree/develop/examples"><b>Examples</b></a> ·
   <a href="#citing-petgem"><b>Citing</b></a>
 </p>
 
