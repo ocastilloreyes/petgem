@@ -1,11 +1,8 @@
 # Extrae profiling / instrumentation config
 
 Runtime configuration for tracing an `fm.csem` run with the
-[Extrae](https://tools.bsc.es/extrae) tracer. These files are test/CI
-infrastructure — they are consumed by the `extrae-smoke` job in
-[`tests-fm-csem.yml`](../../.github/workflows/tests-fm-csem.yml), which
-verifies that the *Extrae-instrumented* `fm.csem.extrae` build actually runs
-and emits a trace — and they double as the template for manual profiling runs.
+[Extrae](https://tools.bsc.es/extrae) tracer. They are the template for manual
+profiling runs of the `fm.csem.extrae` build.
 
 ## Files
 

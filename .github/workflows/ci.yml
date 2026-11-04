@@ -1,0 +1,152 @@
+# PETGEM CI. See docs/source/manual/testing.rst.
+#
+#   changes -> build -> test (one job per suite)  \
+#          \-> docs                                -> ci-ok
+#
+# Each test job runs scripts/ci/run_suite.sh <suite>, the same command as a
+# local run. ci-ok is the only check required by branch rules.
+name: PETGEM CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Selects the jobs to run from the changed paths. Pull requests to master and
+  # manual runs select everything.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+      code: ${{ steps.filter.outputs.code || 'true' }}
+      docs: ${{ steps.filter.outputs.docs || 'true' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v4
+        id: filter
+        if: github.event_name != 'workflow_dispatch' && github.base_ref != 'master'
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'include/**'
+              - 'utils/**'
+              - 'tests/**'
+              - 'examples/**'
+              - 'docker/**'
+              - 'scripts/ci/**'
+              - 'Makefile'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - '.github/workflows/ci.yml'
+            docs:
+              - 'docs/**'
+              - 'src/**'
+              - 'include/**'
+              - 'utils/**'
+              - 'scripts/auto_doc/**'
+              - 'Doxyfile'
+              - 'Makefile'
+              - '.readthedocs.yaml'
+              - '.github/workflows/ci.yml'
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: ${{ needs.changes.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile the kernels and the MMS program
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make -j2 all mms
+      - name: Pack the binaries
+        run: tar -cf binaries.tar build/fm.csem build/im.csem build/fm.mt build/fm.tdcsem build/petgem build/mms
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: binaries.tar
+          if-no-files-found: error
+          retention-days: 3
+
+  test:
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.timeout }}
+    container: ${{ needs.changes.outputs.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { suite: unit, timeout: 20 }
+          - { suite: e2e, timeout: 20 }
+          - { suite: mms, timeout: 20 }
+          - { suite: mt, timeout: 20 }
+          - { suite: im, timeout: 30 }
+          - { suite: tdcsem, timeout: 45 }
+    name: test (${{ matrix.suite }})
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+      - name: Unpack the binaries
+        run: tar -xf binaries.tar
+      - name: Run the suite
+        run: bash scripts/ci/run_suite.sh ${{ matrix.suite }}
+      - name: Keep the test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ matrix.suite }}
+          path: build/reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  docs:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: ${{ needs.changes.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check documentation drift
+        run: bash scripts/auto_doc/check_doc_drift.sh
+      - name: Build the documentation
+        run: make docs
+
+  # Fails unless every job above succeeded or was not selected.
+  ci-ok:
+    needs: [changes, build, test, docs]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the job results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'all(.[]; .result == "success" or .result == "skipped")' > /dev/null

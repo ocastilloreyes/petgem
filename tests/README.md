@@ -106,13 +106,10 @@ Review the diff of the regenerated files before committing them.
 
 ## CI
 
-[`ci-develop.yml`](../.github/workflows/ci-develop.yml) builds `fm.csem`,
-`im.csem`, `fm.mt`, `petgem` and `build/mms` once and passes them to
-[`tests-fm-csem.yml`](../.github/workflows/tests-fm-csem.yml) (harnesses,
-levels 4–5, level 6),
-[`tests-fm-mt.yml`](../.github/workflows/tests-fm-mt.yml) (MT half-space) and
-[`tests-im-csem.yml`](../.github/workflows/tests-im-csem.yml) (reduced inversion).
-All jobs run in the CI image built by
+[`ci.yml`](../.github/workflows/ci.yml) builds the binaries once and runs one
+job per suite with [`scripts/ci/run_suite.sh`](../scripts/ci/run_suite.sh):
+`unit`, `e2e`, `mms`, `mt`, `im` and `tdcsem`. The `ci-ok` job summarizes the
+result. All jobs run in the CI image built by
 [`image.yml`](../.github/workflows/image.yml).
 
 The full inversion benchmarks in `examples/im_csem_block` and

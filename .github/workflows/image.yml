@@ -1,12 +1,12 @@
 # =============================================================================
 # Build + push the PETGEM CI image (PETSc + mpicc + gmsh + python + h5py).
 #
-# Runs when docker/** changes or on manual dispatch; the test workflows pull
-# the resulting :latest tag.
+# Runs when docker/** changes or on manual dispatch; ci.yml uses the resulting
+# :latest tag.
 #
-# NOTE: a change under docker/** triggers this build AND ci-develop.yml at the
-# same time; that CI run pulls the *previous* image. Re-run CI after the image
-# push completes if a run needs the freshly built image.
+# NOTE: a change under docker/** triggers this build AND ci.yml at the same
+# time; that CI run uses the *previous* image. Re-run CI after the image push
+# completes if a run needs the freshly built image.
 # =============================================================================
 name: Build CI image
 

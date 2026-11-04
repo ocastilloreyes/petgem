@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ocastilloreyes/petgem/actions/workflows/ci-develop.yml"><img src="https://img.shields.io/github/actions/workflow/status/ocastilloreyes/petgem/ci-develop.yml?branch=develop&label=CI" alt="CI Status"></a>
+  <a href="https://github.com/ocastilloreyes/petgem/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ocastilloreyes/petgem/ci.yml?branch=develop&label=CI" alt="CI Status"></a>
   <a href="https://petgem.readthedocs.io/en/latest/index.html"><img src="https://img.shields.io/readthedocs/petgem/latest?label=docs" alt="Documentation Status"></a>
   <a href="https://github.com/ocastilloreyes/petgem/blob/develop/LICENSE.rst"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue" alt="License: BSD 3-Clause"></a>
   <a href="https://github.com/ocastilloreyes/petgem/releases"><img src="https://img.shields.io/github/v/release/ocastilloreyes/petgem" alt="Latest release"></a>

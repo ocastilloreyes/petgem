@@ -118,7 +118,7 @@ Every option, path and function named in the pages must exist in the code.
 
 Continuous integration
 ----------------------
-``.github/workflows/ci-develop.yml`` runs two independent groups of jobs. The
+``.github/workflows/ci.yml`` runs two independent groups of jobs. The
 code jobs build every binary and run the tests (see :doc:`testing`). The docs
 jobs run ``make docs`` and ``scripts/auto_doc/check_doc_drift.sh``, which
 fails when a retired name reappears in ``src/`` or ``include/``, when a

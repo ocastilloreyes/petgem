@@ -5,8 +5,8 @@
 #
 # This script meshes geometry/mesh.geo with gmsh and then calls
 # utils/preprocess.py to assemble the mesh and survey into the HDF5 bundle
-# read by fm.csem. CI runs exactly these steps before the e2e and Extrae
-# jobs (see .github/workflows/tests-fm-csem.yml and tests/README.md).
+# read by fm.csem. CI runs this script before the e2e suite (see
+# scripts/ci/run_suite.sh and tests/README.md).
 #
 # Usage (from the repository root):
 #   bash examples/fm_csem_unit_cube/scripts/build_bundles.sh

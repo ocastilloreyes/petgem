@@ -136,10 +136,18 @@ The goldens are regenerated only after an intended change of the results:
 
 Continuous integration
 ----------------------
-``.github/workflows/ci-develop.yml`` builds the binaries and the MMS program
-in the CI image and runs ``tests-fm-csem.yml`` (harnesses, levels 4-6),
-``tests-fm-mt.yml`` (MT half-space), ``tests-im-csem.yml`` (reduced
-inversion) and ``tests-fm-tdcsem.yml`` (time-domain CSEM half-space). Documentation
-jobs run only when the docs or sources change.
+``.github/workflows/ci.yml`` builds the binaries and the MMS program in the CI
+image and runs one job per suite: ``unit`` (harnesses), ``e2e`` (levels 4-5),
+``mms`` (level 6), ``mt``, ``im`` and ``tdcsem``. On a push to ``develop``, the
+jobs run only when the code or the docs change. Pull requests to ``master`` run
+everything. The ``ci-ok`` job fails unless every selected job succeeded.
+
+Each test job runs ``scripts/ci/run_suite.sh``, which reproduces it locally in
+the CI image:
+
+.. code-block:: bash
+
+   docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/workspace -w /workspace petgem-env:latest \
+       bash -c "make -j2 all mms && bash scripts/ci/run_suite.sh mt"
 
 .. _empymod: https://doi.org/10.1190/geo2016-0626.1
