@@ -65,12 +65,11 @@ def parsePreprocessingArgs():
                         help="Observed-data file(s) inside case_dir, required when "
                              "-mode im.csem. Each entry is 'file' or "
                              "'component:file' (component one of "
-                             f"{', '.join(DATA_COMPONENTS)}). An HDF5 (.h5/.hdf5) "
+                             f"{', '.join(DATA_COMPONENTS)}). Each HDF5 file "
                              "holds /<component> [N_freq, N_recv] complex128 "
                              "({r,i} compound) datasets, all of them read unless "
-                             "a component is given; a raw MATLAB-style "
-                             "invEx.dat text file is Ex unless a component is "
-                             "given. NaN marks a missing datum. Embedded into "
+                             "a component is given, and /frequencies [N_freq] "
+                             "(Hz). NaN marks a missing datum. Embedded into "
                              "the bundle under /observed/<component>.")
     parser.add_argument("-mt_frequency_filename", type=str, default=None,
                         help="MT frequency text file inside case_dir, required "
@@ -90,10 +89,9 @@ def parsePreprocessingArgs():
     parser.add_argument("-error_level", type=float, default=None,
                         help="Amplitude-relative noise level written to the "
                              "bundle's /observed @error_level (inverse mode). "
-                             "Overrides an HDF5 file's attribute; for a raw "
-                             "invEx.dat it is the only way to set it. Omit to "
-                             "leave the kernel default (overridable later with "
-                             "-im_error_level).")
+                             "Overrides the attribute of the observed-data file. "
+                             "If neither is set, the kernel default applies "
+                             "(overridable later with -im_error_level).")
     parser.add_argument("-sigma_file",        type=str, required=True,
                         help="Whitespace text table of per-material conductivity "
                              "(sigma_x sigma_y sigma_z [fixed]), relative to "
@@ -255,41 +253,20 @@ def readSourcesText(path):
     return np.asarray(rows, dtype=float)
 
 
-def readInvExDat(path):
-    """Parse a MATLAB-style ``invEx.dat`` observed-data text file.
+def readObservedData(path, component=None):
+    """Read an observed-data HDF5 file.
 
-    Format (one row per frequency)::
-
-        freq_label  Re(d_1) Im(d_1)  Re(d_2) Im(d_2)  ...  Re(d_N) Im(d_N)
-
-    The leading frequency label is dropped (the bundle's frequencies come
-    from the inversion sources file); the remaining Re/Im pairs build the
-    ``[N_freq, N_recv]`` complex array.  The file carries one data component
-    (``Ex`` unless :func:`readObservedData` is told otherwise) and no error
-    level, so the noise level is supplied separately (``-error_level`` /
-    ``-im_error_level``) or left to the kernel default.  NaN marks a missing
-    datum.
-    """
-    data = np.loadtxt(path, comments="#", ndmin=2)
-    values = data[:, 1:]                       # drop the freq label column
-    if values.shape[1] % 2 != 0:
-        raise ValueError(
-            f"{path}: expected an even number of data columns "
-            f"(Re/Im pairs), got {values.shape[1]}")
-    ex = values[:, 0::2] + 1j * values[:, 1::2]
-    return ex.astype(np.complex128), None
-
-
-def readObservedDataH5(path, component=None):
-    """Read an observed-data HDF5 file (e.g. written by utils/make_observed.py).
-
-    Returns (data, error_level) where data maps each component name of
+    Written by utils/make_observed.py or utils/convert_observed.py. Returns
+    (data, frequencies, error_level): data maps each component name of
     :data:`DATA_COMPONENTS` found at the file root (only `component` when
-    given) to its [N_freq, N_recv] complex128 ndarray, and error_level is the
-    amplitude-relative noise level used to synthesize it (None if the source
-    file has no `error_level` attribute).  The compound HDF5 type {r: float64,
-    i: float64} is materialized as complex128 by h5py.
+    given) to its [N_freq, N_recv] complex128 ndarray, frequencies is the
+    [N_freq] /frequencies dataset (Hz), and error_level is the
+    amplitude-relative noise level (None if the file has no `error_level`
+    attribute).  The compound HDF5 type {r: float64, i: float64} is
+    materialized as complex128 by h5py.
     """
+    if not h5py.is_hdf5(path):
+        raise ValueError(f"{path}: not an HDF5 file (text data: see utils/convert_observed.py)")
     names = (component,) if component else DATA_COMPONENTS
     data = {}
     with h5py.File(path, "r") as f:
@@ -297,7 +274,10 @@ def readObservedDataH5(path, component=None):
             if name in f:
                 data[name] = np.asarray(f[name])
         if not data:
-            raise KeyError(f"{path}: no /{' or /'.join(names)} dataset")
+            raise ValueError(f"{path}: no /{' or /'.join(names)} dataset")
+        if "frequencies" not in f:
+            raise ValueError(f"{path}: no /frequencies dataset")
+        frequencies = np.asarray(f["frequencies"], dtype=float)
         # `error_level` may sit on the file root or on a component dataset.
         error_level = None
         for holder in (f, *(f[name] for name in data)):
@@ -308,9 +288,26 @@ def readObservedDataH5(path, component=None):
         if values.ndim != 2:
             raise ValueError(f"{path}: /{name} must be 2-D, got shape {values.shape}")
         if not np.iscomplexobj(values):
-            # File may store as compound-real; coerce to complex.
-            data[name] = values.astype(np.complex128)
-    return data, error_level
+            raise ValueError(f"{path}: /{name} must be complex ({{r, i}} compound), got {values.dtype}")
+        if frequencies.shape != (values.shape[0],):
+            raise ValueError(f"{path}: /frequencies shape {frequencies.shape} does not match "
+                             f"/{name} shape {values.shape}")
+    return data, frequencies, error_level
+
+
+def checkObservedFrequencies(path, frequencies, source_frequencies):
+    """Check that the rows of an observed-data file match the inversion sources.
+
+    Row k of the file must hold the frequency of row k of the sources, to a
+    relative tolerance of 1e-6.
+    """
+    if frequencies.shape != source_frequencies.shape:
+        raise ValueError(f"{path}: {frequencies.size} frequencies, "
+                         f"{source_frequencies.size} source rows")
+    if not np.allclose(frequencies, source_frequencies, rtol=1e-6, atol=0.0):
+        k = int(np.argmax(~np.isclose(frequencies, source_frequencies, rtol=1e-6, atol=0.0)))
+        raise ValueError(f"{path}: row {k} holds {frequencies[k]} Hz, "
+                         f"source row {k} holds {source_frequencies[k]} Hz")
 
 
 def parseObservedSpec(spec):
@@ -326,19 +323,6 @@ def parseObservedSpec(spec):
             if head.lower() == name.lower():
                 return name, tail
     return None, spec
-
-
-def readObservedData(path, component=None):
-    """Observed data of one file, HDF5 or ``invEx.dat`` text.
-
-    Returns (data, error_level, kind): data maps component names to
-    [N_freq, N_recv] complex128 arrays, kind describes the file format.
-    """
-    if path.lower().endswith((".h5", ".hdf5")):
-        data, error_level = readObservedDataH5(path, component)
-        return data, error_level, "HDF5"
-    values, error_level = readInvExDat(path)
-    return {component or "Ex": values}, error_level, "invEx.dat (text)"
 
 
 def writeInversionPayload(filename, observed,
@@ -786,8 +770,8 @@ def runPreprocessing(*, mode, order, case_dir,
         Multi-frequency sources, one row per (frequency, dipole)
         (``im.csem`` only).
     observed_filename : str, list of str or None
-        Observed data, entries ``file`` or ``component:file``, HDF5 or
-        ``invEx.dat`` text (``im.csem`` only).
+        Observed-data HDF5 files, entries ``file`` or ``component:file``
+        (``im.csem`` only).
     error_level : float or None
         Relative noise level; overrides the one stored in an HDF5
         observed-data file.
@@ -993,21 +977,18 @@ def runPreprocessing(*, mode, order, case_dir,
     # (The sources already live in the unified /sources group above.)
     if mode == "im.csem":
         print("\nReading observed data")
-        # Each file is a prebuilt HDF5 (.h5/.hdf5) or a raw MATLAB-style
-        # invEx.dat text file - the .dat is parsed inline, so no separate
-        # convert-to-HDF5 step is needed.
         observed, file_error_level = {}, None
         for comp, path in observed_specs:
-            data, level, src_kind = readObservedData(path, comp)
+            data, frequencies, level = readObservedData(path, comp)
+            checkObservedFrequencies(path, frequencies, sources8[:, 0])
             for name in data:
                 if name in observed:
                     raise ValueError(f"Observed component {name} given twice ({path})")
             observed.update(data)
             if file_error_level is None:
                 file_error_level = level
-            print(f"  Observed source         : {src_kind}  ({', '.join(data)})")
-        # -error_level on the CLI overrides the file's attribute (and is the
-        # only way to set it for a raw .dat).
+            print(f"  Observed source         : {path}  ({', '.join(data)})")
+        # -error_level on the CLI overrides the file's attribute.
         observed_error_level = error_level if error_level is not None else file_error_level
         for name, values in observed.items():
             print(f"  Observed {name:<3} shape      : {values.shape}  (N_freq, N_recv)")

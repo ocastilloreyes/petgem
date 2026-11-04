@@ -13,10 +13,9 @@ Mode-specific arguments (validated by runPreprocessing):
                      forbids  -source_filename
                      (the inverse kernel reads multi-freq sources from
                       /sources/* in the bundle)
-                     -observed_filename accepts either an HDF5 (.h5) or a raw
-                     MATLAB-style invEx.dat text file (parsed inline, so no
-                     separate convert-to-HDF5 step is needed); -error_level
-                     optionally records the noise level.
+                     -observed_filename takes HDF5 files (utils/make_observed.py,
+                     utils/convert_observed.py); -error_level optionally records
+                     the noise level.
     -mode fm.mt    requires -mt_frequency_filename
                      forbids  -source_filename, -im_source_filename,
                               -observed_filename

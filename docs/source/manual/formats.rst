@@ -95,39 +95,36 @@ whitespace **or** commas; ``#`` comments and blank lines are allowed.
 
 Observed data (``-observed_filename``, inverse only)
 ----------------------------------------------------
-The inversion target, in **either** of two forms (``preprocess.py`` selects by
-file extension):
-
-Each entry of ``-observed_filename`` is ``file`` or ``component:file``, the
-component being one of ``Ex``, ``Ey``, ``Ez``, ``Hx``, ``Hy``, ``Hz``, ``Zxx``,
-``Zxy``, ``Zyx``, ``Zyy`` (:math:`Z_{ij} = E_i/H_j`). NaN marks a missing
-datum.
-
-**HDF5** (``.h5`` / ``.hdf5``)
+The inversion target, in HDF5. Each entry of ``-observed_filename`` is ``file``
+or ``component:file``, the component being one of ``Ex``, ``Ey``, ``Ez``,
+``Hx``, ``Hy``, ``Hz``, ``Zxx``, ``Zxy``, ``Zyx``, ``Zyy``
+(:math:`Z_{ij} = E_i/H_j`). NaN marks a missing datum.
 
 - ``/<component>`` - complex ``[N_freq, N_recv]`` dataset (``complex128``,
   stored as an ``{r, i}`` compound), one per component. Row order matches the
-  inverse source frequencies; column order matches the receiver list. All
-  components present are read unless the entry names one.
-- ``/frequencies`` - the frequency of each row (Hz).
+  inverse sources; column order matches the receiver list. All components
+  present are read unless the entry names one. Real-valued datasets are
+  rejected.
+- ``/frequencies`` - the frequency of each row (Hz). Required. Preprocessing
+  checks it row by row against the inverse sources.
 - optional root attribute ``error_level`` - the relative noise level.
 
-**Raw text** (MATLAB-style ``invEx.dat``), parsed inline - one component,
-one row per frequency:
+``utils/make_observed.py`` writes this file from ``fm.csem`` responses.
+``utils/convert_observed.py`` writes it from text files, one per component,
+with one row per frequency:
 
 .. code-block::
 
-   freq_label  Re(d_1) Im(d_1)  Re(d_2) Im(d_2)  ...  Re(d_N) Im(d_N)
-
-The leading label is dropped (frequencies come from the inverse sources); the
-component is ``Ex`` unless the entry names another; the noise level is
-supplied with ``-error_level``, or left to the kernel default.
+   freq  Re(d_1) Im(d_1)  Re(d_2) Im(d_2)  ...  Re(d_N) Im(d_N)
 
 .. code-block:: bash
 
+   # Convert text data
+   python3 utils/convert_observed.py -input ex:observed_ex.dat zxy:observed_zxy.dat \
+       -output_filename observed.h5 -error_level 0.05
+
    # Build the input bundle
-   python3 utils/preprocess.py -mode im.csem ... \
-       -observed_filename ex:observed_ex.dat zxy:observed_zxy.dat -error_level 0.05
+   python3 utils/preprocess.py -mode im.csem ... -observed_filename observed.h5
 
 Input bundle (``-input_filename``, default ``input.h5``)
 --------------------------------------------------------

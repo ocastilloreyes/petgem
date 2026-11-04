@@ -4,9 +4,9 @@ Python API
 
 The package in ``utils/`` (imported as ``petgem`` after ``pip install -e .``)
 builds input bundles and reads the bundles and the kernel output. Every
-function needs ``petsc4py``. ``utils/preprocess.py`` and
-``utils/make_observed.py`` run from a clone without installing it. The file
-formats are described in :doc:`formats`.
+function needs ``petsc4py``. ``utils/preprocess.py``,
+``utils/make_observed.py`` and ``utils/convert_observed.py`` run from a clone
+without installing it. The file formats are described in :doc:`formats`.
 
 Example
 -------
@@ -39,9 +39,7 @@ Preprocessing
 
 .. autofunction:: petgem.parseObservedSpec
 
-.. autofunction:: petgem.readObservedDataH5
-
-.. autofunction:: petgem.readInvExDat
+.. autofunction:: petgem.checkObservedFrequencies
 
 .. autofunction:: petgem.readTdSourcesText
 

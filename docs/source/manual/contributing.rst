@@ -60,8 +60,8 @@ checks these rules on every ``#include``, and fails when a new module has not
 been placed in a layer.
 
 ``utils/`` is the Python pre/post-processing package (installable as
-``petgem``; ``utils/preprocess.py`` and ``utils/make_observed.py`` always use
-the code next to them).
+``petgem``; ``utils/preprocess.py``, ``utils/make_observed.py`` and
+``utils/convert_observed.py`` always use the code next to them).
 
 Shared parameters and output
 ****************************

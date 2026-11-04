@@ -31,6 +31,7 @@ tests/
 ├── csrc/                  C harnesses (petgem_test.h, box_mesh.h, test_*.c)
 ├── unit/test_harnesses.py runs every C harness per order and rank count
 ├── unit/test_layers.py    layered architecture of src/ and include/
+├── unit/test_observed_io.py observed-data HDF5 input and text converter
 ├── e2e/                   levels 4-5
 ├── mms/                   level 6: MMS program (mms.c, mms.h), mesh.geo, inputs, build_bundle.sh,
 │                          regen_golden.sh, reference/mms_golden.json

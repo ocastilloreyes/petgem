@@ -21,16 +21,16 @@ starting model:
    the observed data.
 
 ``-observed_filename``
-   One or more observed-data files, each ``file`` or ``component:file``, with
-   one ``[N_freq, N_recv]`` array per component, in HDF5 or as a MATLAB-style
-   ``invEx.dat`` text file (see :doc:`formats`). An HDF5 file without a
-   component prefix gives all the components it holds; a text file without
-   one is ``Ex``. Preprocessing checks that every shape matches the sources and
-   the receivers. NaN marks a missing datum.
+   One or more observed-data HDF5 files, each ``file`` or ``component:file``,
+   with one ``[N_freq, N_recv]`` array per component and the frequency of each
+   row (see :doc:`formats`). A file without a component prefix gives all the
+   components it holds. Preprocessing checks the frequencies against the
+   sources and every shape against the sources and the receivers. NaN marks a
+   missing datum.
 
 ``-error_level`` (optional)
    Relative noise level used to weight the misfit. It overrides the
-   ``error_level`` attribute of an HDF5 observed-data file.
+   ``error_level`` attribute of the observed-data file.
 
 Materials with a non-zero ``fixed`` column in ``sigmas.txt`` (for example,
 air) are held fixed: their cells are neither updated nor smoothed. Their ids
