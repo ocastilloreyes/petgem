@@ -66,9 +66,11 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # --------------------------------
 # Install Python packages via pip
 # --------------------------------
+COPY docker/requirements-ci.txt /tmp/requirements-ci.txt
+
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir cython pytest h5py matplotlib meshio \
-        sphinx sphinx-rtd-theme breathe
+    pip install --no-cache-dir -r /tmp/requirements-ci.txt && \
+    rm /tmp/requirements-ci.txt
 
 # ---------------------------
 # PETSc
@@ -108,16 +110,17 @@ ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
 # GMSH
 # ---------------------------
 ENV GMSH_DIR=/usr/local/gmsh
+ENV GMSH_VERSION=4.15.2
 
 RUN mkdir -p ${GMSH_DIR}
 
 WORKDIR /workspace
 
-RUN wget https://gmsh.info/bin/Linux/gmsh-stable-Linux64.tgz && \
-    tar -xf gmsh-stable-Linux64.tgz \
+RUN wget https://gmsh.info/bin/Linux/gmsh-${GMSH_VERSION}-Linux64.tgz && \
+    tar -xf gmsh-${GMSH_VERSION}-Linux64.tgz \
         -C ${GMSH_DIR} \
         --strip-components=1 && \
-    rm gmsh-stable-Linux64.tgz
+    rm gmsh-${GMSH_VERSION}-Linux64.tgz
 
 ENV PATH="${GMSH_DIR}/bin:${PATH}"
 

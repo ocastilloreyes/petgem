@@ -62,8 +62,8 @@ The Docker image built from `docker/Dockerfile` contains all of them.
 git clone https://github.com/ocastilloreyes/petgem.git
 cd petgem
 
-docker pull ghcr.io/ocastilloreyes/petgem-ci-env:latest
-docker tag ghcr.io/ocastilloreyes/petgem-ci-env:latest petgem-env
+docker pull "$(cat docker/ci-image.txt)"
+docker tag "$(cat docker/ci-image.txt)" petgem-env
 docker run --rm -it -u $(id -u):$(id -g) -v $(pwd):/workspace -w /workspace petgem-env bash
 
 # inside the container

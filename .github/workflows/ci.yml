@@ -1,10 +1,12 @@
 # PETGEM CI. See docs/source/manual/testing.rst.
 #
-#   changes -> build -> test (one job per suite)  \
-#          \-> docs                                -> ci-ok
+#   changes -> static
+#           -> build -> test (one job per suite)   -> ci-ok
+#           -> docs
 #
-# Each test job runs scripts/ci/run_suite.sh <suite>, the same command as a
-# local run. ci-ok is the only check required by branch rules.
+# The static and test jobs run scripts/ci/, the same commands as a local run.
+# docker/ci-image.txt selects the CI image. ci-ok is the only check required by
+# branch rules.
 name: PETGEM CI
 
 on:
@@ -35,11 +37,14 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      image: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
+      image: ${{ steps.image.outputs.ref }}
       code: ${{ steps.filter.outputs.code || 'true' }}
       docs: ${{ steps.filter.outputs.docs || 'true' }}
     steps:
       - uses: actions/checkout@v5
+      - name: Read the CI image
+        id: image
+        run: echo "ref=$(cat docker/ci-image.txt)" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name != 'workflow_dispatch' && github.base_ref != 'master'
@@ -68,6 +73,17 @@ jobs:
               - '.readthedocs.yaml'
               - '.github/workflows/ci.yml'
 
+  static:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    container: ${{ needs.changes.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check format and syntax
+        run: bash scripts/ci/check_static.sh
+
   build:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -79,7 +95,7 @@ jobs:
       - name: Compile the kernels and the MMS program
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          make -j2 all mms
+          make -j2 EXTRA_CFLAGS=-Werror all mms
       - name: Pack the binaries
         run: tar -cf binaries.tar build/fm.csem build/im.csem build/fm.mt build/fm.tdcsem build/petgem build/mms
       - uses: actions/upload-artifact@v4
@@ -124,22 +140,34 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Same operating system, Python and packages as .readthedocs.yaml.
   docs:
     needs: changes
     if: needs.changes.outputs.docs == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
-    container: ${{ needs.changes.outputs.image }}
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+      - name: Install the documentation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends doxygen graphviz
+          pip install -r docs/requirements.txt
       - name: Check documentation drift
         run: bash scripts/auto_doc/check_doc_drift.sh
-      - name: Build the documentation
-        run: make docs
+      - name: Generate the API pages
+        run: bash scripts/auto_doc/prepare_docs.sh
+      - name: Build the documentation (warnings are errors)
+        run: python -m sphinx -W --keep-going -b html docs/source docs/build/html
 
   # Fails unless every job above succeeded or was not selected.
   ci-ok:
-    needs: [changes, build, test, docs]
+    needs: [changes, static, build, test, docs]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

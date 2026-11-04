@@ -83,10 +83,10 @@ Generic input and output lives in ``io.c``; the physics-specific part lives in
 
 Code conventions
 ----------------
-- The compiler runs with ``-Wall -Wextra`` (plus ``-Wpedantic`` on gcc). Keep new
-  code warning-clean.
+- The compiler runs with ``-Wall -Wextra`` (plus ``-Wpedantic`` on gcc). The CI
+  builds with ``-Werror``.
 - Format C sources with ``clang-format -i`` and the repository's
-  ``.clang-format``.
+  ``.clang-format``. ``scripts/ci/check_static.sh`` runs the check of the CI.
 - Functions and variables are lowerCamelCase, types are PascalCase, macros and
   enum constants are UPPER_CASE. Acronyms are written as words
   (``assembleCsemRhs``, ``MtParams``, ``createCellScalarDm``); PETSc names keep
@@ -118,13 +118,19 @@ Every option, path and function named in the pages must exist in the code.
 
 Continuous integration
 ----------------------
-``.github/workflows/ci.yml`` runs two independent groups of jobs. The
-code jobs build every binary and run the tests (see :doc:`testing`). The docs
-jobs run ``make docs`` and ``scripts/auto_doc/check_doc_drift.sh``, which
+``.github/workflows/ci.yml`` runs two independent groups of jobs. The code jobs
+check the format, build every binary and run the tests (see :doc:`testing`).
+The docs job builds the documentation with the versions of Read the Docs,
+with warnings as errors, and runs ``scripts/auto_doc/check_doc_drift.sh``, which
 fails when a retired name reappears in ``src/`` or ``include/``, when a
 Doxygen ``@param`` no longer matches its function, or when a prototype in
-``include/`` names its parameters differently from the definition. The CI
-image is built by ``image.yml`` when ``docker/`` changes.
+``include/`` names its parameters differently from the definition.
+
+``docker/ci-image.txt`` selects the CI image by digest. To change the image,
+edit ``docker/Dockerfile`` or ``docker/requirements-ci.txt``. ``image.yml``
+builds and publishes the new image and reports its reference in the job summary.
+Write that reference to ``docker/ci-image.txt``: the push runs every suite on
+the new image.
 
 Testing
 -------

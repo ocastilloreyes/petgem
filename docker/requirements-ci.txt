@@ -1,0 +1,11 @@
+# Python packages of the CI image. Keep Sphinx, sphinx-rtd-theme and breathe
+# within the ranges of docs/requirements.txt.
+Cython==3.3.0
+numpy==2.5.4
+h5py==3.16.0
+matplotlib==3.11.2
+meshio==5.3.5
+pytest==9.1.1
+Sphinx==7.4.7
+sphinx-rtd-theme==2.0.0
+breathe==4.36.0

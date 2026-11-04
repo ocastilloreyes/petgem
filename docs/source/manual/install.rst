@@ -34,9 +34,8 @@ explicit error if ``PETSC_DIR`` does not point at a PETSc installation.
 Docker
 ------
 ``docker/Dockerfile`` builds the image: PETSc (complex scalars), Gmsh,
-Extrae, and the Python stack. CI publishes it as
-``ghcr.io/ocastilloreyes/petgem-ci-env:latest``. The repository is mounted,
-not copied:
+Extrae, and the Python stack. ``docker/ci-image.txt`` holds the reference of the
+published image used by the CI. The repository is mounted, not copied:
 
 .. code-block:: bash
 
@@ -45,8 +44,8 @@ not copied:
    cd petgem
 
    # Get the image
-   docker pull ghcr.io/ocastilloreyes/petgem-ci-env:latest
-   docker tag ghcr.io/ocastilloreyes/petgem-ci-env:latest petgem-env
+   docker pull "$(cat docker/ci-image.txt)"
+   docker tag "$(cat docker/ci-image.txt)" petgem-env
 
    # Start a container with the repository mounted
    docker run --rm -it -u $(id -u):$(id -g) -v $(pwd):/workspace -w /workspace petgem-env bash
