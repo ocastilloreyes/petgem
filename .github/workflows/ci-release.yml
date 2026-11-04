@@ -6,14 +6,17 @@ name: PETGEM Release
 # ========================
 # Events that trigger this workflow
 # ========================
+# Manual until pull requests to master are gated by the CI.
 on:
-  push:
-    branches:
-      - master  # Trigger release workflow when merging into master
+  workflow_dispatch:
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5

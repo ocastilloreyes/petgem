@@ -13,16 +13,25 @@ on:
     branches: [develop]
   workflow_dispatch:
 
+# ===========
+# Run control
+# ===========
+# A new run on the same ref cancels the previous one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 # ===================================================
 # Global environment variables accessible by all jobs
 # ===================================================
 env:
   PETSC_DIR: /usr/local/petsc
   PETSC_ARCH: arch-linux-c-opt
-  # Pinned CI image. Built rarely by .github/workflows/image.yml (only when
-  # docker/** changes); this workflow only *pulls* it - it never rebuilds the
-  # image. Pin to a digest (...@sha256:...) instead of :latest for a fully
-  # reproducible run.
+  # CI image, built by .github/workflows/image.yml when docker/** changes.
+  # This workflow only pulls it.
   DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/petgem-ci-env:latest
   # Forces JS actions still declaring Node 20 (dorny/paths-filter@v3, no Node 24
   # release yet) to run on Node 24 - silences the deprecation warning until
@@ -40,6 +49,10 @@ jobs:
   # ================================================================
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       fmcsem: ${{ steps.filter.outputs.fmcsem }}
       docs: ${{ steps.filter.outputs.docs }}
@@ -58,6 +71,7 @@ jobs:
               - 'tests/**'
               - 'examples/**'
               - 'pytest.ini'
+              - 'scripts/ci/**'
               - '.github/workflows/ci-develop.yml'
               - '.github/workflows/tests-fm-csem.yml'
               - '.github/workflows/tests-fm-mt.yml'
@@ -66,6 +80,7 @@ jobs:
             docs:
               - 'docs/**'
               - 'scripts/auto_doc/**'
+              - 'scripts/ci/**'
               - 'Doxyfile'
               - 'include/**'
               - 'src/**'
@@ -75,13 +90,14 @@ jobs:
   # ==============================
   compile-kernels:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: changes
     if: needs.changes.outputs.fmcsem == 'true'
     steps:
       - uses: actions/checkout@v5
 
       - name: Pull CI image
-        run: docker pull ${{ env.DOCKER_IMAGE }}
+        run: bash scripts/ci/pull_image.sh "${{ env.DOCKER_IMAGE }}"
 
       - name: Compile fm.csem, im.csem, fm.mt, fm.tdcsem, petgem and the MMS program
         run: |
@@ -155,12 +171,13 @@ jobs:
   # =====================
   compile-docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     steps:
       - uses: actions/checkout@v5
       - name: Pull CI image
-        run: docker pull ${{ env.DOCKER_IMAGE }}
+        run: bash scripts/ci/pull_image.sh "${{ env.DOCKER_IMAGE }}"
       - name: Generate documentation
         run: |
           docker run --rm \
@@ -176,12 +193,13 @@ jobs:
   # Doxygen @param-vs-signature check. Runs in the CI image (it has doxygen).
   doc-drift:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     steps:
       - uses: actions/checkout@v5
       - name: Pull CI image
-        run: docker pull ${{ env.DOCKER_IMAGE }}
+        run: bash scripts/ci/pull_image.sh "${{ env.DOCKER_IMAGE }}"
       - name: Check documentation drift
         run: |
           docker run --rm \

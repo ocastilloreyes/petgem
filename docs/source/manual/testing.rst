@@ -98,7 +98,8 @@ Running
    PETGEM_FM_TDCSEM=build/fm.tdcsem pytest tests/tdcsem
 
 A bare ``pytest`` runs everything available. Tests whose toolchain, binary or
-bundle is missing are skipped. Without the ``PETGEM_*`` variables the binaries
+bundle is missing are skipped; with the ``CI`` environment variable set they
+fail instead. Without the ``PETGEM_*`` variables the binaries
 are looked up in ``build/``, the current directory and ``PATH``.
 ``PETGEM_NP`` sets the number of MPI ranks. ``pytest -m "not slow"`` runs
 only the tests that do not start a kernel.

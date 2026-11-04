@@ -5,7 +5,8 @@
   * tests/e2e, tests/mt, tests/im: the built fm.csem / fm.mt / im.csem binaries.
   * tests/mms: the MMS verification program build/mms (`make mms`).
 
-Fixtures whose toolchain or binary is missing call ``pytest.skip``.
+Fixtures whose toolchain or binary is missing call ``pytest.skip``. A skipped
+test is reported as failed when the CI environment variable is set.
 """
 import os
 import sys
@@ -15,6 +16,16 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fmcsem_testlib as lib  # noqa: E402
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    if os.environ.get("CI") and report.skipped and not hasattr(report, "wasxfail"):
+        reason = report.longrepr[2] if isinstance(report.longrepr, tuple) else report.longrepr
+        report.outcome = "failed"
+        report.longrepr = f"skipped test in CI: {reason}"
 
 
 @pytest.fixture(scope="session")
