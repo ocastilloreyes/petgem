@@ -1,0 +1,226 @@
+# =============================================================================== #
+# Docker image builder                                                            #
+# =============================================================================== #
+
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /workspace
+
+# ----------------------------
+# Install system dependencies
+# ----------------------------
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        build-essential \
+        gcc \
+        g++ \
+        gfortran \
+        make \
+        cmake \
+        vim \
+        clang-format \
+        flex \
+        bison \
+        libtool \
+        libtool-bin \
+        git \
+        wget \
+        autoconf \
+        automake \
+        autopoint \
+        pkg-config \
+        gettext \
+        python3 \
+        python3-pip \
+        python3-setuptools \
+        python3-venv \
+        python3-dev \
+        libglu1-mesa \
+        libxcursor1 \
+        libgl1 \
+        libxinerama1 \
+        tzdata \
+        texinfo \
+        doxygen \
+        latexmk \
+        texlive \
+        texlive-latex-base \
+        texlive-latex-extra \
+        texlive-fonts-recommended \
+        dvipng \
+        cm-super \
+        libxft2 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# ----------------------------
+# Python virtual environment
+# ----------------------------
+RUN python3 -m venv /opt/venv
+
+ENV PATH="/opt/venv/bin:${PATH}"
+
+# --------------------------------
+# Install Python packages via pip
+# --------------------------------
+COPY docker/requirements-ci.txt /tmp/requirements-ci.txt
+
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r /tmp/requirements-ci.txt && \
+    rm /tmp/requirements-ci.txt
+
+# ---------------------------
+# PETSc
+# ---------------------------
+ENV PETSC_DIR=/usr/local/petsc
+ENV PETSC_ARCH=arch-linux-c-opt
+
+WORKDIR ${PETSC_DIR}
+
+RUN git clone --branch v3.26.0 --depth 1 \
+    https://gitlab.com/petsc/petsc.git . && \
+    ./configure \
+        --with-cc=gcc \
+        --with-cxx=g++ \
+        --with-fc=gfortran \
+        --download-mpich \
+        --download-fblaslapack \
+        --with-scalar-type=complex \
+        --download-mumps \
+        --download-scalapack \
+        --download-ptscotch \
+        --download-cmake \
+        --with-debugging=0 \
+        --download-hdf5 \
+        --download-triangle \
+        --with-fortran-bindings=0 \
+        --with-64-bit-indices && \
+    make PETSC_DIR=${PETSC_DIR} PETSC_ARCH=${PETSC_ARCH} all && \
+    make check
+
+RUN cd ${PETSC_DIR}/src/binding/petsc4py && \
+    pip install .
+
+ENV PATH="${PETSC_DIR}/${PETSC_ARCH}/bin:${PATH}"
+
+# ---------------------------
+# GMSH
+# ---------------------------
+ENV GMSH_DIR=/usr/local/gmsh
+ENV GMSH_VERSION=4.15.2
+
+RUN mkdir -p ${GMSH_DIR}
+
+WORKDIR /workspace
+
+RUN wget https://gmsh.info/bin/Linux/gmsh-${GMSH_VERSION}-Linux64.tgz && \
+    tar -xf gmsh-${GMSH_VERSION}-Linux64.tgz \
+        -C ${GMSH_DIR} \
+        --strip-components=1 && \
+    rm gmsh-${GMSH_VERSION}-Linux64.tgz
+
+ENV PATH="${GMSH_DIR}/bin:${PATH}"
+
+# ---------------------------
+# Extrae
+# ---------------------------
+ENV EXTRAE_HOME=/usr/local/extrae
+
+RUN mkdir -p \
+    ${EXTRAE_HOME}/libunwind \
+    ${EXTRAE_HOME}/papi \
+    ${EXTRAE_HOME}/libxml2 \
+    ${EXTRAE_HOME}/binutils
+
+# ---------------------------
+# libunwind
+# ---------------------------
+WORKDIR /workspace
+
+RUN git clone -b v1.8.3 \
+    https://github.com/libunwind/libunwind.git && \
+    cd libunwind && \
+    autoreconf -i && \
+    ./configure --prefix=${EXTRAE_HOME}/libunwind && \
+    make -j$(nproc) && \
+    make install
+
+# ---------------------------
+# PAPI
+# ---------------------------
+WORKDIR /workspace
+
+RUN git clone -b papi-7-2-0-t \
+    https://github.com/icl-utk-edu/papi && \
+    cd papi/src && \
+    ./configure \
+        --prefix=${EXTRAE_HOME}/papi \
+        CC=gcc \
+        F77=gfortran && \
+    make -j$(nproc) && \
+    make install
+
+# ---------------------------
+# binutils
+# ---------------------------
+WORKDIR /workspace
+
+RUN wget https://ftpmirror.gnu.org/gnu/binutils/binutils-2.42.tar.gz && \
+    tar -xf binutils-2.42.tar.gz && \
+    cd binutils-2.42 && \
+    ./configure \
+        --prefix=${EXTRAE_HOME}/binutils \
+        --enable-shared \
+        CFLAGS="-g -O2 -Wno-error" \
+        CXXFLAGS="-g -O2 -Wno-error" && \
+    make -j$(nproc) && \
+    make install && \
+    cp libiberty/pic/libiberty.a ${EXTRAE_HOME}/binutils/lib
+
+# ---------------------------
+# libxml2
+# ---------------------------
+WORKDIR /workspace
+
+RUN git clone -b v2.13.0 \
+    https://gitlab.gnome.org/GNOME/libxml2.git && \
+    cd libxml2 && \
+    ./autogen.sh \
+        --prefix=${EXTRAE_HOME}/libxml2 \
+        --without-python && \
+    make -j$(nproc) && \
+    make install
+
+# ---------------------------
+# Extrae
+# ---------------------------
+WORKDIR /workspace
+
+RUN git clone -b 5.0.3 \
+    https://github.com/bsc-performance-tools/extrae.git && \
+    cd extrae && \
+    git submodule update --init --recursive && \
+    autoreconf -f -i && \
+    ./configure \
+        --prefix=${EXTRAE_HOME} \
+        --with-mpi=${PETSC_DIR}/${PETSC_ARCH} \
+        --with-papi=${EXTRAE_HOME}/papi \
+        --with-xml-prefix=${EXTRAE_HOME}/libxml2 \
+        --with-unwind=${EXTRAE_HOME}/libunwind \
+        --with-binutils=${EXTRAE_HOME}/binutils \
+        --without-dyninst && \
+    make -j1 && \
+    make install
+
+# ---------------------------
+# Cleanup
+# ---------------------------
+# PETGEM itself is mounted at run time.
+RUN rm -rf /workspace/*
+
+WORKDIR /workspace
+
+CMD ["bash"]

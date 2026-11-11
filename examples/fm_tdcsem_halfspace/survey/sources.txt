@@ -1,0 +1,2 @@
+# x y z current length dip azimuth: x-directed 1 A.m dipole on the surface
+-1000.0 0.0 0.0 1.0 1.0 0.0 0.0

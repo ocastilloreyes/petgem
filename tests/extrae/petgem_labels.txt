@@ -1,0 +1,13 @@
+EVENT_TYPE
+9   1000    Phase
+VALUES
+1 Initialization
+2 Print-header
+3 Read-params
+4 Setup-source
+5 Import-grid
+6 Setup-grid
+7 Assembly
+8 Solver
+9 Post-processing
+10 Print-footer

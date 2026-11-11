@@ -1,0 +1,13 @@
+# docs/requirements.txt
+#
+# Pinned to compatible major ranges for reproducible Read the Docs builds.
+# Sphinx is capped below 8 by breathe 4.35. Bump these together.
+
+# Sphinx documentation engine
+sphinx>=7,<8
+
+# Read the Docs visual theme
+sphinx-rtd-theme>=2,<3
+
+# Doxygen (XML) -> Sphinx bridge for the C API reference
+breathe>=4.35,<5

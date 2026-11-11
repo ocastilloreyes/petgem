@@ -1,0 +1,15 @@
+# Solver preset: PCBDDC iterative solver (FGMRES on the MATIS operator with the
+# exact Nedelec discrete-gradient coarse space).
+# Usable by BOTH kernels - they read the same unprefixed option keys. Add it
+# after the case config, e.g.:
+#   ../../build/im.csem -options_file configs/params_im.txt    -options_file configs/solver_bddc.txt
+#   ../../build/fm.csem -input_filename outputs/input_fm_f1.h5 -options_file configs/solver_bddc.txt
+#
+# For im.csem this preset governs BOTH the forward and the adjoint solve: the
+# adjoint system A_f.nx = nB uses the same operator, so it reuses the same KSP.
+-dm_mat_type                 is
+-ksp_type                    fgmres
+-pc_type                     bddc
+-pc_bddc_use_deluxe_scaling  1
+-pc_bddc_coarse_pc_type      lu
+-sub_schurs_mat_mumps_icntl_14  80

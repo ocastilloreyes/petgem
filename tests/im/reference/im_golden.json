@@ -1,0 +1,8 @@
+{
+  "max_iter": 2,
+  "rms_history": [16.750628016722164, 15.847341611986968, 5.3215206667957515],
+  "log_perturbation_norm": 15.100634662488732,
+  "convergence_reason": "DIVERGED_MAXITS",
+  "num_iterations": 2,
+  "num_objgrad_evaluations": 3
+}

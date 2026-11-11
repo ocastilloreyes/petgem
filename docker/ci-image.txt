@@ -1,0 +1,1 @@
+ghcr.io/ocastilloreyes/petgem-ci-env@sha256:b5d3b99193d75d3845f82c9c1b5ec00d43052638f2f0d911f2f5e6cbeb0b74b6

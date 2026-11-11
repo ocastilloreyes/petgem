@@ -1,0 +1,44 @@
+BasedOnStyle: LLVM
+
+# Line length
+ColumnLimit: 140
+
+# Function declarations & calls
+BinPackArguments: true               # allow multiple arguments per line if they fit
+BinPackParameters: true              # allow multiple parameters per line if they fit
+AlignAfterOpenBracket: Align
+AllowAllArgumentsOnNextLine: true    # allow all arguments on the next line
+AllowAllParametersOfDeclarationOnNextLine: true  # allow all parameters of a declaration on next line
+AlwaysBreakAfterReturnType: None
+
+# Indentation
+IndentWidth: 2
+ContinuationIndentWidth: 4
+
+# Braces
+BreakBeforeBraces: Attach
+PenaltyBreakBeforeFirstCallParameter: 1
+
+# Pointer & reference style
+PointerAlignment: Right
+
+# Keep readable blocks
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+
+# Alignment
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveMacros: Consecutive
+
+# Includes keep their hand-made grouping
+SortIncludes: Never
+
+# Comments
+AlignTrailingComments: true
+ReflowComments: false
+
+# Function separation
+SeparateDefinitionBlocks: Always
+EmptyLineBeforeAccessModifier: Always

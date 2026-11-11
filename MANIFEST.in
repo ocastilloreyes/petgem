@@ -1,6 +1,0 @@
-include setup*.py *.rst
-include *.py
-
-recursive-include petgem *.py
-recursive-include examples/ *
-recursive-include doc/ *

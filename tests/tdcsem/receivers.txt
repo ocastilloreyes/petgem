@@ -1,0 +1,4 @@
+# x y z (m): inline receivers 1 m below the surface
+200.0 0.0 -1.0
+300.0 0.0 -1.0
+400.0 0.0 -1.0

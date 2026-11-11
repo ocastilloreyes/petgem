@@ -1,0 +1,214 @@
+/*
+ * Filename: grid.h
+ * Author: Octavio Castillo Reyes (UPC/BSC)
+ * Date: 2026-02-03
+ *
+ * Description:
+ * Prototypes for the grid-handling routines used throughout PETGEM,
+ * built on PETSc's DMPlex.
+ */
+
+#ifndef GRID_H
+#define GRID_H
+
+#include "constants.h"
+#include <petsc.h>
+
+/**
+ * @brief Finite-element space descriptor.
+ *
+ * Bundles the fields needed by the fem routines (element matrices,
+ * gradient matrix) so those signatures do not need to carry
+ * order + DOF counts separately.
+ *
+ * DOF-class layout inside the per-cell H(curl) vector (length numDofInCell)
+ * matches PETSc DMPlex's closure-traversal order (cell -> faces -> edges
+ * -> vertices), which is also the order the reference Nedelec basis
+ * (femOrient in src/fem.c) emits its per-cell DOFs in:
+ *   order=1: edges only         [edges 0..5]                       (6)
+ *   order=2: faces-then-edges   [faces 0..7, edges 8..19]           (20)
+ *   order=3: volume-faces-edges [volume 0..2, faces 3..26,
+ *                               edges 27..44]                     (45)
+ *   order=k (>=3) generally: [volume 0..nVol-1, faces nVol..nVol+nFace-1,
+ *                            edges nVol+nFace..numDofInCell-1].
+ * The *Offset fields mark the first index of each class (== numDofInCell
+ * when the class is empty), so loops can iterate `[offset, offset+count)`
+ * without a per-order switch.
+ */
+typedef struct {
+  PetscInt order;          /**< Basis order (1, 2, 3, ...). */
+  PetscInt numDofInCell;   /**< Total H(curl) DOFs per cell. */
+  PetscInt numH1DofInCell; /**< P_order H1 DOFs per cell; column count of the G discrete gradient. */
+
+  /* Per-entity DOF counts */
+  PetscInt numDofPerEdge;   /**< H(curl) DOFs per edge. */
+  PetscInt numDofPerFace;   /**< H(curl) DOFs per face. */
+  PetscInt numDofPerVolume; /**< H(curl) DOFs in the volume (interior). */
+
+  /* Per-class totals (per cell) */
+  PetscInt numEdgeDof;   /**< = NUM_EDGES_PER_CELL * numDofPerEdge. */
+  PetscInt numFaceDof;   /**< = NUM_FACES_PER_CELL * numDofPerFace. */
+  PetscInt numVolumeDof; /**< = numDofPerVolume. */
+
+  /* Offsets into the faces-first layout above */
+  PetscInt faceDofOffset;   /**< First index of the face-DOF class. */
+  PetscInt edgeDofOffset;   /**< First index of the edge-DOF class. */
+  PetscInt volumeDofOffset; /**< First index of the volume-DOF class. */
+} FemSpace;
+
+/**
+ * @brief Boundary condition applied to the H(curl) space on the outer boundary.
+ */
+typedef enum {
+  PETGEM_BC_PEC,    /**< n x E = 0: boundary DOFs constrained (homogeneous Dirichlet). */
+  PETGEM_BC_NATURAL /**< No constraint: boundary data enter through the right-hand side. */
+} PetgemBoundaryCondition;
+
+/**
+ * @brief Mesh statistics, local cell range and FE spaces of a Nedelec grid.
+ */
+typedef struct {
+  PetscInt                numCellsGlobal;    /**< Number of global cells. */
+  PetscInt                numFacesGlobal;    /**< Number of global faces. */
+  PetscInt                numEdgesGlobal;    /**< Number of global edges. */
+  PetscInt                numVerticesGlobal; /**< Number of global vertices. */
+  PetscInt                cellStart;         /**< First local cell. */
+  PetscInt                cellEnd;           /**< One past the last local cell. */
+  DM                      H1dm;              /**< P_order H1 DM: column space of the discrete gradient G. */
+  FemSpace                fem;               /**< H(curl) space descriptor. */
+  PetgemBoundaryCondition bc;                /**< Boundary condition of the H(curl) section. */
+} Grid;
+
+/**
+ * @brief Per-cell geometry, material, and topology working data.
+ */
+typedef struct {
+  PetscReal coordinates[NUM_VERTICES_PER_CELL * NUM_DIMENSIONS]; /**< Vertex coords (4×3). */
+  PetscReal conductivity[NUM_CONDUCTIVITY_COMPONENTS];           /**< Cell conductivity (σx, σy, σz). */
+  PetscInt  materialId;                                          /**< Material id of the cell. */
+  PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS];            /**< Geometric Jacobian. */
+  PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS];         /**< Inverse Jacobian. */
+  PetscReal detJacobian;                                         /**< Jacobian determinant. */
+  PetscReal centroid[NUM_DIMENSIONS];                            /**< Cell centroid (vertex barycenter). */
+} Cell;
+
+/**
+ * @brief Configures a DMPlex object with H(curl) and H1 sections.
+ *
+ * Marks the outer boundary faces in the "Boundary" label (value 100) for every
+ * boundary condition; only PETGEM_BC_PEC constrains their DOFs.
+ *
+ * @param[in]     order   Basis order.
+ * @param[in]     bc      Boundary condition of the H(curl) section.
+ * @param[in,out] dm      DMPlex mesh configured with the FE sections.
+ * @param[out]    grid    Grid struct filled with mesh statistics and FemSpace.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode setupNedelecGrid(PetscInt order, PetgemBoundaryCondition bc, DM *dm, Grid *grid);
+
+/**
+ * @brief Releases the H1 DM owned by a grid.
+ *
+ * @param[in,out] grid  Grid filled by setupNedelecGrid().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode destroyGrid(Grid *grid);
+
+/**
+ * @brief Prints the "Mesh" and "FEM space" sections of the run report.
+ *
+ * @param[in] inputFile  Input bundle path.
+ * @param[in] dm         DMPlex carrying the H(curl) section.
+ * @param[in] grid       Grid filled by setupNedelecGrid().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode logGridSummary(const char *inputFile, const DM dm, const Grid *grid);
+
+/**
+ * @brief Locates the mesh cell containing a given point.
+ *
+ * @param[in]  dm           DMPlex mesh.
+ * @param[in]  position     Query point coordinates (x, y, z).
+ * @param[out] pointInCell  Index of the containing cell on the lowest rank that locates the point, -1 elsewhere.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode locatePoint(const DM dm, const PetscReal *position, PetscInt *pointInCell);
+
+/**
+ * @brief Extracts the vertex coordinates of a given cell.
+ *
+ * @param[in]     dm      DMPlex mesh.
+ * @param[in]     cellId  Cell index.
+ * @param[in,out] cell    Cell whose coordinates field is filled.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode extractCellCoordinates(const DM dm, const PetscInt cellId, Cell *cell);
+
+/**
+ * @brief Extracts the conductivity components of a given cell.
+ *
+ * @param[in]     dmConductivity  DM carrying the conductivity field.
+ * @param[in]     conductivity    Per-cell conductivity Vec.
+ * @param[in]     cellId          Cell index.
+ * @param[in,out] cell            Cell whose conductivity field is filled.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode extractCellConductivity(DM dmConductivity, Vec conductivity, PetscInt cellId, Cell *cell);
+
+/**
+ * @brief Extracts the material id of a given cell.
+ *
+ * @param[in]     dmMaterialsId  DM carrying the material-id field.
+ * @param[in]     materialsId    Per-cell material-id Vec.
+ * @param[in]     cellId         Cell index.
+ * @param[in,out] cell           Cell whose materialId field is filled.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode extractCellMaterialId(DM dmMaterialsId, Vec materialsId, PetscInt cellId, Cell *cell);
+
+/**
+ * @brief Computes the geometric centroid (vertex barycenter) of a cell.
+ *
+ * @param[in,out] cell  Cell whose centroid field is filled.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode computeCellCentroid(Cell *cell);
+
+/**
+ * @brief Returns the local outer-boundary faces of the mesh.
+ *
+ * Faces (depth 2) in stratum 100 of the "Boundary" label created by
+ * setupNedelecGrid.
+ *
+ * @param[in]  dm     DMPlex mesh configured by setupNedelecGrid.
+ * @param[out] faces  Local boundary face points (caller destroys).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode getBoundaryFaces(const DM dm, IS *faces);
+
+/**
+ * @brief Computes the geometry of an outer-boundary face.
+ *
+ * @param[in]  dm        DMPlex mesh.
+ * @param[in]  face      Boundary face point.
+ * @param[out] cell      Cell that owns the face (its single support point).
+ * @param[out] vertices  Face vertex coordinates, in face-closure order.
+ * @param[out] normal    Outward unit normal.
+ * @param[out] area      Face area.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ */
+PetscErrorCode computeBoundaryFaceGeometry(const DM dm, const PetscInt face, PetscInt *cell,
+                                           PetscReal vertices[NUM_VERTICES_PER_FACE][NUM_DIMENSIONS], PetscReal normal[NUM_DIMENSIONS],
+                                           PetscReal *area);
+
+#endif

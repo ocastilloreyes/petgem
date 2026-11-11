@@ -1,0 +1,3 @@
+# t (s)  s(t): step-on reached by a 1 us linear ramp
+0.0     0.0
+1.0e-6  1.0
