@@ -129,7 +129,7 @@ def parse_grid_stats(stdout):
 
     Returns a dict of the numeric fields relevant to assembly verification
     (vertices, edges, faces, cells, DOFs-per-entity, global DOFs). Missing keys
-    are simply absent so callers can assert on what they need.
+    are absent.
     """
     import re
     labels = {

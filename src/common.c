@@ -295,10 +295,9 @@ PetscErrorCode logKvInt(MPI_Comm comm, const char *key, PetscInt val) {
 /**
  * @brief Prints a floating-point key/value entry in the PETGEM run report.
  *
- * Renders the value through formatReal(), so it stays visibly a real: whole
- * values print as "1.0" rather than "1", keeping them distinct from the counts
- * logKvInt() prints. Intended for tolerances, weights, frequencies, physical
- * parameters, and other scalar quantities.
+ * Renders the value through formatReal(): whole values print as "1.0" rather
+ * than "1". Intended for tolerances, weights, frequencies, physical parameters,
+ * and other scalar quantities.
  */
 PetscErrorCode logKvReal(MPI_Comm comm, const char *key, PetscReal val) {
   PetscFunctionBeginUser;

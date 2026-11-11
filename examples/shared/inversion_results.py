@@ -74,13 +74,12 @@ def read_convergence(run_dir):
 
     Files written before ``num_objgrad_evaluations`` existed stored the
     evaluation count in ``num_iterations``; there the step count is
-    unrecoverable, so it is reported as None rather than guessed.
+    unrecoverable, so it is reported as None.
     """
     if h5py is None:
         return (None, None, None, None, None)
     # Identify the result by content, not by name: an inversion result is the
-    # HDF5 in run_dir that carries /rms_history. Matching on "responses_im*.h5"
-    # instead would silently tie -output_filename to a fixed prefix.
+    # HDF5 in run_dir that carries /rms_history.
     hit = None
     for cand in sorted(glob.glob(os.path.join(run_dir, "*.h5"))):
         try:

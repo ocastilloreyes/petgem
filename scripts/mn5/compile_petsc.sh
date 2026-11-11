@@ -24,13 +24,14 @@
 #
 # Notes:
 #   - Run this script on a login node.
+#   - PETSC_BASE is the directory of the PETSc installs (default $HOME/petsc).
 #   - Every path, module list and compiler below can be overridden through
 #     an environment variable of the same name.
 # ============================================================================
 
 set -euo pipefail
 
-PETSC_BASE="${PETSC_BASE:-/gpfs/scratch/bsc115/$USER}"
+PETSC_BASE="${PETSC_BASE:-$HOME/petsc}"
 PETSC_VERSION="${PETSC_VERSION:-3.26.0}"
 SRC="${SRC:-$PETSC_BASE/petsc-v$PETSC_VERSION}"
 PREFIX="${PREFIX:-$SRC/install}"

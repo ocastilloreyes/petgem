@@ -195,9 +195,7 @@ def createDM(numDimensions, cells, coords, dm_view=False):
     s.setFieldName(0, "conductivity")
     s.setFieldName(1, "materials_id")
     s.setUp()
-    # setLocalSection, not setSection: petsc4py carried `setSection` as a
-    # deprecated alias for DMSetLocalSection and PETSc main has now removed it,
-    # so the old name raises AttributeError and no bundle can be built.
+    # setLocalSection: PETSc main removed the deprecated alias `setSection`.
     plex.setLocalSection(s)
 
     return plex
@@ -331,9 +329,8 @@ def writeInversionPayload(filename, observed,
 
     Called after writePetgemInputFile, which already wrote the unified
     /sources group (per-entry frequency) shared by both modes. This adds
-    only the data that has no forward counterpart. Uses h5py to append
-    because /observed/<component> is an HDF5 compound complex128 - easier to
-    express directly than via the PETSc viewer.
+    only the data that has no forward counterpart. Uses h5py to append:
+    /observed/<component> is an HDF5 compound complex128.
 
     Bundle additions:
         /observed/<component>                 (HDF5 compound complex128, one per component)
@@ -451,16 +448,14 @@ def _writeArrayAsVec(viewer, arr, name):
 def _writeVTKFields(cells, coords, conductivity, materials_id, output_vtk):
     """Emit a VTU with two cell-data fields (conductivity, materials_id).
 
-    PETSc's VTK viewer is unsuitable here because:
+    Written with meshio, not with PETSc's VTK viewer:
       * For a plain section-based DMPlex (no PetscFE/FV discretization)
         VecView_Plex_Local_VTK writes the whole Vec as a single multi-
-        component array - materials_id never gets a separate VTK field.
-      * Building per-field sub-DMs and viewing each into a shared VTK
-        viewer trips PetscViewerVTKAddField_VTK's same-DM check
-        ("Refusing to write a field from more than one grid"); there
-        is no petsc4py-level escape hatch for the underlying `checkdm`.
-    meshio is already used to read the Gmsh mesh, so we reuse it here
-    to produce a clean VTU with named cell-data fields. """
+        component array, with no separate materials_id field.
+      * Viewing per-field sub-DMs into a shared VTK viewer trips
+        PetscViewerVTKAddField_VTK's same-DM check
+        ("Refusing to write a field from more than one grid").
+    """
     cells_arr = np.asarray(cells)
     coords_arr = np.asarray(coords)
     mesh_out = meshio.Mesh(
@@ -673,11 +668,11 @@ def _loadXYZText(path):
 def _extractTetraMaterial(mesh, tetra_idx, path):
     """Return the 0-based per-tetra material id from a meshio mesh.
 
-    Two input conventions are supported transparently so the preprocess
-    stage accepts both Gmsh ``.msh`` and VTK ``.vtk``/``.vtu`` meshes:
+    Two input conventions are supported, Gmsh ``.msh`` and VTK
+    ``.vtk``/``.vtu`` meshes:
 
-    * Gmsh: the canonical 1-based ``gmsh:physical`` tag is used as before
-      (``id = tag - 1``), preserving existing behavior exactly.
+    * Gmsh: the canonical 1-based ``gmsh:physical`` tag is used
+      (``id = tag - 1``).
     * VTK: an arbitrary integer cell-data array (auto-detected, commonly
       ``cell_scalars``) carries region codes that need not be contiguous
       or 0-based (e.g. ``{10, 20, 30, 40}``). ``np.unique`` maps the
@@ -706,11 +701,7 @@ def _extractTetraMaterial(mesh, tetra_idx, path):
 
 
 def _require_input_file(path, label, hint=None):
-    """Raise a clear FileNotFoundError when a required input file is missing.
-
-    Used to fail preprocessing up front with an actionable message instead of
-    a raw meshio / numpy / open() traceback deeper in the pipeline.
-    """
+    """Raise FileNotFoundError when a required input file is missing."""
     if not os.path.isfile(path):
         msg = f"{label} not found: '{path}'. Check -case_dir and the filename"
         msg += f" ({hint})." if hint else "."

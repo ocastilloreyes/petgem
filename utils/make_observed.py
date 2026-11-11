@@ -89,9 +89,7 @@ def main():
         fields = {name: np.asarray(r[name], dtype=np.complex128).reshape(-1)
                   for name in ("Ex", "Ey", "Ez", "Hx", "Hy", "Hz")}
         got = float(r["source"]["frequency"])
-        # Guard against stacking a file generated for the wrong frequency:
-        # the row order here IS the frequency axis, so a silent mismatch would
-        # misassign every datum.
+        # The row order is the frequency axis.
         if not np.isclose(got, fr, rtol=1e-9):
             sys.exit(f"ERROR: {fn} holds frequency {got} Hz, expected {fr} Hz.")
         for name in components:

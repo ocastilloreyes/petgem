@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 
-# Check the format of the C sources and the syntax of the Python files.
+# ============================================================================
+# Static checks
+#
+# This script checks the format of the C sources with clang-format and the
+# syntax of the Python files.
 #
 # Usage:
 #   bash scripts/ci/check_static.sh
+# ============================================================================
 
 set -euo pipefail
 

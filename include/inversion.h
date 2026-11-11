@@ -6,8 +6,7 @@
  * Description:
  * Data structures and function prototypes for the CSEM inverse
  * kernel (im.csem). Inversion-specific solver functions are also
- * declared here so that solver.c is kept intact for the forward
- * kernel.
+ * declared here.
  */
 
 #ifndef INVERSION_H
@@ -103,9 +102,7 @@ typedef struct {
   PetscReal diagGradientWeight; /**< Self-weight in the smoother. */
 
   /** RMS-plateau early stop, consumed by the L-BFGS loop (src/lbfgs.c).
-   *  Parsed here with every other im.csem option, rather than read from the
-   *  options database at the point of use, so both appear under -help and can
-   *  be set from the params file. */
+   *  Parsed with every other im.csem option. */
   PetscReal rmsRelTol;      /**< Relative RMS-improvement threshold (0 = off). */
   PetscInt  rmsStallWindow; /**< Consecutive stalled iterations before stopping. */
 

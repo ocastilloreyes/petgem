@@ -25,7 +25,7 @@ convention examples/fm_csem_marine uses: depth is a negative z, z=0 is the inter
 RZ, AZT and AZB are negative (AZT is the shallower, AZB the deeper bound).
 
 RX/RZ/AX/AZT/AZB are read from mesh.geo, which already declares them for
-its refinement fields, so the mask and the refinement can never drift apart.
+its refinement fields.
 
 Run from anywhere; needs gmsh on PATH only for -force:
 
@@ -54,8 +54,8 @@ NAMES = {TAG_AIR: "AIR", TAG_BG: "BG", TAG_INVERT: "INVERT", TAG_ANOMALY: "ANOMA
 def classify(c, k, true_model):
     """Physical tag for a cell centroid c=(x,y,z); z is NEGATIVE down.
 
-    RZ/AZT/AZB carry their sign, so the depth tests read as plain interval
-    checks with the deeper (more negative) bound on the left.
+    RZ/AZT/AZB carry their sign; the deeper (more negative) bound is on the
+    left of the depth tests.
     """
     x, y, z = c
     if z > 0.0:

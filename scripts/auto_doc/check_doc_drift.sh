@@ -13,7 +13,7 @@
 #
 #   2. Doxygen @param names. When doxygen is installed, it fails if a
 #      documented @param no longer matches the function signature. Warnings
-#      about undocumented items are ignored on purpose.
+#      about undocumented items are ignored.
 #
 #   3. Parameter names. It fails if a prototype in include/ names its
 #      parameters differently from the definition in src/.

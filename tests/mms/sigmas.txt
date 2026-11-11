@@ -3,7 +3,7 @@
 # material ("cube", tag 1).
 # Columns: sigma_x sigma_y sigma_z [S/m]
 #
-# ANISOTROPIC ON PURPOSE. The mass matrix fm.csem assembles is
+# ANISOTROPIC. The mass matrix fm.csem assembles is
 #     Me[j][k] = INT (sigma . N_j) . N_k
 # with sigma the diagonal per-cell tensor, so an isotropic conductivity leaves
 # the anisotropic path of the assembly untested. The manufactured forcing

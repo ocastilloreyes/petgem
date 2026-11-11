@@ -41,9 +41,7 @@
  *
  * PETSc encodes ghost DOFs (owned by another rank but reachable through
  * the closure) as `-(global_offset + 1)`, and owned DOFs as the offset
- * itself.  This helper restores the positive global offset uniformly,
- * documenting the convention so the call site doesn't carry the magic
- * `-(g + 1)` formula inline.
+ * itself.  This helper restores the positive global offset uniformly.
  *
  * @param[in] rawIdx Value pulled from the globalIdx[] array.
  *

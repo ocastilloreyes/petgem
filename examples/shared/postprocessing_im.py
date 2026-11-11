@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
-# --------------------------------------------------------------------------
-# postprocessing_im.py - im.csem inversion post-processing.
-#
-# Consumes the outputs/ directory of an inversion example (im_csem_block,
-# im_csem_checkerboard): the result file responses_im_p<order>.h5 and the VTU
-# snapshots in outputs/snapshots/, plus reference/reference_metrics.json for
-# the true bodies. Produces the convergence panel and the model sections, plus
-# a console summary of the model at the plotted iterations.
-#
-# One EPS (and PNG) per panel:
-#
-#   im_rms.eps  im_rms_legend.eps                         RMS per evaluation
-#   im_section_iterNNNN.eps  im_section_colorbar.eps      model section per iteration
-#
-# Encoding: colour = log10 resistivity (CMAP_RHO), dashed outline = true body,
-# dotted line = target RMS (black) and RMS of the true model (gray).
-#
-# Usage (optionally write the panels somewhere else, e.g. docs/source/_static):
-#   python3 examples/shared/postprocessing_im.py examples/im_csem_block
-#   python3 examples/shared/postprocessing_im.py examples/im_csem_checkerboard ../figures
-# --------------------------------------------------------------------------
+"""im.csem inversion post-processing.
+
+Consumes the outputs/ directory of an inversion example (im_csem_block,
+im_csem_checkerboard): the result file responses_im_p<order>.h5 and the VTU
+snapshots in outputs/snapshots/, plus reference/reference_metrics.json for
+the true bodies. Produces the convergence panel and the model sections, plus
+a console summary of the model at the plotted iterations.
+
+One EPS (and PNG) per panel:
+
+  im_rms.eps  im_rms_legend.eps                         RMS per evaluation
+  im_section_iterNNNN.eps  im_section_colorbar.eps      model section per iteration
+
+Encoding: colour = log10 resistivity (CMAP_RHO), dashed outline = true body,
+dotted line = target RMS (black) and RMS of the true model (gray).
+
+Usage (optionally write the panels somewhere else, e.g. docs/source/_static):
+  python3 examples/shared/postprocessing_im.py examples/im_csem_block
+  python3 examples/shared/postprocessing_im.py examples/im_csem_checkerboard ../figures
+"""
 import glob
 import json
 import os
@@ -41,7 +40,7 @@ matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['font.family'] = 'Serif'
 matplotlib.rcParams['font.size'] = SIZE_FONT
 COLORS_FIELDS = ['#E41A1C', '#377EB8', '#4DAF4A', '#984EA3', '#FF7F00', '#FFFF33', '#A65628']
-FIG_SIZE_PANEL = (4.5, 3.5)             # one panel, as in postprocessing_oc.py
+FIG_SIZE_PANEL = (4.5, 3.5)             # one panel
 FIG_SIZE_LEGEND = (9.0, 0.6)            # legend strip, width of a two-panel row
 DPI_EPS = 1200
 DPI_PNG = 150
@@ -146,7 +145,7 @@ def volume(verts):
 
 
 def panel():
-    """A single-axes figure of the size of one postprocessing_oc.py panel."""
+    """A single-axes figure of the size of one panel."""
     return plt.subplots(figsize=FIG_SIZE_PANEL, constrained_layout=True)
 
 

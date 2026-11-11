@@ -6,13 +6,9 @@
  * Description:
  * Manufactured solution for the Method-of-Manufactured-Solutions (MMS)
  * order-of-accuracy verification of the PETGEM high-order Nedelec
- * discretization. This header is the C-side single source of truth for the
- * exact field, its curl and the manufactured forcing; it is consumed by the
- * MMS verification program (tests/mms/mms.c).
- *
- * It mirrors, symbol for symbol, data/test1/mms_reference.py.
- * data/test1/verify_c_reference.sh compiles data/test1/mms_c_check.c against
- * THIS header and diffs the result against the Python reference.
+ * discretization. This header defines the exact field, its curl and the
+ * manufactured forcing; it is consumed by the MMS verification program
+ * (tests/mms/mms.c).
  *
  * PROBLEM VERIFIED. The operator fm.csem assembles
  * (src/fem.c::femElementalMatrix, src/assembly.c::assembleMaxwellOperator) is:
@@ -54,12 +50,8 @@
  *     rho = 2 k^2 / (omega mu0 sigma_ref) = 1
  *     nu  = omega mu0 sigma_ref L^2       = 8 pi^2 = 79.0
  *
- * MMS_L is duplicated in data/test1/mesh.geo and data/test1/mms_reference.py;
- * runMmsVerification checks it against the mesh bounding box at start-up and
- * aborts on a mismatch.
- *
- * See data/test1/README.md for the design, the convergence rates and the
- * verification protocol.
+ * MMS_L is duplicated in tests/mms/mesh.geo; runMmsVerification checks it
+ * against the mesh bounding box at start-up and aborts on a mismatch.
  */
 
 #ifndef MMS_H
@@ -68,7 +60,7 @@
 #include "constants.h" /* MU, NUM_DIMENSIONS */
 #include <petsc.h>
 
-/* --- design point (must match data/test1/mesh.geo and mms_reference.py) --- */
+/* --- design point (must match tests/mms/mesh.geo) --- */
 #define MMS_L    1000.0                        /**< Edge length of the cubic domain [0,L]^3 [m].     */
 #define MMS_MODE 2                             /**< Mode number m; k = m pi / L.                     */
 #define MMS_K    (MMS_MODE * PETSC_PI / MMS_L) /**< Manufactured wavenumber.  */

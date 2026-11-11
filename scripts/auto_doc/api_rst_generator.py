@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Write the Sphinx/Breathe pages of the C API reference, plus an index.
 
 Public headers in include/ are grouped into the pages listed in PAGES.

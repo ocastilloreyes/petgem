@@ -178,9 +178,9 @@ static PetscErrorCode createPlainCopy(Vec src, const char *name, Vec *out) {
  * optional CLI overrides for optimization, regularization, diagnostics,
  * and debugging behavior.
  *
- * The FEM basis order (-order) is optional. The bundled HDF5 input is
- * the primary source of truth, and its value is later propagated into
- * the inversion parameters after loadModelInputs. A CLI-provided -order
+ * The FEM basis order (-order) is optional. The value of the bundled
+ * HDF5 input is propagated into the inversion parameters after
+ * loadModelInputs. A CLI-provided -order
  * overrides the bundled value. A value of 0 means "not overridden".
  *
  * The routine also initializes defaults for L-BFGS settings, Tikhonov
@@ -272,7 +272,7 @@ PetscErrorCode readImParams(ImParams *imParams) {
   }
   PetscOptionsEnd();
 
-  /* A -help run has now printed the inversion option group; skip validation and the parameter summary so usage prints cleanly. The caller
+  /* A -help run has now printed the inversion option group; skip validation and the parameter summary. The caller
    * (runInverse) exits right after parsing. */
   {
     PetscBool helpRequested = PETSC_FALSE;

@@ -38,5 +38,7 @@
 #   - Requires numpy, h5py and petsc4py (all in petgem-env).
 # ============================================================================
 
+set -euo pipefail
+
 SEED=20260922
 CASE_DIR=examples/im_csem_checkerboard SEED="${SEED}" exec bash examples/shared/inversion_observations.sh "$@"

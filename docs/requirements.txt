@@ -1,9 +1,7 @@
 # docs/requirements.txt
 #
 # Pinned to compatible major ranges for reproducible Read the Docs builds.
-# Sphinx is capped below 8 because breathe 4.35 does not yet support
-# Sphinx 8 (it emits RemovedInSphinx80Warning today and would break once
-# Sphinx 8 lands). Re-test and bump these together when upgrading.
+# Sphinx is capped below 8 by breathe 4.35. Bump these together.
 
 # Sphinx documentation engine
 sphinx>=7,<8

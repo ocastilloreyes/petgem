@@ -1,0 +1,30 @@
+# Create the release of the version in include/version.h on a merge into master.
+# ci.yml checks the version on the pull request. A version already released is
+# left as it is.
+name: PETGEM Release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(bash scripts/ci/version_tag.sh)"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" > /dev/null; then
+            echo "Release ${tag} already exists"
+            exit 0
+          fi
+          gh release create "${tag}" --target "${GITHUB_SHA}" --title "PETGEM Release ${tag}" --generate-notes

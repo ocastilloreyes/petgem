@@ -20,7 +20,7 @@
 * PetscSection (src/grid.c), so NO nonzero-BC code path is needed and the
 * verification runs on the production assembly and solve. On a centered cube
 * [-L/2,L/2]^3 this trace is NOT zero and the test is invalid: do not move or
-* rescale the domain without changing E* (see mms_reference.py).
+* rescale the domain without changing E*.
 *
 * WHY L = 1000 m AT f = 10 Hz. With sigma_ref = 1 S/m the skin depth is
 * delta = sqrt(2/(w mu0 sigma)) = 159.155 m = L/(m pi), so with m = 2 the
@@ -34,24 +34,23 @@
 * much smaller than the skin depth (nu -> 0) drives kappa up and the measured
 * slopes report the arithmetic floor kappa*eps instead of the discretization
 * error. On the unit cube at the same frequency nu = 7.9e-5, a factor 1e6
-* worse. L is duplicated in tests/mms/mms.h (MMS_L) and mms_reference.py (L):
-* keep the three in step.
+* worse. L is duplicated in tests/mms/mms.h (MMS_L).
 *
 * CONVERGENCE SEQUENCE: regenerate this mesh for several N to get a family of
 * refined meshes with EXACT, KNOWN size h = L/N, e.g.
 *       gmsh -3 -setnumber N 4  -o mesh_N4.msh  mesh.geo
 *       gmsh -3 -setnumber N 8  -o mesh_N8.msh  mesh.geo
 *       gmsh -3 -setnumber N 16 -o mesh_N16.msh mesh.geo
-* The per-order lists used by job_marenostrum.slurm are
+* The per-order lists are
 *       p=1: 16 24 32 48    p=2: 8 12 16 24    p=3: 6 8 12 16
 *       p=4:  4  6  8 12    p=5: 4  6  8 10    p=6: 4 6  8 10
-* which keep every run under ~7.6e5 DOFs (see mms_reference.py --design).
+* which keep every run under ~7.6e5 DOFs.
 *
 * Since lambda = 2L/m = L here, N is also the number of elements per
 * manufactured wavelength.
 *
 * Structured transfinite meshing keeps the node layout DETERMINISTIC and the
-* tetrahedra uniform, so the measured slopes are clean and reproducible.
+* tetrahedra uniform, so the measured slopes are reproducible.
 * N divisions per edge -> (N+1)^3 vertices and 6*N^3 tetrahedra.
 *
 * by the PETGEM team (http://petgem.bsc.es/)
@@ -66,8 +65,8 @@ If(!Exists(N))
 EndIf
 
 // Edge length of the domain [0,L]^3 in metres.
-// MUST match MMS_L in tests/mms/mms.h and L in mms_reference.py;
-// runMMSVerification checks it against the mesh bounding box and aborts on a mismatch.
+// MUST match MMS_L in tests/mms/mms.h;
+// runMmsVerification checks it against the mesh bounding box and aborts on a mismatch.
 L = 1000.0;
 
 // #################################################################

@@ -144,8 +144,7 @@ PetscErrorCode createRhsMatrix(const Vec b, const PetscInt numRhs, Mat *B) {
  * Laplacian, whose only kernel is the constant field) via a PETSc GMRES Arnoldi
  * cycle with PC=none, so the Ritz values are those of H itself. For a connected
  * mesh the expected spectrum is one numerically-zero eigenvalue and the rest
- * strictly positive: rank(G) = N-1. Ported from the legacy KG_validation.c
- * battery; used by reportGradientValidation under -petgem_validate_gradient.
+ * strictly positive: rank(G) = N-1. Used by reportGradientValidation under -petgem_validate_gradient.
  *
  * @param[in] comm  Communicator for the collective solve.
  * @param[in] G     Discrete gradient matrix.
@@ -229,8 +228,8 @@ static PetscErrorCode gradientRankTestEig(MPI_Comm comm, Mat G) {
  * field), so boundary edge dofs are removed; the H1 column space has no BC, so
  * every vertex/edge/face nodal dof is a column of G. The gradient of a boundary
  * H1 dof is therefore truncated and pollutes the raw K·G product. Scaling G's
- * columns by this mask isolates the BC-consistent interior residual. Ported from
- * KG_validation.c; the "Boundary" stratum id (100) matches setupNedelecGrid.
+ * columns by this mask isolates the BC-consistent interior residual. The
+ * "Boundary" stratum id (100) matches setupNedelecGrid.
  *
  * @param[in]  dm               H(curl) DMPlex (source of the "Boundary" label).
  * @param[in]  grid             Grid descriptor (grid.H1dm supplies the section).

@@ -8,8 +8,7 @@
 # distribution name `petgem` (see tests/conftest.py). Make both importable for
 # autodoc, and stand in lightweight mocks for the heavy runtime dependencies
 # that are not installed in the docs build environment (Read the Docs has no
-# PETSc/HDF5). Mocks are used ONLY when the real module is unavailable, so a
-# local build with the full stack keeps the real packages.
+# PETSc/HDF5). A mock is used only when the real module is unavailable.
 import importlib
 import os
 import sys

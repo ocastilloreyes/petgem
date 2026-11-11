@@ -38,8 +38,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import functions as petgem  # noqa: E402
 
 
-# Default case dir = the example root (this script lives in <case>/scripts/),
-# so callers running it directly never need to repeat that path with -case_dir.
+# Default case dir = the example root (this script lives in <case>/scripts/).
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CASE_DIR = os.path.dirname(SCRIPT_DIR)
 CASE_NAME = os.path.basename(CASE_DIR)
@@ -71,8 +70,8 @@ def main():
     order      = bundle['order']
     x_coords  = bundle['receivers'][:, 0]
 
-    # Responses default to the fixed outputs/responses_p<order>.h5 convention,
-    # so a bare run needs no -responses_filename; the order comes from the bundle.
+    # Responses default to outputs/responses_p<order>.h5; the order comes from
+    # the bundle.
     responses_name = args.responses_filename or f"outputs/responses_p{order}.h5"
     responses_path = os.path.join(args.case_dir, responses_name)
     responses = petgem.readResponses(responses_path)

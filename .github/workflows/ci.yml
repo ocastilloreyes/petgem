@@ -3,6 +3,7 @@
 #   changes -> static
 #           -> build -> test (one job per suite)   -> ci-ok
 #           -> docs
+#           -> release-check (pull requests to master)
 #
 # The static and test jobs run scripts/ci/, the same commands as a local run.
 # docker/ci-image.txt selects the CI image. ci-ok is the only check required by
@@ -165,9 +166,29 @@ jobs:
       - name: Build the documentation (warnings are errors)
         run: python -m sphinx -W --keep-going -b html docs/source docs/build/html
 
+  release-check:
+    needs: changes
+    if: github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: ${{ needs.changes.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the release version
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/ci/check_release.sh
+      - name: Build with Extrae
+        run: make -j2 USE_EXTRAE=1 all
+      - name: Install the Python package
+        run: |
+          pip install --no-deps --editable .
+          cd /tmp
+          python3 -c "import petgem; print(petgem.__version__)"
+
   # Fails unless every job above succeeded or was not selected.
   ci-ok:
-    needs: [changes, static, build, test, docs]
+    needs: [changes, static, build, test, docs, release-check]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

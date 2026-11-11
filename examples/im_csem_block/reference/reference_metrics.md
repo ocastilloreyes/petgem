@@ -36,7 +36,7 @@ RMS ≈ 1 for the true model confirms the observed data lies exactly one
 noise-level away from the truth - i.e. the noise model is statistically
 consistent with how the inversion weights the misfit. The value is computed by
 `utils/make_observed.py` and stored as the `rms_true_model` attribute of
-`observed.h5`, so it is checkable rather than nominal.
+`observed.h5`.
 
 ## Convergence
 

@@ -111,8 +111,8 @@ Breathe; the Python API with autodoc.
 
 ``make docs`` runs ``scripts/auto_doc/prepare_docs.sh`` (clean, Doxygen XML,
 API ``.rst`` generation) and then Sphinx. Read the Docs runs the same script as
-its ``pre_build`` job, so the local and hosted builds stay in step. The
-generated ``docs/source/api/`` pages are not committed.
+its ``pre_build`` job. The generated ``docs/source/api/`` pages are not
+committed.
 
 Every option, path and function named in the pages must exist in the code.
 
@@ -131,6 +131,17 @@ edit ``docker/Dockerfile`` or ``docker/requirements-ci.txt``. ``image.yml``
 builds and publishes the new image and reports its reference in the job summary.
 Write that reference to ``docker/ci-image.txt``: the push runs every suite on
 the new image.
+
+Releases
+--------
+Work is pushed to ``develop``. A release is a pull request from ``develop`` to
+``master``:
+
+#. Raise the version in ``include/version.h``.
+#. Open the pull request. The CI runs every job, checks that the version is
+   greater than every tag, builds with Extrae and installs the Python package.
+#. Merge when ``ci-ok`` passes. ``release.yml`` creates the tag and the GitHub
+   release of that version.
 
 Testing
 -------

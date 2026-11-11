@@ -61,7 +61,7 @@ int printVersion(void);
 /**
  * @brief Initializes PETSc, registers the phase stages and prints the header.
  *
- * The header is skipped under -help, so the option listing prints cleanly.
+ * The header is skipped under -help.
  *
  * @param[in,out] argc         Argument count from main().
  * @param[in,out] argv         Argument vector from main().

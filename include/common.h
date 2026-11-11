@@ -73,13 +73,12 @@ const char *formatGroupedInt(PetscInt value);
  *
  * Renders `value` with %g-like significant-digit behavior, then guarantees the
  * result still reads as floating point: a whole value gains a ".0" (1 -> "1.0",
- * -4000 -> "-4000.0") so it cannot be mistaken for a count, while values that
+ * -4000 -> "-4000.0"), while values that
  * already carry a fractional part or an exponent are left as they are ("2.1",
  * "0.01", "1e-08").
  *
  * Use this for physical quantities - frequencies, coordinates, tolerances - and
- * formatGroupedInt() for cardinalities such as cell or receiver counts, so the
- * two are distinguishable at a glance in the report.
+ * formatGroupedInt() for cardinalities such as cell or receiver counts.
  *
  * Uses rotating static buffers (not thread-safe), matching formatGroupedInt().
  *

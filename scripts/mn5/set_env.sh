@@ -9,10 +9,13 @@
 #   source set_env.sh                                  # petsc-current
 #   PETSC_VERSION=3.26.0 source set_env.sh             # a specific version
 #   PETSC_PREFIX=/path/to/install source set_env.sh    # a specific install
+#
+# Notes:
+#   - PETSC_BASE is the directory of the PETSc installs (default $HOME/petsc).
 # ============================================================================
 
 # Locate the petgem_env.sh to load.
-_root="${PETSC_BASE:-/gpfs/scratch/bsc115/$USER}"
+_root="${PETSC_BASE:-$HOME/petsc}"
 if [ -n "${PETSC_PREFIX:-}" ]; then
   _env="$PETSC_PREFIX/petgem_env.sh"
 elif [ -n "${PETSC_VERSION:-}" ]; then

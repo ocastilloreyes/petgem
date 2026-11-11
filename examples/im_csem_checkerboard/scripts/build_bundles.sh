@@ -29,10 +29,12 @@
 #
 # Notes:
 #   - Requires numpy, meshio, h5py and petsc4py (all in petgem-env).
-#   - No observed dataset is shipped. The benchmark is meant to be run end to
-#     end, so the inversion always uses the observations of the current run.
+#   - No observed dataset is shipped. The inversion uses the observations of
+#     the current run.
 #   - Set OBSERVED=<path>, relative to the case directory, to use another
 #     observations file.
 # ============================================================================
+
+set -euo pipefail
 
 CASE_DIR=examples/im_csem_checkerboard exec bash examples/shared/inversion_bundles.sh "$@"

@@ -164,8 +164,8 @@ PetscErrorCode readPetgemParams(PetgemParams *params) {
   PetscBool helpRequested                      = PETSC_FALSE;
   PetscInt  order                              = 0;
 
-  /* When the user runs with -help / -help intro, the option blocks below are registered (so PETSc documents them), but the mandatory-argument checks
-   * are skipped so a help run prints usage cleanly instead of aborting on a missing -input_filename. The caller exits after parsing in that case. */
+  /* With -help / -help intro, the option blocks below are registered and the mandatory-argument checks are skipped. The caller exits after parsing in
+   * that case. */
   PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
 
   /* Two PetscOptionsBegin/End groups so `-help` renders a clean "required" vs
@@ -192,7 +192,7 @@ PetscErrorCode readPetgemParams(PetgemParams *params) {
 
   PetscOptionsEnd();
 
-  /* Both option groups have now been printed under -help; skip argument enforcement and model/directory setup so usage prints cleanly. The
+  /* Both option groups have now been printed under -help; skip argument enforcement and model/directory setup. The
    * caller (runForward / runInverse) exits right after parsing. */
   if (helpRequested) {
     PetscFunctionReturn(PETSC_SUCCESS);
@@ -333,8 +333,7 @@ static PetscErrorCode loadOrderAndReceivers(PetgemParams *params, Vec *receivers
   PetscViewer viewer;
   PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, params->inputFile, FILE_MODE_READ, &viewer));
 
-  /* /order - single-element Vec. Bundle is the source of truth unless the caller explicitly set -order on the command line 
-  * (params->order non-zero at entry). */
+  /* /order - single-element Vec. Read from the bundle unless -order was set on the command line (params->order non-zero at entry). */
   if (params->order <= 0) {
     Vec                orderV;
     const PetscScalar *nArr;

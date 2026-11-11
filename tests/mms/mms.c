@@ -18,8 +18,7 @@
  * The energy norm is the one the operator induces; Cea quasi-optimality holds
  * in it with the constant sqrt(2), independent of h, p, omega and sigma. Both
  * norms converge as O(h^p) for the first-kind Nedelec family of degree p, and
- * as O(Ndof^(-p/3)) against the unknown count. See data/test1/README.md for the
- * design, the theory and the post-processing protocol.
+ * as O(Ndof^(-p/3)) against the unknown count.
  *
  * Three levels, selected by runtime flags:
  *   (default)            Level 1 (standard): one run performs the Galerkin
@@ -68,8 +67,8 @@
  * @brief Relative tolerance on the mesh bounding box against MMS_L.
  *
  * The manufactured field is tied to the corner-at-origin cube [0,MMS_L]^3: on
- * any other domain n x E* != 0 on the boundary. A loose tolerance suffices,
- * since this guards against a different mesh, not round-off in the coordinates.
+ * any other domain n x E* != 0 on the boundary. The tolerance detects a
+ * different mesh, not round-off in the coordinates.
  */
 #define MMS_DOMAIN_TOL 1.0e-6
 
@@ -93,7 +92,7 @@ static PetscErrorCode mmsCheckDomain(const DM dm) {
                PETSC_ERR_ARG_WRONG,
                "MMS: mesh is not the cube [0,%g]^3 the manufactured solution assumes "
                "(axis %" PetscInt_FMT " spans [%g,%g]). n x E* = 0 holds only on that "
-               "domain; use data/test1/mesh.geo or change MMS_L in tests/mms/mms.h.",
+               "domain; use tests/mms/mesh.geo or change MMS_L in tests/mms/mms.h.",
                (double)MMS_L, d, (double)bbmin[d], (double)bbmax[d]);
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -521,8 +520,7 @@ static PetscErrorCode mmsAssembleSolve(const PetscReal omega, const DM dm, const
  *
  * Creates {dir}/{fname}.h5 and stores all MMS measurements as root-group
  * HDF5 attributes, together with PETGEM version and execution-date provenance
- * information. One file corresponds to one MMS run; data/test1/postprocessing_mms.py
- * reads a whole directory of them.
+ * information. One file corresponds to one MMS run.
  *
  * All numerical values are assumed to be globally reduced before the call. The
  * operation is collective on the supplied communicator.
@@ -574,8 +572,7 @@ static PetscErrorCode mmsWriteH5(MPI_Comm comm, const char *dir, const char *fna
   PetscCall(PetscViewerHDF5WriteAttribute(v, NULL, "solve_energy_hi", PETSC_REAL, &solveEnergyhi));
   PetscCall(PetscViewerHDF5WriteAttribute(v, NULL, "forcing_complete", PETSC_INT, &forcingComplete));
 
-  /* Provenance of the manufactured solution, so a result file records the
-   * design point it was produced under. */
+  /* Provenance of the manufactured solution: the design point of the run. */
   {
     PetscReal Lref = MMS_L;
     PetscInt  mode = MMS_MODE;

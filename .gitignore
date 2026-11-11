@@ -17,11 +17,6 @@ examples/*/outputs/
 
 # Local working directories, kept out of the distribution
 data/
-td_fm_csem_paper/
-electric_field_formulations_comparative_paper/
-PID26
-paper_inversion/
-mt_tenerife
 petgem-env.sif
 
 # Run-time artifacts dropped at the repo root

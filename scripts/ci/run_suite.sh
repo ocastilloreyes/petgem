@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
 
-# Build the input of one test suite and run it, as the CI does. The binaries
-# must be in build/ (make all mms). A skipped test is reported as failed.
+# ============================================================================
+# Test suite
+#
+# This script builds the input of one test suite and runs it, as the CI does.
 #
 # Usage:
 #   bash scripts/ci/run_suite.sh <unit|e2e|mms|mt|im|tdcsem>
+#
+# Required input:
+#   build/ binaries (make all mms)
+#
+# Generated output:
+#   build/reports/<suite>.xml
+#
+# Notes:
+#   - A skipped test is reported as failed.
+# ============================================================================
 
 set -euo pipefail
 

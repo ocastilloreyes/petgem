@@ -112,7 +112,7 @@ def main():
     print(f"    conductor centroid= ({rc[0]:.0f}, {rc[1]:.0f}, {rc[2]:.0f})")
     print(f"    lateral offset    = {lat_off:.1f} m")
     # z is negative down, so a positive offset means the recovered body sits
-    # shallower than the truth. Spelled out because the sign alone is ambiguous.
+    # shallower than the truth.
     print(f"    vertical offset   = {ver_off:+.1f} m"
           f"  ({'shallower' if ver_off > 0 else 'deeper'} than true)")
     print(f"    conductor volume  = {cond_vol:.3e} m^3  (rho < {thr:g} ohm.m)")

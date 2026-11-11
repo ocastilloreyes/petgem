@@ -40,9 +40,7 @@ all: $(TARGET)
 # -----------------------------------------------------------------------------
 # Include PETSc-provided makefile configuration
 # -----------------------------------------------------------------------------
-# Fail with a clear message instead of the cryptic
-#   "Makefile:NN: <dir>/lib/petsc/conf/variables: No such file or directory"
-# that make would otherwise emit when PETSC_DIR is unset or wrong.
+# Stop when PETSC_DIR is unset or wrong.
 ifeq ($(wildcard $(PETSC_DIR)/lib/petsc/conf/variables),)
   $(error PETSC_DIR is unset or invalid (got '$(PETSC_DIR)'). \
     Point it at a PETSc install, e.g.  make PETSC_DIR=/path/to/petsc PETSC_ARCH=arch-...)
@@ -66,11 +64,10 @@ INTEL_DETECTED := $(filter icc% icx% icpc% icpx%,$(PCC_NAME))$(findstring mpiicc
 USE_INTEL ?= $(if $(INTEL_DETECTED),1,0)
 
 ifeq ($(USE_INTEL), 1)
-    # Silence icc diagnostics that are noise rather than signal:
+    # Silence icc diagnostics:
     #   10441 = "ICC is deprecated" remark
     #   10148 = "-Wpedantic not supported" (PETSc's $(CLINKER) inherits
-    #           -Wpedantic from PETSc's own configure-time flags; we
-    #           cannot easily strip it, so we silence the warning).
+    #           -Wpedantic from PETSc's own configure-time flags).
     #   11074 = "Inlining inhibited by limit max-size / max-total-size"
     #           - informational IPO remark fired on the largest TUs.
     #   11076 = "To get full report use -qopt-report=4 -qopt-report-phase ipo"
@@ -203,10 +200,9 @@ $(OBJDIR):
 
 # Per-object compile rules, generated one-per-object so each can show its
 # own "[i/N]" progress index (baked in at parse time -> parallel-safe; no
-# runtime counter state). We invoke $(CC) directly instead of PETSc's
-# $(PETSC_COMPILE_SINGLE) because the latter injects a baked-in `-o<stem>.o`,
-# which icc flags as a duplicate (#10122). PETSC_CC_INCLUDES is already part
-# of BASE_CFLAGS, so this has everything it needs.
+# runtime counter state). $(CC) is invoked directly: PETSc's
+# $(PETSC_COMPILE_SINGLE) injects a baked-in `-o<stem>.o`, which icc flags as a
+# duplicate (#10122). PETSC_CC_INCLUDES is part of BASE_CFLAGS.
 # $(1) = object path, $(2) = 1-based index baked into the progress label
 define _emit_cc_rule
 $(1): $(patsubst $(OBJDIR)/%.o,src/%.c,$(1)) | $(OBJDIR) _preamble

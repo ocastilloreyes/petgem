@@ -297,10 +297,7 @@ Both converge as :math:`O(h^p)` for the first-kind Nédélec family of degree
 quadrature rule, and ``-mms_drop_mass`` runs a negative control in which the
 forcing is incomplete and the error does not converge.
 
-The definitions live in ``tests/mms/mms.h`` and are mirrored in
-``data/test1/mms_reference.py``. ``data/test1/verify_c_reference.sh`` checks the
-two against each other. See ``data/test1/README.md`` for the design and the
-verification protocol, and :doc:`testing`.
+The definitions live in ``tests/mms/mms.h``. See :doc:`testing`.
 
 .. _Castillo-Reyes et al. (2022): https://doi.org/10.1016/j.cageo.2021.105030
 .. _Cai et al. (2017): https://doi.org/10.1016/j.jappgeo.2017.08.005

@@ -70,8 +70,7 @@ echo "Loading environment from:  ${ENV_FILE}"
 
 source "${ENV_FILE}"
 
-# Only the input and output paths change with the frequency, so they are
-# passed here instead of keeping one options file per frequency.
+# Only the input and output paths change with the frequency.
 srun --cpu-bind=core "${EXECUTABLE}" \
     -input_filename   "outputs/input_fm_f${FREQ}.h5" \
     -output_dir       "outputs/" \

@@ -77,7 +77,7 @@ RMS ≈ 1 for the true model confirms the observed data lies exactly one
 noise-level away from the truth - i.e. the noise model is statistically
 consistent with how the inversion weights the misfit. The value is computed by
 `utils/make_observed.py` and stored as the `rms_true_model` attribute of
-`observed.h5`, so it is checkable rather than nominal.
+`observed.h5`.
 
 ## Inversion configuration
 
@@ -127,8 +127,8 @@ recovered model holds air at 1e8 and BG at 100.0000 exactly.
 Definitions, as the analyzer computes them. **"Peak"** is the extremum of cell
 resistivity inside the body's quadrant - the minimum for a conductor, the
 maximum for a resistor - a single-cell value. **"Mean"** is the volume-weighted geometric
-mean over the true body box and is what actually describes the body, so it is
-the quantity the amplitude tolerance is set on. **"Contrast"** is the fraction
+mean over the true body box and is the quantity the amplitude tolerance is set
+on. **"Contrast"** is the fraction
 of the true |log₁₀(ρ_body/ρ_background)| that the mean represents. The centroid
 is weighted by cell volume × contrast (1/ρ for a conductor, ρ for a resistor)
 over the cells that cross the detection threshold (ρ < 30 Ω·m for a conductor,

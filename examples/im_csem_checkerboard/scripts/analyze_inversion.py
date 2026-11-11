@@ -106,9 +106,8 @@ def _body_metrics(body, cx, cy, cz, rho, vol, earth, thr_cond, thr_res):
 
     r = rho[search]
     out["peak"] = float(r.max() if resistor else r.min())
-    # Volume-weighted geometric mean over the TRUE body box. Unlike the peak -
-    # a single-cell extremum that can overshoot past the true value - this is
-    # what actually describes the body, so it carries the amplitude tolerance.
+    # Volume-weighted geometric mean over the TRUE body box. It carries the
+    # amplitude tolerance; the peak is a single-cell extremum.
     out["mean"] = float(10.0 ** np.average(np.log10(rho[truth]),
                                            weights=vol[truth])) if truth.any() else np.nan
     hit = search & ((rho > thr_res) if resistor else (rho < thr_cond))
@@ -203,8 +202,7 @@ def main():
               f"{result['lat_off']:8.1f}  {result['ver_off']:+9.1f}  "
               f"{result['volume']:10.3e}  {result['frac_box']*100:5.0f}%")
     # z is negative down, so a positive vertical offset means the recovered
-    # body sits shallower than the truth. Spelled out because the sign alone
-    # is ambiguous.
+    # body sits shallower than the truth.
     print("    (vertical offset > 0 = recovered shallower than true; z is negative down)")
     print("    (peak = single-cell extremum in the quadrant; mean = volume-weighted "
           "over the true box)")

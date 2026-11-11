@@ -199,10 +199,8 @@ PetscErrorCode getSolverName(KSP ksp, char name[], size_t len) {
  *
  * buildHighSigmaPrimalIs emits indices taken from the DM's GLOBAL section, on
  * the assumption that they coincide with the global row numbering of the MATIS
- * operator handed to PCBDDC. If that assumption is wrong the set is not merely
- * incomplete, it is a list of the WRONG dofs, and PCBDDC would dutifully make
- * those primal - which looks like the fix under-performing rather than like a
- * numbering bug.
+ * operator handed to PCBDDC. If that assumption is wrong the set lists the wrong
+ * dofs, and PCBDDC makes those primal.
  *
  * The conductivity enters the operator through the mass term, so a dof inside a
  * conductor carries a diagonal larger than an ordinary one by roughly the
@@ -322,8 +320,7 @@ static PetscErrorCode buildHighSigmaPrimalIs(const DM dm, const Vec conductivity
    * skipped here on the assumption that the owning rank lists them - which
    * holds only if that rank also has a high-sigma cell on this dof. Where the
    * conductor BOUNDARY falls on the subdomain interface it does not, and the
-   * dof is then listed by nobody. Counted so the size of that hole is visible
-   * instead of assumed. */
+   * dof is then listed by nobody. nforeign counts these dofs. */
   PetscInt nforeign = 0;
 
   PetscCall(VecGetDM(conductivity, &dmConductivity));
@@ -391,14 +388,11 @@ static PetscErrorCode buildHighSigmaPrimalIs(const DM dm, const Vec conductivity
   PetscCall(ISCreateGeneral(PetscObjectComm((PetscObject)dm), nsel, sel, PETSC_COPY_VALUES, primal));
 
   {
-    /* COUNT DISTINCT DOFS, not listed ones. DMPlexGetClosureIndices with a
-     * global section returns a non-negative index for a shared dof on EVERY
+    /* Count distinct dofs, not listed ones. DMPlexGetClosureIndices with a
+     * global section returns a non-negative index for a shared dof on every
      * rank that sees it, not only on its owner, so the same global dof is
-     * listed several times and summing local sizes over-counts it - by a factor
-     * near two in practice. PCBDDC deduplicates internally, so the index set is
-     * correct either way; it is the reported number that was wrong, and it was
-     * wrong in a way that made the coarse space look as though it had absorbed
-     * only half of what it was given.
+     * listed several times and summing local sizes over-counts it. PCBDDC
+     * deduplicates internally, so the index set is correct either way.
      *
      * Marking a global vector with INSERT_VALUES and summing it counts each dof
      * once, whoever listed it, at the cost of one assembly. */
