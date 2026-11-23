@@ -37,6 +37,11 @@ HARNESS_SOURCES = {
                       "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
     "test_mt_rhs":   ["mt.c", "io.c", "receiver_interp.c", "assembly.c", "grid.c", "common.c",
                       "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
+    "test_csem_layered": ["csem_layered.c"],
+    "test_csem_background": ["csem_primary.c", "csem_layered.c", "csem.c", "solver.c", "assembly.c", "receiver_interp.c",
+                             "grid.c", "io.c", "common.c", "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
+    "test_csem_primary": ["csem_primary.c", "csem_layered.c", "csem.c", "solver.c", "assembly.c", "receiver_interp.c",
+                          "grid.c", "io.c", "common.c", "constants.c", "fem.c", "fe_nedelec.c", "fe_nodal.c"],
 }
 
 #: Field components in a responses file.
@@ -109,15 +114,15 @@ def run_harness(exe, order, nprocs=1):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
 
-def load_fields(h5py, path):
-    """Return {'Ex': complex ndarray, ...} for src1 of a responses file.
+def load_fields(h5py, path, group="fields"):
+    """Return {'Ex': complex ndarray, ...} of /sources/src1/<group> of a responses file.
 
     Each dataset is (n_recv, 2) = (real, imag) from a PETSc complex Vec.
     """
     import numpy as np
     out = {}
     with h5py.File(str(path), "r") as f:
-        g = f["/sources/src1/fields"]
+        g = f[f"/sources/src1/{group}"]
         for comp in FIELD_COMPONENTS:
             a = np.asarray(g[comp])
             out[comp] = a[:, 0] + 1j * a[:, 1]

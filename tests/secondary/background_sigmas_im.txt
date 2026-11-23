@@ -1,0 +1,6 @@
+# Background per material of mesh.msh (im.csem). INVERT differs from the starting model.
+# Row = 0-based material id (gmsh physical tag - 1).
+# sigma_x sigma_y sigma_z
+1e-08    1e-08    1e-08      # AIR
+0.01     0.01     0.01       # BG
+0.02     0.02     0.02       # INVERT

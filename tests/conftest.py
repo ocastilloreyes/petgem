@@ -2,7 +2,8 @@
 
   * tests/unit: C harnesses under tests/csrc/, compiled once against the
     production sources and run per order.
-  * tests/e2e, tests/mt, tests/im: the built fm.csem / fm.mt / im.csem binaries.
+  * tests/e2e, tests/mt, tests/im, tests/secondary: the built fm.csem / fm.mt /
+    im.csem binaries.
   * tests/mms: the MMS verification program build/mms (`make mms`).
 
 Fixtures whose toolchain or binary is missing call ``pytest.skip``. A skipped

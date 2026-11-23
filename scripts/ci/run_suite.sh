@@ -6,7 +6,7 @@
 # This script builds the input of one test suite and runs it, as the CI does.
 #
 # Usage:
-#   bash scripts/ci/run_suite.sh <unit|e2e|mms|mt|im|tdcsem>
+#   bash scripts/ci/run_suite.sh <unit|e2e|mms|mt|im|tdcsem|secondary>
 #
 # Required input:
 #   build/ binaries (make all mms)
@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-suite="${1:?usage: run_suite.sh <unit|e2e|mms|mt|im|tdcsem>}"
+suite="${1:?usage: run_suite.sh <unit|e2e|mms|mt|im|tdcsem|secondary>}"
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 export CI="${CI:-true}"
@@ -32,6 +32,7 @@ case "${suite}" in
   mt)     bash tests/mt/build_bundle.sh ;;
   im)     bash tests/im/build_bundle.sh ;;
   tdcsem) bash tests/tdcsem/build_bundle.sh ;;
+  secondary) bash tests/secondary/build_bundle.sh ;;
   *)      echo "ERROR: unknown suite ${suite}" >&2; exit 2 ;;
 esac
 

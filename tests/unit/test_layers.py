@@ -7,7 +7,7 @@ must be listed here, so a new file has to be placed in a layer explicitly.
     1  generic I/O    io
     2  discretization fe_nedelec, fe_nodal, grid, fem
     3  numerics       assembly, solver, receiver_interp
-    4  physics        csem, mt
+    4  physics        csem, csem_layered, csem_primary, mt
     5  inversion      inversion, inversion_internal, inversion_io,
                       inversion_smoother, lbfgs
     6  application    runtime, kernels, fm_csem, fm_mt, im_csem, fm_tdcsem, petgem,
@@ -24,7 +24,7 @@ LAYERS = [
     ["io"],
     ["fe_nedelec", "fe_nodal", "grid", "fem"],
     ["assembly", "solver", "receiver_interp"],
-    ["csem", "mt"],
+    ["csem", "csem_layered", "csem_primary", "mt"],
     ["inversion", "inversion_internal", "inversion_io", "inversion_smoother", "lbfgs"],
     ["runtime", "kernels", "fm_csem", "fm_mt", "im_csem", "fm_tdcsem", "petgem",
      "fm_csem_main", "fm_mt_main", "im_csem_main", "fm_tdcsem_main"],
@@ -35,7 +35,8 @@ LAYER = {module: level for level, modules in enumerate(LAYERS) for module in mod
 EXTERNAL = {"git_rev", "extrae_user_events"}
 
 # Physics modules that must stay independent of each other.
-INDEPENDENT = [("csem", "mt"), ("mt", "csem")]
+INDEPENDENT = [("csem", "mt"), ("mt", "csem"), ("csem_layered", "mt"), ("mt", "csem_layered"),
+               ("csem_primary", "mt"), ("mt", "csem_primary")]
 
 SOURCES = sorted((REPO_ROOT / "src").glob("*.c")) + sorted((REPO_ROOT / "include").glob("*.h"))
 INCLUDE = re.compile(r'^\s*#include\s+"([A-Za-z0-9_]+)\.h"', re.M)
