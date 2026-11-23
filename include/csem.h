@@ -15,6 +15,7 @@
 
 #include "grid.h"
 #include "io.h"
+#include "receiver_interp.h"
 
 /** @brief simulation_type tag of fm.csem products. */
 #define PETGEM_SIM_FM "fm.csem"
@@ -38,6 +39,20 @@ typedef struct {
   PetscInt    numSources;  /**< Total number of transmitters. */
   CsemSource *sourceArray; /**< Array of `numSources` transmitter records. */
 } CsemSourceSet;
+
+/**
+ * @brief Adds the primary field of source k (0-based) to the fields at the receivers.
+ *
+ * @param[in]     k          Source index.
+ * @param[in]     Q          Receiver interpolation matrices.
+ * @param[in]     receivers  Serial Vec of 3·N_recv receiver coordinates.
+ * @param[in,out] fields     Fields at the receivers.
+ * @param[in]     ctx        User context.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+typedef PetscErrorCode (*CsemReceiverPrimaryFn)(PetscInt k, const ReceiverInterpolationMatrices *Q, Vec receivers,
+                                                Vec fields[NUM_RECEIVER_FIELDS], void *ctx);
 
 /** @brief Columns of a /sources row (loadSourceRows). */
 typedef enum {
@@ -139,22 +154,28 @@ PetscErrorCode assembleCsemRhs(const CsemSourceSet sources, const DM dm, const G
  *                                         azimuth_angle
  *   /sources/src{k}/fields/        Ex, Ey, Ez, Hx, Hy, Hz (PETSc Vec)
  *
+ * With addPrimary, X is the secondary field: the root attribute formulation
+ * is "secondary", /sources/src{k}/secondary_fields/ holds the fields of X and
+ * /sources/src{k}/fields/ the total fields (X plus the primary field).
+ *
  * The output filename is `{output_directory}/{output_filename}.h5`. All Vec
  * writes are collective on the kernel communicator through PETSc's HDF5
  * viewer. `receivers` is the serial Vec (PETSC_COMM_SELF, length 3·N_recv)
  * returned by loadModelInputs.
  *
- * @param[in] params     Parameters (output paths).
- * @param[in] sources    Transmitter set (one solution column per source).
- * @param[in] dm         DMPlex mesh and H(curl) discretization.
- * @param[in] grid       Finite-element grid descriptor.
- * @param[in] receivers  Serial Vec of 3·N_recv receiver coordinates.
- * @param[in] X          Solution matrix, one column per source.
+ * @param[in] params      Parameters (output paths).
+ * @param[in] sources     Transmitter set (one solution column per source).
+ * @param[in] dm          DMPlex mesh and H(curl) discretization.
+ * @param[in] grid        Finite-element grid descriptor.
+ * @param[in] receivers   Serial Vec of 3·N_recv receiver coordinates.
+ * @param[in] X           Solution matrix, one column per source.
+ * @param[in] addPrimary  Adds the primary field of a source to the receiver fields, or NULL (total field).
+ * @param[in] ctx         Context passed to addPrimary.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.
  */
 PetscErrorCode computeCsemResponses(const PetgemParams *params, const CsemSourceSet sources, const DM dm, const Grid *grid, Vec receivers,
-                                    const Mat X);
+                                    const Mat X, CsemReceiverPrimaryFn addPrimary, void *ctx);
 
 #endif /* CSEM_H */

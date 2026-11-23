@@ -243,6 +243,10 @@ PetscErrorCode assembleCsemRhs(const CsemSourceSet sources, const DM dm, const G
  *                                         current, length, dip_angle,
  *                                         azimuth_angle
  *   /sources/src{k}/fields/        Ex, Ey, Ez, Hx, Hy, Hz (PETSc Vec)
+ *   /sources/src{k}/secondary_fields/  Ex..Hz of X (addPrimary only)
+ *
+ * With addPrimary the root attribute formulation is "secondary" and fields
+ * holds X plus the primary field.
  *
  * The output filename is `{output_directory}/{output_filename}.h5`. All Vec
  * writes are collective on the kernel's MPI communicator and go through
@@ -256,7 +260,7 @@ PetscErrorCode assembleCsemRhs(const CsemSourceSet sources, const DM dm, const G
  *       computational domain trigger a warning and are skipped.
  */
 PetscErrorCode computeCsemResponses(const PetgemParams *params, const CsemSourceSet sources, const DM dm, const Grid *grid, Vec receivers,
-                                    const Mat X) {
+                                    const Mat X, CsemReceiverPrimaryFn addPrimary, void *ctx) {
   PetscFunctionBeginUser;
 
   /* Variable declarations */
@@ -278,6 +282,7 @@ PetscErrorCode computeCsemResponses(const PetgemParams *params, const CsemSource
   PetscCall(writeRunProvenance(viewer, params, PETGEM_SIM_FM));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "num_sources", PETSC_INT, &sources.numSources));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "frequency", PETSC_REAL, &sources.freq));
+  if (addPrimary) PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "formulation", PETSC_STRING, "secondary"));
 
   for (PetscInt i = 0; i < sources.numSources; i++) {
     const CsemSource *s = &sources.sourceArray[i];
@@ -287,6 +292,15 @@ PetscErrorCode computeCsemResponses(const PetgemParams *params, const CsemSource
     PetscCall(MatDenseGetColumnVecRead(X, i, &x));
     PetscCall(interpolateReceiverFields(&Q, x, constFactor, fields));
     PetscCall(MatDenseRestoreColumnVecRead(X, i, &x));
+
+    /* /sources/src{k}/secondary_fields/{Ex..Hz}, then total = secondary + primary */
+    if (addPrimary) {
+      PetscCall(PetscSNPrintf(groupPath, sizeof(groupPath), "/sources/src%" PetscInt_FMT "/secondary_fields", i + 1));
+      PetscCall(PetscViewerHDF5PushGroup(viewer, groupPath));
+      for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(VecView(fields[comp], viewer));
+      PetscCall(PetscViewerHDF5PopGroup(viewer));
+      PetscCall(addPrimary(i, &Q, receivers, fields, ctx));
+    }
 
     /* /sources/src{k}/fields/{Ex..Hz} */
     PetscCall(PetscSNPrintf(groupPath, sizeof(groupPath), "/sources/src%" PetscInt_FMT "/fields", i + 1));

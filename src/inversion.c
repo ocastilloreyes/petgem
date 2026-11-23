@@ -32,6 +32,7 @@
 #include "lbfgs.h"
 #include "solver.h"
 #include "csem.h"
+#include "csem_primary.h"
 
 /* Adds the wall time since t0 to *acc. */
 static PetscErrorCode addElapsed(PetscLogDouble t0, PetscLogDouble *acc) {
@@ -65,8 +66,11 @@ static PetscErrorCode createFrequencyKsp(PetscInt order, Mat A, Mat G, KSP *ksp)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Source RHS, observed row k of every component of dObs and data weights of one frequency; NaN data get weight 0. */
-static PetscErrorCode setupFrequencyData(InversionContext *ctx, const PetscScalar *dObs, PetscInt k, InversionFrequency *f) {
+/*
+ * Source RHS (secondary formulation: E_p,h and the primary fields at the receivers; the RHS is assembled with the model),
+ * observed row k of every component of dObs and data weights of one frequency; NaN data get weight 0.
+ */
+static PetscErrorCode setupFrequencyData(InversionContext *ctx, const PetscScalar *dObs, Vec receivers, PetscInt k, InversionFrequency *f) {
   PetscFunctionBeginUser;
   const ImCsemSource *isrc         = &ctx->imParams->imSources[k];
   const PetscInt      numReceivers = ctx->Q->numReceivers;
@@ -78,12 +82,20 @@ static PetscErrorCode setupFrequencyData(InversionContext *ctx, const PetscScala
 
   f->iwmu = iOmegaMu(isrc->freq);
 
-  PetscCall(assembleCsemRhs(one, ctx->dm, &ctx->grid, f->iwmu, &B));
-  PetscCall(DMCreateGlobalVector(ctx->dm, &f->B));
-  PetscCall(MatDenseGetColumnVecRead(B, 0, &col));
-  PetscCall(VecCopy(col, f->B));
-  PetscCall(MatDenseRestoreColumnVecRead(B, 0, &col));
-  PetscCall(MatDestroy(&B));
+  if (ctx->primary) {
+    PetscCall(DMCreateGlobalVector(ctx->dm, &f->B));
+    f->Ep = ctx->primary->Ep[k][0];
+    PetscCall(createReceiverFields(ctx->Q, f->recvPrimary));
+    for (PetscInt fld = 0; fld < NUM_RECEIVER_FIELDS; fld++) PetscCall(VecZeroEntries(f->recvPrimary[fld]));
+    PetscCall(addCsemPrimaryAtReceivers(ctx->primary, k, 0, ctx->dm, ctx->Q, receivers, f->recvPrimary));
+  } else {
+    PetscCall(assembleCsemRhs(one, ctx->dm, &ctx->grid, f->iwmu, &B));
+    PetscCall(DMCreateGlobalVector(ctx->dm, &f->B));
+    PetscCall(MatDenseGetColumnVecRead(B, 0, &col));
+    PetscCall(VecCopy(col, f->B));
+    PetscCall(MatDenseRestoreColumnVecRead(B, 0, &col));
+    PetscCall(MatDestroy(&B));
+  }
 
   for (PetscInt i = 0; i < ctx->imParams->numComponents; i++) {
     const PetscScalar *obs = &dObs[(i * ctx->numFreqs + k) * numReceivers];
@@ -106,20 +118,88 @@ static PetscErrorCode setupFrequencyData(InversionContext *ctx, const PetscScala
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* PETSC_TRUE on every rank if x lies in a free (not fixed) local cell of some rank; points outside the mesh give PETSC_FALSE. */
+static PetscErrorCode pointInFreeCell(const InversionContext *ctx, const PetscReal x[NUM_DIMENSIONS], PetscBool *inFree) {
+  PetscFunctionBeginUser;
+  Vec                point;
+  PetscSF            sf = NULL;
+  PetscInt           n;
+  const PetscSFNode *found;
+  PetscScalar       *a;
+  PetscMPIInt        flag = 0;
+
+  PetscCall(VecCreateSeq(PETSC_COMM_SELF, NUM_DIMENSIONS, &point));
+  PetscCall(VecSetBlockSize(point, NUM_DIMENSIONS));
+  PetscCall(VecGetArrayWrite(point, &a));
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) a[d] = x[d];
+  PetscCall(VecRestoreArrayWrite(point, &a));
+  PetscCall(DMLocatePoints(ctx->dm, point, DM_POINTLOCATION_NONE, &sf));
+  PetscCall(PetscSFGetGraph(sf, NULL, &n, NULL, &found));
+  for (PetscInt i = 0; i < n; i++) {
+    const PetscInt c = found[i].index;
+    if (c >= ctx->grid.cellStart && c < ctx->grid.cellEnd && !ctx->graph->isFixed[c - ctx->grid.cellStart]) flag = 1;
+  }
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, &flag, 1, MPI_INT, MPI_MAX, PetscObjectComm((PetscObject)ctx->dm)));
+  *inFree = flag ? PETSC_TRUE : PETSC_FALSE;
+  PetscCall(PetscSFDestroy(&sf));
+  PetscCall(VecDestroy(&point));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* E_p,h of every frequency on the free cells and the cells with sigma != sigma_b, and the secondary right-hand side matrices. */
+static PetscErrorCode setupPrimaryField(InversionContext *ctx, CsemPrimary *primary) {
+  PetscFunctionBeginUser;
+  const PetscInt numCells = ctx->grid.cellEnd - ctx->grid.cellStart;
+  MPI_Comm       comm     = PetscObjectComm((PetscObject)ctx->dm);
+  CsemSourceSet *sets;
+  CsemSource    *dipoles;
+  PetscBool     *freeCells;
+  Vec            b;
+
+  if (primary->type == CSEM_PRIMARY_LAYERED)
+    for (PetscInt k = 0; k < ctx->imParams->numFreqs; k++) {
+      const PetscReal *x      = ctx->imParams->imSources[k].dipole.position;
+      PetscBool        inFree = PETSC_FALSE;
+      PetscCall(pointInFreeCell(ctx, x, &inFree));
+      PetscCheck(!inFree, comm, PETSC_ERR_ARG_WRONG,
+                 "runCsemInversion: source %" PetscInt_FMT " at (%g, %g, %g) lies in a free cell; the layered secondary formulation needs "
+                 "the source cells in -im_fixed_materials",
+                 k + 1, (double)x[0], (double)x[1], (double)x[2]);
+    }
+
+  PetscCall(PetscMalloc3(ctx->imParams->numFreqs, &sets, ctx->imParams->numFreqs, &dipoles, numCells, &freeCells));
+  for (PetscInt k = 0; k < ctx->imParams->numFreqs; k++) {
+    dipoles[k] = ctx->imParams->imSources[k].dipole;
+    sets[k]    = (CsemSourceSet){ctx->imParams->imSources[k].freq, 1, &dipoles[k]};
+  }
+  for (PetscInt c = 0; c < numCells; c++) freeCells[c] = ctx->graph->isFixed[c] ? PETSC_FALSE : PETSC_TRUE;
+  PetscCall(computeCsemPrimary(ctx->imParams->numFreqs, sets, ctx->dm, &ctx->grid, freeCells, primary));
+  PetscCall(PetscFree3(sets, dipoles, freeCells));
+  ctx->primary = primary;
+
+  PetscCall(createRhsVector(ctx->dm, &b));
+  PetscCall(PetscMalloc1(ctx->imParams->numFreqs, &ctx->Bs));
+  for (PetscInt k = 0; k < ctx->imParams->numFreqs; k++) PetscCall(createRhsMatrix(b, 1, &ctx->Bs[k]));
+  PetscCall(VecDestroy(&b));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /**
  * @brief Allocates the iterate-independent workspace of the inversion.
  *
  * Quadrature and elemental buffers, solution Vecs, K and G (assembled once;
  * K is the fused operator with constFactor = 0), the Ms pattern, the operator
  * and KSP shared by the frequencies, and for each frequency its RHS, observed
- * data and weights.
+ * data and weights. With primary, the primary field of every frequency.
  *
- * @param[in,out] ctx   Inversion context.
- * @param[in]     dObs  Observed data, component-major numComponents x numFreqs x numReceivers.
+ * @param[in,out] ctx        Inversion context.
+ * @param[in]     dObs       Observed data, component-major numComponents x numFreqs x numReceivers.
+ * @param[in]     receivers  Serial Vec of 3·N_recv receiver coordinates.
+ * @param[in,out] primary    Primary field (createCsemPrimary), or NULL for the total field.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
  */
-static PetscErrorCode setupInversionWorkspace(InversionContext *ctx, const PetscScalar *dObs) {
+static PetscErrorCode setupInversionWorkspace(InversionContext *ctx, const PetscScalar *dObs, Vec receivers, CsemPrimary *primary) {
   PetscFunctionBeginUser;
   const PetscInt numDof = ctx->grid.fem.numDofInCell;
   char           matType[PETSC_MAX_PATH_LEN];
@@ -148,13 +228,14 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx, const Petsc
   if (!matTypeSet) PetscCall(DMSetMatType(ctx->dm, MATIS));
   PetscCall(assembleMaxwellOperator(ctx->dm, &ctx->grid, ctx->conductivity, 0.0, &ctx->K, NULL, &ctx->G));
   PetscCall(MatDuplicate(ctx->K, MAT_DO_NOT_COPY_VALUES, &ctx->Ms));
+  if (primary) PetscCall(setupPrimaryField(ctx, primary));
 
   ctx->numFreqs = ctx->imParams->numFreqs;
   ctx->numData  = 0;
   PetscCall(PetscCalloc1(ctx->numFreqs, &ctx->freq));
   for (PetscInt k = 0; k < ctx->numFreqs; k++) {
     InversionFrequency *f = &ctx->freq[k];
-    PetscCall(setupFrequencyData(ctx, dObs, k, f));
+    PetscCall(setupFrequencyData(ctx, dObs, receivers, k, f));
   }
   PetscCall(MatDuplicate(ctx->K, MAT_DO_NOT_COPY_VALUES, &ctx->A));
   PetscCall(createFrequencyKsp(ctx->grid.fem.order, ctx->A, ctx->G, &ctx->ksp));
@@ -182,7 +263,12 @@ static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx) {
       PetscCall(VecDestroy(&ctx->freq[k].dObs[i]));
       PetscCall(VecDestroy(&ctx->freq[k].W[i]));
     }
+    if (ctx->primary) {
+      PetscCall(destroyReceiverFields(ctx->freq[k].recvPrimary));
+      PetscCall(MatDestroy(&ctx->Bs[k]));
+    }
   }
+  PetscCall(PetscFree(ctx->Bs));
   PetscCall(MatDestroy(&ctx->A));
   PetscCall(KSPDestroy(&ctx->ksp));
   PetscCall(PetscFree(ctx->freq));
@@ -258,13 +344,14 @@ static PetscErrorCode accumulateGradient(InversionContext *c, Vec xLocal, Vec nx
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Fields at the receivers for the solution c->x; H is divided by i omega mu. */
-static PetscErrorCode interpolateFields(InversionContext *c, PetscScalar iwmu) {
+/* Fields at the receivers for the solution c->x of frequency f, plus the primary fields of f in the secondary formulation; H is divided by i omega mu. */
+static PetscErrorCode interpolateFields(InversionContext *c, const InversionFrequency *f) {
   PetscFunctionBeginUser;
-  for (PetscInt f = 0; f < NUM_RECEIVER_FIELDS; f++) {
-    if (!c->recv[f]) continue;
-    PetscCall(MatMult(c->Q->mat[f], c->x, c->recv[f]));
-    if (f >= RECV_HX) PetscCall(VecScale(c->recv[f], 1.0 / iwmu));
+  for (PetscInt fld = 0; fld < NUM_RECEIVER_FIELDS; fld++) {
+    if (!c->recv[fld]) continue;
+    PetscCall(MatMult(c->Q->mat[fld], c->x, c->recv[fld]));
+    if (fld >= RECV_HX) PetscCall(VecScale(c->recv[fld], 1.0 / f->iwmu));
+    if (c->primary) PetscCall(VecAXPY(c->recv[fld], 1.0, f->recvPrimary[fld]));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -350,7 +437,7 @@ static PetscErrorCode weightedMisfit(InversionContext *c, const InversionFrequen
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* One frequency: A_f = K - iwmu Ms, forward solve, misfit, adjoint solve, gradient contribution. */
+/* One frequency: A_f = K - iwmu Ms, forward solve, misfit, adjoint solve, gradient contribution (of x_s + E_p,h in the secondary formulation). */
 static PetscErrorCode evaluateFrequency(InversionContext *c, InversionFrequency *f, PetscReal *misfit) {
   PetscFunctionBeginUser;
   PetscLogDouble t0;
@@ -363,7 +450,7 @@ static PetscErrorCode evaluateFrequency(InversionContext *c, InversionFrequency 
   PetscCall(addElapsed(t0, &c->tAssembly));
 
   PetscCall(solve(c, c->ksp, f->B, c->x));
-  PetscCall(interpolateFields(c, f->iwmu));
+  PetscCall(interpolateFields(c, f));
   for (PetscInt fld = 0; fld < NUM_RECEIVER_FIELDS; fld++)
     if (c->adjSrc[fld]) PetscCall(VecZeroEntries(c->adjSrc[fld]));
   *misfit = 0.0;
@@ -383,13 +470,33 @@ static PetscErrorCode evaluateFrequency(InversionContext *c, InversionFrequency 
   }
   PetscCall(solve(c, c->ksp, c->nB, c->nx));
 
+  /* Constrained DOFs: 0 for x and nx, E_p,h for x_s + E_p,h */
   PetscCall(DMGetLocalVector(c->dm, &xLocal));
   PetscCall(DMGetLocalVector(c->dm, &nxLocal));
+  PetscCall(VecZeroEntries(xLocal));
+  PetscCall(VecZeroEntries(nxLocal));
   PetscCall(DMGlobalToLocal(c->dm, c->x, INSERT_VALUES, xLocal));
   PetscCall(DMGlobalToLocal(c->dm, c->nx, INSERT_VALUES, nxLocal));
+  if (c->primary) PetscCall(VecAXPY(xLocal, 1.0, f->Ep));
   PetscCall(accumulateGradient(c, xLocal, nxLocal, f->iwmu));
   PetscCall(DMRestoreLocalVector(c->dm, &xLocal));
   PetscCall(DMRestoreLocalVector(c->dm, &nxLocal));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* Ms of the current conductivity and, in the secondary formulation, the right-hand side of every frequency. */
+static PetscErrorCode refillOperatorData(InversionContext *c) {
+  PetscFunctionBeginUser;
+  PetscCall(refillMassMatrix(c->dm, &c->grid, c->conductivity, &c->quad3d, c->Me, c->Ke, c->Ms));
+  if (c->primary) {
+    PetscCall(assembleCsemSecondaryRhs(c->primary, c->dm, &c->grid, c->conductivity, c->Bs));
+    for (PetscInt k = 0; k < c->numFreqs; k++) {
+      Vec col;
+      PetscCall(MatDenseGetColumnVecRead(c->Bs[k], 0, &col));
+      PetscCall(VecCopy(col, c->freq[k].B));
+      PetscCall(MatDenseRestoreColumnVecRead(c->Bs[k], 0, &col));
+    }
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -399,7 +506,7 @@ static PetscErrorCode evaluateMisfit(InversionContext *c, PetscReal *misfit) {
   PetscLogDouble t0;
 
   PetscCall(PetscTime(&t0));
-  PetscCall(refillMassMatrix(c->dm, &c->grid, c->conductivity, &c->quad3d, c->Me, c->Ke, c->Ms));
+  PetscCall(refillOperatorData(c));
   PetscCall(addElapsed(t0, &c->tAssembly));
 
   *misfit = 0.0;
@@ -563,7 +670,7 @@ static PetscErrorCode predictData(InversionContext *c, PetscScalar **dPre, Petsc
   PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)c->dm), &rank));
   *dPre = NULL;
   if (rank == 0) PetscCall(PetscCalloc1(numComponents * c->numFreqs * numReceivers, dPre));
-  PetscCall(refillMassMatrix(c->dm, &c->grid, c->conductivity, &c->quad3d, c->Me, c->Ke, c->Ms));
+  PetscCall(refillOperatorData(c));
   PetscCall(VecScatterCreateToZero(c->dPre, &toZero, &preAll));
   for (PetscInt k = 0; k < c->numFreqs; k++) {
     InversionFrequency *f = &c->freq[k];
@@ -573,7 +680,7 @@ static PetscErrorCode predictData(InversionContext *c, PetscScalar **dPre, Petsc
     PetscCall(KSPSolve(c->ksp, f->B, c->x));
     PetscCall(KSPGetConvergedReason(c->ksp, &reason));
     if (reason < 0 && c->failReason == 0) c->failReason = reason;
-    PetscCall(interpolateFields(c, f->iwmu));
+    PetscCall(interpolateFields(c, f));
     for (PetscInt i = 0; i < numComponents; i++) {
       PetscReal m;
       PetscCall(componentData(c, i));
@@ -792,7 +899,7 @@ static PetscErrorCode runLbfgs(InversionContext *c, Vec X, PetscLogDouble t0, In
  * -im_gradient_check runs the gradient check instead.
  */
 PetscErrorCode runCsemInversion(const ImParams *imParams, const DM dm, const Grid *grid, Vec conductivity, Vec materialsId, Vec receivers,
-                                InversionStats *stats) {
+                                const CsemBackground *background, InversionStats *stats) {
   PetscFunctionBeginUser;
   PetscLogDouble                t0, t1, t2;
   NeighborGraph                 graph;
@@ -801,6 +908,7 @@ PetscErrorCode runCsemInversion(const ImParams *imParams, const DM dm, const Gri
   DM                            dmConductivity, dmInversion;
   Vec                           X0, X, DfDm, maskGlobal, maskLocal;
   PetscReal                    *allRms, *gradNorms;
+  CsemPrimary                   primary;
 
   PetscCall(PetscTime(&t0));
   PetscCall(buildNeighborSmoothingGraph(dm, grid, imParams, materialsId, &graph));
@@ -837,9 +945,15 @@ PetscErrorCode runCsemInversion(const ImParams *imParams, const DM dm, const Gri
       .lastRms            = PETSC_INFINITY,
       .kspItsMinRow       = PETSC_INT_MAX,
   };
-  PetscCall(setupInversionWorkspace(&ctx, dObs));
+  /* Secondary formulation: sigma_b against the model of X = 0 (isotropic sigma_x) */
+  if (background) {
+    PetscCall(applyLogToSigma(dmInversion, dmConductivity, X, X0, conductivity, grid, &graph));
+    PetscCall(createCsemPrimary(background, dm, grid, conductivity, materialsId, &primary));
+  }
+  PetscCall(setupInversionWorkspace(&ctx, dObs, receivers, background ? &primary : NULL));
   PetscCall(PetscFree(dObs));
   PetscCall(logInversionAssembly(&ctx, stats));
+  if (background) PetscCall(logCsemFormulation(PetscObjectComm((PetscObject)dm), &primary));
 
   if (imParams->gradientCheck) {
     PetscCall(PetscTime(&t1));
@@ -858,6 +972,7 @@ PetscErrorCode runCsemInversion(const ImParams *imParams, const DM dm, const Gri
   stats->numSnapshots = ctx.numSnapshots;
 
   PetscCall(destroyInversionWorkspace(&ctx));
+  if (background) PetscCall(destroyCsemPrimary(&primary));
   PetscCall(VecDestroy(&X0));
   PetscCall(VecDestroy(&X));
   PetscCall(VecDestroy(&DfDm));

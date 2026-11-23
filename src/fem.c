@@ -12,6 +12,7 @@
  *   - the reference Nedelec element mass / stiffness matrices;
  *   - point evaluation of the physical Nedelec values and curls;
  *   - the per-cell discrete gradient block used by PCBDDC;
+ *   - the per-cell Nedelec interpolation of vector fields;
  *   - thin struct-based adapters (Cell / FemSpace / Quadrature3D) that the
  *     DMPlex-centric assembly, postprocessing and receiver code call.
  *
@@ -533,6 +534,52 @@ static PetscErrorCode femDenseInverse(PetscInt N, PetscReal *A, PetscReal *Ainv)
 }
 
 /**
+ * @brief Builds the inverse of the native->closure orientation map of a cell.
+ *
+ * This function assembles O (dof x dof), O[k][m] = femOrient(e_m)[k], by
+ * applying femOrient to the identity, and returns Oinv = O^{-1}. Closure-order
+ * coefficients follow from native ones as c = O^{-T} c_native.
+ *
+ * @param[in]  order         Nedelec order.
+ * @param[in]  dof           Number of Nedelec DOFs per cell.
+ * @param[in]  vertexCoords  Cell vertex coordinates (4x3) driving orientation.
+ * @param[out] O             Work array (dof x dof, row-major); overwritten.
+ * @param[out] Oinv          Inverse O^{-1} (dof x dof, row-major).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode femOrientInverse(PetscInt order, PetscInt dof, const PetscReal *vertexCoords, PetscReal *O, PetscReal *Oinv) {
+  PetscFunctionBeginUser;
+
+  PetscReal ident[FEM_MAX_ND_DOF * NUM_DIMENSIONS], oriented[FEM_MAX_ND_DOF * NUM_DIMENSIONS];
+
+  /* Build O (dof x dof): O[k][m] = femOrient(e_m)[k]. femOrient acts on the dof
+       index identically per spatial component, so one call yields 3 columns. */
+  for (PetscInt i = 0; i < dof; i += NUM_DIMENSIONS) {
+    for (PetscInt j = 0; j < dof * NUM_DIMENSIONS; j++) {
+      ident[j] = 0.0;
+    }
+
+    for (PetscInt j = 0; j < NUM_DIMENSIONS && i + j < dof; j++) {
+      ident[(i + j) * NUM_DIMENSIONS + j] = 1.0;
+    }
+
+    femOrient(order, vertexCoords, ident, oriented);
+
+    for (PetscInt j = 0; j < NUM_DIMENSIONS && i + j < dof; j++) {
+      for (PetscInt k = 0; k < dof; k++) {
+        O[k * dof + (i + j)] = oriented[k * NUM_DIMENSIONS + j];
+      }
+    }
+  }
+
+  /* Oinv = O^{-1} (O is well conditioned -> clean inverse, no noise) */
+  PetscCall(femDenseInverse(dof, O, Oinv));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
  * @brief Accumulates the reference Nedelec mass and stiffness matrices.
  *
  * This function integrates, over the given quadrature rule, the conductivity-
@@ -702,7 +749,6 @@ static PetscErrorCode femDiscreteGradient(PetscInt order, const PetscReal *verte
 
   PetscReal  ShapH[FEM_MAX_H1_DOF], gradHbuf[NUM_DIMENSIONS][FEM_MAX_H1_DOF];
   PetscReal *GradH[NUM_DIMENSIONS] = {gradHbuf[0], gradHbuf[1], gradHbuf[2]};
-  PetscReal  ident[FEM_MAX_ND_DOF * NUM_DIMENSIONS], oriented[FEM_MAX_ND_DOF * NUM_DIMENSIONS];
   PetscReal *Gnat, *O, *Oinv; /* O(dof^2) work: heap */
 
   PetscCall(PetscCalloc3(dof * nH1, &Gnat, dof * dof, &O, dof * dof, &Oinv));
@@ -722,28 +768,7 @@ static PetscErrorCode femDiscreteGradient(PetscInt order, const PetscReal *verte
     }
   }
 
-  /* Build O (dof x dof): O[k][m] = femOrient(e_m)[k]. femOrient acts on the dof
-       index identically per spatial component, so one call yields 3 columns. */
-  for (PetscInt i = 0; i < dof; i += NUM_DIMENSIONS) {
-    for (PetscInt j = 0; j < dof * NUM_DIMENSIONS; j++) {
-      ident[j] = 0.0;
-    }
-
-    for (PetscInt j = 0; j < NUM_DIMENSIONS && i + j < dof; j++) {
-      ident[(i + j) * NUM_DIMENSIONS + j] = 1.0;
-    }
-
-    femOrient(order, vertexCoords, ident, oriented);
-
-    for (PetscInt j = 0; j < NUM_DIMENSIONS && i + j < dof; j++) {
-      for (PetscInt k = 0; k < dof; k++) {
-        O[k * dof + (i + j)] = oriented[k * NUM_DIMENSIONS + j];
-      }
-    }
-  }
-
-  /* Oinv = O^{-1} (O is well conditioned -> clean inverse, no noise) */
-  PetscCall(femDenseInverse(dof, O, Oinv));
+  PetscCall(femOrientInverse(order, dof, vertexCoords, O, Oinv));
 
   /* G = O^{-T} Gnat : G[k][j] = sum_m Oinv[m][k] Gnat[m][j], clamped */
   for (PetscInt i = 0; i < dof; i++)
@@ -756,6 +781,90 @@ static PetscErrorCode femDiscreteGradient(PetscInt order, const PetscReal *verte
     }
 
   PetscCall(PetscFree3(Gnat, O, Oinv));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Interpolates vector fields onto the Nedelec space of one cell.
+ *
+ * This function evaluates the fields at the physical points of the distinct
+ * Nedelec DOF nodes, x = v0 + J^T node. The native coefficient of DOF m is
+ * (J F(x_m)) . tangent_m, the covariant pullback of F against the DOF tangent
+ * (feNedelecGetDofInfo); the coefficients are then mapped to closure order via
+ * c = O^{-T} c_native, as in femDiscreteGradient.
+ *
+ * @param[in]  order         Nedelec order.
+ * @param[in]  vertexCoords  Cell vertex coordinates (4x3) driving orientation.
+ * @param[in]  jacobian      Cell Jacobian J = F^T.
+ * @param[in]  field         Field evaluator.
+ * @param[in]  ctx           Context passed to field.
+ * @param[in]  numFields     Number of fields.
+ * @param[out] coeff         Closure-order coefficients, coeff[f * dof + i].
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+static PetscErrorCode femInterpolate(PetscInt order, const PetscReal *vertexCoords, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS],
+                                     VectorFieldFn field, void *ctx, PetscInt numFields, PetscScalar *coeff) {
+  PetscFunctionBeginUser;
+
+  PetscCall(femEnsureNedelec(order));
+  const PetscInt dof = feNedelecGetDof(femNd);
+
+  PetscCheck(dof <= FEM_MAX_ND_DOF, PETSC_COMM_SELF, PETSC_ERR_SUP,
+             "femInterpolate: order %" PetscInt_FMT " exceeds work-array cap (raise FEM_MAX_ND_DOF)", order);
+
+  PetscInt     numNodes = 0, nodeOf[FEM_MAX_ND_DOF];
+  PetscReal    nodes[FEM_MAX_ND_DOF * NUM_DIMENSIONS], tangents[FEM_MAX_ND_DOF * NUM_DIMENSIONS];
+  PetscReal   *points, *O, *Oinv;
+  PetscScalar *values, *native;
+
+  /* Distinct DOF nodes; nodeOf[m] is the node of DOF m */
+  for (PetscInt m = 0; m < dof; m++) {
+    PetscReal node[NUM_DIMENSIONS];
+    PetscInt  n = 0;
+
+    PetscCall(feNedelecGetDofInfo(femNd, m, node, &tangents[m * NUM_DIMENSIONS]));
+    while (n < numNodes && (nodes[n * 3] != node[0] || nodes[n * 3 + 1] != node[1] || nodes[n * 3 + 2] != node[2])) n++;
+    if (n == numNodes) {
+      for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) nodes[n * 3 + d] = node[d];
+      numNodes++;
+    }
+    nodeOf[m] = n;
+  }
+
+  PetscCall(PetscMalloc5(numNodes * NUM_DIMENSIONS, &points, numFields * numNodes * NUM_DIMENSIONS, &values, numFields * dof, &native,
+                         dof * dof, &O, dof * dof, &Oinv));
+
+  /* x = v0 + J^T node */
+  for (PetscInt n = 0; n < numNodes; n++)
+    for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) {
+      points[n * 3 + d] = vertexCoords[d];
+      for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) points[n * 3 + d] += jacobian[i][d] * nodes[n * 3 + i];
+    }
+
+  PetscCall(field(numNodes, points, numFields, values, ctx));
+
+  /* c_native[m] = (J F(x_m)) . tangent_m */
+  for (PetscInt f = 0; f < numFields; f++)
+    for (PetscInt m = 0; m < dof; m++) {
+      const PetscScalar *F = &values[(f * numNodes + nodeOf[m]) * NUM_DIMENSIONS];
+      PetscScalar        c = 0.0;
+      for (PetscInt i = 0; i < NUM_DIMENSIONS; i++) {
+        c += (jacobian[i][0] * F[0] + jacobian[i][1] * F[1] + jacobian[i][2] * F[2]) * tangents[m * NUM_DIMENSIONS + i];
+      }
+      native[f * dof + m] = c;
+    }
+
+  /* c = O^{-T} c_native */
+  PetscCall(femOrientInverse(order, dof, vertexCoords, O, Oinv));
+  for (PetscInt f = 0; f < numFields; f++)
+    for (PetscInt i = 0; i < dof; i++) {
+      PetscScalar c = 0.0;
+      for (PetscInt k = 0; k < dof; k++) c += Oinv[k * dof + i] * native[f * dof + k];
+      coeff[f * dof + i] = c;
+    }
+
+  PetscCall(PetscFree5(points, values, native, O, Oinv));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1079,6 +1188,25 @@ PetscErrorCode buildDiscreteGradientMatrix(const FemSpace *fem, const Cell *cell
   PetscFunctionBeginUser;
 
   PetscCall(femDiscreteGradient(fem->order, cell->coordinates, gradientMatrix));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Interpolates vector fields onto the Nedelec space of one cell.
+ *
+ * This function builds the cell Jacobian and delegates to the reference core.
+ * The coefficients are in DMPlex closure order, with the orientation of
+ * buildDiscreteGradientMatrix.
+ */
+PetscErrorCode interpolateNedelecCell(const FemSpace *fem, const Cell *cell, VectorFieldFn field, void *ctx, PetscInt numFields,
+                                      PetscScalar *coeff) {
+  PetscFunctionBeginUser;
+
+  PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS];
+
+  PetscCall(femComputeJacobian(cell->coordinates, jacobian, invJacobian));
+  PetscCall(femInterpolate(fem->order, cell->coordinates, jacobian, field, ctx, numFields, coeff));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
