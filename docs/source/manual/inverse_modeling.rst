@@ -32,6 +32,11 @@ starting model:
    Relative noise level used to weight the misfit. It overrides the
    ``error_level`` attribute of the observed-data file.
 
+``-background_layers_file``, ``-background_sigma_file`` (optional)
+   Background model of the secondary-field formulation, as for ``fm.csem``
+   (see :doc:`formats`). ``-background_sigma_file`` has one row per material
+   of the inversion mesh.
+
 Materials with a non-zero ``fixed`` column in ``sigmas.txt`` (for example,
 air) are held fixed: their cells are neither updated nor smoothed. Their ids
 are stored in the bundle. The ``sigmas.txt`` values of all materials form the
@@ -107,6 +112,14 @@ command line.
    * - ``-im_gradient_check_eps``
      - ``1e-1,1e-2,1e-3,1e-4``
      - Step sizes of the gradient check, in :math:`\log\rho`.
+
+The field formulation options ``-csem_formulation``, ``-csem_primary`` and
+``-csem_background_file`` are those of ``fm.csem`` (see :doc:`fd_modeling`).
+With ``-csem_formulation secondary``, the background conductivity is compared
+with the starting model, :math:`\mathbf{E}_p` is computed on the free cells and
+on the cells that differ from the background, and the predicted data are the
+total fields. With ``-csem_primary layered``, the cells that contain the
+transmitters must be fixed.
 
 Parameter file
 --------------

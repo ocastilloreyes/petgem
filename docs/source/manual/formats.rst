@@ -126,6 +126,37 @@ with one row per frequency:
    # Build the input bundle
    python3 utils/preprocess.py -mode im.csem ... -observed_filename observed.h5
 
+Background model (``-background_layers_file``, ``-background_sigma_file``)
+--------------------------------------------------------------------------
+The background conductivity of the secondary-field formulation
+(``fm.csem`` and ``im.csem``, see :doc:`method`). Either file, or both, can be
+given; ``-csem_primary`` selects the one used.
+
+``-background_layers_file`` is a layered VTI model, one row per layer from top
+to bottom; ``#`` comments and blank lines are allowed:
+
+.. code-block::
+
+   # z_top  sigma_h  [sigma_v]
+   inf      1e-8              # air
+   0        3.3333            # sea water
+   -1000    1.0      0.5      # sediments (VTI)
+
+- ``z_top`` - height of the top of the layer (m, z up): ``inf`` for the first
+  layer, then strictly decreasing.
+- ``sigma_h sigma_v`` - horizontal and vertical conductivity (S/m).
+  ``sigma_v`` defaults to ``sigma_h``.
+
+``-background_sigma_file`` has the format and rows of ``sigmas.txt``: one
+background conductivity per material id of the mesh. The ``fixed`` column is
+ignored.
+
+Preprocessing embeds them into the bundle under ``/background`` and writes
+``-csem_formulation secondary`` into the parameter file.
+``petgem.readBackgroundLayers`` reads the layer file and
+``petgem.writeBackgroundPayload`` adds ``/background`` to an existing bundle
+or to a separate file (``-csem_background_file``).
+
 Input bundle (``-input_filename``, default ``input.h5``)
 --------------------------------------------------------
 ``utils/preprocess.py`` writes a single HDF5 bundle that the kernel reads in
@@ -171,6 +202,14 @@ MT runs ``/mt``, and time-domain runs ``/sources`` and ``/tdcsem``.
    * - ``/tdcsem/time``, ``/tdcsem/waveform``
      - td
      - Waveform sample times (s) and normalized current
+   * - ``/background/layer_ztop``, ``/background/layer_sigma``
+     - fm, im
+     - Layered background (optional): top of each layer (m, first ``+inf``)
+       and ``sigma_h, sigma_v`` per layer, flattened ``[2 * N_layers]``
+   * - ``/background/material_sigma``
+     - fm, im
+     - Background conductivity per material (optional):
+       ``sigma_x, sigma_y, sigma_z``, flattened ``[3 * N_materials]``
 
 ``petgem.readBundle(path)`` reads a CSEM bundle and returns ``receivers``
 (``[N_recv, 3]``), ``order``, ``frequency`` (of the first transmitter) and
@@ -217,11 +256,14 @@ Layout::
     /sources/src1/fields/Hx
     /sources/src1/fields/Hy
     /sources/src1/fields/Hz
+    /sources/src1/secondary_fields/Ex   secondary formulation only: E - E_p, H - H_p
+    ...
     /sources/src2/                 (one such group per transmitter)
     ...
 
 Additional root attributes: ``num_sources``, ``frequency`` (the run's operating
-frequency).
+frequency), and ``formulation`` (``secondary``; absent for the total field).
+``fields`` holds the total fields in both formulations.
 
 Per-source attributes (``/sources/src{k}``, ``k`` 1-based): ``frequency``,
 ``x_pos``, ``y_pos``, ``z_pos``, ``current``, ``length``, ``dip_angle``,
@@ -229,7 +271,7 @@ Per-source attributes (``/sources/src{k}``, ``k`` 1-based): ``frequency``,
 
 ``petgem.readResponses(path, source=k)`` returns the six fields of transmitter
 ``k`` with its attributes; ``petgem.readAllResponses(path)`` returns all of
-them (see :doc:`python_api`).
+them (see :doc:`python_api`). Both take ``group="secondary_fields"``.
 
 Time-domain CSEM responses (``fm.tdcsem``)
 ******************************************

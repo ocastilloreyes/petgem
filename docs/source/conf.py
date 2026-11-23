@@ -11,6 +11,7 @@
 # PETSc/HDF5). A mock is used only when the real module is unavailable.
 import importlib
 import os
+import re
 import sys
 from unittest.mock import MagicMock
 
@@ -32,7 +33,10 @@ sys.modules.setdefault('petgem', _petgem_pkg)
 project = 'PETGEM'
 copyright = '2025, Castillo-Reyes, Octavio'
 author = 'Castillo-Reyes, Octavio'
-release = '2.0.0'
+# The release is the version in include/version.h.
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'include', 'version.h')) as _header:
+    _version_h = _header.read()
+release = '.'.join(re.search(rf'#define VERSION_{_part} (\d+)', _version_h).group(1) for _part in ('MAJOR', 'MINOR', 'PATCH'))
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

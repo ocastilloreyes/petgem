@@ -8,7 +8,8 @@ derivation and for validation studies, see :doc:`publications`.
 Frequency-domain CSEM forward problem
 -------------------------------------
 ``fm.csem`` solves the frequency-domain CSEM problem for the **total** electric
-field :math:`E`, with a constant magnetic permeability :math:`\mu = \mu_0`
+field :math:`E` (default) or for the **secondary** field :math:`E - E_p` (see
+`Secondary-field formulation`_), with a constant magnetic permeability :math:`\mu = \mu_0`
 (``MU`` in ``include/constants.h``) and a diagonal conductivity tensor
 :math:`\sigma = \mathrm{diag}(\sigma_x, \sigma_y, \sigma_z)`:
 
@@ -58,6 +59,51 @@ position:
 Receiver responses are obtained by interpolating the solution :math:`e` at the
 receiver positions; the magnetic components are recovered from
 :math:`\nabla \times E`. The system is solved with PETSc (see :doc:`solver`).
+
+Secondary-field formulation
+***************************
+With ``-csem_formulation secondary``, the field is split as
+:math:`E = E_p + E_s`, where :math:`E_p` is the field of the same transmitters
+in a background conductivity :math:`\sigma_b`. The secondary field satisfies
+
+.. math::
+
+   \nabla \times \nabla \times E_s \;-\; i\,\omega\,\mu\,\sigma\, E_s
+   \;=\; i\,\omega\,\mu\,(\sigma - \sigma_b)\, E_p,
+
+with :math:`n \times E_s = 0` on the boundary. The operator :math:`A` is that
+of the total field, and the right-hand side is
+
+.. math::
+
+   b = i\,\omega\,\mu\, M_{\sigma - \sigma_b}\, e_p,
+
+where :math:`M_{\sigma - \sigma_b}` is the mass matrix of
+:math:`\sigma - \sigma_b`, non-zero only on the cells with
+:math:`\sigma \neq \sigma_b`, and :math:`e_p` the Nédélec interpolant of
+:math:`E_p` on those cells (``assembleCsemSecondaryRhs`` in
+``src/csem_primary.c``). The receiver fields are the total fields
+
+.. math::
+
+   E = Q_E\, e_s + E_p, \qquad H = \frac{Q_H\, e_s}{i\,\omega\,\mu} + H_p,
+
+with :math:`E_p` and :math:`H_p` evaluated at the receivers. The background
+model (``-csem_primary``) is one of:
+
+- ``layered``: horizontal layers, each with conductivity
+  :math:`\mathrm{diag}(\sigma_h, \sigma_h, \sigma_v)`. :math:`E_p` and
+  :math:`H_p` are computed in the wavenumber domain with the recursion of
+  Hunziker et al. (2015) and the 201-point Hankel filter of Key (2009)
+  (``src/csem_layered.c``). :math:`\sigma_b` of a cell is the layer at its
+  centroid. :math:`e_p` takes the degrees of freedom of the interpolant of
+  each cell; a degree of freedom shared by several cells takes their average.
+  A receiver on a layer interface takes the layer of the cell that
+  interpolates :math:`e_s` at it, so that the normal component of
+  :math:`E_p` and :math:`Q_E\, e_s` belong to the same side.
+- ``model``: one :math:`\sigma_b` per material on the same mesh.
+  :math:`e_p` is the finite-element solution with :math:`\sigma_b`, so the
+  secondary and total formulations give the same discrete total field.
 
 Discrete gradient
 *****************
@@ -255,6 +301,14 @@ updated with **limited-memory BFGS (L-BFGS)** (``-im_lbfgs_memory``,
 ``-im_max_iter``). An optional neighbor smoother acts on the gradient
 (``-im_diag_weight``), and the cells of fixed materials are excluded from the
 update. Options are listed in :doc:`inverse_modeling`.
+
+With ``-csem_formulation secondary``, :math:`e_p` is computed once on the
+cells of the free materials and on the cells with
+:math:`\sigma \neq \sigma_b` of the starting model, and the right-hand side
+:math:`b(\sigma)` is reassembled for every model. Because
+:math:`\partial b / \partial \sigma_e = i\omega\mu\, M_e\, e_p`, the
+gradient has the form of the total-field gradient with :math:`e` replaced by
+:math:`e_s + e_p`.
 
 Verification
 ------------

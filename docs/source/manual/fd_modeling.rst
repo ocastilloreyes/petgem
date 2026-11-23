@@ -20,6 +20,11 @@ Besides the mesh and ``sigmas.txt``, ``preprocess.py -mode fm.csem`` takes:
 ``-receiver_filename``
    One ``x y z`` point per row.
 
+``-background_layers_file``, ``-background_sigma_file``
+   Background model of the secondary-field formulation (optional): a layered
+   model, a conductivity per material, or both (see :doc:`formats`). With
+   either, the parameter file selects ``-csem_formulation secondary``.
+
 Parameter file
 --------------
 ``preprocess.py -mode fm.csem`` writes:
@@ -36,8 +41,30 @@ Parameter file
    -pc_bddc_use_deluxe_scaling 1
    -pc_bddc_coarse_pc_type lu
 
-The kernel takes only the common options listed in :doc:`overview`; the rest
-of the file configures PETSc (see :doc:`solver`).
+The kernel takes the common options listed in :doc:`overview` and the field
+formulation options below; the rest of the file configures PETSc (see
+:doc:`solver`).
+
+``-csem_formulation <total|secondary>``
+   ``total`` (default) solves for the total field :math:`\mathbf{E}`.
+   ``secondary`` solves for :math:`\mathbf{E} - \mathbf{E}_p`, where
+   :math:`\mathbf{E}_p` is the field of the transmitters in a background
+   model.
+
+``-csem_primary <layered|model>``
+   Background model of the secondary formulation. ``layered``: a layered VTI
+   medium; :math:`\mathbf{E}_p` is computed analytically. ``model``: one
+   conductivity per material on the same mesh; :math:`\mathbf{E}_p` is a
+   finite-element solve with the background conductivity. Default:
+   ``layered`` if the background has layers, ``model`` otherwise.
+
+``-csem_background_file <file>``
+   HDF5 file with the ``/background`` group. Default: the input bundle.
+
+The run report lists the background model, the number of cells with
+:math:`\sigma \neq \sigma_b` and the time of :math:`\mathbf{E}_p`. With the
+layered background, the cells that cross a layer interface are reported with
+a warning; :math:`\sigma_b` of a cell is the layer at its centroid.
 
 Running
 -------
@@ -51,4 +78,6 @@ Output
 ``<output_dir>/<output_filename>.h5`` holds ``Ex``, ``Ey``, ``Ez``, ``Hx``,
 ``Hy`` and ``Hz`` at every receiver, for each transmitter. Read it with
 ``petgem.readResponses`` or ``petgem.readAllResponses``; the layout is in
-:doc:`formats`.
+:doc:`formats`. With ``-csem_formulation secondary`` these are the total
+fields, and the secondary fields are read with
+``petgem.readResponses(filename, group="secondary_fields")``.

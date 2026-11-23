@@ -1,0 +1,5 @@
+# Layered background of the secondary-field formulation: the model without
+# the Oil layer (sea water over a sediment half-space).
+# z_top  sigma_h  [sigma_v]
+inf      3.3333     # Water
+-1000    1.0        # Sediments

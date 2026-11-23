@@ -45,6 +45,23 @@ Test levels
      - Boundary quadrature, 1D field, boundary right-hand side
      - 1-6
      - C harnesses ``test_boundary.c``, ``test_mt1d.c``, ``test_mt_rhs.c``
+   * - CSEM
+     - Dipole fields in a layered VTI medium
+     - -
+     - C harness ``test_csem_layered.c`` against `empymod`_ and the closed-form
+       whole space
+   * - CSEM
+     - Formulation options and background model input
+     - -
+     - C harness ``test_csem_background.c``; ``tests/unit/test_background_io.py``
+   * - CSEM
+     - Primary field, secondary right-hand side and receivers on interfaces
+     - 1-3
+     - C harness ``test_csem_primary.c`` on 1 and 3 ranks
+   * - CSEM
+     - Response readers, total and secondary fields
+     - -
+     - ``tests/unit/test_responses_io.py``
    * - MT
      - Half-space response
      - 2
@@ -62,6 +79,11 @@ Test levels
      - Half-space step-on response
      - 1-2
      - ``fm.tdcsem`` against `empymod`_ (order 2), 1 and 3 ranks (order 1)
+   * - Secondary
+     - Secondary-field formulation
+     - 1
+     - ``fm.csem`` and ``im.csem`` on ``examples/im_csem_block`` with the
+       model and layered backgrounds, against the total field
 
 Levels 4 and 5 stop at order 3: orders 1, 2 and 3 already have edge, face and
 interior DOFs, and higher orders only add more of the same. Level 6 runs the
@@ -74,7 +96,7 @@ Running
 -------
 .. code-block:: bash
 
-   # Levels 1-3 and the MT harnesses (needs PETSc and mpicc)
+   # Levels 1-3, the CSEM and MT harnesses and the Python input tests (needs PETSc and mpicc)
    pytest tests/unit
 
    # Levels 4-5
@@ -97,6 +119,10 @@ Running
    bash tests/tdcsem/build_bundle.sh
    PETGEM_FM_TDCSEM=build/fm.tdcsem pytest tests/tdcsem
 
+   # Secondary-field formulation
+   bash tests/secondary/build_bundle.sh
+   PETGEM_FM_CSEM=build/fm.csem PETGEM_IM_CSEM=build/im.csem pytest tests/secondary
+
 A bare ``pytest`` runs everything available. Tests whose toolchain, binary or
 bundle is missing are skipped; with the ``CI`` environment variable set they
 fail instead. Without the ``PETGEM_*`` variables the binaries
@@ -107,8 +133,10 @@ only the tests that do not start a kernel.
 Tolerances
 ----------
 - Levels 1-3 check analytic properties (DOF counts, reproduction of constant
-  fields, partition of unity, symmetry, :math:`K_e G_e = 0`) to about
-  ``1e-9``.
+  fields, partition of unity, symmetry, :math:`K_e G_e = 0`, Nédélec
+  interpolation) to about ``1e-9``.
+- The layered dipole matches `empymod`_ to ``1e-7`` and the closed-form whole
+  space to ``1e-6`` (``2e-5`` at the source depth).
 - Level 5 compares against the goldens with a relative tolerance of ``1e-3``.
 - Level 6 uses ``atol + rtol*|golden|`` with ``rtol = 1e-3``, ``atol = 1e-8``,
   and requires :math:`\|Ax-b\|/\|b\| < 10^{-10}`.
@@ -134,11 +162,14 @@ The goldens are regenerated only after an intended change of the results:
    # Regenerate the goldens of level 6
    bash tests/mms/regen_golden.sh
 
+   # Regenerate the layered-dipole reference (needs empymod)
+   python3 tests/csrc/make_csem_layered_reference.py
+
 Continuous integration
 ----------------------
 ``.github/workflows/ci.yml`` checks the format, builds the binaries and the MMS
 program in the CI image with ``-Werror``, and runs one job per suite: ``unit`` (harnesses), ``e2e`` (levels 4-5),
-``mms`` (level 6), ``mt``, ``im`` and ``tdcsem``. On a push to ``develop``, the
+``mms`` (level 6), ``mt``, ``im``, ``tdcsem`` and ``secondary``. On a push to ``develop``, the
 jobs run only when the code or the docs change. Pull requests to ``master`` run
 everything. The ``ci-ok`` job fails unless every selected job succeeded.
 

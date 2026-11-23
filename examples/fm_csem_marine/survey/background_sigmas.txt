@@ -1,0 +1,7 @@
+# Background conductivity per material of the secondary-field formulation:
+# the Oil layer takes the sediment conductivity. Row order = tag - 1.
+# sigma_x  sigma_y  sigma_z
+1.0      1.0      1.0         # Sediments 2
+1.0      1.0      1.0         # Oil
+1.0      1.0      1.0         # Sediments 1
+3.3333   3.3333   3.3333      # Water
