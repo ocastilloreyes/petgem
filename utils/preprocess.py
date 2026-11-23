@@ -28,6 +28,9 @@ Shared arguments (all modes):
     -order, -case_dir, -mesh_filename, -receiver_filename, -sigma_file
     -input_filename, -params_filename, -output_vtk        (all optional with defaults)
 
+Optional with -mode fm.csem and im.csem (secondary-field formulation):
+    -background_layers_file, -background_sigma_file
+
 Usage examples:
     # Forward modeling
     python3 utils/preprocess.py \\
@@ -104,6 +107,8 @@ def main():
         mt_frequency_filename=args.mt_frequency_filename,
         tdcsem_waveform_filename=args.tdcsem_waveform_filename,
         tdcsem_t_end=args.tdcsem_t_end,
+        background_layers_file=args.background_layers_file,
+        background_sigma_file=args.background_sigma_file,
         output_vtk=args.output_vtk,
         dm_view=args.dm_view is not None,
     )

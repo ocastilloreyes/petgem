@@ -1,0 +1,4 @@
+# Layered background of examples/im_csem_block: air over a 100 ohm-m half-space.
+# z_top  sigma_h  [sigma_v]
+inf      1e-8      # air
+0        0.01      # half-space

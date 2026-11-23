@@ -28,7 +28,9 @@
 **PETGEM** (Parallel Edge-element Toolkit for General Electromagnetic Modeling)
 is an open-source code for 3D electromagnetic modeling. It solves the CSEM
 forward problem in the frequency and time domains, the MT forward problem and
-the frequency-domain CSEM inverse problem. The electric field is discretized
+the frequency-domain CSEM inverse problem. The frequency-domain CSEM kernels
+solve for the total field or for the secondary field of a layered or
+per-material background. The electric field is discretized
 with high-order Nédélec (edge) finite elements of polynomial order 1 to 6 on
 unstructured tetrahedral meshes. **PETGEM** is written in C on top of
 [PETSc](https://petsc.org/release/) and MPI. **PETGEM** is developed at the
@@ -39,10 +41,10 @@ and the [Barcelona Supercomputing Center (BSC)](https://www.bsc.es/es/discover-b
 
 | Executable  | Problem                                                                 |
 |-------------|-------------------------------------------------------------------------|
-| `fm.csem`   | CSEM forward modeling (frequency domain)                                |
+| `fm.csem`   | CSEM forward modeling (frequency domain, total or secondary field)      |
 | `fm.tdcsem` | CSEM forward modeling (time domain)                                     |
 | `fm.mt`     | MT forward modeling                                                     |
-| `im.csem`   | CSEM inverse modeling (frequency domain, L-BFGS, adjoint-state gradients) |
+| `im.csem`   | CSEM inverse modeling (frequency domain, L-BFGS, adjoint-state gradients, total or secondary field) |
 
 A `petgem` dispatcher runs any of them. A small Python package in `utils/`
 builds the HDF5 input files and reads the results.

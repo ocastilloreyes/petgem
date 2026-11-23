@@ -143,12 +143,15 @@ SHARED_SRCS := src/common.c \
 # runForward, runInverse, runMtForward and runTdCsemForward; the *_main.c
 # files only provide main().
 INV_SRCS := src/inversion.c src/inversion_io.c src/inversion_smoother.c src/lbfgs.c
+# Primary field of the secondary-field formulation (fm.csem, im.csem)
+CSEM_SEC_SRCS := src/csem_primary.c src/csem_layered.c
 
-FM_SRCS := src/fm_csem.c src/fm_csem_main.c $(SHARED_SRCS)
-IM_SRCS := src/im_csem.c src/im_csem_main.c $(INV_SRCS) $(SHARED_SRCS)
+FM_SRCS := src/fm_csem.c src/fm_csem_main.c $(CSEM_SEC_SRCS) $(SHARED_SRCS)
+IM_SRCS := src/im_csem.c src/im_csem_main.c $(INV_SRCS) $(CSEM_SEC_SRCS) $(SHARED_SRCS)
 MT_SRCS := src/fm_mt.c src/fm_mt_main.c src/mt.c $(SHARED_SRCS)
 TD_SRCS := src/fm_tdcsem.c src/fm_tdcsem_main.c $(SHARED_SRCS)
-PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c src/fm_mt.c src/fm_tdcsem.c src/mt.c $(INV_SRCS) $(SHARED_SRCS)
+PT_SRCS := src/petgem.c src/fm_csem.c src/im_csem.c src/fm_mt.c src/fm_tdcsem.c src/mt.c $(INV_SRCS) $(CSEM_SEC_SRCS) \
+           $(SHARED_SRCS)
 
 # MMS verification program (tests/mms), not part of 'all'
 MMS_SRCS := tests/mms/mms.c

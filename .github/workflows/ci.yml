@@ -122,6 +122,7 @@ jobs:
           - { suite: mt, timeout: 20 }
           - { suite: im, timeout: 30 }
           - { suite: tdcsem, timeout: 45 }
+          - { suite: secondary, timeout: 30 }
     name: test (${{ matrix.suite }})
     steps:
       - uses: actions/checkout@v5

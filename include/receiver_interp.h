@@ -50,9 +50,10 @@ typedef enum { RECV_EX, RECV_EY, RECV_EZ, RECV_HX, RECV_HY, RECV_HZ, NUM_RECEIVE
  * Ex_recv = mat[RECV_EX] * x; Hx_recv = (mat[RECV_HX] * x) / (iωμ).
  */
 typedef struct {
-  Mat      mat[NUM_RECEIVER_FIELDS]; /**< Interpolation matrix per field (E: basis, H: curl). */
-  PetscInt numReceivers;             /**< Number of receivers (rows of each matrix). */
-  PetscInt numDof;                   /**< Number of H(curl) DOFs (columns of each matrix). */
+  Mat        mat[NUM_RECEIVER_FIELDS]; /**< Interpolation matrix per field (E: basis, H: curl). */
+  PetscInt   numReceivers;             /**< Number of receivers (rows of each matrix). */
+  PetscInt   numDof;                   /**< Number of H(curl) DOFs (columns of each matrix). */
+  PetscReal *cellCentroids;            /**< Centroid of the cell of receiver r, [3 r + d], on every rank (the receiver if unlocated). */
 } ReceiverInterpolationMatrices;
 
 /**
@@ -61,7 +62,7 @@ typedef struct {
  * Assembles the Q operators on the same DM as the H(curl) solution vector.
  * Building Q once with global column indexing makes the operator
  * MPI-invariant. The routine opens no file; the caller supplies the
- * receiver coordinates.
+ * receiver coordinates. Q->cellCentroids records the cell of each receiver.
  *
  * @param[in]  receivers  Serial Vec (PETSC_COMM_SELF) of 3·N_recv reals,
  *                        laid out [x0 y0 z0 x1 y1 z1 ...]; produced by
@@ -77,9 +78,9 @@ typedef struct {
 PetscErrorCode buildReceiverInterpolationMatrices(Vec receivers, const DM dm, const Grid *grid, ReceiverInterpolationMatrices *Q);
 
 /**
- * @brief Destroys the matrices held in a ReceiverInterpolationMatrices struct.
+ * @brief Destroys the matrices and cell centroids held in a ReceiverInterpolationMatrices struct.
  *
- * @param[in,out] Q  Struct whose the matrices matrices are destroyed.
+ * @param[in,out] Q  Struct whose matrices and cell centroids are destroyed.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success,
  *         or a PETSc error code otherwise.

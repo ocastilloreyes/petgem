@@ -147,6 +147,7 @@ PetscErrorCode buildReceiverInterpolationMatrices(Vec receivers, const DM dm, co
   PetscSF            receiverSf = NULL;
   PetscInt           size, m, numFound, numSkipped = 0, *ownerRank;
   PetscBool         *rowAssembled;
+  PetscReal         *centroids;
   const PetscSFNode *recvInCell;
   const PetscInt    *recvFound;
   const PetscScalar *coords;
@@ -179,6 +180,8 @@ PetscErrorCode buildReceiverInterpolationMatrices(Vec receivers, const DM dm, co
   PetscCall(createBasisValues(grid->fem.numDofInCell, &Ni));
   PetscCall(createBasisValues(grid->fem.numDofInCell, &NiCurl));
   PetscCall(VecGetArrayRead(receivers, &coords));
+  /* Cell centroids (3 per receiver) followed by the number of cells per receiver */
+  PetscCall(PetscCalloc1((NUM_DIMENSIONS + 1) * Q->numReceivers, &centroids));
 
   for (PetscInt i = 0; i < numFound; i++) {
     const PetscInt ridx   = recvFound ? recvFound[i] : i;
@@ -213,7 +216,19 @@ PetscErrorCode buildReceiverInterpolationMatrices(Vec receivers, const DM dm, co
       PetscCall(computeCellJacobian(&cell));
     }
     PetscCall(addReceiverRow(dm, grid, ridx, point, &cell, cellId, Ni, NiCurl, Q));
+    PetscCall(computeCellCentroid(&cell));
+    for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) centroids[NUM_DIMENSIONS * ridx + d] = cell.centroid[d];
+    centroids[NUM_DIMENSIONS * Q->numReceivers + ridx] = 1.0;
   }
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, centroids, (PetscMPIInt)((NUM_DIMENSIONS + 1) * Q->numReceivers), MPIU_REAL, MPIU_SUM, comm));
+  PetscCall(PetscMalloc1(NUM_DIMENSIONS * Q->numReceivers, &Q->cellCentroids));
+  for (PetscInt r = 0; r < Q->numReceivers; r++) {
+    const PetscBool located = centroids[NUM_DIMENSIONS * Q->numReceivers + r] > 0.0 ? PETSC_TRUE : PETSC_FALSE;
+    for (PetscInt d = 0; d < NUM_DIMENSIONS; d++)
+      Q->cellCentroids[NUM_DIMENSIONS * r + d] =
+          located ? centroids[NUM_DIMENSIONS * r + d] : PetscRealPart(coords[NUM_DIMENSIONS * r + d]);
+  }
+  PetscCall(PetscFree(centroids));
   PetscCall(VecRestoreArrayRead(receivers, &coords));
 
   if (numSkipped > 0) {
@@ -231,11 +246,12 @@ PetscErrorCode buildReceiverInterpolationMatrices(Vec receivers, const DM dm, co
 }
 
 /**
- * @brief Destroys the matrices owned by a ReceiverInterpolationMatrices struct.
+ * @brief Destroys the matrices and cell centroids owned by a ReceiverInterpolationMatrices struct.
  */
 PetscErrorCode destroyReceiverInterpolationMatrices(ReceiverInterpolationMatrices *Q) {
   PetscFunctionBeginUser;
   for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(MatDestroy(&Q->mat[comp]));
+  PetscCall(PetscFree(Q->cellCentroids));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

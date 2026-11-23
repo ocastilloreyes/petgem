@@ -83,6 +83,30 @@ fails when the NRMSD is above ``-tolerance``. It reads
 ``-responses_filename`` to compare another file. See :doc:`quickstart` for
 running other orders.
 
+Secondary-field formulation
+***************************
+``survey/background_layers.txt`` is the model without the Oil layer, sea
+water over a sediment half-space; ``survey/background_sigmas.txt`` is the same
+background per material. ``build_bundles.sh <order> secondary`` embeds both in
+the bundle (see :doc:`formats`), and ``configs/params_secondary.txt`` selects
+``-csem_formulation secondary -csem_primary layered``:
+
+.. code-block:: bash
+
+   # Build the bundle with the background model
+   bash examples/fm_csem_marine/scripts/build_bundles.sh 1 secondary
+
+   # Run the secondary-field simulation
+   (cd examples/fm_csem_marine && mpirun -n 4 ../../build/fm.csem -options_file configs/params_secondary.txt)
+
+   # Post-process the total field
+   python3 examples/fm_csem_marine/scripts/postprocess.py -tolerance 0.03 \
+       -responses_filename outputs/responses_secondary_p1.h5 -figure_filename outputs/figure_secondary_p1.png
+
+The output holds the total field in ``fields`` and the field of the Oil layer
+in ``secondary_fields``. ``-csem_primary model`` uses the per-material
+background.
+
 .. figure:: /_static/images/fd_marine_p2.png
    :alt: Ex of fm.csem and of the reference along the receiver line
    :align: center

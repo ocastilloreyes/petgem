@@ -9,6 +9,9 @@ Overview
 - ``fm.mt`` - MT forward modeling (:doc:`mt_modeling`).
 - ``im.csem`` - frequency-domain CSEM inversion (:doc:`inverse_modeling`).
 
+``fm.csem`` and ``im.csem`` solve for the total field or for the secondary
+field of a layered or per-material background (:doc:`method`).
+
 Each kernel is a binary in ``build/``. The ``petgem`` dispatcher runs the same
 code, selected by a subcommand or by ``-mode``:
 
@@ -121,7 +124,7 @@ The cases in ``examples/`` share one layout: ``geometry/``, ``survey/``,
      - Homogeneous unit cube used by the test suite (:doc:`fd_examples`)
    * - ``examples/fm_csem_marine``
      - ``fm.csem``
-     - Marine CSEM model with a thin resistive layer (:doc:`fd_examples`)
+     - Marine CSEM model with a thin resistive layer, total and secondary-field formulations (:doc:`fd_examples`)
    * - ``examples/fm_tdcsem_halfspace``
      - ``fm.tdcsem``
      - Half-space time-domain CSEM with an analytical solution (:doc:`td_examples`)

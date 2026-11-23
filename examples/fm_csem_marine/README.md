@@ -37,11 +37,14 @@ fm_csem_marine/
 ├── survey/            transmitter, receivers, conductivities
 │   ├── sources.txt        source definition: frequency + dipole row
 │   ├── receivers.txt      receiver positions (x y z per row)
-│   └── sigmas.txt         per-material conductivity table (row order = tag - 1)
+│   ├── sigmas.txt         per-material conductivity table (row order = tag - 1)
+│   ├── background_layers.txt  layered background, secondary-field formulation
+│   └── background_sigmas.txt  per-material background, secondary-field formulation
 ├── configs/           solver options
-│   └── params.txt         forward solve (PCBDDC), order 1
+│   ├── params.txt         forward solve (PCBDDC), order 1
+│   └── params_secondary.txt  secondary-field formulation, order 1
 ├── scripts/           benchmark-specific drivers
-│   ├── build_bundles.sh   gmsh + preprocess --> outputs/input.h5
+│   ├── build_bundles.sh   gmsh + preprocess --> outputs/input.h5 ([order] [secondary])
 │   ├── run_fm.slurm       run fm.csem
 │   └── postprocess.py     compare Ex to the reference, print metrics, plot
 └── reference/         provided data and expected result
@@ -76,6 +79,30 @@ tolerance. On a cluster, submit the solve from `examples/fm_csem_marine` with
 For another order, run `build_bundles.sh 2` and add
 `-output_filename responses_p2` to the solve; `configs/params.txt` fixes the
 stem to `responses_p1`.
+
+## Secondary-field formulation
+
+The background is the model without the Oil layer: sea water over a sediment
+half-space (`survey/background_layers.txt`), or the same model given per
+material (`survey/background_sigmas.txt`). `fm.csem` solves for the field of
+the Oil layer and adds the background field at the receivers.
+
+```bash
+# 1. Bundle with the background model (/background)
+bash examples/fm_csem_marine/scripts/build_bundles.sh 1 secondary
+
+# 2. Secondary-field solve, layered background (-csem_primary layered)
+(cd examples/fm_csem_marine && mpirun -n 4 ../../build/fm.csem -options_file configs/params_secondary.txt)
+
+# 3. Validate the total field
+python3 examples/fm_csem_marine/scripts/postprocess.py -tolerance 0.03 \
+    -responses_filename outputs/responses_secondary_p1.h5 -figure_filename outputs/figure_secondary_p1.png
+```
+
+`outputs/responses_secondary_p1.h5` holds the total field in `fields` and the
+field of the Oil layer in `secondary_fields`. Add `-csem_primary model` to the
+solve for the per-material background. The bundle also runs the total-field
+formulation with `configs/params.txt`.
 
 ## Reference
 

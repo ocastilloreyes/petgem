@@ -17,15 +17,124 @@
  *     kernel of the curl-curl stiffness);
  *   - a positively oriented, non-degenerate cell Jacobian;
  *   - tetrahedronXyzToReference inverts x = v0 + J^T r, the frame of
- *     evaluateNedelecBasis.
+ *     evaluateNedelecBasis;
+ *   - interpolateNedelecCell of grad(phi_j) equals column j of G;
+ *   - interpolateNedelecCell reproduces a complex field of degree order - 1
+ *     plus b x x.
  *
  * Usage: test_elements <order>   (order in 1..6).  Exit 0 iff all checks pass.
  */
 #include "fem.h"
+#include "fe_nodal.h"
 #include "grid.h"
 #include "constants.h"
 #include "petgem_test.h"
 #include <petsc.h>
+
+/* Cell and order seen by the test fields. */
+typedef struct {
+  PetscInt         order;
+  const PetscReal *coords;
+  PetscReal        invJacobian[3][3];
+} FieldCtx;
+
+static const PetscReal polyAlpha[3]   = {0.3, -0.2, 0.5};
+static const PetscReal polyBeta[3][3] = {{0.7, -0.4, 0.2}, {0.1, 0.6, -0.3}, {-0.5, 0.2, 0.8}};
+static const PetscReal polyB[3]       = {0.4, -0.7, 0.25};
+
+/* Field j = grad(phi_j), phi_j the H1 basis function j of the cell. */
+static PetscErrorCode gradientFields(PetscInt numPoints, const PetscReal points[], PetscInt numFields, PetscScalar values[], void *ctx) {
+  PetscFunctionBeginUser;
+  const FieldCtx *c = (const FieldCtx *)ctx;
+  PetscReal       ShapH[FEM_MAX_H1_DOF], gradHbuf[3][FEM_MAX_H1_DOF], ref[3];
+  PetscReal      *GradH[3] = {gradHbuf[0], gradHbuf[1], gradHbuf[2]};
+
+  for (PetscInt q = 0; q < numPoints; q++) {
+    PetscCall(tetrahedronXyzToReference(c->coords, &points[q * 3], ref));
+    PetscCall(feNodalH1Shape(c->order, c->coords, ref, ShapH, GradH));
+    for (PetscInt j = 0; j < numFields; j++)
+      for (PetscInt d = 0; d < 3; d++)
+        values[(j * numPoints + q) * 3 + d] =
+            c->invJacobian[d][0] * GradH[0][j] + c->invJacobian[d][1] * GradH[1][j] + c->invJacobian[d][2] * GradH[2][j];
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* F_d(x) = (1 + 0.5i) (alpha_d + beta_d . x)^(order-1) + (b x x)_d */
+static void polyField(PetscInt order, const PetscReal x[3], PetscScalar F[3]) {
+  const PetscReal bx[3] = {polyB[1] * x[2] - polyB[2] * x[1], polyB[2] * x[0] - polyB[0] * x[2], polyB[0] * x[1] - polyB[1] * x[0]};
+  for (PetscInt d = 0; d < 3; d++) {
+    const PetscReal s = polyAlpha[d] + polyBeta[d][0] * x[0] + polyBeta[d][1] * x[1] + polyBeta[d][2] * x[2];
+    F[d]              = (1.0 + 0.5 * PETSC_i) * PetscPowRealInt(s, order - 1) + bx[d];
+  }
+}
+
+/* Every field is polyField. */
+static PetscErrorCode polyFields(PetscInt numPoints, const PetscReal points[], PetscInt numFields, PetscScalar values[], void *ctx) {
+  PetscFunctionBeginUser;
+  const FieldCtx *c = (const FieldCtx *)ctx;
+  for (PetscInt f = 0; f < numFields; f++)
+    for (PetscInt q = 0; q < numPoints; q++) polyField(c->order, &points[q * 3], &values[(f * numPoints + q) * 3]);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* interpolateNedelecCell against G and against polyField on one cell. */
+static void check_interpolation(PetscInt order, const PetscReal coords[12], PetscReal **G, const char *tag) {
+  const PetscInt dof = order * (order + 2) * (order + 3) / 2;
+  const PetscInt nH1 = (order + 1) * (order + 2) * (order + 3) / 6;
+
+  FemSpace fem;
+  PetscCallAbort(PETSC_COMM_SELF, PetscMemzero(&fem, sizeof(fem)));
+  fem.order        = order;
+  fem.numDofInCell = dof;
+
+  Cell cell;
+  PetscCallAbort(PETSC_COMM_SELF, PetscMemzero(&cell, sizeof(cell)));
+  for (int i = 0; i < 12; i++) cell.coordinates[i] = coords[i];
+  PetscCallAbort(PETSC_COMM_SELF, computeCellJacobian(&cell));
+
+  FieldCtx ctx;
+  ctx.order  = order;
+  ctx.coords = coords;
+  for (int i = 0; i < 3; i++)
+    for (int j = 0; j < 3; j++) ctx.invJacobian[i][j] = cell.invJacobian[i][j];
+
+  PetscScalar *coeff;
+  PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(nH1 * dof, &coeff));
+
+  /* interpolate(grad phi_j) == G[:, j] */
+  PetscCallAbort(PETSC_COMM_SELF, interpolateNedelecCell(&fem, &cell, gradientFields, &ctx, nH1, coeff));
+  PetscReal gErr = 0;
+  for (PetscInt j = 0; j < nH1; j++)
+    for (PetscInt i = 0; i < dof; i++) gErr = PetscMax(gErr, PetscAbsScalar(coeff[j * dof + i] - G[i][j]));
+  PT_CHECK(gErr < 1e-10, "[%s] order=%d: max |interpolate(grad phi) - G| = %.3e", tag, (int)order, gErr);
+
+  /* sum_i c_i N_i(x) == F(x) at interior points */
+  PetscCallAbort(PETSC_COMM_SELF, interpolateNedelecCell(&fem, &cell, polyFields, &ctx, 1, coeff));
+  PetscReal     **Ni;
+  const PetscReal refPoints[4][3] = {{0.25, 0.25, 0.25}, {0.1, 0.2, 0.3}, {0.6, 0.1, 0.05}, {0.05, 0.7, 0.2}};
+  PetscReal       fErr = 0, fMax = 0;
+  PetscCallAbort(PETSC_COMM_SELF, createBasisValues(dof, &Ni));
+  for (int p = 0; p < 4; p++) {
+    PetscReal   x[3];
+    PetscScalar F[3];
+    for (int d = 0; d < 3; d++)
+      x[d] = coords[d] + refPoints[p][0] * (coords[3 + d] - coords[d]) + refPoints[p][1] * (coords[6 + d] - coords[d]) +
+             refPoints[p][2] * (coords[9 + d] - coords[d]);
+    polyField(order, x, F);
+    PetscCallAbort(PETSC_COMM_SELF, evaluateNedelecBasis(&fem, &cell, refPoints[p], Ni, NULL));
+    for (int d = 0; d < 3; d++) {
+      PetscScalar u = 0;
+      for (PetscInt i = 0; i < dof; i++) u += coeff[i] * Ni[d][i];
+      fErr = PetscMax(fErr, PetscAbsScalar(u - F[d]));
+      fMax = PetscMax(fMax, PetscAbsScalar(F[d]));
+    }
+  }
+  PT_CHECK(fErr < 1e-10 * (1.0 + fMax), "[%s] order=%d: max |interpolant - F| = %.3e (max |F| = %.3e)", tag, (int)order, fErr, fMax);
+
+  PetscCallAbort(PETSC_COMM_SELF, destroyBasisValues(&Ni));
+  PetscCallAbort(PETSC_COMM_SELF, PetscFree(coeff));
+}
 
 static PetscReal **alloc2d(PetscInt r, PetscInt c) {
   PetscReal **m, *flat;
@@ -131,6 +240,8 @@ static void check_cell(PetscInt order, const PetscReal coords[12], const char *t
       PT_CLOSE(r[d], refPoints[i][d], 1e-12, "[%s] order=%d: tetrahedronXyzToReference point %d component %d = %.15g, expected %.15g", tag,
                (int)order, i, d, r[d], refPoints[i][d]);
   }
+
+  check_interpolation(order, coords, G, tag);
 
   free2d(Me);
   free2d(Ke);

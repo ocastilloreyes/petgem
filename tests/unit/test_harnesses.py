@@ -5,18 +5,27 @@
     level 2   test_dofs      per-entity DOF partition, node/tangent validity,
                              edge-first ordering
     level 3   test_elements  Me/Ke symmetry and definiteness, Ke . G = 0,
-                             cell Jacobian
+                             cell Jacobian, Nedelec interpolation
     boundary  test_boundary  2D quadrature, boundary faces, setupNedelecGrid
                              with PETGEM_BC_NATURAL and PETGEM_BC_PEC
     MT 1D     test_mt1d      solveMt1D vs the exact layered solution,
                              evalMt1DField, classifyMtBoxFaces, buildMt1DProfile
     MT RHS    test_mt_rhs    assembleMtBoundaryRhs against Eq. (10)
+    layered   test_csem_layered
+                             E and H of a dipole in a layered VTI medium vs
+                             empymod and the whole space, reciprocity, findLayer
+    background test_csem_background
+                             readCsemParams, loadCsemBackground of /background
+    primary   test_csem_primary
+                             createCsemPrimary, computeCsemPrimary (layered and
+                             model), assembleCsemSecondaryRhs,
+                             addCsemPrimaryAtReceivers
 
 Each harness prints "<n> failures" and exits non-zero on failure.
 """
 import pytest
 
-from fmcsem_testlib import ORDERS, run_harness
+from fmcsem_testlib import ORDERS, PIPELINE_ORDERS, run_harness
 
 # (harness, orders, rank counts)
 CASES = [
@@ -26,6 +35,9 @@ CASES = [
     ("test_boundary", ORDERS, [1, 3]),
     ("test_mt1d",     [1],    [1, 3]),
     ("test_mt_rhs",   ORDERS, [1, 3]),
+    ("test_csem_layered", [1], [1]),
+    ("test_csem_background", [1], [1]),
+    ("test_csem_primary", PIPELINE_ORDERS, [1, 3]),
 ]
 
 PARAMS = [pytest.param(name, order, nprocs, id=f"{name}-p{order}-np{nprocs}")

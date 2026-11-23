@@ -86,6 +86,21 @@ def parsePreprocessingArgs():
     parser.add_argument("-tdcsem_t_end", type=float, default=None,
                         help="Final time (s), required when -mode fm.tdcsem. "
                              "Written into the params file as -tdcsem_t_end.")
+    parser.add_argument("-background_layers_file", type=str, default=None,
+                        help="Layered background model text file inside case_dir "
+                             "(fm.csem and im.csem only). One row per layer, top "
+                             "to bottom: 'z_top sigma_h [sigma_v]' (m, z up; "
+                             "S/m); the first z_top is 'inf'; sigma_v defaults "
+                             "to sigma_h. Embedded into the bundle under "
+                             "/background/layer_*; the params file selects "
+                             "-csem_formulation secondary.")
+    parser.add_argument("-background_sigma_file", type=str, default=None,
+                        help="Per-material background conductivity text file "
+                             "inside case_dir (fm.csem and im.csem only), same "
+                             "format and rows as -sigma_file (the 'fixed' column "
+                             "is ignored). Embedded into the bundle under "
+                             "/background/material_sigma; the params file "
+                             "selects -csem_formulation secondary.")
     parser.add_argument("-error_level", type=float, default=None,
                         help="Amplitude-relative noise level written to the "
                              "bundle's /observed @error_level (inverse mode). "
@@ -167,6 +182,55 @@ def readSigmaTable(path):
     else:
         fixed_ids = []
     return sx, sy, sz, fixed_ids
+
+
+def readBackgroundLayers(path):
+    """Read a layered background model (``-background_layers_file``).
+
+    Whitespace-delimited, one row per layer from top to bottom, ``#`` comments
+    and blank lines allowed::
+
+        # z_top  sigma_h  [sigma_v]
+        inf      1e-8              # air
+        0        3.3333            # sea water
+        -1000    1.0      0.5      # sediments (VTI)
+
+    ``z_top`` is the height of the top of the layer (m, z up): ``inf`` for the
+    first layer, then strictly decreasing. ``sigma_v`` defaults to
+    ``sigma_h``.
+
+    Parameters
+    ----------
+    path : str
+        Text file.
+
+    Returns
+    -------
+    ztop, sigma_h, sigma_v : ndarray
+        Per-layer top height (m) and horizontal and vertical conductivity
+        (S/m).
+
+    Raises
+    ------
+    ValueError
+        No rows, rows with other than 2 or 3 columns, a first ``z_top`` other
+        than ``inf``, non-decreasing tops or a non-positive conductivity.
+    """
+    rows = [[float(tok) for tok in toks] for toks in _readTokens(path)]
+    if not rows:
+        raise ValueError(f"{path}: no layer rows found")
+    if any(len(row) not in (2, 3) for row in rows):
+        raise ValueError(f"{path}: expected 2 or 3 columns (z_top sigma_h [sigma_v]) on every row")
+    ztop = np.array([row[0] for row in rows])
+    sigma_h = np.array([row[1] for row in rows])
+    sigma_v = np.array([row[2] if len(row) == 3 else row[1] for row in rows])
+    if ztop[0] != np.inf:
+        raise ValueError(f"{path}: the first z_top must be 'inf', got {ztop[0]}")
+    if not np.all(np.isfinite(ztop[1:])) or np.any(np.diff(ztop[1:]) >= 0.0):
+        raise ValueError(f"{path}: z_top must be finite and strictly decreasing after the first layer, got {ztop.tolist()}")
+    if np.any(sigma_h <= 0.0) or np.any(sigma_v <= 0.0):
+        raise ValueError(f"{path}: conductivities must be positive")
+    return ztop, sigma_h, sigma_v
 
 
 def createDM(numDimensions, cells, coords, dm_view=False):
@@ -436,6 +500,37 @@ def writeMtPayload(filename, frequency):
     viewer.destroy()
 
 
+def writeBackgroundPayload(filename, layers=None, material_sigma=None):
+    """Write the background model (/background) into a bundle or a new HDF5 file.
+
+    Bundle additions::
+
+        /background/layer_ztop      Vec, N layer tops (m, z up), first +inf
+        /background/layer_sigma     Vec, 2N: sigma_h, sigma_v per layer (S/m)
+        /background/material_sigma  Vec, 3M: sigma_x, sigma_y, sigma_z per material (S/m)
+
+    Parameters
+    ----------
+    filename : str
+        Bundle path (written in append mode).
+    layers : tuple of array_like or None
+        ``(ztop, sigma_h, sigma_v)`` as returned by
+        :func:`readBackgroundLayers`. None skips the layer datasets.
+    material_sigma : array_like (M, 3) or None
+        Background conductivity per material id. None skips the dataset.
+    """
+    viewer = PETSc.ViewerHDF5().create(filename, "a")
+    viewer.pushGroup("/background")
+    if layers is not None:
+        ztop, sigma_h, sigma_v = (np.asarray(a, dtype=float) for a in layers)
+        _writeArrayAsVec(viewer, ztop, "layer_ztop")
+        _writeArrayAsVec(viewer, np.column_stack([sigma_h, sigma_v]).reshape(-1), "layer_sigma")
+    if material_sigma is not None:
+        _writeArrayAsVec(viewer, np.asarray(material_sigma, dtype=float).reshape(-1), "material_sigma")
+    viewer.popGroup()
+    viewer.destroy()
+
+
 def _writeArrayAsVec(viewer, arr, name):
     """View a 1-D float64 ndarray as a named PETSc Vec into the given viewer."""
     arr = np.ascontiguousarray(arr, dtype=float).reshape(-1)
@@ -611,7 +706,7 @@ _IM_TUNING_BLOCK = (
 
 
 def writeParamsFile(mode, output_dir, output_filename, input_filename,
-                    params_filename, tdcsem_t_end=None):
+                    params_filename, tdcsem_t_end=None, formulation=None):
     """Emit the PETSc options file for any kernel.
 
     The mode selects the solver block (BDDC for ``fm.csem`` and ``im.csem``,
@@ -635,6 +730,9 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
         Name of the params file to emit inside output_dir.
     tdcsem_t_end : float or None
         Final time (s), ``fm.tdcsem`` only.
+    formulation : {'total', 'secondary'} or None
+        Written as ``-csem_formulation`` (``fm.csem`` and ``im.csem``); None
+        omits the option.
     """
     if mode not in _SOLVER_BLOCK:
         raise ValueError(f"writeParamsFile: unknown mode {mode!r} "
@@ -645,6 +743,7 @@ def writeParamsFile(mode, output_dir, output_filename, input_filename,
         + _SOLVER_BLOCK[mode]
         + (_IM_TUNING_BLOCK if mode == "im.csem" else "")
         + (f"-tdcsem_t_end {tdcsem_t_end!r}\n" if mode == "fm.tdcsem" else "")
+        + (f"-csem_formulation {formulation}\n" if formulation is not None else "")
         + f"-output_dir {output_dir}/\n"
         + f"-output_filename {output_filename}\n"
     )
@@ -716,6 +815,14 @@ _MODE_INPUTS = {
     "fm.tdcsem": {"source_filename", "tdcsem_waveform_filename"},
 }
 
+# Optional input files: accepted in their modes only.
+_MODE_OPTIONAL_INPUTS = {
+    "fm.csem": {"background_layers_file", "background_sigma_file"},
+    "im.csem": {"background_layers_file", "background_sigma_file"},
+    "fm.mt":   set(),
+    "fm.tdcsem": set(),
+}
+
 
 def runPreprocessing(*, mode, order, case_dir,
                      mesh_filename, receiver_filename, source_filename=None,
@@ -728,6 +835,7 @@ def runPreprocessing(*, mode, order, case_dir,
                      error_level=None,
                      mt_frequency_filename=None,
                      tdcsem_waveform_filename=None, tdcsem_t_end=None,
+                     background_layers_file=None, background_sigma_file=None,
                      output_vtk=None, dm_view=False):
     """Build the input bundle and the parameter file for one kernel run.
 
@@ -772,6 +880,11 @@ def runPreprocessing(*, mode, order, case_dir,
         Source waveform ``t s(t)`` (``fm.tdcsem`` only).
     tdcsem_t_end : float or None
         Final time (s), written into the parameter file (``fm.tdcsem`` only).
+    background_layers_file, background_sigma_file : str or None
+        Layered (:func:`readBackgroundLayers`) and per-material
+        (:func:`readSigmaTable`) background models (``fm.csem`` and
+        ``im.csem`` only). Either one writes ``/background`` and
+        ``-csem_formulation secondary``.
     output_vtk : str or None
         Also write the conductivity and material ids to this VTU file.
     dm_view : bool
@@ -782,8 +895,9 @@ def runPreprocessing(*, mode, order, case_dir,
     ValueError
         Unknown mode, a mode-specific input missing or given to the wrong
         mode, material ids outside the conductivity table, more than one
-        frequency for ``fm.csem``, or observed data whose shape does not match
-        the sources and receivers.
+        frequency for ``fm.csem``, observed data whose shape does not match
+        the sources and receivers, or a background conductivity table whose
+        rows differ from the conductivity table.
     FileNotFoundError
         A required input file does not exist.
     """
@@ -797,6 +911,11 @@ def runPreprocessing(*, mode, order, case_dir,
         if name in _MODE_INPUTS[mode] and value is None:
             raise ValueError(f"runPreprocessing: -{name} is required when mode='{mode}'")
         if name not in _MODE_INPUTS[mode] and value is not None:
+            raise ValueError(f"runPreprocessing: -{name} is not valid with mode='{mode}'")
+    optional = {"background_layers_file": background_layers_file,
+                "background_sigma_file": background_sigma_file}
+    for name, value in optional.items():
+        if name not in _MODE_OPTIONAL_INPUTS[mode] and value is not None:
             raise ValueError(f"runPreprocessing: -{name} is not valid with mode='{mode}'")
     if (mode == "fm.tdcsem") != (tdcsem_t_end is not None):
         raise ValueError("runPreprocessing: -tdcsem_t_end is required with mode='fm.tdcsem' "
@@ -826,6 +945,9 @@ def runPreprocessing(*, mode, order, case_dir,
     observed_specs = [(comp, inCase(path)) for comp, path in observed_specs]
     input_mt_frequency_filename = inCase(mt_frequency_filename)
     input_td_waveform_filename  = inCase(tdcsem_waveform_filename)
+    input_background_layers     = inCase(background_layers_file)
+    input_background_sigma      = inCase(background_sigma_file)
+    has_background              = background_layers_file is not None or background_sigma_file is not None
 
     print("====================================================")
     print(f" PETGEM INPUT PREPROCESSING ({mode})")
@@ -844,6 +966,10 @@ def runPreprocessing(*, mode, order, case_dir,
         print(f"  IM sources file        : {input_im_sources_filename}")
         for comp, path in observed_specs:
             print(f"  Observed data file     : {path}" + (f"  ({comp})" if comp else ""))
+    if input_background_layers:
+        print(f"  Background layers file : {input_background_layers}")
+    if input_background_sigma:
+        print(f"  Background sigma file  : {input_background_sigma}")
     print(f"  Output bundle          : {output_filename}")
     print(f"\n  Number of materials    : {len(sigma_x)}")
 
@@ -862,6 +988,10 @@ def runPreprocessing(*, mode, order, case_dir,
             _require_input_file(path, "Observed-data file")
     else:
         _require_input_file(input_mt_frequency_filename, "MT frequency file")
+    if input_background_layers:
+        _require_input_file(input_background_layers, "Background layers file")
+    if input_background_sigma:
+        _require_input_file(input_background_sigma, "Background sigma file")
 
     # 1. Import mesh (Gmsh .msh or VTK .vtk/.vtu - meshio auto-detects the
     #    format from the extension/header). PETGEM is tetrahedral-only, so
@@ -945,6 +1075,22 @@ def runPreprocessing(*, mode, order, case_dir,
                 f"{src_path}: fm.csem solves one frequency per run, got "
                 f"{uniq_freqs.tolist()} Hz; build one bundle per frequency")
 
+    # 4b. Background model of the secondary formulation (layers and/or
+    #     per-material conductivity).
+    background_layers, background_material_sigma = None, None
+    if input_background_layers:
+        print("\nReading background layers")
+        background_layers = readBackgroundLayers(input_background_layers)
+        print(f"  Layers                  : {background_layers[0].size}")
+    if input_background_sigma:
+        print("\nReading background conductivity per material")
+        bx, by, bz, _ = readSigmaTable(input_background_sigma)
+        if bx.size != nmat:
+            raise ValueError(
+                f"{input_background_sigma}: {bx.size} row(s), the conductivity table has {nmat}")
+        background_material_sigma = np.column_stack([bx, by, bz])
+        print(f"  Materials               : {bx.size}")
+
     # 5. Build the DMPlex
     print("\nCreating PETSc DM (DMPlex)")
     plex = createDM(NUM_DIMENSIONS, cells, coords, dm_view=dm_view)
@@ -1009,10 +1155,18 @@ def runPreprocessing(*, mode, order, case_dir,
         print(f"  Wrote {written}, /im_meta/fixed_materials "
               f"into {output_filename}")
 
+    # 6c. Background model of the secondary formulation: append /background.
+    if has_background:
+        print("\nEmbedding background model into bundle")
+        writeBackgroundPayload(output_filename, layers=background_layers,
+                               material_sigma=background_material_sigma)
+        print(f"  Wrote /background into {output_filename}")
+
     # 7. Params file (one writer for every mode; mode selects the solver block)
     print("\nGenerating PETGEM parameter file")
     writeParamsFile(mode, case_dir, output_petgem_filename,
-                    input_filename, params_filename, tdcsem_t_end=tdcsem_t_end)
+                    input_filename, params_filename, tdcsem_t_end=tdcsem_t_end,
+                    formulation="secondary" if has_background else None)
     print(f"  Params file: {os.path.join(case_dir, params_filename)}")
 
     print("\n====================================================")
@@ -1057,7 +1211,7 @@ def readBundle(filename):
     }
 
 
-def readResponses(filename, source=1):
+def readResponses(filename, source=1, group="fields"):
     """Read the fields of one transmitter from an ``fm.csem`` output file.
 
     Parameters
@@ -1066,6 +1220,9 @@ def readResponses(filename, source=1):
         Path to the responses HDF5 file.
     source : int, optional
         1-based source index (default 1).
+    group : str, optional
+        ``"fields"`` (default; total field) or ``"secondary_fields"``
+        (secondary field of a ``-csem_formulation secondary`` run).
 
     Returns
     -------
@@ -1082,35 +1239,43 @@ def readResponses(filename, source=1):
     Raises
     ------
     KeyError
-        The file has no ``/sources/src{source}`` group.
+        The file has no ``/sources/src{source}`` group or no ``group``
+        subgroup in it.
     """
     import h5py
 
     src_group    = f"/sources/src{int(source)}"
-    fields_group = f"{src_group}/fields"
+    fields_group = f"{src_group}/{group}"
 
     out = {}
-    for name in ('Ex', 'Ey', 'Ez', 'Hx', 'Hy', 'Hz'):
-        out[name] = np.array(readVectorH5(filename, name, group=fields_group))
-
     with h5py.File(filename, 'r') as f:
         if src_group not in f:
             raise KeyError(
                 f"{filename}: missing group {src_group!r} (file holds "
                 f"{int(f.attrs.get('num_sources', -1))} sources)"
             )
+        if fields_group not in f:
+            raise KeyError(
+                f"{filename}: missing group {fields_group!r} (formulation "
+                f"{_decodeH5Attr(f.attrs.get('formulation', 'total'))!r})"
+            )
         out['source']     = {key: _decodeH5Attr(value) for key, value in f[src_group].attrs.items()}
         out['provenance'] = {key: _decodeH5Attr(value) for key, value in f.attrs.items()}
+
+    for name in ('Ex', 'Ey', 'Ez', 'Hx', 'Hy', 'Hz'):
+        out[name] = np.array(readVectorH5(filename, name, group=fields_group))
     return out
 
 
-def readAllResponses(filename):
+def readAllResponses(filename, group="fields"):
     """Read the fields of every transmitter from an ``fm.csem`` output file.
 
     Parameters
     ----------
     filename : str
         Path to the responses HDF5 file.
+    group : str, optional
+        ``"fields"`` (default) or ``"secondary_fields"`` (see ``readResponses``).
 
     Returns
     -------
@@ -1120,7 +1285,7 @@ def readAllResponses(filename):
           provenance : dict of root-level attributes (see ``readResponses``)
           num_sources : int
           sources    : dict keyed by 1-based source index; each value has the
-                       same shape as ``readResponses(filename, source=k)``
+                       same shape as ``readResponses(filename, source=k, group=group)``
                        (Ex..Hz arrays + 'source' attrs + 'provenance').
 
     """
@@ -1132,7 +1297,7 @@ def readAllResponses(filename):
         if num_sources <= 0 and '/sources' in f:
             num_sources = len([name for name in f['/sources'].keys() if name.startswith('src')])
 
-    sources = {source: readResponses(filename, source=source)
+    sources = {source: readResponses(filename, source=source, group=group)
                for source in range(1, num_sources + 1)}
     return {
         'provenance':  provenance,

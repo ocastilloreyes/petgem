@@ -41,6 +41,14 @@ typedef struct {
 } Quadrature2D;
 
 /**
+ * @brief Evaluates numFields vector fields at physical points.
+ *
+ * values[(f * numPoints + q) * 3 + d] is component d of field f at point q;
+ * points[q * 3 + d] is coordinate d of point q.
+ */
+typedef PetscErrorCode (*VectorFieldFn)(PetscInt numPoints, const PetscReal points[], PetscInt numFields, PetscScalar values[], void *ctx);
+
+/**
  * @brief Computes a 3D unit vector from sequential azimuth/dip rotations.
  *
  * @param[in]  azimuth         Azimuth angle (degrees).
@@ -185,5 +193,27 @@ PetscErrorCode buildDiscreteGradientMatrix(const FemSpace *fem, const Cell *cell
  */
 PetscErrorCode evaluateNedelecBasis(const FemSpace *fem, const Cell *cell, const PetscReal point[NUM_DIMENSIONS], PetscReal **Ni,
                                     PetscReal **NiCurl);
+
+/**
+ * @brief Interpolates vector fields onto the Nedelec space of one cell.
+ *
+ * The coefficient of each DOF is the tangential component of the field at the
+ * DOF node (feNedelecGetDofInfo) in the reference cell, with the covariant
+ * pullback and the orientation of buildDiscreteGradientMatrix, so
+ * interpolating grad(phi_j) gives column j of the discrete gradient block.
+ * Fields of polynomial degree <= order - 1 are reproduced exactly. The field
+ * is evaluated once per distinct DOF node.
+ *
+ * @param[in]  fem        Finite-element space descriptor.
+ * @param[in]  cell       Cell geometry.
+ * @param[in]  field      Field evaluator.
+ * @param[in]  ctx        Context passed to field.
+ * @param[in]  numFields  Number of fields.
+ * @param[out] coeff      Coefficients in DMPlex closure order: coeff[f * numDofInCell + i].
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ */
+PetscErrorCode interpolateNedelecCell(const FemSpace *fem, const Cell *cell, VectorFieldFn field, void *ctx, PetscInt numFields,
+                                      PetscScalar *coeff);
 
 #endif

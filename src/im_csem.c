@@ -10,6 +10,7 @@
 /* PETGEM functions */
 #include "common.h"
 #include "constants.h"
+#include "csem_primary.h"
 #include "grid.h"
 #include "inversion.h"
 #include "io.h"
@@ -52,8 +53,17 @@ OPTIONAL  (inversion control; defaults in brackets)\n\
   -im_gradient_check         Check the adjoint gradient and stop\n\
   -im_gradient_check_eps <l> Check step sizes   [1e-1,1e-2,1e-3,1e-4]\n\
 \n\
+FIELD FORMULATION  (defaults in brackets)\n\
+  -csem_formulation <f>      total | secondary            [total]\n\
+  -csem_primary <p>          Background of the secondary field:\n\
+                             layered | model  [layered if the\n\
+                             background has layers, else model]\n\
+  -csem_background_file <f>  HDF5 file with the /background group\n\
+                             [the input bundle]\n\
+\n\
  Every inversion option is -im_* (matching this kernel and the\n\
- `petgem im.csem` subcommand).\n\
+ `petgem im.csem` subcommand); the formulation options -csem_* are\n\
+ shared with fm.csem.\n\
 \n\
 EXAMPLES\n\
   mpirun -n 56 ./im.csem -options_file params_p1.txt -output_dir out/\n\
@@ -73,6 +83,9 @@ int runInverse(int argc, char **argv) {
   DM             dm;
   Vec            conductivity, materialsId, receivers;
   ImParams       imParams; /* imParams.common holds the parameters shared with fm.csem */
+  CsemParams     csemParams;
+  CsemBackground background;
+  PetscBool      secondary;
   Grid           grid;
   InversionStats stats;
   MPI_Comm       comm;
@@ -85,6 +98,7 @@ int runInverse(int argc, char **argv) {
   PetscCall(beginPhase(&run, PHASE_PARSE));
   PetscCall(readPetgemParams(&imParams.common));
   PetscCall(readImParams(&imParams));
+  PetscCall(readCsemParams(&imParams.common, &csemParams));
   PetscCall(endPhase(&run, PHASE_PARSE));
   if (run.helpRequested) {
     PetscCall(endHelpRun(&run));
@@ -100,6 +114,8 @@ int runInverse(int argc, char **argv) {
   PetscCall(beginPhase(&run, PHASE_LOAD));
   PetscCall(loadModelInputs(&imParams.common, &dm, &conductivity, &materialsId, &receivers));
   PetscCall(setupInversionSources(imParams.common.inputFile, &imParams));
+  secondary = (csemParams.formulation == CSEM_FORMULATION_SECONDARY) ? PETSC_TRUE : PETSC_FALSE;
+  if (secondary) PetscCall(loadCsemBackground(&csemParams, &background));
   PetscCall(endPhase(&run, PHASE_LOAD));
 
   /* Setup grid */
@@ -111,7 +127,7 @@ int runInverse(int argc, char **argv) {
 
   /* L-BFGS inversion */
   PetscCall(beginPhase(&run, PHASE_SOLVE));
-  PetscCall(runCsemInversion(&imParams, dm, &grid, conductivity, materialsId, receivers, &stats));
+  PetscCall(runCsemInversion(&imParams, dm, &grid, conductivity, materialsId, receivers, secondary ? &background : NULL, &stats));
   PetscCall(endPhase(&run, PHASE_SOLVE));
 
   {
@@ -142,6 +158,7 @@ int runInverse(int argc, char **argv) {
   }
 
   /* Free memory */
+  if (secondary) PetscCall(destroyCsemBackground(&background));
   PetscCall(destroyGrid(&grid));
   PetscCall(DMDestroy(&dm));
   PetscCall(VecDestroy(&conductivity));

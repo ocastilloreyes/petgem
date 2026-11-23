@@ -23,8 +23,9 @@ petgem-env.sif
 petgem*.err
 petgem*.out
 
-# Python bytecode
+# Python bytecode and test caches
 **/__pycache__/
+.pytest_cache/
 
 # Editor / OS noise
 .DS_Store

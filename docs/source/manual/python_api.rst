@@ -33,6 +33,10 @@ Preprocessing
 
 .. autofunction:: petgem.readSigmaTable
 
+.. autofunction:: petgem.readBackgroundLayers
+
+.. autofunction:: petgem.writeBackgroundPayload
+
 .. autofunction:: petgem.readSourcesText
 
 .. autofunction:: petgem.readObservedData

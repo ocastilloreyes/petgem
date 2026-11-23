@@ -18,6 +18,7 @@
 #include "io.h"  /* PetgemParams: shared base parameters embedded below */
 #include "receiver_interp.h"
 #include "csem.h"
+#include "csem_primary.h"
 
 /** @brief simulation_type tag of im.csem products. */
 #define PETGEM_SIM_IM "im.csem"
@@ -176,10 +177,12 @@ typedef struct {
  * @brief Per-frequency data, built once and reused by every evaluation.
  */
 typedef struct {
-  PetscScalar iwmu;                         /**< i omega mu. */
-  Vec         B;                            /**< Source right-hand side (global, on dm). */
-  Vec         dObs[IM_NUM_DATA_COMPONENTS]; /**< Observed data per fitted component (sequential). */
-  Vec         W[IM_NUM_DATA_COMPONENTS];    /**< Data weights 1 / (|dObs| errorLevel), 0 for missing data (sequential). */
+  PetscScalar iwmu;                             /**< i omega mu. */
+  Vec         B;                                /**< Source right-hand side (global, on dm). */
+  Vec         dObs[IM_NUM_DATA_COMPONENTS];     /**< Observed data per fitted component (sequential). */
+  Vec         W[IM_NUM_DATA_COMPONENTS];        /**< Data weights 1 / (|dObs| errorLevel), 0 for missing data (sequential). */
+  Vec         Ep;                               /**< Secondary formulation: E_p,h (local, owned by the primary field); NULL otherwise. */
+  Vec         recvPrimary[NUM_RECEIVER_FIELDS]; /**< Secondary formulation: primary E and H at the receivers (parallel, like recv). */
 } InversionFrequency;
 
 /**
@@ -233,6 +236,8 @@ typedef struct {
   KSP                 ksp;                         /**< Solver bound to A (forward and adjoint solves of every frequency). */
   PetscInt            numFreqs;                    /**< Number of frequencies. */
   InversionFrequency *freq;                        /**< Per-frequency data and solvers. */
+  const CsemPrimary  *primary;                     /**< Primary field of the secondary formulation; NULL for the total field. */
+  Mat                *Bs;                          /**< Secondary formulation: right-hand side of each frequency (one column). */
 } InversionContext;
 
 /* ------------------------------------------------------------------ */
@@ -395,18 +400,25 @@ typedef struct {
  * consumed once by buildReceiverInterpolationMatrices; the caller retains
  * ownership for cleanup.
  *
- * @param[in]  imParams       Inversion parameters.
- * @param[in]  dm            H(curl) DM.
- * @param[in]  grid          Finite-element grid descriptor.
- * @param[in]  conductivity  Initial per-cell conductivity Vec.
- * @param[in]  materialsId   Per-cell material-id Vec.
- * @param[in]  receivers     Serial Vec of 3·N_recv receiver coordinates.
- * @param[out] stats         Wall times and counters for the run report.
+ * With background, the forward problems are solved for the secondary field:
+ * sigma_b is compared with the isotropic model of X = 0, E_p,h is computed on
+ * the free cells and the cells with sigma != sigma_b, the right-hand sides are
+ * reassembled for every model, the predicted data are the total fields and
+ * the gradient uses x_s + E_p,h.
+ *
+ * @param[in]     imParams      Inversion parameters.
+ * @param[in]     dm            H(curl) DM.
+ * @param[in]     grid          Finite-element grid descriptor.
+ * @param[in]     conductivity  Initial per-cell conductivity Vec.
+ * @param[in]     materialsId   Per-cell material-id Vec.
+ * @param[in]     receivers     Serial Vec of 3·N_recv receiver coordinates.
+ * @param[in]     background    Background model of the secondary formulation (loadCsemBackground), or NULL for the total field.
+ * @param[out]    stats         Wall times and counters for the run report.
  *
  * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
  */
 PetscErrorCode runCsemInversion(const ImParams *imParams, const DM dm, const Grid *grid, Vec conductivity, Vec materialsId, Vec receivers,
-                                InversionStats *stats);
+                                const CsemBackground *background, InversionStats *stats);
 
 /**
  * @brief Frees the NeighborGraph memory.

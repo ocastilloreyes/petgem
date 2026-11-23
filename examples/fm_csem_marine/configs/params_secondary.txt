@@ -1,0 +1,17 @@
+# fm.csem forward config - marine CSEM benchmark, order 1, secondary-field
+# formulation with the layered background of survey/background_layers.txt.
+# Consumes the bundle built by scripts/build_bundles.sh <order> secondary.
+# -csem_primary model uses the per-material background instead.
+
+-input_filename   outputs/input.h5
+-output_dir       outputs/
+-output_filename  responses_secondary_p1
+
+-csem_formulation secondary
+-csem_primary     layered
+
+-dm_mat_type                 is
+-ksp_type                    fgmres
+-pc_type                     bddc
+-pc_bddc_use_deluxe_scaling  1
+-pc_bddc_coarse_pc_type      lu
