@@ -33,7 +33,8 @@ PetscBool feNodalSupports(PetscInt order);
  * @param[out] ShapH         Shape values, one per H1 DOF, in closure order.
  * @param[out] GradH         Reference gradients: GradH[d][dof], d in [0,3).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode feNodalH1Shape(PetscInt order, const PetscReal *vertexCoords, const PetscReal X[3], PetscReal *ShapH, PetscReal **GradH);
 

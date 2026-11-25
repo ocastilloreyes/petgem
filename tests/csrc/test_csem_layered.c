@@ -16,14 +16,24 @@
  *
  * Usage: test_csem_layered   Exit 0 iff all checks pass.
  */
-#include "constants.h"
-#include "csem_layered.h"
-#include "petgem_test.h"
+/* PETSc libraries */
 #include <petsc.h>
 
+/* PETGEM functions */
+#include "constants.h"
+#include "csem_layered.h"
 #include "csem_layered_reference.h"
+#include "petgem_test.h"
 
-/* max_d |a_d - b_d| / max_d |b_d| over the three components. */
+/**
+ * @brief Relative error max_d |a_d - b_d| / max_d |b_d| over the three
+ *        components.
+ *
+ * @param[in] a  Computed vector.
+ * @param[in] b  Reference vector.
+ *
+ * @return PetscReal Relative error.
+ */
 static PetscReal relativeError(const PetscScalar a[3], const PetscScalar b[3]) {
   PetscReal err = 0.0, scale = 0.0;
   for (int d = 0; d < 3; d++) {
@@ -33,7 +43,18 @@ static PetscReal relativeError(const PetscScalar a[3], const PetscScalar b[3]) {
   return err / scale;
 }
 
-/* E and H at points of the dipole (position, moment) in a model. */
+/**
+ * @brief E and H of a dipole at a set of points in a layered model.
+ *
+ * @param[in]  model     Layered model.
+ * @param[in]  freq      Frequency (Hz).
+ * @param[in]  position  Dipole position.
+ * @param[in]  moment    Dipole moment.
+ * @param[in]  n         Number of points.
+ * @param[in]  points    Point coordinates.
+ * @param[out] E         Electric field (3 per point).
+ * @param[out] H         Magnetic field (3 per point).
+ */
 static void dipoleFields(const LayeredModel *model, PetscReal freq, const PetscReal position[3], const PetscReal moment[3], PetscInt n,
                          const PetscReal *points, PetscScalar *E, PetscScalar *H) {
   LayeredDipole dipole;
@@ -42,7 +63,17 @@ static void dipoleFields(const LayeredModel *model, PetscReal freq, const PetscR
   PetscCallAbort(PETSC_COMM_SELF, destroyLayeredDipole(&dipole));
 }
 
-/* E and H of the dipole p at xs in a whole space of conductivity sigma, e^{-iwt}. */
+/**
+ * @brief E and H of a dipole in a whole space, time convention e^{-iwt}.
+ *
+ * @param[in]  sigma  Conductivity (S/m).
+ * @param[in]  freq   Frequency (Hz).
+ * @param[in]  xs     Dipole position.
+ * @param[in]  p      Dipole moment.
+ * @param[in]  x      Point coordinates.
+ * @param[out] E      Electric field.
+ * @param[out] H      Magnetic field.
+ */
 static void wholeSpace(PetscReal sigma, PetscReal freq, const PetscReal xs[3], const PetscReal p[3], const PetscReal x[3], PetscScalar E[3],
                        PetscScalar H[3]) {
   const PetscReal   w = angularFrequency(freq);
@@ -67,6 +98,9 @@ static void wholeSpace(PetscReal sigma, PetscReal freq, const PetscReal xs[3], c
   }
 }
 
+/**
+ * @brief Checks the layered fields against the empymod reference cases.
+ */
 static void check_reference(void) {
   for (size_t c = 0; c < sizeof(layeredReference) / sizeof(layeredReference[0]); c++) {
     const LayeredReference *ref = &layeredReference[c];
@@ -90,6 +124,10 @@ static void check_reference(void) {
   }
 }
 
+/**
+ * @brief Checks the fields of one and four equal layers against the whole
+ *        space.
+ */
 static void check_whole_space(void) {
   const PetscReal sigma = 0.3, freq = 3.0;
   const PetscReal s1[1] = {sigma}, s4[4] = {sigma, sigma, sigma, sigma}, interfaces4[3] = {-100.0, -300.0, -700.0};
@@ -119,6 +157,10 @@ static void check_whole_space(void) {
   PetscCallAbort(PETSC_COMM_SELF, destroyLayeredModel(&four));
 }
 
+/**
+ * @brief Checks source-receiver reciprocity G_ab(x1, x0) = G_ba(x0, x1) of the
+ *        layered kernels.
+ */
 static void check_reciprocity(void) {
   const PetscReal interfaces[4] = {0.0, -1000.0, -2000.0, -2100.0};
   const PetscReal sh[5] = {1e-8, 3.3333, 1.0, 0.01, 1.0}, sv[5] = {1e-8, 3.3333, 0.5, 0.01, 0.5};
@@ -148,6 +190,10 @@ static void check_reciprocity(void) {
   PetscCallAbort(PETSC_COMM_SELF, destroyLayeredModel(&model));
 }
 
+/**
+ * @brief Checks the layer assigned to heights above, inside and on the
+ *        interfaces.
+ */
 static void check_find_layer(void) {
   const PetscReal interfaces[2] = {0.0, -100.0}, s[3] = {1e-8, 0.1, 0.01};
   const PetscReal z[6]     = {10.0, 0.0, -50.0, -100.0, -100.5, -1e6};
@@ -160,6 +206,10 @@ static void check_find_layer(void) {
   PetscCallAbort(PETSC_COMM_SELF, destroyLayeredModel(&model));
 }
 
+/**
+ * @brief Checks the fields at receivers on an interface evaluated in the layer
+ *        above and below.
+ */
 static void check_interface_side(void) {
   const PetscReal interfaces[2] = {0.0, -100.0}, sh[3] = {1e-8, 0.1, 0.02}, sv[3] = {1e-8, 0.05, 0.02};
   const PetscReal xs[3] = {0.0, 0.0, -40.0}, p[3] = {0.6, 0.3, 0.74}, freq = 1.0;
@@ -168,7 +218,6 @@ static void check_interface_side(void) {
   PetscScalar     Ea[6], Ha[6], Eb[6], Hb[6], E0[6], H0[6];
   LayeredModel    model;
   LayeredDipole   dipole;
-  PetscErrorCode  ierr;
 
   PetscCallAbort(PETSC_COMM_SELF, createLayeredModel(3, interfaces, sh, sv, &model));
   PetscCallAbort(PETSC_COMM_SELF, createLayeredDipole(&model, freq, xs, p, &dipole));
@@ -194,6 +243,7 @@ static void check_interface_side(void) {
     const PetscReal x[3]     = {300.0, 0.0, -50.0};
     const PetscInt  wrong[1] = {2};
     PetscScalar     E[3];
+    PetscErrorCode  ierr;
     PetscCallAbort(PETSC_COMM_SELF, PetscPushErrorHandler(PetscReturnErrorHandler, NULL));
     ierr = evaluateLayeredDipole(&dipole, 1, x, wrong, E, NULL);
     PetscCallAbort(PETSC_COMM_SELF, PetscPopErrorHandler());
@@ -212,6 +262,15 @@ static void check_interface_side(void) {
   PetscCallAbort(PETSC_COMM_SELF, destroyLayeredModel(&model));
 }
 
+/**
+ * @brief Runs the layered dipole checks and reports the number of failures.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector; argv[1] is the basis order where the
+ *                  harness takes one.
+ *
+ * @return int 0 when every check passes, non-zero otherwise.
+ */
 int main(int argc, char **argv) {
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
 

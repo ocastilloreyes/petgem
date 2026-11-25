@@ -26,6 +26,10 @@
  *
  * Usage: test_csem_primary <order>   (order 1-4) Exit 0 iff all checks pass.
  */
+/* PETSc libraries */
+#include <petsc.h>
+
+/* PETGEM functions */
 #include "assembly.h"
 #include "box_mesh.h"
 #include "constants.h"
@@ -36,7 +40,6 @@
 #include "petgem_test.h"
 #include "receiver_interp.h"
 #include "solver.h"
-#include <petsc.h>
 
 static const PetscInt  boxFaces[3]       = {4, 4, 4};
 static const PetscReal boxLower[3]       = {-600.0, -600.0, -1000.0};
@@ -46,21 +49,49 @@ static const PetscReal backgroundSigma[] = {0.1, 0.1, 0.1, 1.0, 1.0, 1.0, 1.0, 1
 static const PetscReal freq              = 1.0;
 static const PetscReal receiverXyz[9]    = {100.0, 50.0, -10.0, -400.0, 300.0, -600.0, 250.0, -350.0, -900.0};
 
-/* Material 0 above z = -500, 1 below, 2 in the block (-300, 0) x (0, 300) x (-750, -500). */
+/**
+ * @brief Material at a point.
+ *
+ * Material 0 above z = -500, 1 below, 2 in the block (-300, 0) x (0, 300) x
+ * (-750, -500).
+ *
+ * @param[in] x  Point coordinates.
+ *
+ * @return PetscInt Material id.
+ */
 static PetscInt materialAt(const PetscReal x[3]) {
   if (x[0] > -300.0 && x[0] < 0.0 && x[1] > 0.0 && x[1] < 300.0 && x[2] > -750.0 && x[2] < -500.0) return 2;
   return x[2] > -500.0 ? 0 : 1;
 }
 
+/**
+ * @brief Material id at a point as a real (cell field callback).
+ *
+ * @param[in] x  Point coordinates.
+ *
+ * @return PetscReal Material id.
+ */
 static PetscReal materialOf(const PetscReal x[3]) {
   return (PetscReal)materialAt(x);
 }
 
+/**
+ * @brief Conductivity of the material at a point (cell field callback).
+ *
+ * @param[in] x  Point coordinates.
+ *
+ * @return PetscReal sigma_x of the material.
+ */
 static PetscReal sigmaOf(const PetscReal x[3]) {
   return materialSigma[3 * materialAt(x)];
 }
 
-/* Per-cell material id Vec laid out as loadModelInputs builds it. */
+/**
+ * @brief Per-cell material id Vec laid out as loadModelInputs() builds it.
+ *
+ * @param[in]  dm   DMPlex mesh.
+ * @param[out] mat  Per-cell material id.
+ */
 static void create_cell_material(DM dm, Vec *mat) {
   DM                 dmM;
   PetscSection       sec;
@@ -90,7 +121,17 @@ static void create_cell_material(DM dm, Vec *mat) {
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dmM));
 }
 
-/* Box mesh with the H(curl) space of the given order, conductivity and material ids. */
+/**
+ * @brief Box mesh with the H(curl) space of one order, its conductivity and
+ *        material ids.
+ *
+ * @param[in]  order  Basis order.
+ * @param[in]  bc     Boundary condition.
+ * @param[out] dm     Box mesh.
+ * @param[out] grid   Grid.
+ * @param[out] sigma  Per-cell conductivity.
+ * @param[out] mat    Per-cell material id.
+ */
 static void setup(PetscInt order, PetgemBoundaryCondition bc, DM *dm, Grid *grid, Vec *sigma, Vec *mat) {
   create_box_mesh(boxFaces, boxLower, boxUpper, 0.0, dm);
   PetscCallAbort(PETSC_COMM_WORLD, setupNedelecGrid(order, bc, dm, grid));
@@ -98,6 +139,14 @@ static void setup(PetscInt order, PetgemBoundaryCondition bc, DM *dm, Grid *grid
   create_cell_material(*dm, mat);
 }
 
+/**
+ * @brief Destroys the objects created by setup().
+ *
+ * @param[in,out] dm     Box mesh.
+ * @param[in,out] grid   Grid.
+ * @param[in,out] sigma  Per-cell conductivity.
+ * @param[in,out] mat    Per-cell material id.
+ */
 static void teardown(DM *dm, Grid *grid, Vec *sigma, Vec *mat) {
   PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(mat));
   PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(sigma));
@@ -108,12 +157,22 @@ static void teardown(DM *dm, Grid *grid, Vec *sigma, Vec *mat) {
 /* Two transmitters in the top layer, frequency freq. */
 static CsemSource sourceArray[2] = {{{150.0, -150.0, -200.0}, 2.0, 50.0, 20.0, 30.0}, {{-140.0, 160.0, -230.0}, 1.0, 100.0, -10.0, 120.0}};
 
+/**
+ * @brief Two transmitters in the top layer at frequency freq.
+ *
+ * @return CsemSourceSet Source set.
+ */
 static CsemSourceSet sourceSet(void) {
   CsemSourceSet set = {freq, 2, sourceArray};
   return set;
 }
 
-/* Layered background with the given interface. */
+/**
+ * @brief Two-layer background with one interface.
+ *
+ * @param[in]  interface  Height of the interface (m).
+ * @param[out] bg         Background model.
+ */
 static void layered_background(PetscReal interface, CsemBackground *bg) {
   const PetscReal s[2] = {0.1, 1.0};
   PetscCallAbort(PETSC_COMM_WORLD, PetscMemzero(bg, sizeof(*bg)));
@@ -121,7 +180,13 @@ static void layered_background(PetscReal interface, CsemBackground *bg) {
   PetscCallAbort(PETSC_COMM_WORLD, createLayeredModel(2, &interface, s, s, &bg->layered));
 }
 
-/* Model background with numMaterials rows of table. */
+/**
+ * @brief Model background with numMaterials rows of a conductivity table.
+ *
+ * @param[in]  table         sigma_x, sigma_y, sigma_z per material.
+ * @param[in]  numMaterials  Number of materials.
+ * @param[out] bg            Background model.
+ */
 static void model_background(const PetscReal *table, PetscInt numMaterials, CsemBackground *bg) {
   PetscCallAbort(PETSC_COMM_WORLD, PetscMemzero(bg, sizeof(*bg)));
   bg->type         = CSEM_PRIMARY_MODEL;
@@ -130,13 +195,26 @@ static void model_background(const PetscReal *table, PetscInt numMaterials, Csem
   PetscCallAbort(PETSC_COMM_WORLD, PetscArraycpy(bg->materialSigma, table, 3 * numMaterials));
 }
 
-/* Global E_p,h of source k of set 0. */
+/**
+ * @brief Global Vec of E_p,h of source k of set 0.
+ *
+ * @param[in]  dm       DMPlex carrying the H(curl) section.
+ * @param[in]  primary  Primary field.
+ * @param[in]  k        Source.
+ * @param[out] x        Global Vec.
+ */
 static void primary_global(const DM dm, const CsemPrimary *primary, PetscInt k, Vec *x) {
   PetscCallAbort(PETSC_COMM_WORLD, DMCreateGlobalVector(dm, x));
   PetscCallAbort(PETSC_COMM_WORLD, DMLocalToGlobal(dm, primary->Ep[0][k], INSERT_VALUES, *x));
 }
 
-/* Sequential receiver Vec of n points. */
+/**
+ * @brief Sequential receiver Vec of n points.
+ *
+ * @param[in]  n    Number of points.
+ * @param[in]  xyz  Point coordinates.
+ * @param[out] r    Receiver Vec.
+ */
 static void receiver_vec(PetscInt n, const PetscReal *xyz, Vec *r) {
   PetscScalar *a;
   PetscCallAbort(PETSC_COMM_SELF, VecCreateSeq(PETSC_COMM_SELF, 3 * n, r));
@@ -146,7 +224,15 @@ static void receiver_vec(PetscInt n, const PetscReal *xyz, Vec *r) {
   PetscCallAbort(PETSC_COMM_SELF, VecRestoreArray(*r, &a));
 }
 
-/* max_f ||a_f - b_f|| / max_f ||b_f|| over the receiver fields. */
+/**
+ * @brief Relative error max_f ||a_f - b_f|| / max_f ||b_f|| over the receiver
+ *        fields.
+ *
+ * @param[in] a  Computed fields.
+ * @param[in] b  Reference fields.
+ *
+ * @return PetscReal Relative error.
+ */
 static PetscReal fields_error(Vec a[NUM_RECEIVER_FIELDS], Vec b[NUM_RECEIVER_FIELDS]) {
   PetscReal err = 0.0, scale = 0.0;
   for (PetscInt f = 0; f < NUM_RECEIVER_FIELDS; f++) {
@@ -163,6 +249,12 @@ static PetscReal fields_error(Vec a[NUM_RECEIVER_FIELDS], Vec b[NUM_RECEIVER_FIE
   return err / scale;
 }
 
+/**
+ * @brief Checks the background conductivity and the cell counts of the layered
+ *        and model backgrounds.
+ *
+ * @param[in] order  Basis order.
+ */
 static void check_background(PetscInt order) {
   DM             dm;
   Grid           grid;
@@ -227,6 +319,11 @@ static void check_background(PetscInt order) {
   teardown(&dm, &grid, &sigma, &mat);
 }
 
+/**
+ * @brief Checks the secondary right-hand side b = iωμ Ms(Δσ) x_p.
+ *
+ * @param[in] order  Basis order.
+ */
 static void check_rhs(PetscInt order) {
   CsemSourceSet  sets[2] = {sourceSet(), {3.0, 1, &sourceArray[1]}};
   DM             dm;
@@ -283,6 +380,12 @@ static void check_rhs(PetscInt order) {
   teardown(&dm, &grid, &sigma, &mat);
 }
 
+/**
+ * @brief Checks that x_s + E_p,h of the model background matches the total
+ *        field.
+ *
+ * @param[in] order  Basis order.
+ */
 static void check_model_decomposition(PetscInt order) {
   const PetscScalar             iwmu = iOmegaMu(freq);
   CsemSourceSet                 set  = sourceSet();
@@ -370,7 +473,12 @@ static void check_model_decomposition(PetscInt order) {
   teardown(&dm, &grid, &sigma, &mat);
 }
 
-/* Analytic E and H of source k at the receivers, by rank-local evaluation. */
+/**
+ * @brief Checks the analytic E and H of each source at the receivers, by
+ *        rank-local evaluation.
+ *
+ * @param[in] order  Basis order.
+ */
 static void check_layered_receivers(PetscInt order) {
   CsemSourceSet                 set = sourceSet();
   DM                            dm;
@@ -436,12 +544,26 @@ static void check_layered_receivers(PetscInt order) {
   teardown(&dm, &grid, &sigma, &mat);
 }
 
+/**
+ * @brief Unit conductivity (cell field callback).
+ *
+ * @param[in] x  Point coordinates.
+ *
+ * @return PetscReal 1.
+ */
 static PetscReal unitSigma(const PetscReal x[3]) {
   (void)x;
   return 1.0;
 }
 
-/* Interpolated E_p,h and curl(E_p,h)/(iωμ) against the analytic field in a 40 m box 900 m from the source. */
+/**
+ * @brief Checks the interpolated E_p,h and curl(E_p,h)/(iωμ) against the
+ *        analytic field.
+ *
+ * In a 40 m box 900 m from the source.
+ *
+ * @param[in] order  Basis order.
+ */
 static void check_layered_conventions(PetscInt order) {
   const PetscInt                faces[3] = {2, 2, 2};
   const PetscReal               lower[3] = {880.0, -20.0, -520.0}, upper[3] = {920.0, 20.0, -480.0};
@@ -535,7 +657,14 @@ static void check_layered_conventions(PetscInt order) {
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dm));
 }
 
-/* Receivers on an interface: interpolated E_p,h and addCsemPrimaryAtReceivers against the analytic field in the layer of their cell. */
+/**
+ * @brief Checks receivers on an interface against the analytic field in the
+ *        layer of their cell.
+ *
+ * Both the interpolated E_p,h and addCsemPrimaryAtReceivers() are checked.
+ *
+ * @param[in] order  Basis order.
+ */
 static void check_interface_receivers(PetscInt order) {
   const PetscInt                faces[3] = {2, 2, 2};
   const PetscReal               lower[3] = {880.0, -20.0, -520.0}, upper[3] = {920.0, 20.0, -480.0};
@@ -631,6 +760,15 @@ static void check_interface_receivers(PetscInt order) {
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dm));
 }
 
+/**
+ * @brief Runs the primary field checks and reports the number of failures.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector; argv[1] is the basis order where the
+ *                  harness takes one.
+ *
+ * @return int 0 when every check passes, non-zero otherwise.
+ */
 int main(int argc, char **argv) {
   PetscInt order = 1;
 

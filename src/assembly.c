@@ -12,8 +12,8 @@
 #include <petscsys.h>
 
 /* PETGEM functions */
-#include "common.h"
 #include "assembly.h"
+#include "common.h"
 #include "constants.h"
 #include "fem.h"
 #include "grid.h"
@@ -34,7 +34,8 @@
  * @param[in] n  Number of H1 DOFs per cell (columns of G).
  * @param[in] w  Cell index, used only to label diagnostic messages.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode checkGradientKernel(PetscReal *M, PetscReal *G, PetscInt m, PetscInt n, PetscInt w) {
   PetscReal normM = 0, normG = 0, worst = 0;
@@ -106,38 +107,6 @@ static PetscErrorCode prepareCellForAssembly(const DM dm, const DM dmConductivit
 }
 
 /**
- * @brief Creates a global right-hand-side Vec that accepts closure insertion.
- *
- * The Vec carries the DM local-to-global mapping and ignores negative
- * (constrained) indices, so element closures can be inserted with
- * VecSetValuesLocal.
- */
-PetscErrorCode createRhsVector(const DM dm, Vec *b) {
-  PetscFunctionBeginUser;
-  ISLocalToGlobalMapping mapping;
-  PetscCall(DMCreateGlobalVector(dm, b));
-  PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
-  PetscCall(VecSetLocalToGlobalMapping(*b, mapping));
-  PetscCall(VecSetOption(*b, VEC_IGNORE_NEGATIVE_INDICES, PETSC_TRUE));
-  PetscCall(VecSetFromOptions(*b));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Creates a dense matrix with one column per right-hand side, laid out like @p b.
- */
-PetscErrorCode createRhsMatrix(const Vec b, const PetscInt numRhs, Mat *B) {
-  PetscFunctionBeginUser;
-  PetscInt m, M;
-  VecType  vtype;
-  PetscCall(VecGetSize(b, &M));
-  PetscCall(VecGetLocalSize(b, &m));
-  PetscCall(VecGetType(b, &vtype));
-  PetscCall(MatCreateDenseFromVecType(PetscObjectComm((PetscObject)b), vtype, m, PETSC_DECIDE, M, numRhs, m, NULL, B));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
  * @brief True numerical rank test of the discrete gradient G.
  *
  * Uses the smallest eigenvalues of H = Gᵀ·G (the weighted nodal graph
@@ -149,7 +118,8 @@ PetscErrorCode createRhsMatrix(const Vec b, const PetscInt numRhs, Mat *B) {
  * @param[in] comm  Communicator for the collective solve.
  * @param[in] G     Discrete gradient matrix.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode gradientRankTestEig(MPI_Comm comm, Mat G) {
   PetscFunctionBeginUser;
@@ -237,7 +207,8 @@ static PetscErrorCode gradientRankTestEig(MPI_Comm comm, Mat G) {
  * @param[out] mask             Column-space Vec, 0 on boundary / 1 on interior.
  * @param[out] numBoundaryCols  Count of masked (boundary) H1 columns.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode buildInteriorColumnMask(DM dm, const Grid *grid, Mat G, Vec *mask, PetscInt *numBoundaryCols) {
   PetscFunctionBeginUser;
@@ -298,7 +269,8 @@ static PetscErrorCode buildInteriorColumnMask(DM dm, const Grid *grid, Mat G, Ve
  * @param[in] grid   Grid descriptor (order, per-class dof counts).
  * @param[in] G      Assembled, filtered discrete gradient.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode reportGradientBddcStructure(MPI_Comm comm, const Grid *grid, Mat G) {
   PetscFunctionBeginUser;
@@ -377,7 +349,8 @@ static PetscErrorCode reportGradientBddcStructure(MPI_Comm comm, const Grid *gri
  * @param[in] Acurl  Pure curl-curl matrix (Ke only, no mass term).
  * @param[in] G      Assembled discrete gradient.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode reportGradientValidation(MPI_Comm comm, DM dm, const Grid *grid, Mat Acurl, Mat G) {
   PetscFunctionBeginUser;
@@ -458,7 +431,20 @@ static PetscErrorCode reportGradientValidation(MPI_Comm comm, DM dm, const Grid 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Adds X + beta*Y (Y may be NULL) over the n x n closure block of a cell. */
+/**
+ * @brief Adds X + beta Y over the n x n closure block of a cell.
+ *
+ * @param[in]  mat   Global matrix with a local-to-global mapping.
+ * @param[in]  n     Number of closure dofs of the cell.
+ * @param[in]  idx   Local closure indices of the cell (n entries).
+ * @param[in]  X     Dense n x n block.
+ * @param[in]  Y     Dense n x n block, or NULL to add X only.
+ * @param[in]  beta  Scale of Y.
+ * @param[out] buf   Work array of n * n entries.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode addElementBlock(Mat mat, PetscInt n, const PetscInt *idx, PetscReal **X, PetscReal **Y, PetscScalar beta,
                                       PetscScalar *buf) {
   PetscFunctionBeginUser;
@@ -469,6 +455,18 @@ static PetscErrorCode addElementBlock(Mat mat, PetscInt n, const PetscInt *idx, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Creates the operator matrix on the H(curl) layout of dm.
+ *
+ * The matrix type follows -mat_type; inserting outside the preallocated pattern
+ * raises an error.
+ *
+ * @param[in]  dm  DMPlex carrying the H(curl) section.
+ * @param[out] A   Preallocated operator matrix.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode createOperatorMatrix(DM dm, Mat *A) {
   PetscFunctionBeginUser;
   PetscCall(DMCreateMatrix(dm, A));
@@ -477,7 +475,19 @@ static PetscErrorCode createOperatorMatrix(DM dm, Mat *A) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Empty discrete gradient: rows on the H(curl) space of dm, columns on grid->H1dm. */
+/**
+ * @brief Creates an empty discrete gradient matrix.
+ *
+ * Rows follow the H(curl) space of dm and columns the nodal space grid->H1dm;
+ * both local-to-global mappings are attached.
+ *
+ * @param[in]  dm    DMPlex carrying the H(curl) section.
+ * @param[in]  grid  Grid with the nodal space H1dm.
+ * @param[out] G     AIJ matrix of size N(H(curl)) x N(H1).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode createGradientMatrix(DM dm, const Grid *grid, Mat *G) {
   PetscFunctionBeginUser;
   Vec                    e, h;
@@ -502,10 +512,50 @@ static PetscErrorCode createGradientMatrix(DM dm, const Grid *grid, Mat *G) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Completes the final assembly of a matrix.
+ *
+ * @param[in,out] A  Matrix to assemble.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode assembleFinal(Mat A) {
   PetscFunctionBeginUser;
   PetscCall(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Creates a global right-hand-side Vec that accepts closure insertion.
+ *
+ * The Vec carries the DM local-to-global mapping and ignores negative
+ * (constrained) indices, so element closures can be inserted with
+ * VecSetValuesLocal.
+ */
+PetscErrorCode createRhsVector(const DM dm, Vec *b) {
+  PetscFunctionBeginUser;
+  ISLocalToGlobalMapping mapping;
+  PetscCall(DMCreateGlobalVector(dm, b));
+  PetscCall(DMGetLocalToGlobalMapping(dm, &mapping));
+  PetscCall(VecSetLocalToGlobalMapping(*b, mapping));
+  PetscCall(VecSetOption(*b, VEC_IGNORE_NEGATIVE_INDICES, PETSC_TRUE));
+  PetscCall(VecSetFromOptions(*b));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Creates a dense matrix with one column per right-hand side, laid out like @p b.
+ */
+PetscErrorCode createRhsMatrix(const Vec b, const PetscInt numRhs, Mat *B) {
+  PetscFunctionBeginUser;
+  PetscInt m, M;
+  VecType  vtype;
+  PetscCall(VecGetSize(b, &M));
+  PetscCall(VecGetLocalSize(b, &m));
+  PetscCall(VecGetType(b, &vtype));
+  PetscCall(MatCreateDenseFromVecType(PetscObjectComm((PetscObject)b), vtype, m, PETSC_DECIDE, M, numRhs, m, NULL, B));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

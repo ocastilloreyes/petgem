@@ -46,6 +46,9 @@ UNIFIED BINARY\n\
   mpirun -n 96 ./petgem fm.mt -options_file params.txt\n\
 \n" PETGEM_HELP_FOOTER;
 
+/**
+ * @brief Runs the MT forward-modeling kernel (fm.mt).
+ */
 int runMtForward(int argc, char **argv) {
 
   if (isVersionRequest(argc, argv)) return printVersion();

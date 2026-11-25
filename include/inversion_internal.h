@@ -17,8 +17,9 @@
 #ifndef INVERSION_INTERNAL_H
 #define INVERSION_INTERNAL_H
 
-#include "inversion.h"
 #include <petsc.h>
+
+#include "inversion.h"
 
 /**
  * @brief Builds the persistent 0/1 mask used to freeze fixed cells.
@@ -96,7 +97,8 @@ PetscErrorCode writeInversionResults(const ImParams *imParams, DM dmConductivity
  * @param[in] adjoint   Adjoint directional derivative, repeated per step (rank 0).
  * @param[in] n         Number of steps.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode writeGradientCheck(const ImParams *imParams, MPI_Comm comm, const PetscReal *eps, const PetscReal *fd,
                                   const PetscReal *adjoint, PetscInt n);

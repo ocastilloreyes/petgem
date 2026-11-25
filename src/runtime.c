@@ -28,6 +28,13 @@
 #define EXTRAE_FIRST_PHASE 3
 #define EXTRAE_SUMMARY     9
 
+/**
+ * @brief Emits an Extrae event of type EXTRAE_EVENT_TYPE.
+ *
+ * No-op unless built with USE_EXTRAE.
+ *
+ * @param[in] value  Event value; 0 closes the current event.
+ */
 static void extraeEvent(int value) {
 #ifdef USE_EXTRAE
   Extrae_event(EXTRAE_EVENT_TYPE, value);
@@ -36,15 +43,26 @@ static void extraeEvent(int value) {
 #endif
 }
 
+/**
+ * @brief Returns PETSC_TRUE when argv[1] is --version.
+ */
 PetscBool isVersionRequest(int argc, char **argv) {
   return (PetscBool)(argc > 1 && strcmp(argv[1], "--version") == 0);
 }
 
+/**
+ * @brief Prints "PETGEM version X.Y.Z" with plain printf (no PETSc
+ *        needed).
+ */
 int printVersion(void) {
   printf("PETGEM version %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
   return 0;
 }
 
+/**
+ * @brief Initializes PETSc, registers the phase stages and prints the
+ *        header.
+ */
 PetscErrorCode beginKernelRun(int *argc, char ***argv, const char help[], const char *name, const char *outputStage, KernelRun *run) {
   PetscFunctionBeginUser;
 
@@ -66,6 +84,9 @@ PetscErrorCode beginKernelRun(int *argc, char ***argv, const char help[], const 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Opens a phase: pushes its log stage and starts its timer.
+ */
 PetscErrorCode beginPhase(KernelRun *run, KernelPhase phase) {
   PetscFunctionBeginUser;
   extraeEvent(EXTRAE_FIRST_PHASE + (int)phase);
@@ -74,6 +95,9 @@ PetscErrorCode beginPhase(KernelRun *run, KernelPhase phase) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Closes a phase: adds the elapsed time and pops its log stage.
+ */
 PetscErrorCode endPhase(KernelRun *run, KernelPhase phase) {
   PetscFunctionBeginUser;
   PetscLogDouble now;
@@ -84,6 +108,9 @@ PetscErrorCode endPhase(KernelRun *run, KernelPhase phase) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Ends a -help run: prints the usage tip and finalizes PETSc.
+ */
 PetscErrorCode endHelpRun(const KernelRun *run) {
   PetscFunctionBeginUser;
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "\nTip: '%s -help intro' shows the concise usage summary.\n", run->name));
@@ -91,6 +118,9 @@ PetscErrorCode endHelpRun(const KernelRun *run) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints the timers and the closing banner.
+ */
 PetscErrorCode printRunSummary(const char *const labels[], const PetscLogDouble times[], PetscInt n) {
   PetscFunctionBeginUser;
   extraeEvent(EXTRAE_SUMMARY);
@@ -100,10 +130,18 @@ PetscErrorCode printRunSummary(const char *const labels[], const PetscLogDouble 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Time spent reading parameters, loading the bundle and setting up
+ *        the grid.
+ */
 PetscLogDouble setupTime(const KernelRun *run) {
   return run->elapsed[PHASE_PARSE] + run->elapsed[PHASE_LOAD] + run->elapsed[PHASE_GRID];
 }
 
+/**
+ * @brief Prints the timers of a forward kernel (load + grid, assembly,
+ *        solve, output) and the footer.
+ */
 PetscErrorCode printForwardSummary(const KernelRun *run) {
   PetscFunctionBeginUser;
   const char *const    labels[] = {"Load + grid", "Assembly", "Linear solve", run->outputStage};
@@ -112,6 +150,10 @@ PetscErrorCode printForwardSummary(const KernelRun *run) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints the "Assembly" section: operator type and right-hand
+ *        sides.
+ */
 PetscErrorCode logAssembly(MPI_Comm comm, Mat A, PetscInt numRhs) {
   PetscFunctionBeginUser;
   MatType type;
@@ -122,6 +164,9 @@ PetscErrorCode logAssembly(MPI_Comm comm, Mat A, PetscInt numRhs) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints the "Solve" section: solver name and convergence status.
+ */
 PetscErrorCode logSolve(MPI_Comm comm, const SolveInfo *info) {
   PetscFunctionBeginUser;
   PetscCall(logSection(comm, "Solve"));
@@ -130,6 +175,10 @@ PetscErrorCode logSolve(MPI_Comm comm, const SolveInfo *info) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints a receiver-output section: receiver count and output
+ *        file.
+ */
 PetscErrorCode logReceiverOutput(MPI_Comm comm, const char *title, const PetgemParams *params, Vec receivers) {
   PetscFunctionBeginUser;
   PetscInt n;

@@ -8,46 +8,28 @@
  * inverse kernel.
  */
 
+/* PETSc libraries */
 #include <petsc.h>
 #include <petscdmplex.h>
 
+/* PETGEM functions */
 #include "constants.h"
-#include "grid.h"
 #include "fem.h"
+#include "grid.h"
 #include "inversion.h"
 #include "inversion_internal.h"
 
-PetscErrorCode createCellScalarDm(DM dm, DM *cellDm) {
-  PetscFunctionBeginUser;
-  MPI_Comm     comm = PetscObjectComm((PetscObject)dm);
-  PetscFV      fvm;
-  PetscSection sec;
-  PetscInt     pStart, pEnd, cStart, cEnd;
-
-  PetscCall(DMClone(dm, cellDm));
-  PetscCall(PetscFVCreate(comm, &fvm));
-  PetscCall(PetscFVSetNumComponents(fvm, 1));
-  PetscCall(PetscObjectSetName((PetscObject)fvm, "scalar"));
-  PetscCall(DMAddField(*cellDm, NULL, (PetscObject)fvm));
-  PetscCall(PetscFVDestroy(&fvm));
-
-  PetscCall(DMPlexGetChart(dm, &pStart, &pEnd));
-  PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
-  PetscCall(PetscSectionCreate(comm, &sec));
-  PetscCall(PetscSectionSetNumFields(sec, 1));
-  PetscCall(PetscSectionSetFieldComponents(sec, 0, 1));
-  PetscCall(PetscSectionSetChart(sec, pStart, pEnd));
-  for (PetscInt c = cStart; c < cEnd; c++) {
-    PetscCall(PetscSectionSetDof(sec, c, 1));
-    PetscCall(PetscSectionSetFieldDof(sec, c, 0, 1));
-  }
-  PetscCall(PetscSectionSetUp(sec));
-  PetscCall(DMSetLocalSection(*cellDm, sec));
-  PetscCall(PetscSectionDestroy(&sec));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Appends v to the growable array (*a, *n, *cap). */
+/**
+ * @brief Appends a value to a growable array.
+ *
+ * @param[in,out] a    Array; reallocated when full.
+ * @param[in,out] n    Number of entries.
+ * @param[in,out] cap  Capacity.
+ * @param[in]     v    Value.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode appendInt(PetscInt **a, PetscInt *n, PetscInt *cap, PetscInt v) {
   PetscFunctionBeginUser;
   if (*n == *cap) {
@@ -58,7 +40,23 @@ static PetscErrorCode appendInt(PetscInt **a, PetscInt *n, PetscInt *cap, PetscI
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Cells in [cStart, cEnd), other than cell, sharing a vertex with it; first-seen order, no duplicates. */
+/**
+ * @brief Cells in [cStart, cEnd), other than a given cell, that share a vertex
+ *        with it.
+ *
+ * First-seen order, without duplicates.
+ *
+ * @param[in]     dm      DMPlex mesh.
+ * @param[in]     cell    Cell.
+ * @param[in]     cStart  First cell.
+ * @param[in]     cEnd    End of the cell range (exclusive).
+ * @param[in,out] nb      Neighbor array (appendInt).
+ * @param[out]    n       Number of neighbors.
+ * @param[in,out] cap     Capacity of nb.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode vertexNeighbors(DM dm, PetscInt cell, PetscInt cStart, PetscInt cEnd, PetscInt **nb, PetscInt *n, PetscInt *cap) {
   PetscFunctionBeginUser;
   PetscInt closureSize = 0, *closure = NULL;
@@ -83,7 +81,19 @@ static PetscErrorCode vertexNeighbors(DM dm, PetscInt cell, PetscInt cStart, Pet
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* CSR graph over the first numLocalCells cells of [cStart, cEnd) in dm: vertex neighbors with normalized 1/dist weights. */
+/**
+ * @brief CSR graph of vertex neighbors with normalized 1/dist weights.
+ *
+ * Rows are the first numLocalCells cells of [cStart, cEnd) in dm.
+ *
+ * @param[in]     dm      DMPlex mesh.
+ * @param[in]     cStart  First cell.
+ * @param[in]     cEnd    End of the cell range (exclusive).
+ * @param[in,out] graph   Neighbor graph; numLocalCells is set by the caller.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode buildCsr(DM dm, PetscInt cStart, PetscInt cEnd, NeighborGraph *graph) {
   PetscFunctionBeginUser;
   const PetscInt numCells = cEnd - cStart;
@@ -136,7 +146,15 @@ static PetscErrorCode buildCsr(DM dm, PetscInt cStart, PetscInt cEnd, NeighborGr
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* overlap=1 copy of dm under vertex adjacency, or NULL when dm is not distributed. */
+/**
+ * @brief Copy of dm with one layer of overlap under vertex adjacency.
+ *
+ * @param[in]  dm      DMPlex mesh.
+ * @param[out] dmOver  Overlapping DM, or NULL when dm is not distributed.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode createVertexOverlapDm(DM dm, DM *dmOver) {
   PetscFunctionBeginUser;
   PetscBool useCone, useClosure;
@@ -148,6 +166,84 @@ static PetscErrorCode createVertexOverlapDm(DM dm, DM *dmOver) {
   PetscCall(DMPlexDistributeOverlap(dm, 1, &sf, dmOver));
   PetscCall(PetscSFDestroy(&sf));
   PetscCall(DMSetBasicAdjacency(dm, useCone, useClosure));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief One Jacobi sweep over the non-fixed owned cells.
+ *
+ * out[i] = diagWeight in[i] + sum_j w_ij in[j].
+ *
+ * @param[in]  graph       Neighbor graph of the owned cells.
+ * @param[in]  diagWeight  Weight of the cell itself.
+ * @param[in]  in          Input values.
+ * @param[out] out         Output values.
+ */
+static void jacobiSweep(const NeighborGraph *graph, PetscReal diagWeight, const PetscScalar *in, PetscScalar *out) {
+  for (PetscInt i = 0; i < graph->numLocalCells; i++) {
+    PetscScalar v;
+    if (graph->isFixed[i]) continue;
+    v = diagWeight * in[i];
+    for (PetscInt j = graph->neighborStart[i]; j < graph->neighborStart[i + 1]; j++) {
+      v += graph->neighborWeights[j] * in[graph->neighborList[j]];
+    }
+    out[i] = v;
+  }
+}
+
+/**
+ * @brief Copies the owned cells between a one-dof-per-cell Vec and the overlap
+ *        work Vec.
+ *
+ * @param[in]  graph  Neighbor graph of the owned cells.
+ * @param[in]  from   Source Vec.
+ * @param[out] to     Destination Vec.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode copyOwned(const NeighborGraph *graph, Vec from, Vec to) {
+  PetscFunctionBeginUser;
+  const PetscScalar *src;
+  PetscScalar       *dst;
+  PetscCall(VecGetArrayRead(from, &src));
+  PetscCall(VecGetArray(to, &dst));
+  PetscCall(PetscArraycpy(dst, src, graph->numLocalCells));
+  PetscCall(VecRestoreArray(to, &dst));
+  PetscCall(VecRestoreArrayRead(from, &src));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Clones the topology of @p dm with one scalar DOF per cell.
+ */
+PetscErrorCode createCellScalarDm(DM dm, DM *cellDm) {
+  PetscFunctionBeginUser;
+  MPI_Comm     comm = PetscObjectComm((PetscObject)dm);
+  PetscFV      fvm;
+  PetscSection sec;
+  PetscInt     pStart, pEnd, cStart, cEnd;
+
+  PetscCall(DMClone(dm, cellDm));
+  PetscCall(PetscFVCreate(comm, &fvm));
+  PetscCall(PetscFVSetNumComponents(fvm, 1));
+  PetscCall(PetscObjectSetName((PetscObject)fvm, "scalar"));
+  PetscCall(DMAddField(*cellDm, NULL, (PetscObject)fvm));
+  PetscCall(PetscFVDestroy(&fvm));
+
+  PetscCall(DMPlexGetChart(dm, &pStart, &pEnd));
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
+  PetscCall(PetscSectionCreate(comm, &sec));
+  PetscCall(PetscSectionSetNumFields(sec, 1));
+  PetscCall(PetscSectionSetFieldComponents(sec, 0, 1));
+  PetscCall(PetscSectionSetChart(sec, pStart, pEnd));
+  for (PetscInt c = cStart; c < cEnd; c++) {
+    PetscCall(PetscSectionSetDof(sec, c, 1));
+    PetscCall(PetscSectionSetFieldDof(sec, c, 0, 1));
+  }
+  PetscCall(PetscSectionSetUp(sec));
+  PetscCall(DMSetLocalSection(*cellDm, sec));
+  PetscCall(PetscSectionDestroy(&sec));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -194,32 +290,10 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM dm, const Grid *grid, const 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* out[i] = diagWeight in[i] + sum_j w_ij in[j] for the non-fixed owned cells. */
-static void jacobiSweep(const NeighborGraph *graph, PetscReal diagWeight, const PetscScalar *in, PetscScalar *out) {
-  for (PetscInt i = 0; i < graph->numLocalCells; i++) {
-    PetscScalar v;
-    if (graph->isFixed[i]) continue;
-    v = diagWeight * in[i];
-    for (PetscInt j = graph->neighborStart[i]; j < graph->neighborStart[i + 1]; j++) {
-      v += graph->neighborWeights[j] * in[graph->neighborList[j]];
-    }
-    out[i] = v;
-  }
-}
-
-/* Copies the owned cells between the 1-DOF/cell vector v and the overlap work vector. */
-static PetscErrorCode copyOwned(const NeighborGraph *graph, Vec from, Vec to) {
-  PetscFunctionBeginUser;
-  const PetscScalar *src;
-  PetscScalar       *dst;
-  PetscCall(VecGetArrayRead(from, &src));
-  PetscCall(VecGetArray(to, &dst));
-  PetscCall(PetscArraycpy(dst, src, graph->numLocalCells));
-  PetscCall(VecRestoreArray(to, &dst));
-  PetscCall(VecRestoreArrayRead(from, &src));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
+/**
+ * @brief Applies two Jacobi smoothing sweeps to a 1-DOF/cell local
+ *        vector.
+ */
 PetscErrorCode applyGraphSmoothing(const NeighborGraph *graph, PetscReal diagWeight, Vec v) {
   PetscFunctionBeginUser;
   Vec          work = graph->dmOverlap ? graph->overlapLocal : v;
@@ -311,6 +385,9 @@ PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity, const Vec X, c
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Frees the NeighborGraph memory.
+ */
 PetscErrorCode destroyNeighborGraph(NeighborGraph *graph) {
   PetscFunctionBeginUser;
   PetscCall(PetscFree(graph->isFixed));

@@ -36,10 +36,14 @@
  *   {output_filename}.h5    one file per run, metrics as root-group attributes.
  */
 
+/* C libraries */
 #include <stdio.h>
+
+/* PETSc libraries */
 #include <petsc.h>
 #include <petscviewerhdf5.h>
 
+/* PETGEM functions */
 #include "assembly.h"
 #include "common.h"
 #include "constants.h"
@@ -341,7 +345,8 @@ static PetscErrorCode mmsResidual(const Mat A, const Mat B, const Mat X, PetscRe
  * @param[in]  kind          Which right-hand side to build (see MmsRhsKind).
  * @param[out] B             One-column dense RHS matrix, created by this call.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  *
  * @note The caller is responsible for destroying the returned matrix `B`.
  */
@@ -707,6 +712,14 @@ OPTIONS\n\
   -mms_drop_mass    Negative control: mass term dropped from f*.\n\
 \n" PETGEM_HELP_FOOTER;
 
+/**
+ * @brief Entry point of the MMS verification program.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector.
+ *
+ * @return int 0 on success.
+ */
 int main(int argc, char **argv) {
   if (isVersionRequest(argc, argv)) return printVersion();
 

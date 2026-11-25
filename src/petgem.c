@@ -16,11 +16,15 @@
  * The positional form takes precedence.
  */
 
+/* C libraries */
 #include <stdio.h>
 #include <string.h>
 
+/* PETGEM functions */
 #include "kernels.h"
 #include "runtime.h"
+
+#define NUM_KERNELS ((int)(sizeof(kernels) / sizeof(kernels[0])))
 
 typedef int (*KernelMain)(int argc, char **argv);
 
@@ -29,15 +33,20 @@ static const struct {
   KernelMain  run;
   const char *summary;
 } kernels[] = {
-    {"fm.csem", runForward, "CSEM forward modeling"},
-    {"im.csem", runInverse, "CSEM inverse modeling"},
+    {"fm.csem", runCsemForward, "CSEM forward modeling"},
+    {"im.csem", runCsemInverse, "CSEM inverse modeling"},
     {"fm.mt", runMtForward, "MT forward modeling"},
-    {"fm.tdcsem", runTdCsemForward, "Time-domain CSEM forward modeling"},
+    {"fm.tdcsem", runTdcsemForward, "Time-domain CSEM forward modeling"},
 };
 
-#define NUM_KERNELS ((int)(sizeof(kernels) / sizeof(kernels[0])))
-
-/* Kernel named s, or NULL. */
+/**
+ * @brief Looks up a kernel by name.
+ *
+ * @param[in] s  Kernel name (fm.csem, im.csem, fm.mt, fm.tdcsem).
+ *
+ * @return KernelMain Entry point of the kernel, or NULL when s is not a kernel
+ *         name.
+ */
 static KernelMain findKernel(const char *s) {
   for (int i = 0; i < NUM_KERNELS; i++) {
     if (strcmp(s, kernels[i].name) == 0) return kernels[i].run;
@@ -45,7 +54,13 @@ static KernelMain findKernel(const char *s) {
   return NULL;
 }
 
-/* Plain printf: called before PetscInitialize. */
+/**
+ * @brief Prints the usage of the unified binary.
+ *
+ * @param[in] progname  Program name (argv[0]).
+ *
+ * @note Uses printf, since it runs before PetscInitialize.
+ */
 static void printUsage(const char *progname) {
   printf("Usage:\n");
   for (int i = 0; i < NUM_KERNELS; i++) {
@@ -59,18 +74,47 @@ static void printUsage(const char *progname) {
          progname, progname);
 }
 
+/**
+ * @brief Reports an unknown kernel name and prints the usage.
+ *
+ * @param[in] progname  Program name (argv[0]).
+ * @param[in] what      Where the name came from ("subcommand" or "-mode
+ *                      value").
+ * @param[in] name      Name given on the command line.
+ *
+ * @return int Exit status 2.
+ */
 static int unknownKernel(const char *progname, const char *what, const char *name) {
   fprintf(stderr, "PETGEM: unknown %s '%s' (expected fm.csem, im.csem, fm.mt or fm.tdcsem)\n", what, name);
   printUsage(progname);
   return 2;
 }
 
-/* Removes argv[first .. first+count-1], keeping argv NULL-terminated. */
+/**
+ * @brief Removes argv[first .. first + count - 1], keeping argv
+ *        NULL-terminated.
+ *
+ * @param[in,out] argc   Argument count.
+ * @param[in,out] argv   Argument vector.
+ * @param[in]     first  First argument to remove.
+ * @param[in]     count  Number of arguments to remove.
+ */
 static void removeArgs(int *argc, char **argv, int first, int count) {
   for (int i = first; i + count <= *argc; i++) argv[i] = argv[i + count];
   *argc -= count;
 }
 
+/**
+ * @brief Entry point of the unified petgem binary.
+ *
+ * Selects the kernel from the first positional argument or from -mode, removes
+ * it from the command line and runs the kernel.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector.
+ *
+ * @return int Exit status of the kernel; 2 when no valid kernel is given.
+ */
 int main(int argc, char **argv) {
   KernelMain run = NULL;
 

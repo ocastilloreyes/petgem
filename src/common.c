@@ -25,9 +25,22 @@
 #include "version.h"
 
 #define LINE_WIDTH 74
-#define KEY_WIDTH  24
 
-/* Number of characters (UTF-8 start bytes) in s. */
+#define KEY_WIDTH 24
+
+#define FORMAT_NUM_BUFS 16
+
+#define FORMAT_BUF_LEN 32
+
+/**
+ * @brief Number of characters of a UTF-8 string.
+ *
+ * Counts the UTF-8 start bytes, so a multi-byte character counts once.
+ *
+ * @param[in] s  NUL-terminated UTF-8 string.
+ *
+ * @return int Number of characters in s.
+ */
 static int displayWidth(const char *s) {
   int n = 0;
   for (; *s; s++) {
@@ -49,8 +62,8 @@ static int displayWidth(const char *s) {
  *
  * @param[in] c  Character used to fill the separator line.
  *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode printSeparator(const char c) {
 
@@ -80,8 +93,8 @@ static PetscErrorCode printSeparator(const char c) {
  * Output is produced using PETSc parallel printing routines on
  * PETSC_COMM_WORLD.
  *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode printEmptyLine(void) {
 
@@ -107,8 +120,8 @@ static PetscErrorCode printEmptyLine(void) {
  * @param[in] text  Null-terminated string to be printed centered
  *                  within the formatted line.
  *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode printCenteredText(const char *text) {
   PetscFunctionBeginUser;
@@ -140,8 +153,8 @@ static PetscErrorCode printCenteredText(const char *text) {
  * @param[in] total  Total elapsed time used to compute the
  *                   percentage, in seconds.
  *
- * @return PetscErrorCode PETSC_SUCCESS on successful
- *         completion, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode printTimerLine(const char *label, PetscLogDouble t, PetscLogDouble total) {
   PetscFunctionBeginUser;
@@ -163,16 +176,34 @@ static PetscErrorCode printTimerLine(const char *label, PetscLogDouble t, PetscL
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define FORMAT_NUM_BUFS 16
-#define FORMAT_BUF_LEN  32
-
-/* Rotating buffers, so several formatted values fit in one printf (not thread-safe). */
+/**
+ * @brief Returns the next of FORMAT_NUM_BUFS rotating buffers of FORMAT_BUF_LEN
+ *        characters.
+ *
+ * Several formatted values can be used in one printf call.
+ *
+ * @note Not thread-safe.
+ *
+ * @return char * Buffer that stays valid for the next FORMAT_NUM_BUFS - 1
+ *         calls.
+ */
 static char *nextFormatBuffer(void) {
   static char     bufs[FORMAT_NUM_BUFS][FORMAT_BUF_LEN];
   static PetscInt which = 0;
   char           *out   = bufs[which];
   which                 = (which + 1) % FORMAT_NUM_BUFS;
   return out;
+}
+
+/**
+ * @brief Formats the current local time as "YYYY-MM-DD hh:mm:ss".
+ *
+ * @param[out] buf  Destination buffer.
+ * @param[in]  len  Size of @p buf in bytes.
+ */
+static void formatNow(char *buf, size_t len) {
+  time_t now = time(NULL);
+  strftime(buf, len, "%Y-%m-%d %H:%M:%S", localtime(&now));
 }
 
 /**
@@ -333,17 +364,6 @@ PetscErrorCode logKvf(MPI_Comm comm, const char *key, const char *valfmt, ...) {
 }
 
 /**
- * @brief Formats the current local time as "YYYY-MM-DD hh:mm:ss".
- *
- * @param[out] buf  Destination buffer.
- * @param[in]  len  Size of @p buf in bytes.
- */
-static void formatNow(char *buf, size_t len) {
-  time_t now = time(NULL);
-  strftime(buf, len, "%Y-%m-%d %H:%M:%S", localtime(&now));
-}
-
-/**
  * @brief Prints the PETGEM banner followed by the "Run" section.
  *
  * The banner carries the project name, repository, developer and
@@ -400,8 +420,8 @@ PetscErrorCode printHeader(const char *kernel) {
 /**
  * @brief Prints the closing banner with the finish time.
  *
- * @return PetscErrorCode PETSC_SUCCESS on successful completion, or a
- *         PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode printFooter(void) {
 

@@ -4,7 +4,7 @@
  * Date: 2026-02-03
  *
  * Description:
- * Inverse CSEM kernel (runInverse), linked into im.csem and petgem.
+ * Inverse CSEM kernel (runCsemInverse), linked into im.csem and petgem.
  */
 
 /* PETGEM functions */
@@ -74,7 +74,10 @@ UNIFIED BINARY\n\
   mpirun -n 56 ./petgem im.csem -options_file params_p1.txt\n\
 \n" PETGEM_HELP_FOOTER;
 
-int runInverse(int argc, char **argv) {
+/**
+ * @brief Runs the CSEM inversion kernel (im.csem).
+ */
+int runCsemInverse(int argc, char **argv) {
 
   if (isVersionRequest(argc, argv)) return printVersion();
 

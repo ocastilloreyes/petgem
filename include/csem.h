@@ -49,7 +49,8 @@ typedef struct {
  * @param[in,out] fields     Fields at the receivers.
  * @param[in]     ctx        User context.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 typedef PetscErrorCode (*CsemReceiverPrimaryFn)(PetscInt k, const ReceiverInterpolationMatrices *Q, Vec receivers,
                                                 Vec fields[NUM_RECEIVER_FIELDS], void *ctx);
@@ -118,7 +119,8 @@ PetscErrorCode logForwardSources(const CsemSourceSet *sources);
  * @param[in,out] dm      DMPlex mesh configured with the FE sections.
  * @param[out]    grid    Grid struct filled with mesh statistics and FemSpace.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode setupCsemGrid(PetscInt order, DM *dm, Grid *grid);
 

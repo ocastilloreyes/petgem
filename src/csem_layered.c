@@ -32,8 +32,11 @@
 /* Points with horizontal offset r < rc = max(LAYERED_AXIS_RATIO |z - z_s|, LAYERED_MIN_OFFSET) are interpolated from
    LAYERED_AXIS_NODES offsets on each side of the dipole axis. */
 #define LAYERED_AXIS_RATIO 4.0e-2
+
 #define LAYERED_MIN_OFFSET 1.0e-3
+
 #define LAYERED_AXIS_NODES 4
+
 /* A height z lies on the interface z_i when |z - z_i| <= LAYERED_INTERFACE_RTOL max(1, |z_i|). */
 #define LAYERED_INTERFACE_RTOL 1.0e-8
 
@@ -518,13 +521,19 @@ typedef struct {
   PetscBool dsign;    /* ab in {13, 14, 15, 23, 24, 25, 31, 32} */
 } KernelGroup;
 
-static const KernelGroup group11 = {PETSC_FALSE, PETSC_FALSE, PETSC_TRUE, PETSC_FALSE};  /* 11, 12, 21, 22 */
-static const KernelGroup group13 = {PETSC_TRUE, PETSC_TRUE, PETSC_TRUE, PETSC_TRUE};     /* 13, 23 */
-static const KernelGroup group31 = {PETSC_FALSE, PETSC_TRUE, PETSC_FALSE, PETSC_TRUE};   /* 31, 32 */
-static const KernelGroup group33 = {PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, PETSC_FALSE};  /* 33 */
-static const KernelGroup group14 = {PETSC_TRUE, PETSC_TRUE, PETSC_TRUE, PETSC_TRUE};     /* 14, 15, 24, 25 */
+static const KernelGroup group11 = {PETSC_FALSE, PETSC_FALSE, PETSC_TRUE, PETSC_FALSE}; /* 11, 12, 21, 22 */
+
+static const KernelGroup group13 = {PETSC_TRUE, PETSC_TRUE, PETSC_TRUE, PETSC_TRUE}; /* 13, 23 */
+
+static const KernelGroup group31 = {PETSC_FALSE, PETSC_TRUE, PETSC_FALSE, PETSC_TRUE}; /* 31, 32 */
+
+static const KernelGroup group33 = {PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, PETSC_FALSE}; /* 33 */
+
+static const KernelGroup group14 = {PETSC_TRUE, PETSC_TRUE, PETSC_TRUE, PETSC_TRUE}; /* 14, 15, 24, 25 */
+
 static const KernelGroup group16 = {PETSC_FALSE, PETSC_FALSE, PETSC_FALSE, PETSC_FALSE}; /* 16, 26 */
-static const KernelGroup group34 = {PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, PETSC_FALSE};  /* 34, 35 */
+
+static const KernelGroup group34 = {PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, PETSC_FALSE}; /* 34, 35 */
 
 /* Wavenumber-domain work arrays of one source-receiver arrangement. */
 typedef struct {
@@ -541,26 +550,62 @@ typedef struct {
   Arrangement  aE, aH; /* Electric receiver; magnetic receiver by reciprocity */
 } Workspace;
 
-/* Membership of ab in a list of codes. */
+/**
+ * @brief Membership of a kernel code in a list of codes.
+ *
+ * @param[in] ab   Kernel code (empymod ab).
+ * @param[in] set  List of codes.
+ * @param[in] n    Number of codes in set.
+ *
+ * @return PetscBool PETSC_TRUE if ab is in set.
+ */
 static PetscBool inSet(PetscInt ab, const PetscInt set[], PetscInt n) {
   for (PetscInt i = 0; i < n; i++)
     if (set[i] == ab) return PETSC_TRUE;
   return PETSC_FALSE;
 }
 
-/* Layer n with depth[n] < zd <= depth[n+1] (depth[numLayers] = +inf). */
+/**
+ * @brief Layer that contains a depth.
+ *
+ * Layer n with depth[n] < zd <= depth[n + 1], with depth[numLayers] = +inf.
+ *
+ * @param[in] d   Dipole and layered model.
+ * @param[in] zd  Depth (m, z down).
+ *
+ * @return PetscInt Layer index.
+ */
 static PetscInt layerOfDepth(const LayeredDipole *d, PetscReal zd) {
   PetscInt n = 0;
   while (n + 1 < d->numLayers && zd > d->depth[n + 1]) n++;
   return n;
 }
 
-/* PETSC_TRUE if a lies on the interface at b. */
+/**
+ * @brief Tests whether a depth lies on an interface.
+ *
+ * a lies on the interface at b when |a - b| <= LAYERED_INTERFACE_RTOL max(1,
+ * |b|).
+ *
+ * @param[in] a  Depth (m).
+ * @param[in] b  Interface depth (m).
+ *
+ * @return PetscBool PETSC_TRUE if a lies on the interface at b.
+ */
 static PetscBool onInterface(PetscReal a, PetscReal b) {
   return PetscAbsReal(a - b) <= LAYERED_INTERFACE_RTOL * PetscMax(1.0, PetscAbsReal(b)) ? PETSC_TRUE : PETSC_FALSE;
 }
 
-/* PETSC_TRUE if depth zd lies in layer n or on its boundary. */
+/**
+ * @brief Tests whether a depth lies in a layer or on its boundary.
+ *
+ * @param[in] d   Dipole and layered model.
+ * @param[in] n   Layer index.
+ * @param[in] zd  Depth (m, z down).
+ *
+ * @return PetscBool PETSC_TRUE if zd lies in layer n or on one of its
+ *         interfaces.
+ */
 static PetscBool inLayerClosure(const LayeredDipole *d, PetscInt n, PetscReal zd) {
   const PetscBool belowTop = (n == 0 || zd >= d->depth[n] || onInterface(zd, d->depth[n])) ? PETSC_TRUE : PETSC_FALSE;
   const PetscBool aboveBottom =
@@ -568,7 +613,17 @@ static PetscBool inLayerClosure(const LayeredDipole *d, PetscInt n, PetscReal zd
   return (belowTop && aboveBottom) ? PETSC_TRUE : PETSC_FALSE;
 }
 
-/* Gam[n] = sqrt(etaH/etaV lambda^2 + zeta etaH) (TM) and sqrt(lambda^2 + zeta etaH) (TE). */
+/**
+ * @brief Vertical wavenumbers of the TM and TE modes in every layer.
+ *
+ * Gam[n] = sqrt(etaH/etaV lambda^2 + zeta etaH) (TM) and sqrt(lambda^2 + zeta
+ * etaH) (TE).
+ *
+ * @param[in]  d       Dipole and layered model.
+ * @param[in]  lambda  Horizontal wavenumber (1/m).
+ * @param[out] GamTM   TM wavenumber per layer.
+ * @param[out] GamTE   TE wavenumber per layer.
+ */
 static void computeGamma(const LayeredDipole *d, PetscReal lambda, PetscScalar GamTM[], PetscScalar GamTE[]) {
   const PetscReal l2 = lambda * lambda;
   for (PetscInt n = 0; n < d->numLayers; n++) {
@@ -577,7 +632,20 @@ static void computeGamma(const LayeredDipole *d, PetscReal lambda, PetscScalar G
   }
 }
 
-/* Reflection coefficients from below (Rp) and above (Rm) between lsrc and lrec (empymod reflections). */
+/**
+ * @brief Reflection coefficients from below (Rp) and above (Rm) between the
+ *        source and receiver layers.
+ *
+ * Port of empymod reflections.
+ *
+ * @param[in]  d     Dipole and layered model.
+ * @param[in]  ezH   Mode parameter per layer (etaH for TM, zetaH for TE).
+ * @param[in]  Gam   Vertical wavenumber of the mode per layer.
+ * @param[in]  lrec  Receiver layer.
+ * @param[in]  lsrc  Source layer.
+ * @param[out] Rp    Reflection coefficients from below.
+ * @param[out] Rm    Reflection coefficients from above.
+ */
 static void computeReflections(const LayeredDipole *d, const PetscScalar ezH[], const PetscScalar Gam[], PetscInt lrec, PetscInt lsrc,
                                PetscScalar Rp[], PetscScalar Rm[]) {
   const PetscInt nl = d->numLayers, maxl = PetscMax(lrec, lsrc), minl = PetscMin(lrec, lsrc);
@@ -615,7 +683,22 @@ static void computeReflections(const LayeredDipole *d, const PetscScalar ezH[], 
   }
 }
 
-/* Up- (Pu) and downgoing (Pd) fields at the receiver level (empymod fields). */
+/**
+ * @brief Upgoing (Pu) and downgoing (Pd) fields at the receiver level.
+ *
+ * Port of empymod fields.
+ *
+ * @param[in]  d     Dipole and layered model.
+ * @param[in]  Gam   Vertical wavenumber of the mode per layer.
+ * @param[in]  Rp    Reflection coefficients from below.
+ * @param[in]  Rm    Reflection coefficients from above.
+ * @param[in]  lrec  Receiver layer.
+ * @param[in]  lsrc  Source layer.
+ * @param[in]  zsrc  Source depth (m, z down).
+ * @param[in]  plus  Sign of the kernel group (KernelGroup.plus).
+ * @param[out] Pu    Upgoing field.
+ * @param[out] Pd    Downgoing field.
+ */
 static void computeUpDown(const LayeredDipole *d, const PetscScalar Gam[], const PetscScalar Rp[], const PetscScalar Rm[], PetscInt lrec,
                           PetscInt lsrc, PetscReal zsrc, PetscBool plus, PetscScalar *Pu, PetscScalar *Pd) {
   const PetscInt     nl = d->numLayers, nlsr = PetscAbsInt(lsrc - lrec) + 1, pm = plus ? 1 : -1;
@@ -705,7 +788,19 @@ static void computeUpDown(const LayeredDipole *d, const PetscScalar Gam[], const
   }
 }
 
-/* Reflections and fields of one arrangement for both modes. */
+/**
+ * @brief Reflection coefficients and up- and downgoing fields of one
+ *        source-receiver arrangement for both modes.
+ *
+ * No-op for a single layer.
+ *
+ * @param[in]     d      Dipole and layered model.
+ * @param[in]     zetaH  TE mode parameter per layer.
+ * @param[in]     GamTM  TM wavenumber per layer.
+ * @param[in]     GamTE  TE wavenumber per layer.
+ * @param[in,out] a      Arrangement; its reflection coefficients and fields are
+ *                       set here.
+ */
 static void computeArrangement(const LayeredDipole *d, const PetscScalar zetaH[], const PetscScalar GamTM[], const PetscScalar GamTE[],
                                Arrangement *a) {
   if (d->numLayers == 1) return;
@@ -717,7 +812,19 @@ static void computeArrangement(const LayeredDipole *d, const PetscScalar zetaH[]
   computeUpDown(d, GamTE, a->RpTE, a->RmTE, a->lrec, a->lsrc, a->zsrc, PETSC_TRUE, &a->PuTEp, &a->PdTEp);
 }
 
-/* Green's function of one mode and kernel group, before the ab factors (empymod greenfct). */
+/**
+ * @brief Green's function of one mode and kernel group, before the ab factors.
+ *
+ * Port of empymod greenfct.
+ *
+ * @param[in] d    Dipole and layered model.
+ * @param[in] a    Source-receiver arrangement (computeArrangement).
+ * @param[in] g    Kernel group.
+ * @param[in] tm   PETSC_TRUE for the TM mode, PETSC_FALSE for TE.
+ * @param[in] Gam  Vertical wavenumber of the mode per layer.
+ *
+ * @return PetscScalar Green's function at the receiver.
+ */
 static PetscScalar greenFunction(const LayeredDipole *d, const Arrangement *a, const KernelGroup *g, PetscBool tm,
                                  const PetscScalar Gam[]) {
   const PetscInt     nl      = d->numLayers;
@@ -760,7 +867,22 @@ static PetscScalar greenFunction(const LayeredDipole *d, const Arrangement *a, c
   return green;
 }
 
-/* Adds the DLF terms of kernel ab at filter point i: J0 (S0), J1 (S1) and angle-dependent J0 (S0b) (empymod wavenumber). */
+/**
+ * @brief Adds the digital linear filter terms of a kernel at one filter point.
+ *
+ * J0 terms go to S0, J1 terms to S1 and the angle-dependent J0 terms to S0b
+ * (empymod wavenumber).
+ *
+ * @param[in]     ab      Kernel code (empymod ab).
+ * @param[in]     mrec    PETSC_TRUE for a magnetic receiver.
+ * @param[in]     PTM     TM Green's function.
+ * @param[in]     PTE     TE Green's function.
+ * @param[in]     lambda  Horizontal wavenumber (1/m).
+ * @param[in]     i       Filter point.
+ * @param[in,out] S0      J0 sums.
+ * @param[in,out] S1      J1 sums.
+ * @param[in,out] S0b     Angle-dependent J0 sums.
+ */
 static void accumulateKernel(PetscInt ab, PetscBool mrec, PetscScalar PTM, PetscScalar PTE, PetscReal lambda, PetscInt i,
                              PetscScalar S0[3][6], PetscScalar S1[3][6], PetscScalar S0b[3][6]) {
   static const PetscInt setJ2[] = {11, 12, 21, 22, 14, 24, 15, 25}, setJ0[] = {11, 22, 24, 15}, setJ1[] = {13, 23, 31, 32, 34, 35, 16, 26};
@@ -784,7 +906,18 @@ static void accumulateKernel(PetscInt ab, PetscBool mrec, PetscScalar PTM, Petsc
   }
 }
 
-/* Angle factor of kernel ab for the source-receiver azimuth angle (empymod angle_factor). */
+/**
+ * @brief Angle factor of a kernel for the source-receiver azimuth.
+ *
+ * Port of empymod angle_factor; factors within round-off of zero are set to
+ * zero.
+ *
+ * @param[in] angle  Source-receiver azimuth (rad).
+ * @param[in] ab     Kernel code (empymod ab).
+ * @param[in] mrec   PETSC_TRUE for a magnetic receiver.
+ *
+ * @return PetscReal Angle factor.
+ */
 static PetscReal angleFactor(PetscReal angle, PetscInt ab, PetscBool mrec) {
   static const PetscInt setCos[] = {11, 22, 15, 24, 13, 31, 26, 35}, setDouble[] = {11, 22, 15, 24, 12, 21, 14, 25};
   const PetscBool       useCos = inSet(ab, setCos, 8);
@@ -798,7 +931,20 @@ static PetscReal angleFactor(PetscReal angle, PetscInt ab, PetscBool mrec) {
   return useCos ? PetscCosReal(a) : PetscSinReal(a);
 }
 
-/* Frequency-domain kernel ab from its DLF sums at offset r. */
+/**
+ * @brief Frequency-domain kernel from its digital linear filter sums at one
+ *        offset.
+ *
+ * @param[in] ab     Kernel code (empymod ab).
+ * @param[in] mrec   PETSC_TRUE for a magnetic receiver.
+ * @param[in] r      Horizontal offset (m).
+ * @param[in] angle  Source-receiver azimuth (rad).
+ * @param[in] S0     J0 sums.
+ * @param[in] S1     J1 sums.
+ * @param[in] S0b    Angle-dependent J0 sums.
+ *
+ * @return PetscScalar Kernel ab at offset r.
+ */
 static PetscScalar transformKernel(PetscInt ab, PetscBool mrec, PetscReal r, PetscReal angle, PetscScalar S0[3][6], PetscScalar S1[3][6],
                                    PetscScalar S0b[3][6]) {
   static const PetscInt setJ2[] = {11, 12, 21, 22, 14, 24, 15, 25};
@@ -808,78 +954,20 @@ static PetscScalar transformKernel(PetscInt ab, PetscBool mrec, PetscReal r, Pet
   return ((s1 + S0b[i][j]) * angleFactor(angle, ab, mrec) + S0[i][j]) / r;
 }
 
-PetscErrorCode createLayeredModel(PetscInt numLayers, const PetscReal interfaces[], const PetscReal sigmaH[], const PetscReal sigmaV[],
-                                  LayeredModel *model) {
-  PetscFunctionBeginUser;
-
-  PetscCheck(numLayers >= 1, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "createLayeredModel: numLayers = %" PetscInt_FMT " (expected >= 1)",
-             numLayers);
-  for (PetscInt n = 0; n < numLayers - 1; n++) {
-    PetscCheck(!PetscIsInfOrNanReal(interfaces[n]), PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
-               "createLayeredModel: interface %" PetscInt_FMT " = %g is not finite", n, (double)interfaces[n]);
-    PetscCheck(n == 0 || interfaces[n] < interfaces[n - 1], PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
-               "createLayeredModel: interface %" PetscInt_FMT " = %g is not below interface %" PetscInt_FMT " = %g", n,
-               (double)interfaces[n], n - 1, (double)interfaces[n - 1]);
-  }
-  for (PetscInt n = 0; n < numLayers; n++)
-    PetscCheck(sigmaH[n] > 0.0 && sigmaV[n] > 0.0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
-               "createLayeredModel: layer %" PetscInt_FMT " has sigmaH = %g, sigmaV = %g (expected > 0)", n, (double)sigmaH[n],
-               (double)sigmaV[n]);
-
-  model->numLayers = numLayers;
-  PetscCall(PetscMalloc3(numLayers - 1, &model->interfaces, numLayers, &model->sigmaH, numLayers, &model->sigmaV));
-  PetscCall(PetscArraycpy(model->interfaces, interfaces, numLayers - 1));
-  PetscCall(PetscArraycpy(model->sigmaH, sigmaH, numLayers));
-  PetscCall(PetscArraycpy(model->sigmaV, sigmaV, numLayers));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode destroyLayeredModel(LayeredModel *model) {
-  PetscFunctionBeginUser;
-  PetscCall(PetscFree3(model->interfaces, model->sigmaH, model->sigmaV));
-  model->numLayers = 0;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscInt findLayer(const LayeredModel *model, PetscReal z) {
-  PetscInt n = 0;
-  while (n + 1 < model->numLayers && z < model->interfaces[n]) n++;
-  return n;
-}
-
-PetscInt findLayerOnSide(const LayeredModel *model, PetscReal z, PetscReal zSide) {
-  const PetscInt n = findLayer(model, z);
-  if (n > 0 && onInterface(z, model->interfaces[n - 1]) && zSide > model->interfaces[n - 1]) return n - 1;
-  if (n + 1 < model->numLayers && onInterface(z, model->interfaces[n]) && zSide < model->interfaces[n]) return n + 1;
-  return n;
-}
-
-PetscErrorCode createLayeredDipole(const LayeredModel *model, PetscReal freq, const PetscReal position[3], const PetscReal moment[3],
-                                   LayeredDipole *dipole) {
-  PetscFunctionBeginUser;
-
-  const PetscInt nl = model->numLayers;
-
-  PetscCheck(freq > 0.0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "createLayeredDipole: frequency = %g (expected > 0)", (double)freq);
-
-  dipole->numLayers = nl;
-  PetscCall(PetscMalloc3(nl, &dipole->depth, nl, &dipole->etaH, nl, &dipole->etaV));
-  for (PetscInt n = 0; n < nl; n++) {
-    dipole->depth[n] = (n == 0) ? -(PetscReal)INFINITY : -model->interfaces[n - 1];
-    dipole->etaH[n]  = model->sigmaH[n];
-    dipole->etaV[n]  = model->sigmaV[n];
-  }
-  dipole->zeta = PETSC_i * angularFrequency(freq) * MU;
-  for (PetscInt d = 0; d < 3; d++) {
-    dipole->position[d] = position[d];
-    dipole->moment[d]   = moment[d];
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Fields at horizontal offset (dx, dy) >= LAYERED_MIN_OFFSET and depth zrec in layer lrec, PETGEM frame; H = NULL skips H. */
+/**
+ * @brief Fields of the dipole at a horizontal offset and a receiver depth, in
+ *        the PETGEM frame.
+ *
+ * @param[in]     dipole  Dipole and layered model.
+ * @param[in,out] w       Work arrays.
+ * @param[in]     dx      Offset along x (m); the offset must be >=
+ *                        LAYERED_MIN_OFFSET.
+ * @param[in]     dy      Offset along y (m).
+ * @param[in]     zrec    Receiver depth (m, z down).
+ * @param[in]     lrec    Receiver layer.
+ * @param[out]    E       Electric field.
+ * @param[out]    H       Magnetic field, or NULL to skip it.
+ */
 static void evaluateOffset(const LayeredDipole *dipole, Workspace *w, PetscReal dx, PetscReal dy, PetscReal zrec, PetscInt lrec,
                            PetscScalar E[3], PetscScalar H[3]) {
   const PetscReal s[3]        = {1.0, 1.0, -1.0};
@@ -968,6 +1056,96 @@ static void evaluateOffset(const LayeredDipole *dipole, Workspace *w, PetscReal 
   }
 }
 
+/**
+ * @brief Creates a layered model from per-layer arrays (copied).
+ */
+PetscErrorCode createLayeredModel(PetscInt numLayers, const PetscReal interfaces[], const PetscReal sigmaH[], const PetscReal sigmaV[],
+                                  LayeredModel *model) {
+  PetscFunctionBeginUser;
+
+  PetscCheck(numLayers >= 1, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "createLayeredModel: numLayers = %" PetscInt_FMT " (expected >= 1)",
+             numLayers);
+  for (PetscInt n = 0; n < numLayers - 1; n++) {
+    PetscCheck(!PetscIsInfOrNanReal(interfaces[n]), PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
+               "createLayeredModel: interface %" PetscInt_FMT " = %g is not finite", n, (double)interfaces[n]);
+    PetscCheck(n == 0 || interfaces[n] < interfaces[n - 1], PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
+               "createLayeredModel: interface %" PetscInt_FMT " = %g is not below interface %" PetscInt_FMT " = %g", n,
+               (double)interfaces[n], n - 1, (double)interfaces[n - 1]);
+  }
+  for (PetscInt n = 0; n < numLayers; n++)
+    PetscCheck(sigmaH[n] > 0.0 && sigmaV[n] > 0.0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
+               "createLayeredModel: layer %" PetscInt_FMT " has sigmaH = %g, sigmaV = %g (expected > 0)", n, (double)sigmaH[n],
+               (double)sigmaV[n]);
+
+  model->numLayers = numLayers;
+  PetscCall(PetscMalloc3(numLayers - 1, &model->interfaces, numLayers, &model->sigmaH, numLayers, &model->sigmaV));
+  PetscCall(PetscArraycpy(model->interfaces, interfaces, numLayers - 1));
+  PetscCall(PetscArraycpy(model->sigmaH, sigmaH, numLayers));
+  PetscCall(PetscArraycpy(model->sigmaV, sigmaV, numLayers));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Frees a model created by createLayeredModel().
+ */
+PetscErrorCode destroyLayeredModel(LayeredModel *model) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscFree3(model->interfaces, model->sigmaH, model->sigmaV));
+  model->numLayers = 0;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Returns the layer that contains height z.
+ */
+PetscInt findLayer(const LayeredModel *model, PetscReal z) {
+  PetscInt n = 0;
+  while (n + 1 < model->numLayers && z < model->interfaces[n]) n++;
+  return n;
+}
+
+/**
+ * @brief Returns the layer that contains height z, taking the side of
+ *        zSide on an interface.
+ */
+PetscInt findLayerOnSide(const LayeredModel *model, PetscReal z, PetscReal zSide) {
+  const PetscInt n = findLayer(model, z);
+  if (n > 0 && onInterface(z, model->interfaces[n - 1]) && zSide > model->interfaces[n - 1]) return n - 1;
+  if (n + 1 < model->numLayers && onInterface(z, model->interfaces[n]) && zSide < model->interfaces[n]) return n + 1;
+  return n;
+}
+
+/**
+ * @brief Sets up an electric point dipole in a layered model.
+ */
+PetscErrorCode createLayeredDipole(const LayeredModel *model, PetscReal freq, const PetscReal position[3], const PetscReal moment[3],
+                                   LayeredDipole *dipole) {
+  PetscFunctionBeginUser;
+
+  const PetscInt nl = model->numLayers;
+
+  PetscCheck(freq > 0.0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "createLayeredDipole: frequency = %g (expected > 0)", (double)freq);
+
+  dipole->numLayers = nl;
+  PetscCall(PetscMalloc3(nl, &dipole->depth, nl, &dipole->etaH, nl, &dipole->etaV));
+  for (PetscInt n = 0; n < nl; n++) {
+    dipole->depth[n] = (n == 0) ? -(PetscReal)INFINITY : -model->interfaces[n - 1];
+    dipole->etaH[n]  = model->sigmaH[n];
+    dipole->etaV[n]  = model->sigmaV[n];
+  }
+  dipole->zeta = PETSC_i * angularFrequency(freq) * MU;
+  for (PetscInt d = 0; d < 3; d++) {
+    dipole->position[d] = position[d];
+    dipole->moment[d]   = moment[d];
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Evaluates E (and optionally H) of the dipole at points.
+ */
 PetscErrorCode evaluateLayeredDipole(const LayeredDipole *dipole, PetscInt numPoints, const PetscReal points[], const PetscInt layers[],
                                      PetscScalar E[], PetscScalar H[]) {
   PetscFunctionBeginUser;
@@ -1039,6 +1217,9 @@ PetscErrorCode evaluateLayeredDipole(const LayeredDipole *dipole, PetscInt numPo
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Frees a dipole created by createLayeredDipole().
+ */
 PetscErrorCode destroyLayeredDipole(LayeredDipole *dipole) {
   PetscFunctionBeginUser;
   PetscCall(PetscFree3(dipole->depth, dipole->etaH, dipole->etaV));

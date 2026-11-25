@@ -14,12 +14,24 @@
  *
  * Usage: test_dofs <order>   (order in 1..6).  Exit 0 iff all checks pass.
  */
-#include "fe_nedelec.h"
-#include "fe_nodal.h"
-#include "constants.h"
-#include "petgem_test.h"
+/* PETSc libraries */
 #include <petsc.h>
 
+/* PETGEM functions */
+#include "constants.h"
+#include "fe_nedelec.h"
+#include "fe_nodal.h"
+#include "petgem_test.h"
+
+/**
+ * @brief Runs the dof ordering checks and reports the number of failures.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector; argv[1] is the basis order where the
+ *                  harness takes one.
+ *
+ * @return int 0 when every check passes, non-zero otherwise.
+ */
 int main(int argc, char **argv) {
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
   PetscInt order = (argc > 1) ? atoi(argv[1]) : 1;

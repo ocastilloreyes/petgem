@@ -11,8 +11,9 @@
 #ifndef GRID_H
 #define GRID_H
 
-#include "constants.h"
 #include <petsc.h>
+
+#include "constants.h"
 
 /**
  * @brief Finite-element space descriptor.
@@ -103,7 +104,8 @@ typedef struct {
  * @param[in,out] dm      DMPlex mesh configured with the FE sections.
  * @param[out]    grid    Grid struct filled with mesh statistics and FemSpace.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode setupNedelecGrid(PetscInt order, PetgemBoundaryCondition bc, DM *dm, Grid *grid);
 
@@ -112,7 +114,8 @@ PetscErrorCode setupNedelecGrid(PetscInt order, PetgemBoundaryCondition bc, DM *
  *
  * @param[in,out] grid  Grid filled by setupNedelecGrid().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyGrid(Grid *grid);
 
@@ -123,7 +126,8 @@ PetscErrorCode destroyGrid(Grid *grid);
  * @param[in] dm         DMPlex carrying the H(curl) section.
  * @param[in] grid       Grid filled by setupNedelecGrid().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logGridSummary(const char *inputFile, const DM dm, const Grid *grid);
 
@@ -134,7 +138,8 @@ PetscErrorCode logGridSummary(const char *inputFile, const DM dm, const Grid *gr
  * @param[in]  position     Query point coordinates (x, y, z).
  * @param[out] pointInCell  Index of the containing cell on the lowest rank that locates the point, -1 elsewhere.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode locatePoint(const DM dm, const PetscReal *position, PetscInt *pointInCell);
 
@@ -145,7 +150,8 @@ PetscErrorCode locatePoint(const DM dm, const PetscReal *position, PetscInt *poi
  * @param[in]     cellId  Cell index.
  * @param[in,out] cell    Cell whose coordinates field is filled.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode extractCellCoordinates(const DM dm, const PetscInt cellId, Cell *cell);
 
@@ -157,7 +163,8 @@ PetscErrorCode extractCellCoordinates(const DM dm, const PetscInt cellId, Cell *
  * @param[in]     cellId          Cell index.
  * @param[in,out] cell            Cell whose conductivity field is filled.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode extractCellConductivity(DM dmConductivity, Vec conductivity, PetscInt cellId, Cell *cell);
 
@@ -169,7 +176,8 @@ PetscErrorCode extractCellConductivity(DM dmConductivity, Vec conductivity, Pets
  * @param[in]     cellId         Cell index.
  * @param[in,out] cell           Cell whose materialId field is filled.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode extractCellMaterialId(DM dmMaterialsId, Vec materialsId, PetscInt cellId, Cell *cell);
 
@@ -178,7 +186,8 @@ PetscErrorCode extractCellMaterialId(DM dmMaterialsId, Vec materialsId, PetscInt
  *
  * @param[in,out] cell  Cell whose centroid field is filled.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode computeCellCentroid(Cell *cell);
 
@@ -191,7 +200,8 @@ PetscErrorCode computeCellCentroid(Cell *cell);
  * @param[in]  dm     DMPlex mesh configured by setupNedelecGrid.
  * @param[out] faces  Local boundary face points (caller destroys).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode getBoundaryFaces(const DM dm, IS *faces);
 
@@ -205,7 +215,8 @@ PetscErrorCode getBoundaryFaces(const DM dm, IS *faces);
  * @param[out] normal    Outward unit normal.
  * @param[out] area      Face area.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode computeBoundaryFaceGeometry(const DM dm, const PetscInt face, PetscInt *cell,
                                            PetscReal vertices[NUM_VERTICES_PER_FACE][NUM_DIMENSIONS], PetscReal normal[NUM_DIMENSIONS],

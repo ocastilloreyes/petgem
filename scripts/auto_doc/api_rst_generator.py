@@ -31,11 +31,12 @@ PAGES = [
      "Global operator and discrete gradient, linear solve and BDDC setup, "
      "interpolation at the receivers.",
      ["assembly.h", "solver.h", "receiver_interp.h"]),
-    ("physics", "CSEM and MT",
+    ("physics", "CSEM, TD-CSEM and MT",
      "Transmitters and dipole sources, field formulation and background "
-     "model, fields of a dipole in a layered medium (CSEM); 1D boundary "
+     "model, fields of a dipole in a layered medium (CSEM); time stepping, "
+     "discrete charge and receiver time series (TD-CSEM); 1D boundary "
      "field, boundary right-hand side and transfer functions (MT).",
-     ["csem.h", "csem_primary.h", "csem_layered.h", "mt.h"]),
+     ["csem.h", "csem_primary.h", "csem_layered.h", "tdcsem.h", "mt.h"]),
     ("inversion", "Inversion",
      "im.csem parameters, objective and gradient, and the L-BFGS optimizer.",
      ["inversion.h", "lbfgs.h"]),

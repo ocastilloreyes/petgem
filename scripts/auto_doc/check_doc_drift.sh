@@ -58,6 +58,9 @@ GUARDS=(
   '\bassembleCsemMMSRHS\b|renamed function assembleCsemMMSRHS - now assembleMmsRhs (tests/mms/mms.c)'
   '\bassembleCsemMsRefill\b|renamed function assembleCsemMsRefill - now refillMassMatrix'
   '(transmitter|postprocessing)\.h|removed header - the CSEM types and responses live in csem.h'
+  '\brunForward\b|renamed function runForward - now runCsemForward (src/fm_csem.c)'
+  '\brunInverse\b|renamed function runInverse - now runCsemInverse (src/im_csem.c)'
+  '\brunTdCsemForward\b|renamed function runTdCsemForward - now runTdcsemForward (src/fm_tdcsem.c)'
 )
 
 echo "== check_doc_drift: removed-symbol guard =="

@@ -27,14 +27,14 @@
 
 /* PETSc libraries */
 #include <petsc.h>
-#include <petscsys.h>
 #include <petscdt.h>
+#include <petscsys.h>
 
 /* PETGEM functions */
 #include "constants.h"
-#include "fem.h"
 #include "fe_nedelec.h"
 #include "fe_nodal.h"
+#include "fem.h"
 #include "grid.h"
 
 /* PETGEM closure edge slot E -> native edge; native edge -> local vertices. */
@@ -67,6 +67,9 @@ static PetscInt   femNdOrder = 0;
  * @param[in]  coords       Cell vertex coordinates (4x3, row-major).
  * @param[out] jacobian     Cell Jacobian J = F^T.
  * @param[out] invJacobian  Inverse Jacobian J^{-1}.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femComputeJacobian(const PetscReal *coords, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS],
                                          PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS]) {
@@ -125,7 +128,8 @@ static PetscErrorCode femComputeJacobian(const PetscReal *coords, PetscReal jaco
  * @param[out] points   Quadrature point coordinates (m^3 x 3).
  * @param[out] weights  Quadrature weights (m^3).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femGaussPoints3D(PetscInt m, PetscReal **points, PetscReal *weights) {
   PetscFunctionBeginUser;
@@ -172,7 +176,8 @@ static PetscErrorCode femGaussPoints3D(PetscInt m, PetscReal **points, PetscReal
  * @param[out] points   Point coordinates (m*m points, 2 reals each).
  * @param[out] weights  Weights (m*m entries).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femGaussPoints2D(PetscInt m, PetscReal **points, PetscReal *weights) {
   PetscFunctionBeginUser;
@@ -211,7 +216,8 @@ static PetscErrorCode femGaussPoints2D(PetscInt m, PetscReal **points, PetscReal
  * cached order. It is registered with PetscRegisterFinalize so the handle is
  * freed at PETSc shutdown.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femFinalize(void) {
   PetscFunctionBeginUser;
@@ -234,7 +240,8 @@ static PetscErrorCode femFinalize(void) {
  *
  * @param[in] order  Requested Nedelec order (1..6).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femEnsureNedelec(PetscInt order) {
   PetscFunctionBeginUser;
@@ -472,7 +479,8 @@ static void femPiola(PetscInt dof, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENS
  * @param[in,out] A     Input matrix (N x N, row-major); overwritten.
  * @param[out]    Ainv  Output inverse (N x N, row-major).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femDenseInverse(PetscInt N, PetscReal *A, PetscReal *Ainv) {
   PetscFunctionBeginUser;
@@ -546,7 +554,8 @@ static PetscErrorCode femDenseInverse(PetscInt N, PetscReal *A, PetscReal *Ainv)
  * @param[out] O             Work array (dof x dof, row-major); overwritten.
  * @param[out] Oinv          Inverse O^{-1} (dof x dof, row-major).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femOrientInverse(PetscInt order, PetscInt dof, const PetscReal *vertexCoords, PetscReal *O, PetscReal *Oinv) {
   PetscFunctionBeginUser;
@@ -600,7 +609,8 @@ static PetscErrorCode femOrientInverse(PetscInt order, PetscInt dof, const Petsc
  * @param[out] Me              Mass matrix (dof x dof).
  * @param[out] Ke              Stiffness matrix (dof x dof).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femElementalMatrix(PetscInt order, const PetscReal *vertexCoords, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS],
                                          PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], PetscInt numGaussPoints,
@@ -682,7 +692,8 @@ static PetscErrorCode femElementalMatrix(PetscInt order, const PetscReal *vertex
  * @param[out] basisFunctions      Physical values, [NUM_DIMENSIONS][dof].
  * @param[out] curlBasisFunctions  Physical curls, [NUM_DIMENSIONS][dof].
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femBasisFunctions(PetscInt order, const PetscReal *vertexCoords, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS],
                                         PetscReal invJacobian[NUM_DIMENSIONS][NUM_DIMENSIONS], const PetscReal *point,
@@ -727,7 +738,8 @@ static PetscErrorCode femBasisFunctions(PetscInt order, const PetscReal *vertexC
  * @param[in]  vertexCoords    Cell vertex coordinates (4x3) driving orientation.
  * @param[out] gradientMatrix  Per-cell block (dof x nH1).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femDiscreteGradient(PetscInt order, const PetscReal *vertexCoords, PetscReal **gradientMatrix) {
   /* Discrete gradient by direct interpolation: the native coefficient of grad(phi_j)
@@ -801,7 +813,8 @@ static PetscErrorCode femDiscreteGradient(PetscInt order, const PetscReal *verte
  * @param[in]  numFields     Number of fields.
  * @param[out] coeff         Closure-order coefficients, coeff[f * dof + i].
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode femInterpolate(PetscInt order, const PetscReal *vertexCoords, PetscReal jacobian[NUM_DIMENSIONS][NUM_DIMENSIONS],
                                      VectorFieldFn field, void *ctx, PetscInt numFields, PetscScalar *coeff) {
@@ -917,7 +930,8 @@ PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal di
  * @param[in]  order       Basis order driving the quadrature degree.
  * @param[out] quadrature  Rule; release it with destroyQuadrature3D().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createQuadrature3D(const PetscInt order, Quadrature3D *quadrature) {
   PetscFunctionBeginUser;
@@ -939,7 +953,8 @@ PetscErrorCode createQuadrature3D(const PetscInt order, Quadrature3D *quadrature
  *
  * @param[in,out] quadrature  Rule to free.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyQuadrature3D(Quadrature3D *quadrature) {
   PetscFunctionBeginUser;
@@ -958,7 +973,8 @@ PetscErrorCode destroyQuadrature3D(Quadrature3D *quadrature) {
  * @param[in]  order       Basis order driving the quadrature degree.
  * @param[out] quadrature  Rule; release it with destroyQuadrature2D().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createQuadrature2D(const PetscInt order, Quadrature2D *quadrature) {
   PetscFunctionBeginUser;
@@ -979,7 +995,8 @@ PetscErrorCode createQuadrature2D(const PetscInt order, Quadrature2D *quadrature
  *
  * @param[in,out] quadrature  Rule to free.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyQuadrature2D(Quadrature2D *quadrature) {
   PetscFunctionBeginUser;
@@ -999,7 +1016,8 @@ PetscErrorCode destroyQuadrature2D(Quadrature2D *quadrature) {
  * @param[in]  cols  Number of columns.
  * @param[out] M     Matrix; M[0] is the contiguous row-major block. Free with destroyDenseRows().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createDenseRows(PetscInt rows, PetscInt cols, PetscReal ***M) {
   PetscFunctionBeginUser;
@@ -1014,7 +1032,8 @@ PetscErrorCode createDenseRows(PetscInt rows, PetscInt cols, PetscReal ***M) {
  *
  * @param[in,out] M  Matrix; set to NULL.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyDenseRows(PetscReal ***M) {
   PetscFunctionBeginUser;
@@ -1029,7 +1048,8 @@ PetscErrorCode destroyDenseRows(PetscReal ***M) {
  * @param[in]  numDof  Number of DOFs per cell.
  * @param[out] N       Buffer; release it with destroyBasisValues().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createBasisValues(const PetscInt numDof, PetscReal ***N) {
   PetscFunctionBeginUser;
@@ -1045,7 +1065,8 @@ PetscErrorCode createBasisValues(const PetscInt numDof, PetscReal ***N) {
  *
  * @param[in,out] N  Buffer to free (set to NULL).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyBasisValues(PetscReal ***N) {
   PetscFunctionBeginUser;

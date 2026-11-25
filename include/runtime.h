@@ -48,6 +48,11 @@ typedef struct {
 
 /**
  * @brief Returns PETSC_TRUE when argv[1] is --version.
+ *
+ * @param[in] argc  Argument count from main().
+ * @param[in] argv  Argument vector from main().
+ *
+ * @return PetscBool PETSC_TRUE when argv[1] is --version.
  */
 PetscBool isVersionRequest(int argc, char **argv);
 
@@ -77,16 +82,33 @@ PetscErrorCode beginKernelRun(int *argc, char ***argv, const char help[], const 
 
 /**
  * @brief Opens a phase: pushes its log stage and starts its timer.
+ *
+ * @param[in,out] run    Kernel run.
+ * @param[in]     phase  Phase.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode beginPhase(KernelRun *run, KernelPhase phase);
 
 /**
  * @brief Closes a phase: adds the elapsed time and pops its log stage.
+ *
+ * @param[in,out] run    Kernel run.
+ * @param[in]     phase  Phase.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode endPhase(KernelRun *run, KernelPhase phase);
 
 /**
  * @brief Ends a -help run: prints the usage tip and finalizes PETSc.
+ *
+ * @param[in] run  Kernel run.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode endHelpRun(const KernelRun *run);
 
@@ -96,6 +118,9 @@ PetscErrorCode endHelpRun(const KernelRun *run);
  * @param[in] labels  Timer labels.
  * @param[in] times   Timer values in seconds.
  * @param[in] n       Number of timers.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode printRunSummary(const char *const labels[], const PetscLogDouble times[], PetscInt n);
 
@@ -113,17 +138,31 @@ PetscLogDouble setupTime(const KernelRun *run);
  *
  * @param[in] run  Kernel run.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode printForwardSummary(const KernelRun *run);
 
 /**
  * @brief Prints the "Assembly" section: operator type and right-hand sides.
+ *
+ * @param[in] comm    Communicator (rank 0 prints).
+ * @param[in] A       Operator.
+ * @param[in] numRhs  Number of right-hand sides.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logAssembly(MPI_Comm comm, Mat A, PetscInt numRhs);
 
 /**
  * @brief Prints the "Solve" section: solver name and convergence status.
+ *
+ * @param[in] comm  Communicator (rank 0 prints).
+ * @param[in] info  Solver name and convergence status.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logSolve(MPI_Comm comm, const SolveInfo *info);
 
@@ -134,6 +173,9 @@ PetscErrorCode logSolve(MPI_Comm comm, const SolveInfo *info);
  * @param[in] title      Section title.
  * @param[in] params     Parameters carrying the output path.
  * @param[in] receivers  Serial Vec of 3·N_recv receiver coordinates.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logReceiverOutput(MPI_Comm comm, const char *title, const PetgemParams *params, Vec receivers);
 

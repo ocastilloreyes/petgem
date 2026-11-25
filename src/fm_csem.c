@@ -4,7 +4,7 @@
  * Date: 2026-02-03
  *
  * Description:
- * Forward CSEM kernel (runForward), linked into fm.csem and petgem.
+ * Forward CSEM kernel (runCsemForward), linked into fm.csem and petgem.
  */
 
 /* PETGEM functions */
@@ -53,22 +53,10 @@ UNIFIED BINARY\n\
   mpirun -n 96 ./petgem fm.csem -options_file params.txt\n\
 \n" PETGEM_HELP_FOOTER;
 
-/* Context of addPrimaryField. */
-typedef struct {
-  const CsemPrimary *primary;
-  DM                 dm;
-} PrimaryFieldCtx;
-
-/* Adds the primary field of source k of the single source set to the receiver fields. */
-static PetscErrorCode addPrimaryField(PetscInt k, const ReceiverInterpolationMatrices *Q, Vec receivers, Vec fields[NUM_RECEIVER_FIELDS],
-                                      void *ctx) {
-  PetscFunctionBeginUser;
-  const PrimaryFieldCtx *c = (const PrimaryFieldCtx *)ctx;
-  PetscCall(addCsemPrimaryAtReceivers(c->primary, 0, k, c->dm, Q, receivers, fields));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-int runForward(int argc, char **argv) {
+/**
+ * @brief Runs the CSEM forward-modeling kernel (fm.csem).
+ */
+int runCsemForward(int argc, char **argv) {
 
   if (isVersionRequest(argc, argv)) return printVersion();
 
@@ -146,8 +134,8 @@ int runForward(int argc, char **argv) {
   /* Fields at the receivers */
   PetscCall(beginPhase(&run, PHASE_OUTPUT));
   {
-    PrimaryFieldCtx ctx = {&primary, dm};
-    PetscCall(computeCsemResponses(&params, sources, dm, &grid, receivers, X, secondary ? addPrimaryField : NULL, &ctx));
+    CsemPrimaryFieldCtx ctx = {&primary, dm};
+    PetscCall(computeCsemResponses(&params, sources, dm, &grid, receivers, X, secondary ? addCsemPrimaryField : NULL, &ctx));
   }
   PetscCall(endPhase(&run, PHASE_OUTPUT));
   PetscCall(logReceiverOutput(comm, run.outputStage, &params, receivers));

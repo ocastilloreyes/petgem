@@ -27,11 +27,128 @@
 #define MT_FACE_RECORD 4
 
 /**
+ * @brief Compares two reals for qsort.
+ *
+ * @param[in] a  Pointer to the first PetscReal.
+ * @param[in] b  Pointer to the second PetscReal.
+ *
+ * @return int Negative, zero or positive when a is smaller, equal or larger
+ *         than b.
+ */
+static int compareReal(const void *a, const void *b) {
+  const PetscReal x = *(const PetscReal *)a, y = *(const PetscReal *)b;
+  return (x > y) - (x < y);
+}
+
+/**
+ * @brief Creates a Vec with the layout of a template and sets its name.
+ *
+ * @param[in]  tmpl  Template Vec.
+ * @param[in]  name  Object name (HDF5 dataset name).
+ * @param[out] v     New Vec.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode createNamedLike(Vec tmpl, const char *name, Vec *v) {
+  PetscFunctionBeginUser;
+  PetscCall(VecDuplicate(tmpl, v));
+  PetscCall(PetscObjectSetName((PetscObject)*v, name));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Writes n Vecs to an HDF5 group.
+ *
+ * @param[in] viewer  HDF5 viewer.
+ * @param[in] group   Group path.
+ * @param[in] v       Vecs, written under their object names.
+ * @param[in] n       Number of Vecs.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode viewGroup(PetscViewer viewer, const char *group, Vec v[], PetscInt n) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscViewerHDF5PushGroup(viewer, group));
+  for (PetscInt comp = 0; comp < n; comp++) PetscCall(VecView(v[comp], viewer));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Impedance, apparent resistivity, phase and tipper at the receivers.
+ *
+ * Per receiver: Z = [E1 E2][H1 H2]^-1 and T = [Hz1 Hz2][H1 H2]^-1 (Eq. A.3),
+ * rho (Eq. A.4) and phi in degrees (Eq. A.5).
+ *
+ * @param[in]  fields  Fields at the receivers of both polarizations.
+ * @param[in]  omega   Angular frequency (rad/s).
+ * @param[out] Z       Zxx, Zxy, Zyx, Zyy.
+ * @param[out] rho     Apparent resistivity of each Z component.
+ * @param[out] phi     Phase of each Z component (degrees).
+ * @param[out] T       Tipper Tzx, Tzy.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode computeImpedance(Vec fields[MT_NUM_POLARIZATIONS][NUM_RECEIVER_FIELDS], PetscReal omega, Vec Z[4], Vec rho[4],
+                                       Vec phi[4], Vec T[2]) {
+  PetscFunctionBeginUser;
+  const PetscScalar *f[MT_NUM_POLARIZATIONS][NUM_RECEIVER_FIELDS];
+  PetscScalar       *z[4], *r[4], *p[4], *t[2];
+  PetscInt           n;
+
+  PetscCall(VecGetLocalSize(fields[0][0], &n));
+  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
+    for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(VecGetArrayRead(fields[k][comp], &f[k][comp]));
+  }
+  for (PetscInt comp = 0; comp < 4; comp++) {
+    PetscCall(VecGetArray(Z[comp], &z[comp]));
+    PetscCall(VecGetArray(rho[comp], &r[comp]));
+    PetscCall(VecGetArray(phi[comp], &p[comp]));
+  }
+  for (PetscInt comp = 0; comp < 2; comp++) PetscCall(VecGetArray(T[comp], &t[comp]));
+
+  for (PetscInt i = 0; i < n; i++) {
+    const PetscScalar E1x = f[0][RECV_EX][i], E1y = f[0][RECV_EY][i];
+    const PetscScalar H1x = f[0][RECV_HX][i], H1y = f[0][RECV_HY][i], H1z = f[0][RECV_HZ][i];
+    const PetscScalar E2x = f[1][RECV_EX][i], E2y = f[1][RECV_EY][i];
+    const PetscScalar H2x = f[1][RECV_HX][i], H2y = f[1][RECV_HY][i], H2z = f[1][RECV_HZ][i];
+    /* [H1 H2]^-1 = [H2y -H2x; -H1y H1x] / det */
+    const PetscScalar det = H1x * H2y - H2x * H1y;
+
+    z[0][i] = (E1x * H2y - E2x * H1y) / det;
+    z[1][i] = (E2x * H1x - E1x * H2x) / det;
+    z[2][i] = (E1y * H2y - E2y * H1y) / det;
+    z[3][i] = (E2y * H1x - E1y * H2x) / det;
+    t[0][i] = (H1z * H2y - H2z * H1y) / det;
+    t[1][i] = (H2z * H1x - H1z * H2x) / det;
+    for (PetscInt comp = 0; comp < 4; comp++) {
+      r[comp][i] = PetscSqr(PetscAbsScalar(z[comp][i])) / (omega * MU);
+      p[comp][i] = PetscAtan2Real(PetscImaginaryPart(z[comp][i]), PetscRealPart(z[comp][i])) * 180.0 / PETSC_PI;
+    }
+  }
+
+  for (PetscInt comp = 0; comp < 2; comp++) PetscCall(VecRestoreArray(T[comp], &t[comp]));
+  for (PetscInt comp = 0; comp < 4; comp++) {
+    PetscCall(VecRestoreArray(phi[comp], &p[comp]));
+    PetscCall(VecRestoreArray(rho[comp], &r[comp]));
+    PetscCall(VecRestoreArray(Z[comp], &z[comp]));
+  }
+  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
+    for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(VecRestoreArrayRead(fields[k][comp], &f[k][comp]));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
  * @brief Reads the MT options -mt_1d_refine and -mt_1d_equation.
  *
  * @param[out] mtParams  MT options.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode readMtParams(MtParams *mtParams) {
   PetscFunctionBeginUser;
@@ -61,7 +178,8 @@ PetscErrorCode readMtParams(MtParams *mtParams) {
  * @param[in]     params  Parameters (input file).
  * @param[in,out] mtParams      MT options; frequency is set.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode loadMtSettings(const PetgemParams *params, MtParams *mtParams) {
   PetscFunctionBeginUser;
@@ -138,14 +256,6 @@ PetscErrorCode classifyMtBoxFaces(const DM dm, IS faces, MtBoxFace **tags) {
   PetscCall(ISRestoreIndices(faces, &faceIdx));
 
   PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/**
- * @brief Compares two reals for qsort.
- */
-static int compareReal(const void *a, const void *b) {
-  const PetscReal x = *(const PetscReal *)a, y = *(const PetscReal *)b;
-  return (x > y) - (x < y);
 }
 
 /**
@@ -377,7 +487,8 @@ PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mtParams, M
  * @param[in]  z      Height.
  * @param[out] H      H(z).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode evalMt1DField(const Mt1DField *field, const PetscReal z, PetscScalar *H) {
   PetscFunctionBeginUser;
@@ -546,7 +657,8 @@ PetscErrorCode assembleMtBoundaryRhs(const PetscReal frequency, const DM dm, con
  * @param[in] profile   Layered conductivity of the lateral faces.
  * @param[in] field     Nodal H(z).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mtParams, IS faces, const Mt1DProfile *profile, const Mt1DField *field) {
   PetscFunctionBeginUser;
@@ -571,72 +683,6 @@ PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mtParams, IS faces, con
         logKvf(comm, key, "z = [%g, %g] m, sigma = %g S/m", (double)profile->z[l], (double)profile->z[l + 1], (double)profile->sigma[l]));
   }
 
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode createNamedLike(Vec tmpl, const char *name, Vec *v) {
-  PetscFunctionBeginUser;
-  PetscCall(VecDuplicate(tmpl, v));
-  PetscCall(PetscObjectSetName((PetscObject)*v, name));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode viewGroup(PetscViewer viewer, const char *group, Vec v[], PetscInt n) {
-  PetscFunctionBeginUser;
-  PetscCall(PetscViewerHDF5PushGroup(viewer, group));
-  for (PetscInt comp = 0; comp < n; comp++) PetscCall(VecView(v[comp], viewer));
-  PetscCall(PetscViewerHDF5PopGroup(viewer));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Per receiver: Z = [E1 E2][H1 H2]^-1, T = [Hz1 Hz2][H1 H2]^-1 (Eq. A.3), rho (Eq. A.4), phi in degrees (Eq. A.5). */
-static PetscErrorCode computeImpedance(Vec fields[MT_NUM_POLARIZATIONS][NUM_RECEIVER_FIELDS], PetscReal omega, Vec Z[4], Vec rho[4],
-                                       Vec phi[4], Vec T[2]) {
-  PetscFunctionBeginUser;
-  const PetscScalar *f[MT_NUM_POLARIZATIONS][NUM_RECEIVER_FIELDS];
-  PetscScalar       *z[4], *r[4], *p[4], *t[2];
-  PetscInt           n;
-
-  PetscCall(VecGetLocalSize(fields[0][0], &n));
-  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-    for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(VecGetArrayRead(fields[k][comp], &f[k][comp]));
-  }
-  for (PetscInt comp = 0; comp < 4; comp++) {
-    PetscCall(VecGetArray(Z[comp], &z[comp]));
-    PetscCall(VecGetArray(rho[comp], &r[comp]));
-    PetscCall(VecGetArray(phi[comp], &p[comp]));
-  }
-  for (PetscInt comp = 0; comp < 2; comp++) PetscCall(VecGetArray(T[comp], &t[comp]));
-
-  for (PetscInt i = 0; i < n; i++) {
-    const PetscScalar E1x = f[0][RECV_EX][i], E1y = f[0][RECV_EY][i];
-    const PetscScalar H1x = f[0][RECV_HX][i], H1y = f[0][RECV_HY][i], H1z = f[0][RECV_HZ][i];
-    const PetscScalar E2x = f[1][RECV_EX][i], E2y = f[1][RECV_EY][i];
-    const PetscScalar H2x = f[1][RECV_HX][i], H2y = f[1][RECV_HY][i], H2z = f[1][RECV_HZ][i];
-    /* [H1 H2]^-1 = [H2y -H2x; -H1y H1x] / det */
-    const PetscScalar det = H1x * H2y - H2x * H1y;
-
-    z[0][i] = (E1x * H2y - E2x * H1y) / det;
-    z[1][i] = (E2x * H1x - E1x * H2x) / det;
-    z[2][i] = (E1y * H2y - E2y * H1y) / det;
-    z[3][i] = (E2y * H1x - E1y * H2x) / det;
-    t[0][i] = (H1z * H2y - H2z * H1y) / det;
-    t[1][i] = (H2z * H1x - H1z * H2x) / det;
-    for (PetscInt comp = 0; comp < 4; comp++) {
-      r[comp][i] = PetscSqr(PetscAbsScalar(z[comp][i])) / (omega * MU);
-      p[comp][i] = PetscAtan2Real(PetscImaginaryPart(z[comp][i]), PetscRealPart(z[comp][i])) * 180.0 / PETSC_PI;
-    }
-  }
-
-  for (PetscInt comp = 0; comp < 2; comp++) PetscCall(VecRestoreArray(T[comp], &t[comp]));
-  for (PetscInt comp = 0; comp < 4; comp++) {
-    PetscCall(VecRestoreArray(phi[comp], &p[comp]));
-    PetscCall(VecRestoreArray(rho[comp], &r[comp]));
-    PetscCall(VecRestoreArray(Z[comp], &z[comp]));
-  }
-  for (PetscInt k = 0; k < MT_NUM_POLARIZATIONS; k++) {
-    for (PetscInt comp = 0; comp < NUM_RECEIVER_FIELDS; comp++) PetscCall(VecRestoreArrayRead(fields[k][comp], &f[k][comp]));
-  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -713,7 +759,8 @@ PetscErrorCode computeMtResponses(const PetgemParams *params, const MtParams *mt
  *
  * @param[in,out] profile  Profile to free.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyMt1DProfile(Mt1DProfile *profile) {
   PetscFunctionBeginUser;
@@ -727,7 +774,8 @@ PetscErrorCode destroyMt1DProfile(Mt1DProfile *profile) {
  *
  * @param[in,out] field  Field to free.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyMt1DField(Mt1DField *field) {
   PetscFunctionBeginUser;

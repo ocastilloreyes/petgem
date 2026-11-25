@@ -24,16 +24,17 @@
  *       receiver is therefore assigned to a single owner (the lowest rank that
  *       located it) and skipped on every other rank. */
 
-#include "common.h"
-#include "receiver_interp.h"
-
-#include "constants.h"
-#include "fem.h"
-#include "grid.h"
-
+/* PETSc libraries */
 #include <petsc.h>
 #include <petscdmplex.h>
 #include <petscviewerhdf5.h>
+
+/* PETGEM functions */
+#include "common.h"
+#include "constants.h"
+#include "fem.h"
+#include "grid.h"
+#include "receiver_interp.h"
 
 /**
  * @brief Decodes a global DOF index returned by DMPlexGetClosureIndices
@@ -51,7 +52,22 @@ static inline PetscInt decodeGlobalDof(PetscInt rawIdx) {
   return (rawIdx >= 0) ? rawIdx : -(rawIdx + 1);
 }
 
-/* Lowest rank that located each receiver (nprocs when none did). */
+/**
+ * @brief Lowest rank that located each receiver.
+ *
+ * @param[in]  comm          Communicator of the mesh.
+ * @param[in]  numReceivers  Number of receivers.
+ * @param[in]  numFound      Entries of found and inCell.
+ * @param[in]  found         Receiver of each entry, or NULL when entry i is
+ *                           receiver i.
+ * @param[in]  inCell        Cell located for each entry (index < 0 when not
+ *                           found).
+ * @param[out] owner         Owner rank of each receiver; the communicator size
+ *                           when no rank located it.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode electReceiverOwners(MPI_Comm comm, PetscInt numReceivers, PetscInt numFound, const PetscInt *found,
                                           const PetscSFNode *inCell, PetscInt *owner) {
   PetscFunctionBeginUser;
@@ -71,7 +87,18 @@ static PetscErrorCode electReceiverOwners(MPI_Comm comm, PetscInt numReceivers, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* First local cell sharing a vertex with cellId whose Jacobian is not degenerate, or -1. */
+/**
+ * @brief First local cell sharing a vertex with a cell and with a
+ *        non-degenerate Jacobian.
+ *
+ * @param[in]  dm            DMPlex mesh.
+ * @param[in]  grid          Grid (local cell range).
+ * @param[in]  cellId        Cell.
+ * @param[out] neighborCell  Neighbor cell, or -1 when there is none.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode findNonDegenerateNeighbor(DM dm, const Grid *grid, PetscInt cellId, PetscInt *neighborCell) {
   PetscFunctionBeginUser;
   PetscInt closureSize = 0, *closure = NULL;
@@ -102,7 +129,26 @@ static PetscErrorCode findNonDegenerateNeighbor(DM dm, const Grid *grid, PetscIn
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Adds receiver row ridx (basis and curl at point in cellId) to every matrix of Q. */
+/**
+ * @brief Adds the row of one receiver to every matrix of the receiver
+ *        interpolation.
+ *
+ * Evaluates the Nedelec basis and its curl at the receiver point in the cell;
+ * constrained dofs are skipped.
+ *
+ * @param[in]     dm      DMPlex carrying the H(curl) section.
+ * @param[in]     grid    Grid filled by setupNedelecGrid().
+ * @param[in]     ridx    Receiver row.
+ * @param[in]     point   Receiver coordinates.
+ * @param[in]     cell    Cell descriptor with the vertex coordinates.
+ * @param[in]     cellId  Cell that contains the point.
+ * @param[out]    Ni      Work rows for the basis values.
+ * @param[out]    NiCurl  Work rows for the basis curls.
+ * @param[in,out] Q       Receiver interpolation matrices.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode addReceiverRow(DM dm, const Grid *grid, PetscInt ridx, const PetscReal point[NUM_DIMENSIONS], const Cell *cell,
                                      PetscInt cellId, PetscReal **Ni, PetscReal **NiCurl, ReceiverInterpolationMatrices *Q) {
   PetscFunctionBeginUser;
@@ -284,7 +330,8 @@ PetscErrorCode interpolateReceiverFields(const ReceiverInterpolationMatrices *Q,
  *
  * @param[in,out] fields  Field Vecs.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyReceiverFields(Vec fields[NUM_RECEIVER_FIELDS]) {
   PetscFunctionBeginUser;

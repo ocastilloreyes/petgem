@@ -7,8 +7,6 @@
  * Constant definitions used throughout PETGEM.
  */
 
-/* C libraries */
-
 /* PETSc libraries */
 #include <petscsys.h>
 

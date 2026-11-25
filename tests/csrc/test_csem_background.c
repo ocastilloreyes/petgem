@@ -17,15 +17,27 @@
  *
  * Usage: test_csem_background   Exit 0 iff all checks pass.
  */
-#include "csem_primary.h"
-#include "petgem_test.h"
-#include <petscviewerhdf5.h>
+/* C libraries */
 #include <string.h>
 #include <unistd.h>
 
+/* PETSc libraries */
+#include <petscviewerhdf5.h>
+
+/* PETGEM functions */
+#include "csem_primary.h"
+#include "petgem_test.h"
+
 static char tmpFile[PETSC_MAX_PATH_LEN];
 
-/* Writes n reals as the Vec /background/<name> of an open viewer. */
+/**
+ * @brief Writes n reals as the Vec /background/<name> of an open viewer.
+ *
+ * @param[in] viewer  HDF5 viewer.
+ * @param[in] name    Dataset name.
+ * @param[in] n       Number of values.
+ * @param[in] values  Values.
+ */
 static void writeVec(PetscViewer viewer, const char *name, PetscInt n, const PetscReal values[]) {
   Vec          v;
   PetscScalar *a;
@@ -38,7 +50,18 @@ static void writeVec(PetscViewer viewer, const char *name, PetscInt n, const Pet
   PetscCallAbort(PETSC_COMM_SELF, VecDestroy(&v));
 }
 
-/* Writes tmpFile with the given datasets; numLayers = 0 or numMaterials = 0 omits them. */
+/**
+ * @brief Writes the background datasets to tmpFile.
+ *
+ * numLayers = 0 omits the layered datasets and numMaterials = 0 the material
+ * dataset.
+ *
+ * @param[in] numLayers      Number of layers.
+ * @param[in] ztop           Top of each layer.
+ * @param[in] layerSigma     sigma_h, sigma_v per layer.
+ * @param[in] numMaterials   Number of materials.
+ * @param[in] materialSigma  sigma_x, sigma_y, sigma_z per material.
+ */
 static void writeBackground(PetscInt numLayers, const PetscReal ztop[], const PetscReal layerSigma[], PetscInt numMaterials,
                             const PetscReal materialSigma[]) {
   PetscViewer viewer;
@@ -54,7 +77,15 @@ static void writeBackground(PetscInt numLayers, const PetscReal ztop[], const Pe
   PetscCallAbort(PETSC_COMM_SELF, PetscViewerDestroy(&viewer));
 }
 
-/* CsemParams that read tmpFile, with an optional explicit -csem_primary. */
+/**
+ * @brief Formulation options that read tmpFile, with an optional explicit
+ *        -csem_primary.
+ *
+ * @param[in] typeSet  PETSC_TRUE to set the background type.
+ * @param[in] type     Background type.
+ *
+ * @return CsemParams Formulation options.
+ */
 static CsemParams paramsFor(PetscBool typeSet, CsemPrimaryType type) {
   CsemParams p;
   p.formulation    = CSEM_FORMULATION_SECONDARY;
@@ -64,7 +95,14 @@ static CsemParams paramsFor(PetscBool typeSet, CsemPrimaryType type) {
   return p;
 }
 
-/* PETSC_TRUE if loadCsemBackground fails on tmpFile. */
+/**
+ * @brief Tests whether loadCsemBackground() fails on tmpFile.
+ *
+ * @param[in] typeSet  PETSC_TRUE to set the background type.
+ * @param[in] type     Background type.
+ *
+ * @return PetscBool PETSC_TRUE if loading fails.
+ */
 static PetscBool loadFails(PetscBool typeSet, CsemPrimaryType type) {
   const CsemParams p = paramsFor(typeSet, type);
   CsemBackground   bg;
@@ -80,6 +118,9 @@ static const PetscReal layerZtop[5]     = {INFINITY, 0.0, -1000.0, -2000.0, -210
 static const PetscReal layerSigma[10]   = {1e-8, 1e-8, 3.3, 3.3, 1.0, 0.5, 0.01, 0.01, 1.0, 0.5};
 static const PetscReal materialSigma[9] = {1e-8, 1e-8, 1e-8, 3.3, 3.3, 3.3, 1.0, 1.0, 0.5};
 
+/**
+ * @brief Checks the defaults and the parsing of the -csem_* options.
+ */
 static void check_params(void) {
   PetgemParams params;
   CsemParams   csem;
@@ -102,6 +143,10 @@ static void check_params(void) {
   PetscCallAbort(PETSC_COMM_SELF, PetscOptionsClearValue(NULL, "-csem_background_file"));
 }
 
+/**
+ * @brief Checks the selection and the loading of the layered and model
+ *        backgrounds.
+ */
 static void check_layered(void) {
   CsemParams     p;
   CsemBackground bg;
@@ -146,6 +191,9 @@ static void check_layered(void) {
   PT_CHECK(loadFails(PETSC_TRUE, CSEM_PRIMARY_LAYERED), "-csem_primary layered accepted without /background/layer_sigma");
 }
 
+/**
+ * @brief Checks that invalid background files are rejected.
+ */
 static void check_rejected(void) {
   const PetscReal finiteTop[3] = {100.0, 0.0, -100.0}, increasing[3] = {INFINITY, -100.0, 0.0};
   const PetscReal badMaterial[6] = {1.0, 1.0, 1.0, 0.0, 1.0, 1.0};
@@ -170,6 +218,15 @@ static void check_rejected(void) {
   PT_CHECK(loadFails(PETSC_FALSE, CSEM_PRIMARY_LAYERED), "layer_sigma of wrong size accepted");
 }
 
+/**
+ * @brief Runs the background input checks and reports the number of failures.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector; argv[1] is the basis order where the
+ *                  harness takes one.
+ *
+ * @return int 0 when every check passes, non-zero otherwise.
+ */
 int main(int argc, char **argv) {
   char tmpDir[PETSC_MAX_PATH_LEN];
 

@@ -14,23 +14,40 @@
  *
  * Usage: [mpirun -n N] test_boundary <order>   (order in 1..6).  Exit 0 iff all checks pass.
  */
+/* PETSc libraries */
+#include <petsc.h>
+
+/* PETGEM functions */
+#include "box_mesh.h"
+#include "constants.h"
 #include "fem.h"
 #include "grid.h"
-#include "constants.h"
 #include "petgem_test.h"
-#include "box_mesh.h"
-#include <petsc.h>
 
 static const PetscInt  boxFaces[3] = {2, 3, 2};
 static const PetscReal boxLower[3] = {0.0, 0.0, -1.0};
 static const PetscReal boxUpper[3] = {2.0, 3.0, 0.5};
 
+/**
+ * @brief Factorial of n.
+ *
+ * @param[in] n  Non-negative integer.
+ *
+ * @return PetscReal n!.
+ */
 static PetscReal factorial(PetscInt n) {
   PetscReal f = 1.0;
   for (PetscInt i = 2; i <= n; i++) f *= (PetscReal)i;
   return f;
 }
 
+/**
+ * @brief Checks the point count, weights and exactness of the 2D quadrature
+ *        rule of one order.
+ *
+ * @param[in] order  Basis order.
+ * @param[in] rank   Rank (only rank 0 checks).
+ */
 static void check_quadrature_2d(PetscInt order, PetscMPIInt rank) {
   Quadrature2D quad;
   PetscCallAbort(PETSC_COMM_SELF, createQuadrature2D(order, &quad));
@@ -62,11 +79,23 @@ static void check_quadrature_2d(PetscInt order, PetscMPIInt rank) {
   (void)rank;
 }
 
+/**
+ * @brief Creates the distributed box mesh of the boundary checks.
+ *
+ * @param[out] dm  Box mesh.
+ */
 static void create_box(DM *dm) {
   create_box_mesh(boxFaces, boxLower, boxUpper, 0.0, dm);
 }
 
-/* Global counts of edges / faces / cells, total and on the "Boundary" label. */
+/**
+ * @brief Global counts of edges, faces and cells, in total and on the
+ *        "Boundary" label.
+ *
+ * @param[in]  dm   DMPlex mesh.
+ * @param[out] all  Edges, faces and cells.
+ * @param[out] bnd  Edges, faces and cells on the "Boundary" label.
+ */
 static void count_entities(DM dm, PetscInt all[3], PetscInt bnd[3]) {
   IS              numbering;
   const PetscInt *gidx;
@@ -97,6 +126,13 @@ static void count_entities(DM dm, PetscInt all[3], PetscInt bnd[3]) {
   }
 }
 
+/**
+ * @brief Global number of dofs of the section of a DM.
+ *
+ * @param[in] dm  DMPlex mesh.
+ *
+ * @return PetscInt Global number of dofs.
+ */
 static PetscInt global_dofs(DM dm) {
   Vec      v;
   PetscInt n;
@@ -106,6 +142,14 @@ static PetscInt global_dofs(DM dm) {
   return n;
 }
 
+/**
+ * @brief Checks the boundary label and the constrained dofs of the H(curl) grid
+ *        of one order.
+ *
+ * @param[in] order  Basis order.
+ * @param[in] bc     Boundary condition.
+ * @param[in] tag    Label of the failure messages.
+ */
 static void check_grid(PetscInt order, PetgemBoundaryCondition bc, const char *tag) {
   DM       dm;
   Grid     grid;
@@ -169,6 +213,15 @@ static void check_grid(PetscInt order, PetgemBoundaryCondition bc, const char *t
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dm));
 }
 
+/**
+ * @brief Runs the boundary tool checks and reports the number of failures.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector; argv[1] is the basis order where the
+ *                  harness takes one.
+ *
+ * @return int 0 when every check passes, non-zero otherwise.
+ */
 int main(int argc, char **argv) {
   PetscMPIInt rank;
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));

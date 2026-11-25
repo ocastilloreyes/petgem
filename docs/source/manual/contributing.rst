@@ -44,8 +44,10 @@ layer or on lower ones:
    * - 4
      - Physics
      - ``csem`` (transmitters, PEC grid, dipole right-hand side, receiver
-       fields), ``mt`` (1D boundary field, boundary right-hand side, impedance
-       and tipper)
+       fields), ``csem_layered`` (dipole in a layered medium), ``csem_primary``
+       (field formulation, background model, primary field), ``tdcsem`` (time
+       stepping, discrete charge, receiver time series), ``mt`` (1D boundary
+       field, boundary right-hand side, impedance and tipper)
    * - 5
      - Inversion
      - ``inversion``, ``inversion_io``, ``inversion_smoother``, ``lbfgs``
@@ -55,7 +57,8 @@ layer or on lower ones:
        sections), the kernels ``fm_csem``, ``fm_mt``, ``im_csem``, ``fm_tdcsem``, the
        dispatcher ``petgem`` and the ``*_main`` entry points
 
-``csem`` and ``mt`` are independent of each other. ``tests/unit/test_layers.py``
+``csem`` (and ``csem_layered``, ``csem_primary``, ``tdcsem``) and ``mt`` are
+independent of each other. ``tests/unit/test_layers.py``
 checks these rules on every ``#include``, and fails when a new module has not
 been placed in a layer.
 
@@ -94,9 +97,19 @@ Code conventions
 - Parameter structs are named ``params`` (``PetgemParams``), ``imParams``
   (``ImParams``) and ``mtParams`` (``MtParams``).
 - Use American spelling in code, comments and documentation.
-- Keep the file-header comment block of ``.c``/``.h`` files, and document
-  public functions in their header with Doxygen (``@brief``, ``@param``,
-  ``@return``).
+- Each kernel file (``fm_csem.c``, ``fm_mt.c``, ``fm_tdcsem.c``,
+  ``im_csem.c``) holds only its ``static`` help text and its entry point
+  ``run<Method><Mode>`` (``runCsemForward``, ``runMtForward``,
+  ``runTdcsemForward``, ``runCsemInverse``); the rest lives in the module of
+  its layer.
+- A source file is laid out top to bottom as: file-header comment block
+  (``Filename``, ``Author``, ``Date``, ``Description``), C and PETSc
+  ``#include <...>``, PETGEM ``#include "..."``, ``#define``, ``static``
+  types, data and functions, public functions.
+- Document public functions in their header with Doxygen (``@brief``,
+  ``@param``, ``@return``); the definition in ``src/`` repeats the ``@brief``.
+  ``static`` functions carry the full block in ``src/``. ``@note`` is used only
+  for usage constraints.
 
 Documentation
 -------------

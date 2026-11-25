@@ -16,12 +16,15 @@
  *
  * Usage: [mpirun -n N] test_mt1d   Exit 0 iff all checks pass.
  */
+/* PETSc libraries */
+#include <petsc.h>
+
+/* PETGEM functions */
+#include "box_mesh.h"
+#include "constants.h"
 #include "grid.h"
 #include "mt.h"
-#include "constants.h"
 #include "petgem_test.h"
-#include "box_mesh.h"
-#include <petsc.h>
 
 /* 1D model: [-3000, -1000] σ = 1, [-1000, 0] σ = 0.01, [0, 1000] air */
 static const PetscReal modelZ[4]     = {-3000.0, -1000.0, 0.0, 1000.0};
@@ -35,7 +38,19 @@ static const PetscReal boxUpper[3]  = {3.0, 2.0, 0.5};
 static const PetscReal boxLayerZ[4] = {-1.0, -0.5, 0.0, 0.5};
 static const PetscReal boxSigma[3]  = {0.1, 1.0, 1.0e-8};
 
-/* Exact H(z): propagate (H, H') upward from H(z_min) = 0, H'(z_min) = 1, then scale to H(z_max) = 1. */
+/**
+ * @brief Exact H(z) of the 1D profile.
+ *
+ * Propagates (H, H') upward from H(z_min) = 0, H'(z_min) = 1, then scales to
+ * H(z_max) = 1.
+ *
+ * @param[in] p      1D profile.
+ * @param[in] eq     1D equation.
+ * @param[in] omega  Angular frequency (rad/s).
+ * @param[in] z      Height (m).
+ *
+ * @return PetscScalar H(z).
+ */
 static PetscScalar exact_h(const Mt1DProfile *p, Mt1DEquation eq, PetscReal omega, PetscReal z) {
   PetscScalar H = 0.0, dH = 1.0, Htop = 0.0;
   PetscScalar Hz = 0.0;
@@ -56,12 +71,28 @@ static PetscScalar exact_h(const Mt1DProfile *p, Mt1DEquation eq, PetscReal omeg
   return Hz / Htop;
 }
 
+/**
+ * @brief Maximum error of a 1D field against exact_h() over its nodes.
+ *
+ * @param[in] f      1D field.
+ * @param[in] p      1D profile.
+ * @param[in] eq     1D equation.
+ * @param[in] omega  Angular frequency (rad/s).
+ *
+ * @return PetscReal Maximum error.
+ */
 static PetscReal field_error(const Mt1DField *f, const Mt1DProfile *p, Mt1DEquation eq, PetscReal omega) {
   PetscReal err = 0.0;
   for (PetscInt i = 0; i < f->numNodes; i++) err = PetscMax(err, PetscAbsScalar(f->H[i] - exact_h(p, eq, omega, f->z[i])));
   return err;
 }
 
+/**
+ * @brief Checks the 1D solve and its convergence under refinement.
+ *
+ * @param[in] eq   1D equation.
+ * @param[in] tag  Label of the failure messages.
+ */
 static void check_solve(Mt1DEquation eq, const char *tag) {
   Mt1DProfile     p;
   Mt1DField       f10, f20;
@@ -114,6 +145,10 @@ static void check_solve(Mt1DEquation eq, const char *tag) {
   PetscCallAbort(PETSC_COMM_SELF, destroyMt1DField(&f20));
 }
 
+/**
+ * @brief Checks that the paper and h equations give different fields on a
+ *        layered profile.
+ */
 static void check_equations_differ(void) {
   Mt1DProfile     p;
   Mt1DField       fp, fh;
@@ -134,23 +169,49 @@ static void check_equations_differ(void) {
   PetscCallAbort(PETSC_COMM_SELF, destroyMt1DField(&fh));
 }
 
+/**
+ * @brief Conductivity of the layered box model.
+ *
+ * @param[in] c  Cell centroid.
+ *
+ * @return PetscReal Conductivity.
+ */
 static PetscReal layered_sigma(const PetscReal c[3]) {
   PetscInt layer = 0;
   while (layer < 2 && c[2] > boxLayerZ[layer + 1]) layer++;
   return boxSigma[layer];
 }
 
+/**
+ * @brief Layered box model with a conductive anomaly in the middle layer.
+ *
+ * @param[in] c  Cell centroid.
+ *
+ * @return PetscReal Conductivity.
+ */
 static PetscReal anomaly_sigma(const PetscReal c[3]) {
   const PetscReal s = layered_sigma(c);
   return (s == boxSigma[1] && c[0] < 1.0 && c[1] < 1.0) ? 5.0 : s;
 }
 
+/**
+ * @brief Box mesh, its order-1 grid and its boundary faces.
+ *
+ * @param[in]  topShift  Vertical shift of the top face (0 for a box).
+ * @param[out] dm        Mesh.
+ * @param[out] grid      Grid.
+ * @param[out] faces     Boundary faces.
+ */
 static void setup_box(PetscReal topShift, DM *dm, Grid *grid, IS *faces) {
   create_box_mesh(boxFaces, boxLower, boxUpper, topShift, dm);
   PetscCallAbort(PETSC_COMM_WORLD, setupNedelecGrid(1, PETGEM_BC_NATURAL, dm, grid));
   PetscCallAbort(PETSC_COMM_WORLD, getBoundaryFaces(*dm, faces));
 }
 
+/**
+ * @brief Checks the face tags, the 1D profile of the box and the rejection of a
+ *        lateral anomaly.
+ */
 static void check_box(void) {
   DM              dm;
   Grid            grid;
@@ -233,6 +294,9 @@ static void check_box(void) {
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dm));
 }
 
+/**
+ * @brief Checks that a mesh that is not a box is rejected.
+ */
 static void check_not_a_box(void) {
   DM         dm;
   Grid       grid;
@@ -252,6 +316,15 @@ static void check_not_a_box(void) {
   PetscCallAbort(PETSC_COMM_WORLD, DMDestroy(&dm));
 }
 
+/**
+ * @brief Runs the MT 1D field checks and reports the number of failures.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector; argv[1] is the basis order where the
+ *                  harness takes one.
+ *
+ * @return int 0 when every check passes, non-zero otherwise.
+ */
 int main(int argc, char **argv) {
   PetscMPIInt rank;
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));

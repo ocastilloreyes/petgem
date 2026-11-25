@@ -16,8 +16,9 @@ docs/source/readme
 examples/*/outputs/
 
 # Local working directories, kept out of the distribution
-data/
 petgem-env.sif
+global_induction
+td_fm_csem_paper
 
 # Run-time artifacts dropped at the repo root
 petgem*.err
