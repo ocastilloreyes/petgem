@@ -7,18 +7,26 @@
  * Grid-handling functions used throughout PETGEM, built on PETSc's DMPlex.
  */
 
-/* C libraries */
-
 /* PETSc libraries */
 #include <petscdmplex.h>
 #include <petscviewerhdf5.h>
 
-/* PETGEM funcions*/
+/* PETGEM functions */
 #include "common.h"
 #include "constants.h"
 #include "grid.h"
 
-/* Number of points in [start, end) owned by this rank. */
+/**
+ * @brief Number of points in [start, end) owned by this rank.
+ *
+ * @param[in] globalNumbering  Global point numbering of the DM (negative for
+ *                             points owned elsewhere).
+ * @param[in] pStart           First point of the chart.
+ * @param[in] start            First point of the range.
+ * @param[in] end              End of the range (exclusive).
+ *
+ * @return PetscInt Number of owned points.
+ */
 static PetscInt countOwnedPoints(const PetscInt *globalNumbering, PetscInt pStart, PetscInt start, PetscInt end) {
   PetscInt n = 0;
   for (PetscInt p = start; p < end; p++) {
@@ -27,7 +35,15 @@ static PetscInt countOwnedPoints(const PetscInt *globalNumbering, PetscInt pStar
   return n;
 }
 
-/* Per-cell H(curl) layout in DMPlex closure order: volume, faces, edges. */
+/**
+ * @brief Sets the per-cell H(curl) dof counts and offsets of a basis order.
+ *
+ * The closure order of DMPlex is volume, faces, edges.
+ *
+ * @param[in]  order  Basis order.
+ * @param[out] fem    Dof counts per entity and cell, and the offsets of each
+ *                    entity class.
+ */
 static void setupFemSpace(PetscInt order, FemSpace *fem) {
   fem->order           = order;
   fem->numDofPerEdge   = order;
@@ -44,7 +60,17 @@ static void setupFemSpace(PetscInt order, FemSpace *fem) {
   fem->edgeDofOffset   = fem->numVolumeDof + fem->numFaceDof;
 }
 
-/* Attaches a one-field local section with numDof[depth] DOFs per point. */
+/**
+ * @brief Attaches a one-field local section to a DM.
+ *
+ * @param[in] dm           DMPlex mesh.
+ * @param[in] numDof       Dofs per point at each depth (vertex, edge, face,
+ *                         cell).
+ * @param[in] constrained  Constrained points, or NULL.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode setLocalSection(DM dm, const PetscInt numDof[4], IS *constrained) {
   PetscFunctionBeginUser;
   PetscSection section;
@@ -123,6 +149,9 @@ PetscErrorCode setupNedelecGrid(PetscInt order, PetgemBoundaryCondition bc, DM *
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Releases the H1 DM owned by a grid.
+ */
 PetscErrorCode destroyGrid(Grid *grid) {
   PetscFunctionBeginUser;
   PetscCall(DMDestroy(&grid->H1dm));

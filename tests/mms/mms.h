@@ -57,8 +57,9 @@
 #ifndef MMS_H
 #define MMS_H
 
-#include "constants.h" /* MU, NUM_DIMENSIONS */
 #include <petsc.h>
+
+#include "constants.h"
 
 /* --- design point (must match tests/mms/mesh.geo) --- */
 #define MMS_L    1000.0                        /**< Edge length of the cubic domain [0,L]^3 [m].     */

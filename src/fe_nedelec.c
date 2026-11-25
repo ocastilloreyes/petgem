@@ -8,8 +8,11 @@
  *
  */
 
-#include "fe_nedelec.h"
+/* C libraries */
 #include <math.h>
+
+/* PETGEM functions */
+#include "fe_nedelec.h"
 
 /* Reference tangents of the six Nedelec DOF families (edges and the derived
  * face/interior directions), indexed by dof2tk. */
@@ -126,7 +129,9 @@ static void feNdGaussLegendre01(PetscInt n, PetscReal *pts) {
  * functionals to obtain the nodal basis.
  *
  * @param[in]  order  Polynomial order p.
- * @param[in]  x,y,z  Reference-cell coordinates.
+ * @param[in]  x      Reference-cell coordinate x.
+ * @param[in]  y      Reference-cell coordinate y.
+ * @param[in]  z      Reference-cell coordinate z.
  * @param[in]  sx     Chebyshev values in x (order entries).
  * @param[in]  sy     Chebyshev values in y (order entries).
  * @param[in]  sz     Chebyshev values in z (order entries).
@@ -188,11 +193,19 @@ static void feNdRawV(PetscInt order, PetscReal x, PetscReal y, PetscReal z, cons
  * The lambda derivative already carries the -1 from lambda = 1-x-y-z through
  * the raw-curl expressions, so dl is passed as the plain polynomial derivative.
  *
- * @param[in]  order        Polynomial order p.
- * @param[in]  x,y,z        Reference-cell coordinates.
- * @param[in]  sx,sy,sz,sl  Chebyshev values in x, y, z, lambda (order entries each).
- * @param[in]  dx,dy,dz,dl  Chebyshev derivatives in x, y, z, lambda (order entries each).
- * @param[out] Uc           Raw curl values, dof x 3 row-major.
+ * @param[in]  order  Polynomial order p.
+ * @param[in]  x      Reference-cell coordinate x.
+ * @param[in]  y      Reference-cell coordinate y.
+ * @param[in]  z      Reference-cell coordinate z.
+ * @param[in]  sx     Chebyshev values in x (order entries).
+ * @param[in]  sy     Chebyshev values in y (order entries).
+ * @param[in]  sz     Chebyshev values in z (order entries).
+ * @param[in]  sl     Chebyshev values in lambda (order entries).
+ * @param[in]  dx     Chebyshev derivatives in x (order entries).
+ * @param[in]  dy     Chebyshev derivatives in y (order entries).
+ * @param[in]  dz     Chebyshev derivatives in z (order entries).
+ * @param[in]  dl     Chebyshev derivatives in lambda (order entries).
+ * @param[out] Uc     Raw curl values, dof x 3 row-major.
  */
 static void feNdRawCurl(PetscInt order, PetscReal x, PetscReal y, PetscReal z, const PetscReal *sx, const PetscReal *sy,
                         const PetscReal *sz, const PetscReal *sl, const PetscReal *dx, const PetscReal *dy, const PetscReal *dz,
@@ -341,8 +354,9 @@ static void feNdBuildNodes(PetscInt p, const PetscReal *eop, const PetscReal *fo
  * @param[in]  A     Input matrix, N x N row-major.
  * @param[out] Ainv  Output inverse, N x N row-major.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code
- *         (PETSC_ERR_MAT_LU_ZRPVT) if the matrix is singular.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise (PETSC_ERR_MAT_LU_ZRPVT if the
+ *         matrix is singular).
  */
 static PetscErrorCode feNdInvert(PetscInt N, const PetscReal *A, PetscReal *Ainv) {
 

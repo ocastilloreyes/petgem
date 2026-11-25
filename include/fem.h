@@ -21,10 +21,11 @@
 #ifndef FEM_H
 #define FEM_H
 
-#include "constants.h"
-#include "grid.h"
 #include <petsc.h>
 #include <petscdmplex.h>
+
+#include "constants.h"
+#include "grid.h"
 
 /** @brief 3D (tetrahedron) Gauss quadrature rule (points and weights). */
 typedef struct {
@@ -55,7 +56,8 @@ typedef PetscErrorCode (*VectorFieldFn)(PetscInt numPoints, const PetscReal poin
  * @param[in]  dip             Dip angle (degrees).
  * @param[out] rotationVector  Resulting unit direction vector.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal dip, PetscReal rotationVector[NUM_DIMENSIONS]);
 
@@ -69,7 +71,8 @@ PetscErrorCode computeVectorRotation(const PetscReal azimuth, const PetscReal di
  * @param[in]  point        Global point to map.
  * @param[out] XiEtaZeta    Reference coordinates of the point.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode tetrahedronXyzToReference(const PetscReal coordinates[NUM_VERTICES_PER_CELL * NUM_DIMENSIONS],
                                          const PetscReal point[NUM_DIMENSIONS], PetscReal XiEtaZeta[NUM_DIMENSIONS]);
@@ -83,7 +86,8 @@ PetscErrorCode tetrahedronXyzToReference(const PetscReal coordinates[NUM_VERTICE
  *
  * @param[in,out] cell  Cell whose jacobian/invJacobian/detJacobian are filled.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode computeCellJacobian(Cell *cell);
 
@@ -93,12 +97,18 @@ PetscErrorCode computeCellJacobian(Cell *cell);
  * @param[in]  order       Basis order driving the quadrature degree.
  * @param[out] quadrature  Rule; release it with destroyQuadrature3D().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createQuadrature3D(const PetscInt order, Quadrature3D *quadrature);
 
 /**
  * @brief Frees a rule created by createQuadrature3D().
+ *
+ * @param[in,out] quadrature  Quadrature rule.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyQuadrature3D(Quadrature3D *quadrature);
 
@@ -108,22 +118,40 @@ PetscErrorCode destroyQuadrature3D(Quadrature3D *quadrature);
  * @param[in]  order       Basis order driving the quadrature degree.
  * @param[out] quadrature  Rule; release it with destroyQuadrature2D().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createQuadrature2D(const PetscInt order, Quadrature2D *quadrature);
 
 /**
  * @brief Frees a rule created by createQuadrature2D().
+ *
+ * @param[in,out] quadrature  Quadrature rule.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyQuadrature2D(Quadrature2D *quadrature);
 
 /**
  * @brief Allocates a zeroed rows x cols matrix as row pointers into one contiguous block.
+ *
+ * @param[in]  rows  Number of rows.
+ * @param[in]  cols  Number of columns.
+ * @param[out] M     Row pointers; free them with destroyDenseRows().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createDenseRows(PetscInt rows, PetscInt cols, PetscReal ***M);
 
 /**
  * @brief Frees a matrix created by createDenseRows() (NULL-safe).
+ *
+ * @param[in,out] M  Row pointers; set to NULL.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyDenseRows(PetscReal ***M);
 
@@ -133,12 +161,18 @@ PetscErrorCode destroyDenseRows(PetscReal ***M);
  * @param[in]  numDof  Number of DOFs per cell.
  * @param[out] N       Buffer; release it with destroyBasisValues().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createBasisValues(const PetscInt numDof, PetscReal ***N);
 
 /**
  * @brief Frees a buffer created by createBasisValues().
+ *
+ * @param[in,out] N  Basis values; set to NULL.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyBasisValues(PetscReal ***N);
 
@@ -157,7 +191,8 @@ PetscErrorCode destroyBasisValues(PetscReal ***N);
  * @param[out] Me          Elemental mass matrix (numDofInCell x numDofInCell).
  * @param[out] Ke          Elemental stiffness matrix (numDofInCell x numDofInCell).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode computeElementalMatrices(const FemSpace *fem, const Cell *cell, const Quadrature3D *quadrature, PetscReal **Me,
                                         PetscReal **Ke);
@@ -173,7 +208,8 @@ PetscErrorCode computeElementalMatrices(const FemSpace *fem, const Cell *cell, c
  * @param[in]  cell            Cell geometry.
  * @param[out] gradientMatrix  Block sized numDofInCell x numH1DofInCell.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode buildDiscreteGradientMatrix(const FemSpace *fem, const Cell *cell, PetscReal **gradientMatrix);
 
@@ -189,7 +225,8 @@ PetscErrorCode buildDiscreteGradientMatrix(const FemSpace *fem, const Cell *cell
  * @param[out] Ni      Basis-function values: Ni[d][dof], d in [0,3).
  * @param[out] NiCurl  Basis-curl values: NiCurl[d][dof] (NULL to skip).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode evaluateNedelecBasis(const FemSpace *fem, const Cell *cell, const PetscReal point[NUM_DIMENSIONS], PetscReal **Ni,
                                     PetscReal **NiCurl);
@@ -211,7 +248,8 @@ PetscErrorCode evaluateNedelecBasis(const FemSpace *fem, const Cell *cell, const
  * @param[in]  numFields  Number of fields.
  * @param[out] coeff      Coefficients in DMPlex closure order: coeff[f * numDofInCell + i].
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode interpolateNedelecCell(const FemSpace *fem, const Cell *cell, VectorFieldFn field, void *ctx, PetscInt numFields,
                                       PetscScalar *coeff);

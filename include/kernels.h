@@ -4,8 +4,8 @@
  * Date: 2026-05-20
  *
  * Description:
- * Public entry points for the PETGEM kernels (runForward, runInverse, runMtForward,
- * runTdCsemForward).
+ * Public entry points for the PETGEM kernels (runCsemForward, runCsemInverse, runMtForward,
+ * runTdcsemForward).
  */
 
 /*
@@ -31,7 +31,7 @@
  *
  * @return int the PetscErrorCode (cast to int) as the process exit status.
  */
-int runForward(int argc, char **argv);
+int runCsemForward(int argc, char **argv);
 
 /**
  * @brief Runs the CSEM inversion kernel (im.csem).
@@ -44,7 +44,7 @@ int runForward(int argc, char **argv);
  *
  * @return int the PetscErrorCode (cast to int) as the process exit status.
  */
-int runInverse(int argc, char **argv);
+int runCsemInverse(int argc, char **argv);
 
 /**
  * @brief Runs the MT forward-modeling kernel (fm.mt).
@@ -70,6 +70,6 @@ int runMtForward(int argc, char **argv);
  *
  * @return int the PetscErrorCode (cast to int) as the process exit status.
  */
-int runTdCsemForward(int argc, char **argv);
+int runTdcsemForward(int argc, char **argv);
 
 #endif /* KERNELS_H */

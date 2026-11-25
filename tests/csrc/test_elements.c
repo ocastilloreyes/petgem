@@ -24,12 +24,15 @@
  *
  * Usage: test_elements <order>   (order in 1..6).  Exit 0 iff all checks pass.
  */
-#include "fem.h"
-#include "fe_nodal.h"
-#include "grid.h"
-#include "constants.h"
-#include "petgem_test.h"
+/* PETSc libraries */
 #include <petsc.h>
+
+/* PETGEM functions */
+#include "constants.h"
+#include "fe_nodal.h"
+#include "fem.h"
+#include "grid.h"
+#include "petgem_test.h"
 
 /* Cell and order seen by the test fields. */
 typedef struct {
@@ -42,7 +45,18 @@ static const PetscReal polyAlpha[3]   = {0.3, -0.2, 0.5};
 static const PetscReal polyBeta[3][3] = {{0.7, -0.4, 0.2}, {0.1, 0.6, -0.3}, {-0.5, 0.2, 0.8}};
 static const PetscReal polyB[3]       = {0.4, -0.7, 0.25};
 
-/* Field j = grad(phi_j), phi_j the H1 basis function j of the cell. */
+/**
+ * @brief Fields grad(phi_j), with phi_j the H1 basis function j of the cell.
+ *
+ * @param[in]  numPoints  Number of points.
+ * @param[in]  points     Point coordinates (3 per point).
+ * @param[in]  numFields  Number of fields.
+ * @param[out] values     values[(f * numPoints + q) * 3 + d].
+ * @param[in]  ctx        Unused.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode gradientFields(PetscInt numPoints, const PetscReal points[], PetscInt numFields, PetscScalar values[], void *ctx) {
   PetscFunctionBeginUser;
   const FieldCtx *c = (const FieldCtx *)ctx;
@@ -60,7 +74,14 @@ static PetscErrorCode gradientFields(PetscInt numPoints, const PetscReal points[
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* F_d(x) = (1 + 0.5i) (alpha_d + beta_d . x)^(order-1) + (b x x)_d */
+/**
+ * @brief Polynomial test field F_d(x) = (1 + 0.5i) (alpha_d + beta_d .
+ *        x)^(order-1) + (b x x)_d.
+ *
+ * @param[in]  order  Basis order.
+ * @param[in]  x      Point coordinates.
+ * @param[out] F      Field value.
+ */
 static void polyField(PetscInt order, const PetscReal x[3], PetscScalar F[3]) {
   const PetscReal bx[3] = {polyB[1] * x[2] - polyB[2] * x[1], polyB[2] * x[0] - polyB[0] * x[2], polyB[0] * x[1] - polyB[1] * x[0]};
   for (PetscInt d = 0; d < 3; d++) {
@@ -69,7 +90,18 @@ static void polyField(PetscInt order, const PetscReal x[3], PetscScalar F[3]) {
   }
 }
 
-/* Every field is polyField. */
+/**
+ * @brief Every field is polyField().
+ *
+ * @param[in]  numPoints  Number of points.
+ * @param[in]  points     Point coordinates (3 per point).
+ * @param[in]  numFields  Number of fields.
+ * @param[out] values     values[(f * numPoints + q) * 3 + d].
+ * @param[in]  ctx        Unused.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode polyFields(PetscInt numPoints, const PetscReal points[], PetscInt numFields, PetscScalar values[], void *ctx) {
   PetscFunctionBeginUser;
   const FieldCtx *c = (const FieldCtx *)ctx;
@@ -78,7 +110,15 @@ static PetscErrorCode polyFields(PetscInt numPoints, const PetscReal points[], P
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* interpolateNedelecCell against G and against polyField on one cell. */
+/**
+ * @brief Checks interpolateNedelecCell() against G and against polyField() on
+ *        one cell.
+ *
+ * @param[in] order   Basis order.
+ * @param[in] coords  Cell vertex coordinates (4 x 3).
+ * @param[in] G       Discrete gradient of the cell.
+ * @param[in] tag     Label of the failure messages.
+ */
 static void check_interpolation(PetscInt order, const PetscReal coords[12], PetscReal **G, const char *tag) {
   const PetscInt dof = order * (order + 2) * (order + 3) / 2;
   const PetscInt nH1 = (order + 1) * (order + 2) * (order + 3) / 6;
@@ -136,6 +176,14 @@ static void check_interpolation(PetscInt order, const PetscReal coords[12], Pets
   PetscCallAbort(PETSC_COMM_SELF, PetscFree(coeff));
 }
 
+/**
+ * @brief Allocates a zeroed r x c matrix as row pointers into one block.
+ *
+ * @param[in] r  Rows.
+ * @param[in] c  Columns.
+ *
+ * @return PetscReal ** Row pointers; free with free2d().
+ */
 static PetscReal **alloc2d(PetscInt r, PetscInt c) {
   PetscReal **m, *flat;
   PetscCallAbort(PETSC_COMM_SELF, PetscMalloc1(r, &m));
@@ -144,11 +192,23 @@ static PetscReal **alloc2d(PetscInt r, PetscInt c) {
   return m;
 }
 
+/**
+ * @brief Frees a matrix created by alloc2d().
+ *
+ * @param[in] m  Row pointers.
+ */
 static void free2d(PetscReal **m) {
   PetscCallAbort(PETSC_COMM_SELF, PetscFree(m[0]));
   PetscCallAbort(PETSC_COMM_SELF, PetscFree(m));
 }
 
+/**
+ * @brief Checks the element matrices and the discrete gradient of one cell.
+ *
+ * @param[in] order   Basis order.
+ * @param[in] coords  Cell vertex coordinates (4 x 3).
+ * @param[in] tag     Label of the failure messages.
+ */
 static void check_cell(PetscInt order, const PetscReal coords[12], const char *tag) {
   const PetscInt dof = order * (order + 2) * (order + 3) / 2;
   const PetscInt nH1 = (order + 1) * (order + 2) * (order + 3) / 6;
@@ -249,6 +309,15 @@ static void check_cell(PetscInt order, const PetscReal coords[12], const char *t
   PetscCallAbort(PETSC_COMM_SELF, destroyQuadrature3D(&quad));
 }
 
+/**
+ * @brief Runs the element matrix checks and reports the number of failures.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector; argv[1] is the basis order where the
+ *                  harness takes one.
+ *
+ * @return int 0 when every check passes, non-zero otherwise.
+ */
 int main(int argc, char **argv) {
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
   PetscInt order = (argc > 1) ? atoi(argv[1]) : 1;

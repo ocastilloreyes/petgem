@@ -67,7 +67,8 @@ typedef struct {
  * @param[in,out] X        Initial iterate; last accepted iterate on return.
  * @param[out]    result   Stop reason and counters.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode lbfgsOptimize(const LbfgsProblem *problem, const LbfgsOptions *opts, Vec X, LbfgsResult *result);
 

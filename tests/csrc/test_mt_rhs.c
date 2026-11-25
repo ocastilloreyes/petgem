@@ -16,14 +16,17 @@
  *
  * Usage: [mpirun -n N] test_mt_rhs <order>   (order in 1..6).  Exit 0 iff all checks pass.
  */
+/* PETSc libraries */
+#include <petsc.h>
+
+/* PETGEM functions */
 #include "assembly.h"
+#include "box_mesh.h"
+#include "constants.h"
 #include "fem.h"
 #include "grid.h"
 #include "mt.h"
-#include "constants.h"
 #include "petgem_test.h"
-#include "box_mesh.h"
-#include <petsc.h>
 
 static const PetscInt  boxFaces[3] = {3, 2, 3};
 static const PetscReal boxLower[3] = {0.0, 0.0, -1.0};
@@ -31,6 +34,12 @@ static const PetscReal boxUpper[3] = {3.0, 2.0, 0.5};
 
 typedef void (*FieldFn)(const PetscReal x[3], PetscReal F[3]);
 
+/**
+ * @brief Constant field (1, 0, 0).
+ *
+ * @param[in]  x  Point coordinates.
+ * @param[out] F  Field value.
+ */
 static void f_x(const PetscReal x[3], PetscReal F[3]) {
   (void)x;
   F[0] = 1.0;
@@ -38,6 +47,12 @@ static void f_x(const PetscReal x[3], PetscReal F[3]) {
   F[2] = 0.0;
 }
 
+/**
+ * @brief Constant field (0, 1, 0).
+ *
+ * @param[in]  x  Point coordinates.
+ * @param[out] F  Field value.
+ */
 static void f_y(const PetscReal x[3], PetscReal F[3]) {
   (void)x;
   F[0] = 0.0;
@@ -45,6 +60,12 @@ static void f_y(const PetscReal x[3], PetscReal F[3]) {
   F[2] = 0.0;
 }
 
+/**
+ * @brief Constant field (0, 0, 1).
+ *
+ * @param[in]  x  Point coordinates.
+ * @param[out] F  Field value.
+ */
 static void f_z(const PetscReal x[3], PetscReal F[3]) {
   (void)x;
   F[0] = 0.0;
@@ -52,24 +73,52 @@ static void f_z(const PetscReal x[3], PetscReal F[3]) {
   F[2] = 1.0;
 }
 
+/**
+ * @brief Field (z, 0, x).
+ *
+ * @param[in]  x  Point coordinates.
+ * @param[out] F  Field value.
+ */
 static void f_zox(const PetscReal x[3], PetscReal F[3]) {
   F[0] = x[2];
   F[1] = 0.0;
   F[2] = x[0];
 }
 
+/**
+ * @brief Field (0, z, y).
+ *
+ * @param[in]  x  Point coordinates.
+ * @param[out] F  Field value.
+ */
 static void f_ozy(const PetscReal x[3], PetscReal F[3]) {
   F[0] = 0.0;
   F[1] = x[2];
   F[2] = x[1];
 }
 
+/**
+ * @brief Unit conductivity (cell field callback).
+ *
+ * @param[in] c  Cell centroid.
+ *
+ * @return PetscReal 1.
+ */
 static PetscReal unit_sigma(const PetscReal c[3]) {
   (void)c;
   return 1.0;
 }
 
-/* Coefficients of F: solve Ms coeffs = INT F . N */
+/**
+ * @brief Coefficients of a field in the H(curl) space: solves Ms coeffs = INT F
+ *        . N.
+ *
+ * @param[in]  dm      DMPlex carrying the H(curl) section.
+ * @param[in]  grid    Grid.
+ * @param[in]  Ms      Mass matrix.
+ * @param[in]  F       Field.
+ * @param[out] coeffs  Coefficients.
+ */
 static void project(DM dm, const Grid *grid, Mat Ms, FieldFn F, Vec *coeffs) {
   Vec                    f;
   ISLocalToGlobalMapping mapping;
@@ -129,6 +178,19 @@ static void project(DM dm, const Grid *grid, Mat Ms, FieldFn F, Vec *coeffs) {
   PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(&f));
 }
 
+/**
+ * @brief Checks b^T c against its expected value, with b a boundary right-hand
+ *        side and c the projection of F.
+ *
+ * @param[in] dm        DMPlex carrying the H(curl) section.
+ * @param[in] grid      Grid.
+ * @param[in] Ms        Mass matrix.
+ * @param[in] B         Boundary right-hand sides.
+ * @param[in] pol       Polarization (column of B).
+ * @param[in] F         Field.
+ * @param[in] expected  Expected value.
+ * @param[in] tag       Label of the failure messages.
+ */
 static void check_identity(DM dm, const Grid *grid, Mat Ms, Mat B, PetscInt pol, FieldFn F, PetscScalar expected, const char *tag) {
   Vec         c, b;
   PetscScalar value;
@@ -145,6 +207,16 @@ static void check_identity(DM dm, const Grid *grid, Mat Ms, Mat B, PetscInt pol,
            (double)PetscImaginaryPart(expected));
 }
 
+/**
+ * @brief Runs the MT boundary right-hand side checks and reports the number of
+ *        failures.
+ *
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector; argv[1] is the basis order where the
+ *                  harness takes one.
+ *
+ * @return int 0 when every check passes, non-zero otherwise.
+ */
 int main(int argc, char **argv) {
   PetscMPIInt rank;
   PetscInt    order;

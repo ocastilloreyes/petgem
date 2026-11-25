@@ -9,12 +9,12 @@
  */
 
 /* C libraries */
+#include <hdf5.h>
 #include <stdio.h>
 #include <string.h>
 
 /* PETSc libraries */
 #include <petscviewerhdf5.h>
-#include <hdf5.h>
 
 /* PETGEM functions */
 #include "common.h"
@@ -25,22 +25,19 @@
 #include "inversion_internal.h"
 #include "io.h"
 
-const char *const imDataComponentNames[IM_NUM_DATA_COMPONENTS] = {"Ex", "Ey", "Ez", "Hx", "Hy", "Hz", "Zxx", "Zxy", "Zyx", "Zyy"};
-
-void imDataComponentFields(ImDataComponent comp, ReceiverField *numerator, ReceiverField *denominator) {
-  /* Zxx, Zxy, Zyx, Zyy = E{x,x,y,y} / H{x,y,x,y} */
-  static const ReceiverField zNum[4] = {RECV_EX, RECV_EX, RECV_EY, RECV_EY};
-  static const ReceiverField zDen[4] = {RECV_HX, RECV_HY, RECV_HX, RECV_HY};
-  if (comp < IM_DATA_ZXX) {
-    *numerator   = (ReceiverField)comp;
-    *denominator = NUM_RECEIVER_FIELDS;
-  } else {
-    *numerator   = zNum[comp - IM_DATA_ZXX];
-    *denominator = zDen[comp - IM_DATA_ZXX];
-  }
-}
-
-/* Resolves the -im_data_components names into imParams->components (case-insensitive, no repeats) and frees them. */
+/**
+ * @brief Resolves the -im_data_components names into data components.
+ *
+ * Names are case-insensitive and may not repeat. The names are freed here.
+ *
+ * @param[in,out] names     Component names given on the command line.
+ * @param[in]     n         Number of names.
+ * @param[out]    imParams  Inversion parameters; components and numComponents
+ *                          are set here.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode setDataComponents(char *names[], PetscInt n, ImParams *imParams) {
   PetscFunctionBeginUser;
   PetscCheck(n > 0, PETSC_COMM_WORLD, PETSC_ERR_ARG_WRONG, "-im_data_components needs at least one component");
@@ -113,14 +110,33 @@ static PetscErrorCode writeVtuPiece(const char *filename, PetscInt nCells, const
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Name of the VTU piece of one rank, relative to the snapshot directory. */
+/**
+ * @brief Name of the VTU piece of one rank, relative to the snapshot directory.
+ *
+ * @param[in]  iter  Iteration.
+ * @param[in]  rank  Rank.
+ * @param[out] name  Piece name.
+ * @param[in]  len   Size of name.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode vtuPieceName(PetscInt iter, PetscMPIInt rank, char *name, size_t len) {
   PetscFunctionBeginUser;
   PetscCall(PetscSNPrintf(name, len, "iter%04" PetscInt_FMT "_r%04d.vtu", iter, rank));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Master .pvtu that references the pieces of all ranks. */
+/**
+ * @brief Writes the master .pvtu file that references the pieces of all ranks.
+ *
+ * @param[in] filename  Master file.
+ * @param[in] iter      Iteration.
+ * @param[in] size      Number of ranks.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode writePvtuMaster(const char *filename, PetscInt iter, PetscMPIInt size) {
   PetscFunctionBeginUser;
   FILE *fp = fopen(filename, "w");
@@ -169,6 +185,172 @@ static PetscErrorCode createPlainCopy(Vec src, const char *name, Vec *out) {
   PetscCall(VecCopy(src, *out));
   PetscCall(PetscObjectSetName((PetscObject)*out, name));
   PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Reads one observed data component from /observed/<name>.
+ *
+ * The dataset is complex128 {r, i} of numFreqs x numReceivers. Read on rank 0
+ * and broadcast.
+ *
+ * @param[in]  file          Observed data file.
+ * @param[in]  name          Dataset name.
+ * @param[in]  numFreqs      Number of frequencies.
+ * @param[in]  numReceivers  Number of receivers.
+ * @param[out] obs           Observed data, numFreqs x numReceivers.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode readObservedExternal(const char *file, const char *name, PetscInt numFreqs, PetscInt numReceivers, PetscScalar *obs) {
+  PetscFunctionBeginUser;
+  MPI_Comm    comm = PETSC_COMM_WORLD;
+  PetscMPIInt rank;
+  char        path[64];
+
+  PetscCall(PetscSNPrintf(path, sizeof(path), "/observed/%s", name));
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (rank == 0) {
+    hid_t   fileId, dset, space, h5complex;
+    hsize_t dims[2] = {0, 0};
+    herr_t  status;
+
+    fileId = H5Fopen(file, H5F_ACC_RDONLY, H5P_DEFAULT);
+    PetscCheck(fileId >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "Cannot open %s", file);
+    PetscCheck(H5Lexists(fileId, "/observed", H5P_DEFAULT) > 0 && H5Lexists(fileId, path, H5P_DEFAULT) > 0, PETSC_COMM_SELF,
+               PETSC_ERR_FILE_READ, "Cannot find %s in %s (see -im_data_components)", path, file);
+    dset = H5Dopen2(fileId, path, H5P_DEFAULT);
+    PetscCheck(dset >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "Cannot open %s in %s", path, file);
+    space = H5Dget_space(dset);
+    PetscCheck(H5Sget_simple_extent_ndims(space) == 2, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "%s must be 2D", path);
+    H5Sget_simple_extent_dims(space, dims, NULL);
+    H5Sclose(space);
+    PetscCheck((PetscInt)dims[0] == numFreqs && (PetscInt)dims[1] == numReceivers, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
+               "%s shape [%llu x %llu] != expected [%" PetscInt_FMT " x %" PetscInt_FMT "]", path, (unsigned long long)dims[0],
+               (unsigned long long)dims[1], numFreqs, numReceivers);
+
+    h5complex = H5Tcreate(H5T_COMPOUND, sizeof(PetscScalar));
+    H5Tinsert(h5complex, "r", 0, H5T_NATIVE_DOUBLE);
+    H5Tinsert(h5complex, "i", sizeof(double), H5T_NATIVE_DOUBLE);
+    status = H5Dread(dset, h5complex, H5S_ALL, H5S_ALL, H5P_DEFAULT, obs);
+    H5Tclose(h5complex);
+    H5Dclose(dset);
+    H5Fclose(fileId);
+    PetscCheck(status >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "Cannot read %s from %s", path, file);
+  }
+  PetscCallMPI(MPI_Bcast(obs, (PetscMPIInt)(numFreqs * numReceivers), MPIU_SCALAR, 0, comm));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Reads the observed data components from an fm.csem responses file.
+ *
+ * Source k of /sources/src{k}/fields gives row k - 1 of each component. Read on
+ * every rank.
+ *
+ * @param[in]  file          fm.csem responses file.
+ * @param[in]  imParams      Inversion parameters (data components,
+ *                           frequencies).
+ * @param[in]  numReceivers  Number of receivers.
+ * @param[out] obs           Observed data; component i, frequency k starts at
+ *                           (i * numFreqs + k) * numReceivers.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode readObservedFmNative(const char *file, const ImParams *imParams, PetscInt numReceivers, PetscScalar *obs) {
+  PetscFunctionBeginUser;
+  const char *const fieldNames[NUM_RECEIVER_FIELDS] = {"Ex", "Ey", "Ez", "Hx", "Hy", "Hz"};
+  const PetscInt    numFreqs                        = imParams->numFreqs;
+  PetscViewer       viewer;
+
+  PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, file, FILE_MODE_READ, &viewer));
+  for (PetscInt k = 0; k < numFreqs; k++) {
+    char               group[PETSC_MAX_PATH_LEN];
+    Vec                v[NUM_RECEIVER_FIELDS] = {NULL};
+    const PetscScalar *a[NUM_RECEIVER_FIELDS] = {NULL};
+
+    PetscCall(PetscSNPrintf(group, sizeof(group), "/sources/src%" PetscInt_FMT "/fields", k + 1));
+    PetscCall(PetscViewerHDF5PushGroup(viewer, group));
+    for (PetscInt i = 0; i < imParams->numComponents; i++) {
+      ReceiverField num, den;
+      imDataComponentFields(imParams->components[i], &num, &den);
+      for (PetscInt j = 0; j < 2; j++) {
+        const ReceiverField fld = (j == 0) ? num : den;
+        PetscInt            n;
+        if (fld == NUM_RECEIVER_FIELDS || v[fld]) continue;
+        PetscCall(loadSerialVec(viewer, fieldNames[fld], &v[fld]));
+        PetscCall(VecGetSize(v[fld], &n));
+        PetscCheck(n == numReceivers, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ,
+                   "%s: %s/%s length %" PetscInt_FMT " != expected receivers %" PetscInt_FMT, file, group, fieldNames[fld], n,
+                   numReceivers);
+        PetscCall(VecGetArrayRead(v[fld], &a[fld]));
+      }
+    }
+    PetscCall(PetscViewerHDF5PopGroup(viewer));
+    for (PetscInt i = 0; i < imParams->numComponents; i++) {
+      ReceiverField num, den;
+      PetscScalar  *row = &obs[(i * numFreqs + k) * numReceivers];
+      imDataComponentFields(imParams->components[i], &num, &den);
+      for (PetscInt r = 0; r < numReceivers; r++) row[r] = (den == NUM_RECEIVER_FIELDS) ? a[num][r] : a[num][r] / a[den][r];
+    }
+    for (PetscInt f = 0; f < NUM_RECEIVER_FIELDS; f++) {
+      if (!v[f]) continue;
+      PetscCall(VecRestoreArrayRead(v[f], &a[f]));
+      PetscCall(VecDestroy(&v[f]));
+    }
+  }
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Writes n reals held on rank 0 as an MPI Vec.
+ *
+ * @param[in] viewer  HDF5 viewer.
+ * @param[in] comm    Communicator of the Vec.
+ * @param[in] name    Dataset name.
+ * @param[in] values  Values (rank 0).
+ * @param[in] n       Number of values.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode writeRealHistory(PetscViewer viewer, MPI_Comm comm, const char *name, const PetscReal *values, PetscInt n) {
+  PetscFunctionBeginUser;
+  PetscMPIInt rank;
+  Vec         v;
+
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  PetscCall(VecCreateMPI(comm, (rank == 0) ? n : 0, n, &v));
+  PetscCall(PetscObjectSetName((PetscObject)v, name));
+  if (rank == 0) {
+    PetscScalar *a;
+    PetscCall(VecGetArray(v, &a));
+    for (PetscInt i = 0; i < n; i++) a[i] = values[i];
+    PetscCall(VecRestoreArray(v, &a));
+  }
+  PetscCall(VecView(v, viewer));
+  PetscCall(VecDestroy(&v));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+const char *const imDataComponentNames[IM_NUM_DATA_COMPONENTS] = {"Ex", "Ey", "Ez", "Hx", "Hy", "Hz", "Zxx", "Zxy", "Zyx", "Zyy"};
+
+/**
+ * @brief Receiver fields of a data component.
+ */
+void imDataComponentFields(ImDataComponent comp, ReceiverField *numerator, ReceiverField *denominator) {
+  /* Zxx, Zxy, Zyx, Zyy = E{x,x,y,y} / H{x,y,x,y} */
+  static const ReceiverField zNum[4] = {RECV_EX, RECV_EX, RECV_EY, RECV_EY};
+  static const ReceiverField zDen[4] = {RECV_HX, RECV_HY, RECV_HX, RECV_HY};
+  if (comp < IM_DATA_ZXX) {
+    *numerator   = (ReceiverField)comp;
+    *denominator = NUM_RECEIVER_FIELDS;
+  } else {
+    *numerator   = zNum[comp - IM_DATA_ZXX];
+    *denominator = zDen[comp - IM_DATA_ZXX];
+  }
 }
 
 /**
@@ -273,7 +455,7 @@ PetscErrorCode readImParams(ImParams *imParams) {
   PetscOptionsEnd();
 
   /* A -help run has now printed the inversion option group; skip validation and the parameter summary. The caller
-   * (runInverse) exits right after parsing. */
+   * (runCsemInverse) exits right after parsing. */
   {
     PetscBool helpRequested = PETSC_FALSE;
     PetscCall(PetscOptionsHasHelp(NULL, &helpRequested));
@@ -532,94 +714,10 @@ PetscErrorCode logInversionSummary(const ImParams *imParams) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* /observed/<name> (complex128 {r, i}, numFreqs x numReceivers) read on rank 0 and broadcast. */
-static PetscErrorCode readObservedExternal(const char *file, const char *name, PetscInt numFreqs, PetscInt numReceivers, PetscScalar *obs) {
-  PetscFunctionBeginUser;
-  MPI_Comm    comm = PETSC_COMM_WORLD;
-  PetscMPIInt rank;
-  char        path[64];
-
-  PetscCall(PetscSNPrintf(path, sizeof(path), "/observed/%s", name));
-  PetscCallMPI(MPI_Comm_rank(comm, &rank));
-  if (rank == 0) {
-    hid_t   fileId, dset, space, h5complex;
-    hsize_t dims[2] = {0, 0};
-    herr_t  status;
-
-    fileId = H5Fopen(file, H5F_ACC_RDONLY, H5P_DEFAULT);
-    PetscCheck(fileId >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "Cannot open %s", file);
-    PetscCheck(H5Lexists(fileId, "/observed", H5P_DEFAULT) > 0 && H5Lexists(fileId, path, H5P_DEFAULT) > 0, PETSC_COMM_SELF,
-               PETSC_ERR_FILE_READ, "Cannot find %s in %s (see -im_data_components)", path, file);
-    dset = H5Dopen2(fileId, path, H5P_DEFAULT);
-    PetscCheck(dset >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "Cannot open %s in %s", path, file);
-    space = H5Dget_space(dset);
-    PetscCheck(H5Sget_simple_extent_ndims(space) == 2, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "%s must be 2D", path);
-    H5Sget_simple_extent_dims(space, dims, NULL);
-    H5Sclose(space);
-    PetscCheck((PetscInt)dims[0] == numFreqs && (PetscInt)dims[1] == numReceivers, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
-               "%s shape [%llu x %llu] != expected [%" PetscInt_FMT " x %" PetscInt_FMT "]", path, (unsigned long long)dims[0],
-               (unsigned long long)dims[1], numFreqs, numReceivers);
-
-    h5complex = H5Tcreate(H5T_COMPOUND, sizeof(PetscScalar));
-    H5Tinsert(h5complex, "r", 0, H5T_NATIVE_DOUBLE);
-    H5Tinsert(h5complex, "i", sizeof(double), H5T_NATIVE_DOUBLE);
-    status = H5Dread(dset, h5complex, H5S_ALL, H5S_ALL, H5P_DEFAULT, obs);
-    H5Tclose(h5complex);
-    H5Dclose(dset);
-    H5Fclose(fileId);
-    PetscCheck(status >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "Cannot read %s from %s", path, file);
-  }
-  PetscCallMPI(MPI_Bcast(obs, (PetscMPIInt)(numFreqs * numReceivers), MPIU_SCALAR, 0, comm));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Components of an fm.csem responses file from /sources/src{k}/fields (source k -> row k-1), read on every rank. */
-static PetscErrorCode readObservedFmNative(const char *file, const ImParams *imParams, PetscInt numReceivers, PetscScalar *obs) {
-  PetscFunctionBeginUser;
-  const char *const fieldNames[NUM_RECEIVER_FIELDS] = {"Ex", "Ey", "Ez", "Hx", "Hy", "Hz"};
-  const PetscInt    numFreqs                        = imParams->numFreqs;
-  PetscViewer       viewer;
-
-  PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, file, FILE_MODE_READ, &viewer));
-  for (PetscInt k = 0; k < numFreqs; k++) {
-    char               group[PETSC_MAX_PATH_LEN];
-    Vec                v[NUM_RECEIVER_FIELDS] = {NULL};
-    const PetscScalar *a[NUM_RECEIVER_FIELDS] = {NULL};
-
-    PetscCall(PetscSNPrintf(group, sizeof(group), "/sources/src%" PetscInt_FMT "/fields", k + 1));
-    PetscCall(PetscViewerHDF5PushGroup(viewer, group));
-    for (PetscInt i = 0; i < imParams->numComponents; i++) {
-      ReceiverField num, den;
-      imDataComponentFields(imParams->components[i], &num, &den);
-      for (PetscInt j = 0; j < 2; j++) {
-        const ReceiverField fld = (j == 0) ? num : den;
-        PetscInt            n;
-        if (fld == NUM_RECEIVER_FIELDS || v[fld]) continue;
-        PetscCall(loadSerialVec(viewer, fieldNames[fld], &v[fld]));
-        PetscCall(VecGetSize(v[fld], &n));
-        PetscCheck(n == numReceivers, PETSC_COMM_WORLD, PETSC_ERR_FILE_READ,
-                   "%s: %s/%s length %" PetscInt_FMT " != expected receivers %" PetscInt_FMT, file, group, fieldNames[fld], n,
-                   numReceivers);
-        PetscCall(VecGetArrayRead(v[fld], &a[fld]));
-      }
-    }
-    PetscCall(PetscViewerHDF5PopGroup(viewer));
-    for (PetscInt i = 0; i < imParams->numComponents; i++) {
-      ReceiverField num, den;
-      PetscScalar  *row = &obs[(i * numFreqs + k) * numReceivers];
-      imDataComponentFields(imParams->components[i], &num, &den);
-      for (PetscInt r = 0; r < numReceivers; r++) row[r] = (den == NUM_RECEIVER_FIELDS) ? a[num][r] : a[num][r] / a[den][r];
-    }
-    for (PetscInt f = 0; f < NUM_RECEIVER_FIELDS; f++) {
-      if (!v[f]) continue;
-      PetscCall(VecRestoreArrayRead(v[f], &a[f]));
-      PetscCall(VecDestroy(&v[f]));
-    }
-  }
-  PetscCall(PetscViewerDestroy(&viewer));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
+/**
+ * @brief Observed-data abstraction entry point used by the inverse
+ *        kernel.
+ */
 PetscErrorCode loadObservedDataset(const ImParams *imParams, PetscInt numReceivers, PetscScalar **dObs) {
   PetscFunctionBeginUser;
   MPI_Comm        comm  = PETSC_COMM_WORLD;
@@ -648,26 +746,6 @@ PetscErrorCode loadObservedDataset(const ImParams *imParams, PetscInt numReceive
   PetscCall(logKvStr(comm, "File", where));
   PetscCall(logKvInt(comm, "Frequencies", imParams->numFreqs));
   PetscCall(logKvInt(comm, "Receivers", numReceivers));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Writes n reals held on rank 0 as an MPI Vec named name. */
-static PetscErrorCode writeRealHistory(PetscViewer viewer, MPI_Comm comm, const char *name, const PetscReal *values, PetscInt n) {
-  PetscFunctionBeginUser;
-  PetscMPIInt rank;
-  Vec         v;
-
-  PetscCallMPI(MPI_Comm_rank(comm, &rank));
-  PetscCall(VecCreateMPI(comm, (rank == 0) ? n : 0, n, &v));
-  PetscCall(PetscObjectSetName((PetscObject)v, name));
-  if (rank == 0) {
-    PetscScalar *a;
-    PetscCall(VecGetArray(v, &a));
-    for (PetscInt i = 0; i < n; i++) a[i] = values[i];
-    PetscCall(VecRestoreArray(v, &a));
-  }
-  PetscCall(VecView(v, viewer));
-  PetscCall(VecDestroy(&v));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -780,6 +858,9 @@ PetscErrorCode writeInversionResults(const ImParams *imParams, DM dmConductivity
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Writes the gradient check to {output_dir}/{output_filename}.h5.
+ */
 PetscErrorCode writeGradientCheck(const ImParams *imParams, MPI_Comm comm, const PetscReal *eps, const PetscReal *fd,
                                   const PetscReal *adjoint, PetscInt n) {
   PetscFunctionBeginUser;

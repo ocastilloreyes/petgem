@@ -33,11 +33,12 @@
 #ifndef RECEIVER_INTERP_H
 #define RECEIVER_INTERP_H
 
-#include "constants.h"
-#include "grid.h"
 #include <petsc.h>
 #include <petscdm.h>
 #include <petscmat.h>
+
+#include "constants.h"
+#include "grid.h"
 
 /** @brief Field components at a receiver; NUM_RECEIVER_FIELDS counts them. */
 typedef enum { RECV_EX, RECV_EY, RECV_EZ, RECV_HX, RECV_HY, RECV_HZ, NUM_RECEIVER_FIELDS } ReceiverField;
@@ -114,6 +115,11 @@ PetscErrorCode interpolateReceiverFields(const ReceiverInterpolationMatrices *Q,
 
 /**
  * @brief Destroys the Vecs created by createReceiverFields().
+ *
+ * @param[in,out] fields  Field Vecs.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyReceiverFields(Vec fields[NUM_RECEIVER_FIELDS]);
 

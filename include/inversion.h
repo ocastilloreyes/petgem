@@ -12,22 +12,23 @@
 #ifndef INVERSION_H
 #define INVERSION_H
 
+#include <petsc.h>
+#include <petscdmplex.h>
+#include <petscksp.h>
+
 #include "constants.h"
-#include "grid.h"
-#include "fem.h" /* Quadrature3D used by InversionContext workspace */
-#include "io.h"  /* PetgemParams: shared base parameters embedded below */
-#include "receiver_interp.h"
 #include "csem.h"
 #include "csem_primary.h"
+#include "fem.h"
+#include "grid.h"
+#include "io.h"
+#include "receiver_interp.h"
 
 /** @brief simulation_type tag of im.csem products. */
 #define PETGEM_SIM_IM "im.csem"
 
 /** @brief Max number of step sizes of the gradient check. */
 #define IM_MAX_GRADIENT_CHECK_STEPS 8
-#include <petsc.h>
-#include <petscdmplex.h>
-#include <petscksp.h>
 
 /**
  * @brief Inversion source: a transmitter and its frequency.
@@ -249,7 +250,8 @@ typedef struct {
  *
  * @param[out] imParams  Struct receiving the parsed inversion parameters.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode readImParams(ImParams *imParams);
 
@@ -264,7 +266,8 @@ PetscErrorCode readImParams(ImParams *imParams);
  * @param[in]     bundleFile  Path to the unified PETGEM HDF5 bundle.
  * @param[in,out] imParams   Inversion parameters updated in place.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile, ImParams *imParams);
 
@@ -278,7 +281,8 @@ PetscErrorCode loadInversionMetaFromBundle(const char *bundleFile, ImParams *imP
  * @param[in]     bundleFile  Path to the unified PETGEM HDF5 bundle.
  * @param[in,out] imParams   Inversion parameters whose sources are filled.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode setupInversionSources(const char *bundleFile, ImParams *imParams);
 
@@ -289,7 +293,8 @@ PetscErrorCode setupInversionSources(const char *bundleFile, ImParams *imParams)
  * @param[in] imParams  Inversion parameters, after setupInversionSources()
  *                       and loadInversionMetaFromBundle().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logInversionSummary(const ImParams *imParams);
 
@@ -306,7 +311,8 @@ PetscErrorCode logInversionSummary(const ImParams *imParams);
  * @param[in]  numReceivers  Number of receivers (columns).
  * @param[out] dObs          Observed data, component-major numComponents x numFreqs x numReceivers (caller frees).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode loadObservedDataset(const ImParams *imParams, PetscInt numReceivers, PetscScalar **dObs);
 
@@ -323,7 +329,8 @@ PetscErrorCode loadObservedDataset(const ImParams *imParams, PetscInt numReceive
  * @param[in]  materialsId  Per-cell material-id Vec.
  * @param[out] graph        Neighbor graph to populate.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode buildNeighborSmoothingGraph(const DM dm, const Grid *grid, const ImParams *imParams, Vec materialsId, NeighborGraph *graph);
 
@@ -337,7 +344,8 @@ PetscErrorCode buildNeighborSmoothingGraph(const DM dm, const Grid *grid, const 
  * @param[in]     diagWeight Self-weight applied to the diagonal during sweeps.
  * @param[in,out] v          Vector smoothed in place.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode applyGraphSmoothing(const NeighborGraph *graph, PetscReal diagWeight, Vec v);
 
@@ -357,7 +365,8 @@ PetscErrorCode applyGraphSmoothing(const NeighborGraph *graph, PetscReal diagWei
  * @param[in]  grid            Finite-element grid descriptor.
  * @param[in]  graph           Neighbor smoothing graph.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity, const Vec X, const Vec X0, Vec sigmaModel, const Grid *grid,
                                const NeighborGraph *graph);
@@ -373,7 +382,8 @@ PetscErrorCode applyLogToSigma(DM dmInversion, DM dmConductivity, const Vec X, c
  * @param[in] ctx           Inversion context.
  * @param[in] acceptedIter  Index of the accepted iteration (used in filename).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode writeInversionSnapshotVtu(const InversionContext *ctx, PetscInt acceptedIter);
 
@@ -415,7 +425,8 @@ typedef struct {
  * @param[in]     background    Background model of the secondary formulation (loadCsemBackground), or NULL for the total field.
  * @param[out]    stats         Wall times and counters for the run report.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode runCsemInversion(const ImParams *imParams, const DM dm, const Grid *grid, Vec conductivity, Vec materialsId, Vec receivers,
                                 const CsemBackground *background, InversionStats *stats);
@@ -425,7 +436,8 @@ PetscErrorCode runCsemInversion(const ImParams *imParams, const DM dm, const Gri
  *
  * @param[in,out] graph  Neighbor graph to destroy.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PetscError code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyNeighborGraph(NeighborGraph *graph);
 

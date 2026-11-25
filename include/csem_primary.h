@@ -66,7 +66,8 @@ typedef struct {
  * @param[in]  params      Parameters (input file, default of -csem_background_file).
  * @param[out] csemParams  Formulation options.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode readCsemParams(const PetgemParams *params, CsemParams *csemParams);
 
@@ -80,7 +81,8 @@ PetscErrorCode readCsemParams(const PetgemParams *params, CsemParams *csemParams
  * @param[in]  csemParams  Formulation options.
  * @param[out] background  Background model; release it with destroyCsemBackground().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode loadCsemBackground(const CsemParams *csemParams, CsemBackground *background);
 
@@ -89,7 +91,8 @@ PetscErrorCode loadCsemBackground(const CsemParams *csemParams, CsemBackground *
  *
  * @param[in,out] background  Background model.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyCsemBackground(CsemBackground *background);
 
@@ -124,7 +127,8 @@ typedef struct {
  * @param[in]  materialsId   Per-cell material id Vec (CSEM_PRIMARY_MODEL; may be NULL otherwise).
  * @param[out] primary       Primary field; release it with destroyCsemPrimary().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createCsemPrimary(const CsemBackground *background, const DM dm, const Grid *grid, Vec conductivity, Vec materialsId,
                                  CsemPrimary *primary);
@@ -147,7 +151,8 @@ PetscErrorCode createCsemPrimary(const CsemBackground *background, const DM dm, 
  * @param[in]     extraCells  Further cells where E_p,h is needed (cell - cellStart), or NULL.
  * @param[in,out] primary     Primary field (createCsemPrimary).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode computeCsemPrimary(PetscInt numSets, const CsemSourceSet sets[], const DM dm, const Grid *grid, const PetscBool extraCells[],
                                   CsemPrimary *primary);
@@ -164,7 +169,8 @@ PetscErrorCode computeCsemPrimary(PetscInt numSets, const CsemSourceSet sets[], 
  * @param[in]     conductivity  Per-cell conductivity Vec.
  * @param[in,out] B             Right-hand sides, B[s] one column per source of set s (createRhsMatrix); overwritten.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode assembleCsemSecondaryRhs(const CsemPrimary *primary, const DM dm, const Grid *grid, Vec conductivity, Mat B[]);
 
@@ -183,10 +189,36 @@ PetscErrorCode assembleCsemSecondaryRhs(const CsemPrimary *primary, const DM dm,
  * @param[in]     receivers  Receiver coordinates (sequential Vec of 3 * numReceivers).
  * @param[in,out] fields     Fields at the receivers (createReceiverFields).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode addCsemPrimaryAtReceivers(const CsemPrimary *primary, PetscInt set, PetscInt source, const DM dm,
                                          const ReceiverInterpolationMatrices *Q, Vec receivers, Vec fields[NUM_RECEIVER_FIELDS]);
+
+/** @brief Context of addCsemPrimaryField. */
+typedef struct {
+  const CsemPrimary *primary; /**< Primary field (computeCsemPrimary) of a single source set. */
+  DM                 dm;      /**< DMPlex mesh carrying the H(curl) section. */
+} CsemPrimaryFieldCtx;
+
+/**
+ * @brief Adds the primary field of source k of the single source set to the
+ *        fields at the receivers.
+ *
+ * CsemReceiverPrimaryFn passed to computeCsemResponses() by fm.csem in the
+ * secondary formulation.
+ *
+ * @param[in]     k          Source index.
+ * @param[in]     Q          Receiver interpolation matrices.
+ * @param[in]     receivers  Receiver coordinates (sequential Vec of 3 * numReceivers).
+ * @param[in,out] fields     Fields at the receivers (createReceiverFields).
+ * @param[in]     ctx        CsemPrimaryFieldCtx.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+PetscErrorCode addCsemPrimaryField(PetscInt k, const ReceiverInterpolationMatrices *Q, Vec receivers, Vec fields[NUM_RECEIVER_FIELDS],
+                                   void *ctx);
 
 /**
  * @brief Prints the "CSEM formulation" section of the run report.
@@ -194,7 +226,8 @@ PetscErrorCode addCsemPrimaryAtReceivers(const CsemPrimary *primary, PetscInt se
  * @param[in] comm     Communicator of the report.
  * @param[in] primary  Primary field (computeCsemPrimary).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logCsemFormulation(MPI_Comm comm, const CsemPrimary *primary);
 
@@ -203,7 +236,8 @@ PetscErrorCode logCsemFormulation(MPI_Comm comm, const CsemPrimary *primary);
  *
  * @param[in,out] primary  Primary field.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyCsemPrimary(CsemPrimary *primary);
 

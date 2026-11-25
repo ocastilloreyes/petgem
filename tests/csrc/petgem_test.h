@@ -13,9 +13,9 @@
 #ifndef PETGEM_TEST_H
 #define PETGEM_TEST_H
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 
 static int pt_checks   = 0;
 static int pt_failures = 0;

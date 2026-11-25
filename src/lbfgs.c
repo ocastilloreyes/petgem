@@ -8,13 +8,12 @@
  * inverse kernel. References: Nocedal & Wright, "Numerical Optimization", Ch. 7.
  */
 
+/* PETSc libraries */
 #include <petsc.h>
 
+/* PETGEM functions */
 #include "common.h"
 #include "lbfgs.h"
-
-const char *const LbfgsReasons[] = {"CONVERGED_GRTOL", "CONVERGED_RMSTOL",    "CONVERGED_RMS_STALL",
-                                    "DIVERGED_MAXITS", "DIVERGED_LS_FAILURE", "DIVERGED_NAN"};
 
 /* Armijo sufficient-decrease parameter */
 #define LBFGS_ARMIJO_C1 1e-4
@@ -28,6 +27,16 @@ typedef struct {
   PetscReal *rho, *alpha;
 } LbfgsHistory;
 
+/**
+ * @brief Creates an empty L-BFGS history.
+ *
+ * @param[in]  X       Template Vec.
+ * @param[in]  memory  Number of (s, y) pairs.
+ * @param[out] h       L-BFGS history.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode createHistory(Vec X, PetscInt memory, LbfgsHistory *h) {
   PetscFunctionBeginUser;
   h->memory = memory;
@@ -39,6 +48,14 @@ static PetscErrorCode createHistory(Vec X, PetscInt memory, LbfgsHistory *h) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Destroys an L-BFGS history.
+ *
+ * @param[in,out] h  L-BFGS history.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode destroyHistory(LbfgsHistory *h) {
   PetscFunctionBeginUser;
   PetscCall(VecDestroyVecs(h->memory, &h->S));
@@ -47,6 +64,16 @@ static PetscErrorCode destroyHistory(LbfgsHistory *h) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Real part of the dot product of two Vecs.
+ *
+ * @param[in]  a  First Vec.
+ * @param[in]  b  Second Vec.
+ * @param[out] v  Re(a^H b).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode realDot(Vec a, Vec b, PetscReal *v) {
   PetscFunctionBeginUser;
   PetscScalar dot;
@@ -55,7 +82,16 @@ static PetscErrorCode realDot(Vec a, Vec b, PetscReal *v) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* d = -H G by the two-loop recursion. */
+/**
+ * @brief Search direction d = -H G by the two-loop recursion.
+ *
+ * @param[in,out] h  L-BFGS history.
+ * @param[in]     G  Gradient.
+ * @param[out]    d  Search direction.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode searchDirection(LbfgsHistory *h, Vec G, Vec d) {
   PetscFunctionBeginUser;
   const PetscInt M = h->memory;
@@ -85,7 +121,21 @@ static PetscErrorCode searchDirection(LbfgsHistory *h, Vec G, Vec d) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Stores the accepted pair when it satisfies the curvature condition y^T s > 0. */
+/**
+ * @brief Stores the accepted pair when it satisfies the curvature condition y^T
+ *        s > 0.
+ *
+ * @param[in,out] h     L-BFGS history.
+ * @param[in]     X     Previous model.
+ * @param[in]     Xnew  Accepted model.
+ * @param[in]     G     Previous gradient.
+ * @param[in]     Gnew  Accepted gradient.
+ * @param[in]     ys    y^T s.
+ * @param[in]     comm  Communicator of the report.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode updateHistory(LbfgsHistory *h, Vec X, Vec Xnew, Vec G, Vec Gnew, PetscReal ys, MPI_Comm comm) {
   PetscFunctionBeginUser;
   if (ys <= 1e-30) {
@@ -102,7 +152,28 @@ static PetscErrorCode updateHistory(LbfgsHistory *h, Vec X, Vec Xnew, Vec G, Vec
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Backtracking Armijo search along d from (X, f) with slope gTd; *ok is false when it fails. */
+/**
+ * @brief Backtracking Armijo line search.
+ *
+ * Halves the step until f(X + stp d) <= f + LBFGS_ARMIJO_C1 stp gTd, at most
+ * LBFGS_MAX_LINE_SEARCH times.
+ *
+ * @param[in]     problem   Objective and gradient.
+ * @param[in]     X         Current model.
+ * @param[in]     f         Objective at X.
+ * @param[in]     d         Search direction.
+ * @param[in]     gTd       Slope G^T d.
+ * @param[in,out] stp       Step length.
+ * @param[out]    Xnew      Trial model.
+ * @param[out]    fnew      Objective at Xnew.
+ * @param[out]    Gnew      Gradient at Xnew.
+ * @param[out]    rms       RMS at Xnew.
+ * @param[in,out] numEvals  Objective evaluations.
+ * @param[out]    ok        PETSC_FALSE when no step satisfies the condition.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode lineSearch(const LbfgsProblem *problem, Vec X, PetscReal f, Vec d, PetscReal gTd, PetscReal *stp, Vec Xnew,
                                  PetscReal *fnew, Vec Gnew, PetscReal *rms, PetscInt *numEvals, PetscBool *ok) {
   PetscFunctionBeginUser;
@@ -121,6 +192,16 @@ static PetscErrorCode lineSearch(const LbfgsProblem *problem, Vec X, PetscReal f
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Gradient ratio |G| / max(1, |X|).
+ *
+ * @param[in]  G      Gradient.
+ * @param[in]  X      Model.
+ * @param[out] ratio  Gradient ratio.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode gradientRatio(Vec G, Vec X, PetscReal *ratio) {
   PetscFunctionBeginUser;
   PetscReal gnorm, xnorm;
@@ -130,6 +211,18 @@ static PetscErrorCode gradientRatio(Vec G, Vec X, PetscReal *ratio) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints the exit reason of the optimization.
+ *
+ * @param[in] comm       Communicator of the report.
+ * @param[in] opts       L-BFGS options.
+ * @param[in] result     L-BFGS result.
+ * @param[in] rms        Final RMS.
+ * @param[in] gradRatio  Final gradient ratio.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode logExit(MPI_Comm comm, const LbfgsOptions *opts, const LbfgsResult *result, PetscReal rms, PetscReal gradRatio) {
   PetscFunctionBeginUser;
   char detail[128];
@@ -163,6 +256,12 @@ static PetscErrorCode logExit(MPI_Comm comm, const LbfgsOptions *opts, const Lbf
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+const char *const LbfgsReasons[] = {"CONVERGED_GRTOL", "CONVERGED_RMSTOL",    "CONVERGED_RMS_STALL",
+                                    "DIVERGED_MAXITS", "DIVERGED_LS_FAILURE", "DIVERGED_NAN"};
+
+/**
+ * @brief Minimizes problem->objgrad from X with L-BFGS.
+ */
 PetscErrorCode lbfgsOptimize(const LbfgsProblem *problem, const LbfgsOptions *opts, Vec X, LbfgsResult *result) {
   PetscFunctionBeginUser;
 

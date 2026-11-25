@@ -26,8 +26,9 @@
  *   - volume: never shared, emitted in a fixed enumeration (no orientation).
  */
 
-#include "fe_nodal.h"
+/* PETGEM functions */
 #include "constants.h"
+#include "fe_nodal.h"
 
 /* DMPlex closure edge slots E0..E5 -> their two local cell vertices (from the
  * reference-cell topology probe). Only the vertex pair is used; the dof order

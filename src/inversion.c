@@ -20,21 +20,29 @@
 #include <petscdmplex.h>
 #include <petscksp.h>
 
-/* PETGEM headers */
-#include "common.h"
+/* PETGEM functions */
 #include "assembly.h"
+#include "common.h"
 #include "constants.h"
-#include "grid.h"
-#include "fem.h"
-#include "io.h"
-#include "inversion.h"
-#include "inversion_internal.h"
-#include "lbfgs.h"
-#include "solver.h"
 #include "csem.h"
 #include "csem_primary.h"
+#include "fem.h"
+#include "grid.h"
+#include "inversion.h"
+#include "inversion_internal.h"
+#include "io.h"
+#include "lbfgs.h"
+#include "solver.h"
 
-/* Adds the wall time since t0 to *acc. */
+/**
+ * @brief Adds the wall time elapsed since t0 to an accumulator.
+ *
+ * @param[in]     t0   Start time (PetscTime).
+ * @param[in,out] acc  Accumulated time (s).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode addElapsed(PetscLogDouble t0, PetscLogDouble *acc) {
   PetscFunctionBeginUser;
   PetscLogDouble now;
@@ -54,7 +62,8 @@ static PetscErrorCode addElapsed(PetscLogDouble t0, PetscLogDouble *acc) {
  * @param[in]  G      Discrete gradient for PCBDDC.
  * @param[out] ksp    KSP bound to A.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode createFrequencyKsp(PetscInt order, Mat A, Mat G, KSP *ksp) {
   PetscFunctionBeginUser;
@@ -66,9 +75,22 @@ static PetscErrorCode createFrequencyKsp(PetscInt order, Mat A, Mat G, KSP *ksp)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/*
- * Source RHS (secondary formulation: E_p,h and the primary fields at the receivers; the RHS is assembled with the model),
- * observed row k of every component of dObs and data weights of one frequency; NaN data get weight 0.
+/**
+ * @brief Right-hand side, observed data and data weights of one frequency.
+ *
+ * Sets the source right-hand side (in the secondary formulation, E_p,h and the
+ * primary fields at the receivers; the right-hand side is assembled with the
+ * model), the observed row k of every data component and the data weights.
+ * Missing (NaN) data get weight 0.
+ *
+ * @param[in,out] ctx        Inversion context.
+ * @param[in]     dObs       Observed data, one row per frequency.
+ * @param[in]     receivers  Receiver coordinates.
+ * @param[in]     k          Frequency (source) index.
+ * @param[out]    f          Data of frequency k.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode setupFrequencyData(InversionContext *ctx, const PetscScalar *dObs, Vec receivers, PetscInt k, InversionFrequency *f) {
   PetscFunctionBeginUser;
@@ -118,7 +140,18 @@ static PetscErrorCode setupFrequencyData(InversionContext *ctx, const PetscScala
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* PETSC_TRUE on every rank if x lies in a free (not fixed) local cell of some rank; points outside the mesh give PETSC_FALSE. */
+/**
+ * @brief Tests whether a point lies in a free (not fixed) cell on any rank.
+ *
+ * Points outside the mesh give PETSC_FALSE.
+ *
+ * @param[in]  ctx     Inversion context.
+ * @param[in]  x       Point coordinates.
+ * @param[out] inFree  Same value on every rank.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode pointInFreeCell(const InversionContext *ctx, const PetscReal x[NUM_DIMENSIONS], PetscBool *inFree) {
   PetscFunctionBeginUser;
   Vec                point;
@@ -146,7 +179,18 @@ static PetscErrorCode pointInFreeCell(const InversionContext *ctx, const PetscRe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* E_p,h of every frequency on the free cells and the cells with sigma != sigma_b, and the secondary right-hand side matrices. */
+/**
+ * @brief Primary field of every frequency and the secondary right-hand side
+ *        matrices.
+ *
+ * E_p,h is set on the free cells and on the cells with sigma != sigma_b.
+ *
+ * @param[in,out] ctx      Inversion context; Bs is created here.
+ * @param[in,out] primary  Primary field of every frequency.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode setupPrimaryField(InversionContext *ctx, CsemPrimary *primary) {
   PetscFunctionBeginUser;
   const PetscInt numCells = ctx->grid.cellEnd - ctx->grid.cellStart;
@@ -197,7 +241,8 @@ static PetscErrorCode setupPrimaryField(InversionContext *ctx, CsemPrimary *prim
  * @param[in]     receivers  Serial Vec of 3·N_recv receiver coordinates.
  * @param[in,out] primary    Primary field (createCsemPrimary), or NULL for the total field.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode setupInversionWorkspace(InversionContext *ctx, const PetscScalar *dObs, Vec receivers, CsemPrimary *primary) {
   PetscFunctionBeginUser;
@@ -244,6 +289,15 @@ static PetscErrorCode setupInversionWorkspace(InversionContext *ctx, const Petsc
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Destroys the operators, solvers and per-frequency data of the
+ *        inversion context.
+ *
+ * @param[in,out] ctx  Inversion context.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx) {
   PetscFunctionBeginUser;
   PetscCall(destroyQuadrature3D(&ctx->quad3d));
@@ -279,7 +333,18 @@ static PetscErrorCode destroyInversionWorkspace(InversionContext *ctx) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Solves with ksp and records its time, iterations and failure reason. */
+/**
+ * @brief Solves a linear system and records its time, iterations and failure
+ *        reason.
+ *
+ * @param[in,out] c    Inversion context.
+ * @param[in]     ksp  Solver.
+ * @param[in]     rhs  Right-hand side.
+ * @param[out]    sol  Solution.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode solve(InversionContext *c, KSP ksp, Vec rhs, Vec sol) {
   PetscFunctionBeginUser;
   PetscLogDouble     t0;
@@ -309,7 +374,8 @@ static PetscErrorCode solve(InversionContext *c, KSP ksp, Vec rhs, Vec sol) {
  * @param[in]     nxLocal  Adjoint solution (local).
  * @param[in]     iwmu     i omega mu.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode accumulateGradient(InversionContext *c, Vec xLocal, Vec nxLocal, PetscScalar iwmu) {
   PetscFunctionBeginUser;
@@ -344,7 +410,18 @@ static PetscErrorCode accumulateGradient(InversionContext *c, Vec xLocal, Vec nx
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Fields at the receivers for the solution c->x of frequency f, plus the primary fields of f in the secondary formulation; H is divided by i omega mu. */
+/**
+ * @brief Fields at the receivers for the solution c->x of one frequency.
+ *
+ * H is divided by i omega mu. In the secondary formulation the primary fields
+ * of the frequency are added.
+ *
+ * @param[in,out] c  Inversion context; recv is set here.
+ * @param[in]     f  Frequency data.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode interpolateFields(InversionContext *c, const InversionFrequency *f) {
   PetscFunctionBeginUser;
   for (PetscInt fld = 0; fld < NUM_RECEIVER_FIELDS; fld++) {
@@ -356,7 +433,18 @@ static PetscErrorCode interpolateFields(InversionContext *c, const InversionFreq
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* c->dPre = component i of the fitted data, from c->recv. */
+/**
+ * @brief Fitted data of one data component from the fields at the receivers.
+ *
+ * Field components are copied; impedance components are the ratio of two
+ * fields.
+ *
+ * @param[in,out] c  Inversion context; dPre is set here from recv.
+ * @param[in]     i  Data component.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode componentData(InversionContext *c, PetscInt i) {
   PetscFunctionBeginUser;
   ReceiverField      num, den;
@@ -380,9 +468,21 @@ static PetscErrorCode componentData(InversionContext *c, PetscInt i) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/*
- * Sum over receivers of |W (dObs - d)|^2 for component i, d = c->dPre. With adjoint, adds J^T a to c->adjSrc,
- * a = W^2 conj(dObs - d) and J the derivative of d with respect to the interpolated fields.
+/**
+ * @brief Weighted misfit of one data component.
+ *
+ * Sum over receivers of |W (dObs - d)|^2 with d = c->dPre. With adjoint, adds
+ * J^T a to c->adjSrc, with a = W^2 conj(dObs - d) and J the derivative of d
+ * with respect to the fields at the receivers.
+ *
+ * @param[in,out] c        Inversion context.
+ * @param[in]     f        Frequency data.
+ * @param[in]     i        Data component.
+ * @param[in]     adjoint  PETSC_TRUE to add the adjoint source.
+ * @param[out]    misfit   Misfit, summed over ranks.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode weightedMisfit(InversionContext *c, const InversionFrequency *f, PetscInt i, PetscBool adjoint, PetscReal *misfit) {
   PetscFunctionBeginUser;
@@ -437,7 +537,20 @@ static PetscErrorCode weightedMisfit(InversionContext *c, const InversionFrequen
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* One frequency: A_f = K - iwmu Ms, forward solve, misfit, adjoint solve, gradient contribution (of x_s + E_p,h in the secondary formulation). */
+/**
+ * @brief Misfit and gradient contribution of one frequency.
+ *
+ * Forms A_f = K - i omega mu Ms, solves the forward and adjoint problems and
+ * adds the gradient contribution of x_s (x_s + E_p,h in the secondary
+ * formulation) to c->DfDm.
+ *
+ * @param[in,out] c       Inversion context.
+ * @param[in,out] f       Frequency data.
+ * @param[out]    misfit  Misfit of the frequency.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode evaluateFrequency(InversionContext *c, InversionFrequency *f, PetscReal *misfit) {
   PetscFunctionBeginUser;
   PetscLogDouble t0;
@@ -484,7 +597,16 @@ static PetscErrorCode evaluateFrequency(InversionContext *c, InversionFrequency 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Ms of the current conductivity and, in the secondary formulation, the right-hand side of every frequency. */
+/**
+ * @brief Refills the operator data of the current conductivity.
+ *
+ * Ms and, in the secondary formulation, the right-hand side of every frequency.
+ *
+ * @param[in,out] c  Inversion context.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode refillOperatorData(InversionContext *c) {
   PetscFunctionBeginUser;
   PetscCall(refillMassMatrix(c->dm, &c->grid, c->conductivity, &c->quad3d, c->Me, c->Ke, c->Ms));
@@ -500,7 +622,16 @@ static PetscErrorCode refillOperatorData(InversionContext *c) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Data misfit of the current conductivity and its derivative in c->DfDm, summed over frequencies. */
+/**
+ * @brief Data misfit of the current conductivity and its derivative, summed
+ *        over frequencies.
+ *
+ * @param[in,out] c       Inversion context; DfDm is set here.
+ * @param[out]    misfit  Data misfit.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode evaluateMisfit(InversionContext *c, PetscReal *misfit) {
   PetscFunctionBeginUser;
   PetscLogDouble t0;
@@ -519,7 +650,20 @@ static PetscErrorCode evaluateMisfit(InversionContext *c, PetscReal *misfit) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* G = mask( scatter( smooth( mask( -sigma DfDm ) ) / numData ) + 2 lambda/N X ). */
+/**
+ * @brief Gradient of the objective with respect to log(rho).
+ *
+ * G = mask(scatter(smooth(mask(-sigma DfDm)) / numData) + 2 lambda / N X).
+ *
+ * @param[in,out] c         Inversion context.
+ * @param[in]     X         Model, log(rho) per cell.
+ * @param[in]     numData   Number of data.
+ * @param[in]     numCells  Global number of cells (N).
+ * @param[out]    G         Gradient.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode assembleGradient(InversionContext *c, Vec X, PetscInt numData, PetscInt numCells, Vec G) {
   PetscFunctionBeginUser;
   PetscSection       sec;
@@ -561,7 +705,8 @@ static PetscErrorCode assembleGradient(InversionContext *c, Vec X, PetscInt numD
  * @param[out] G     Gradient.
  * @param[out] rms   Data RMS.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode inversionObjGrad(void *ctx, Vec X, PetscReal *F, Vec G, PetscReal *rms) {
   PetscFunctionBeginUser;
@@ -602,7 +747,8 @@ static PetscErrorCode inversionObjGrad(void *ctx, Vec X, PetscReal *F, Vec G, Pe
  * @param[in] gradRatio  ||g|| / max(1, ||X||).
  * @param[in] step       Accepted step length (unused on row 0).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode inversionMonitor(void *ctx, PetscInt iter, PetscReal gnorm, PetscReal gradRatio, PetscReal step) {
   PetscFunctionBeginUser;
@@ -655,7 +801,8 @@ static PetscErrorCode inversionMonitor(void *ctx, PetscInt iter, PetscReal gnorm
  * @param[out]    dPre  Predicted data, component-major numComponents x numFreqs x numReceivers, on rank 0 (NULL elsewhere; caller frees).
  * @param[out]    rms   Data RMS of dPre against the observed data.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode predictData(InversionContext *c, PetscScalar **dPre, PetscReal *rms) {
   PetscFunctionBeginUser;
@@ -703,7 +850,20 @@ static PetscErrorCode predictData(InversionContext *c, PetscScalar **dPre, Petsc
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Multiplies sigma (all three components) of every local cell by exp(-eps dir), i.e. log(rho) += eps dir, from sigma0. */
+/**
+ * @brief Perturbs the conductivity along a direction in log(rho).
+ *
+ * Multiplies the three conductivity components of every local cell of sigma0 by
+ * exp(-eps dir), that is log(rho) += eps dir.
+ *
+ * @param[in,out] c         Inversion context; conductivity is set here.
+ * @param[in]     sigma0    Unperturbed conductivity.
+ * @param[in]     dirLocal  Direction, local Vec of the inversion DM.
+ * @param[in]     eps       Step.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode perturbConductivity(InversionContext *c, Vec sigma0, Vec dirLocal, PetscReal eps) {
   PetscFunctionBeginUser;
   PetscSection       sec;
@@ -734,7 +894,8 @@ static PetscErrorCode perturbConductivity(InversionContext *c, Vec sigma0, Vec d
  *
  * @param[in,out] c  Inversion context (conductivity holds the starting model, restored on exit).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code otherwise.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 static PetscErrorCode runGradientCheck(InversionContext *c) {
   PetscFunctionBeginUser;
@@ -812,7 +973,18 @@ static PetscErrorCode runGradientCheck(InversionContext *c) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* X0 = log(1 / sigma_x) per cell. */
+/**
+ * @brief Initial model X0 = log(1 / sigma_x) per cell.
+ *
+ * @param[in]  dmInversion     DM of the inversion model (one value per cell).
+ * @param[in]  dmConductivity  DM carrying the conductivity field.
+ * @param[in]  conductivity    Per-cell conductivity.
+ * @param[in]  grid            Grid (local cell range).
+ * @param[out] X0              Initial model.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode initialLogResistivity(DM dmInversion, DM dmConductivity, Vec conductivity, const Grid *grid, Vec X0) {
   PetscFunctionBeginUser;
   PetscSection       sec;
@@ -836,6 +1008,16 @@ static PetscErrorCode initialLogResistivity(DM dmInversion, DM dmConductivity, V
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/**
+ * @brief Prints the "Assembly" section of the run report and records the solver
+ *        name.
+ *
+ * @param[in]     ctx    Inversion context.
+ * @param[in,out] stats  Inversion statistics; solver is set here.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode logInversionAssembly(const InversionContext *ctx, InversionStats *stats) {
   PetscFunctionBeginUser;
   MPI_Comm comm = PetscObjectComm((PetscObject)ctx->dm);
@@ -848,7 +1030,20 @@ static PetscErrorCode logInversionAssembly(const InversionContext *ctx, Inversio
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* L-BFGS from X, then the model of the last accepted X, its predicted data and the HDF5 results. */
+/**
+ * @brief Runs L-BFGS from X and writes the results.
+ *
+ * After the optimization, sets the model of the last accepted X, predicts its
+ * data and writes the HDF5 results.
+ *
+ * @param[in,out] c      Inversion context.
+ * @param[in,out] X      Initial model; the last accepted model on return.
+ * @param[in]     t0     Start time of the inversion (PetscTime).
+ * @param[in,out] stats  Inversion statistics.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode runLbfgs(InversionContext *c, Vec X, PetscLogDouble t0, InversionStats *stats) {
   PetscFunctionBeginUser;
   const ImParams *imParams = c->imParams;

@@ -12,35 +12,16 @@
 #include <stdio.h>
 #include <string.h>
 
-/* PETSc functions*/
+/* PETSc libraries */
 #include <petsc.h>
 #include <petscsys.h>
 #include <petscviewerhdf5.h>
 
-/* PETGEM headers */
+/* PETGEM functions */
 #include "common.h"
 #include "constants.h"
 #include "io.h"
 #include "version.h"
-
-/**
- * @brief Loads a PETSc Vec from an HDF5 viewer on PETSC_COMM_SELF.
- *
- * This helper reads a named dataset from the current HDF5 group
- * and creates a sequential Vec containing its values. It is intended
- * for small datasets (e.g., scalars or per-process data) that are
- * loaded locally rather than in parallel.
- *
- * The Vec is assigned the same name as the HDF5 dataset for
- * debugging and traceability.
- */
-PetscErrorCode loadSerialVec(PetscViewer viewer, const char *name, Vec *out) {
-  PetscFunctionBeginUser;
-  PetscCall(VecCreate(PETSC_COMM_SELF, out));
-  PetscCall(PetscObjectSetName((PetscObject)*out, name));
-  PetscCall(VecLoad(*out, viewer));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 /**
  * @brief Clones @p dm with a plain section of @p numDof DOFs per cell.
@@ -65,6 +46,189 @@ static PetscErrorCode createCellFieldDm(DM dm, PetscInt numDof, DM *cellDm) {
   PetscCall(PetscSectionSetUp(section));
   PetscCall(DMSetLocalSection(*cellDm, section));
   PetscCall(PetscSectionDestroy(&section));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Loads the distributed mesh and the per-cell conductivity and material
+ *        id.
+ *
+ * Parallel I/O of the input bundle: the mesh is loaded, distributed and the
+ * cell fields are migrated with it.
+ *
+ * @param[in]  inputFile     Input bundle (HDF5).
+ * @param[out] odm           Distributed DMPlex mesh.
+ * @param[out] conductivity  Per-cell conductivity, 3 components per cell.
+ * @param[out] materialsId   Per-cell material id.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode loadMeshAndModel(const char *inputFile, DM *odm, Vec *conductivity, Vec *materialsId) {
+  PetscFunctionBeginUser;
+  PetscViewer  viewer;
+  DM           dm, dmDist, subDmSigma, subDmMat;
+  PetscSF      sfLoad, sfDist = NULL, sfXc = NULL, sfG;
+  PetscSection combinedSection, localSecSigma, localSecMat;
+  Vec          combinedGlobal, combinedLocal, localSigma, localMat;
+  char         typeName[PETSC_MAX_PATH_LEN];
+  PetscBool    flg;
+  PetscInt     cellStart, cellEnd;
+
+  PetscCall(DMCreate(PETSC_COMM_WORLD, &dm));
+  PetscCall(DMSetType(dm, DMPLEX));
+  PetscCall(PetscObjectSetName((PetscObject)dm, "petgem_mesh"));
+
+  PetscCall(PetscViewerHDF5Open(PETSC_COMM_WORLD, inputFile, FILE_MODE_READ, &viewer));
+  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_PETSC));
+
+  PetscCall(DMPlexTopologyLoad(dm, viewer, &sfLoad));
+  PetscCall(DMPlexLabelsLoad(dm, viewer, sfLoad));
+  PetscCall(DMPlexCoordinatesLoad(dm, viewer, sfLoad));
+  PetscCall(DMPlexDistribute(dm, 0, &sfDist, &dmDist));
+  if (dmDist) {
+    PetscCall(PetscSFCompose(sfLoad, sfDist, &sfXc));
+    PetscCall(DMDestroy(&dm));
+    dm = dmDist;
+    PetscCall(PetscObjectSetName((PetscObject)dm, "petgem_mesh"));
+  } else {
+    PetscCall(PetscObjectReference((PetscObject)sfLoad));
+    sfXc = sfLoad;
+  }
+  PetscCall(DMViewFromOptions(dm, NULL, "-load_dm_view"));
+
+  /* 2-field section: field 0 = conductivity (3 dofs/cell), field 1 = materialsId (1 dof/cell).
+   * DMSetNumFields is not called (it fails without a discretization object); the layout comes from the loaded section. */
+  PetscCall(DMPlexSectionLoad(dm, viewer, NULL, sfXc, &sfG, NULL));
+
+  /* Combined global vector - 4 dofs/cell [sigma_x sigma_y sigma_z mat_id] */
+  PetscCall(DMCreateGlobalVector(dm, &combinedGlobal));
+  PetscCall(PetscObjectSetName((PetscObject)combinedGlobal, "model_data"));
+  PetscCall(DMPlexGlobalVectorLoad(dm, viewer, NULL, sfG, combinedGlobal));
+  PetscCall(VecViewFromOptions(combinedGlobal, NULL, "-load_model_view"));
+
+  PetscCall(PetscViewerPopFormat(viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscCall(PetscSFDestroy(&sfLoad));
+  PetscCall(PetscSFDestroy(&sfDist));
+  PetscCall(PetscSFDestroy(&sfXc));
+  PetscCall(PetscSFDestroy(&sfG));
+
+  /* Global -> local so ghosts (needed for closure walks across partition boundaries) are populated on every rank. */
+  PetscCall(DMCreateLocalVector(dm, &combinedLocal));
+  PetscCall(DMGlobalToLocal(dm, combinedGlobal, INSERT_VALUES, combinedLocal));
+  PetscCall(VecDestroy(&combinedGlobal));
+
+  PetscCall(DMGetLocalSection(dm, &combinedSection));
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &cellStart, &cellEnd));
+
+  /* Per-cell sub-DMs: conductivity (3 dofs/cell) and materials id (1 dof/cell) */
+  PetscCall(createCellFieldDm(dm, NUM_CONDUCTIVITY_COMPONENTS, &subDmSigma));
+  PetscCall(createCellFieldDm(dm, NUM_MATERIALS_ID_COMPONENTS, &subDmMat));
+
+  PetscCall(DMCreateLocalVector(subDmSigma, &localSigma));
+  PetscCall(DMCreateLocalVector(subDmMat, &localMat));
+
+  PetscCall(DMGetLocalSection(subDmSigma, &localSecSigma));
+  PetscCall(DMGetLocalSection(subDmMat, &localSecMat));
+
+  /* Split the combined per-cell block [sigma_x sigma_y sigma_z mat_id] into the two sub-Vecs */
+  {
+    const PetscScalar *cArr;
+    PetscScalar       *sigmaArr, *matArr;
+    PetscCall(VecGetArrayRead(combinedLocal, &cArr));
+    PetscCall(VecGetArray(localSigma, &sigmaArr));
+    PetscCall(VecGetArray(localMat, &matArr));
+    for (PetscInt i = cellStart; i < cellEnd; i++) {
+      PetscInt cOff, sigmaOff, matOff;
+      PetscCall(PetscSectionGetOffset(combinedSection, i, &cOff));
+      PetscCall(PetscSectionGetOffset(localSecSigma, i, &sigmaOff));
+      PetscCall(PetscSectionGetOffset(localSecMat, i, &matOff));
+      sigmaArr[sigmaOff + 0] = cArr[cOff + 0];
+      sigmaArr[sigmaOff + 1] = cArr[cOff + 1];
+      sigmaArr[sigmaOff + 2] = cArr[cOff + 2];
+      matArr[matOff]         = cArr[cOff + 3];
+    }
+    PetscCall(VecRestoreArray(localMat, &matArr));
+    PetscCall(VecRestoreArray(localSigma, &sigmaArr));
+    PetscCall(VecRestoreArrayRead(combinedLocal, &cArr));
+  }
+  PetscCall(VecDestroy(&combinedLocal));
+  PetscCall(DMDestroy(&subDmSigma));
+  PetscCall(DMDestroy(&subDmMat));
+
+  /* Cloned DM is the public-facing handle; setupNedelecGrid installs the H(curl) section on it without disturbing the original */
+  PetscCall(DMClone(dm, odm));
+  PetscCall(DMDestroy(&dm));
+
+  *conductivity = localSigma;
+  *materialsId  = localMat;
+
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-dm_vec_type", typeName, sizeof(typeName), &flg));
+  if (flg) {
+    PetscCall(DMSetVecType(*odm, typeName));
+  }
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-dm_mat_type", typeName, sizeof(typeName), &flg));
+  if (flg) {
+    PetscCall(DMSetMatType(*odm, typeName));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Loads the basis order and the receivers from the input bundle.
+ *
+ * The order is read from /order unless -order was given (params->order > 0 at
+ * entry). Serial I/O on every rank.
+ *
+ * @param[in,out] params     PETGEM parameters; order is set here when it was
+ *                           not given.
+ * @param[out]    receivers  Sequential Vec of 3 * numReceivers coordinates.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode loadOrderAndReceivers(PetgemParams *params, Vec *receivers) {
+  PetscFunctionBeginUser;
+  PetscViewer viewer;
+  PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, params->inputFile, FILE_MODE_READ, &viewer));
+
+  /* /order - single-element Vec. Read from the bundle unless -order was set on the command line (params->order non-zero at entry). */
+  if (params->order <= 0) {
+    Vec                orderV;
+    const PetscScalar *nArr;
+    PetscCall(loadSerialVec(viewer, "order", &orderV));
+    PetscCall(VecGetArrayRead(orderV, &nArr));
+    params->order = (PetscInt)(PetscRealPart(nArr[0]) + 0.5);
+    PetscCall(VecRestoreArrayRead(orderV, &nArr));
+    PetscCall(VecDestroy(&orderV));
+  }
+  PetscCheck(params->order >= 1 && params->order <= 6, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE,
+             "Basis order %" PetscInt_FMT " not in 1..6 (-order or /order of %s)", params->order, params->inputFile);
+
+  PetscCall(loadSerialVec(viewer, "receivers", receivers));
+  PetscCall(VecSetBlockSize(*receivers, NUM_DIMENSIONS));
+
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Loads a PETSc Vec from an HDF5 viewer on PETSC_COMM_SELF.
+ *
+ * This helper reads a named dataset from the current HDF5 group
+ * and creates a sequential Vec containing its values. It is intended
+ * for small datasets (e.g., scalars or per-process data) that are
+ * loaded locally rather than in parallel.
+ *
+ * The Vec is assigned the same name as the HDF5 dataset for
+ * debugging and traceability.
+ */
+PetscErrorCode loadSerialVec(PetscViewer viewer, const char *name, Vec *out) {
+  PetscFunctionBeginUser;
+  PetscCall(VecCreate(PETSC_COMM_SELF, out));
+  PetscCall(PetscObjectSetName((PetscObject)*out, name));
+  PetscCall(VecLoad(*out, viewer));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -193,7 +357,7 @@ PetscErrorCode readPetgemParams(PetgemParams *params) {
   PetscOptionsEnd();
 
   /* Both option groups have now been printed under -help; skip argument enforcement and model/directory setup. The
-   * caller (runForward / runInverse) exits right after parsing. */
+   * caller (runCsemForward / runCsemInverse) exits right after parsing. */
   if (helpRequested) {
     PetscFunctionReturn(PETSC_SUCCESS);
   }
@@ -212,144 +376,6 @@ PetscErrorCode readPetgemParams(PetgemParams *params) {
 
   PetscCall(createDirectory(outputDir));
 
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Distributed mesh and per-cell conductivity / material id (parallel I/O). */
-static PetscErrorCode loadMeshAndModel(const char *inputFile, DM *odm, Vec *conductivity, Vec *materialsId) {
-  PetscFunctionBeginUser;
-  PetscViewer  viewer;
-  DM           dm, dmDist, subDmSigma, subDmMat;
-  PetscSF      sfLoad, sfDist = NULL, sfXc = NULL, sfG;
-  PetscSection combinedSection, localSecSigma, localSecMat;
-  Vec          combinedGlobal, combinedLocal, localSigma, localMat;
-  char         typeName[PETSC_MAX_PATH_LEN];
-  PetscBool    flg;
-  PetscInt     cellStart, cellEnd;
-
-  PetscCall(DMCreate(PETSC_COMM_WORLD, &dm));
-  PetscCall(DMSetType(dm, DMPLEX));
-  PetscCall(PetscObjectSetName((PetscObject)dm, "petgem_mesh"));
-
-  PetscCall(PetscViewerHDF5Open(PETSC_COMM_WORLD, inputFile, FILE_MODE_READ, &viewer));
-  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_PETSC));
-
-  PetscCall(DMPlexTopologyLoad(dm, viewer, &sfLoad));
-  PetscCall(DMPlexLabelsLoad(dm, viewer, sfLoad));
-  PetscCall(DMPlexCoordinatesLoad(dm, viewer, sfLoad));
-  PetscCall(DMPlexDistribute(dm, 0, &sfDist, &dmDist));
-  if (dmDist) {
-    PetscCall(PetscSFCompose(sfLoad, sfDist, &sfXc));
-    PetscCall(DMDestroy(&dm));
-    dm = dmDist;
-    PetscCall(PetscObjectSetName((PetscObject)dm, "petgem_mesh"));
-  } else {
-    PetscCall(PetscObjectReference((PetscObject)sfLoad));
-    sfXc = sfLoad;
-  }
-  PetscCall(DMViewFromOptions(dm, NULL, "-load_dm_view"));
-
-  /* 2-field section: field 0 = conductivity (3 dofs/cell), field 1 = materialsId (1 dof/cell).
-   * DMSetNumFields is not called (it fails without a discretization object); the layout comes from the loaded section. */
-  PetscCall(DMPlexSectionLoad(dm, viewer, NULL, sfXc, &sfG, NULL));
-
-  /* Combined global vector - 4 dofs/cell [sigma_x sigma_y sigma_z mat_id] */
-  PetscCall(DMCreateGlobalVector(dm, &combinedGlobal));
-  PetscCall(PetscObjectSetName((PetscObject)combinedGlobal, "model_data"));
-  PetscCall(DMPlexGlobalVectorLoad(dm, viewer, NULL, sfG, combinedGlobal));
-  PetscCall(VecViewFromOptions(combinedGlobal, NULL, "-load_model_view"));
-
-  PetscCall(PetscViewerPopFormat(viewer));
-  PetscCall(PetscViewerDestroy(&viewer));
-  PetscCall(PetscSFDestroy(&sfLoad));
-  PetscCall(PetscSFDestroy(&sfDist));
-  PetscCall(PetscSFDestroy(&sfXc));
-  PetscCall(PetscSFDestroy(&sfG));
-
-  /* Global -> local so ghosts (needed for closure walks across partition boundaries) are populated on every rank. */
-  PetscCall(DMCreateLocalVector(dm, &combinedLocal));
-  PetscCall(DMGlobalToLocal(dm, combinedGlobal, INSERT_VALUES, combinedLocal));
-  PetscCall(VecDestroy(&combinedGlobal));
-
-  PetscCall(DMGetLocalSection(dm, &combinedSection));
-  PetscCall(DMPlexGetHeightStratum(dm, 0, &cellStart, &cellEnd));
-
-  /* Per-cell sub-DMs: conductivity (3 dofs/cell) and materials id (1 dof/cell) */
-  PetscCall(createCellFieldDm(dm, NUM_CONDUCTIVITY_COMPONENTS, &subDmSigma));
-  PetscCall(createCellFieldDm(dm, NUM_MATERIALS_ID_COMPONENTS, &subDmMat));
-
-  PetscCall(DMCreateLocalVector(subDmSigma, &localSigma));
-  PetscCall(DMCreateLocalVector(subDmMat, &localMat));
-
-  PetscCall(DMGetLocalSection(subDmSigma, &localSecSigma));
-  PetscCall(DMGetLocalSection(subDmMat, &localSecMat));
-
-  /* Split the combined per-cell block [sigma_x sigma_y sigma_z mat_id] into the two sub-Vecs */
-  {
-    const PetscScalar *cArr;
-    PetscScalar       *sigmaArr, *matArr;
-    PetscCall(VecGetArrayRead(combinedLocal, &cArr));
-    PetscCall(VecGetArray(localSigma, &sigmaArr));
-    PetscCall(VecGetArray(localMat, &matArr));
-    for (PetscInt i = cellStart; i < cellEnd; i++) {
-      PetscInt cOff, sigmaOff, matOff;
-      PetscCall(PetscSectionGetOffset(combinedSection, i, &cOff));
-      PetscCall(PetscSectionGetOffset(localSecSigma, i, &sigmaOff));
-      PetscCall(PetscSectionGetOffset(localSecMat, i, &matOff));
-      sigmaArr[sigmaOff + 0] = cArr[cOff + 0];
-      sigmaArr[sigmaOff + 1] = cArr[cOff + 1];
-      sigmaArr[sigmaOff + 2] = cArr[cOff + 2];
-      matArr[matOff]         = cArr[cOff + 3];
-    }
-    PetscCall(VecRestoreArray(localMat, &matArr));
-    PetscCall(VecRestoreArray(localSigma, &sigmaArr));
-    PetscCall(VecRestoreArrayRead(combinedLocal, &cArr));
-  }
-  PetscCall(VecDestroy(&combinedLocal));
-  PetscCall(DMDestroy(&subDmSigma));
-  PetscCall(DMDestroy(&subDmMat));
-
-  /* Cloned DM is the public-facing handle; setupNedelecGrid installs the H(curl) section on it without disturbing the original */
-  PetscCall(DMClone(dm, odm));
-  PetscCall(DMDestroy(&dm));
-
-  *conductivity = localSigma;
-  *materialsId  = localMat;
-
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-dm_vec_type", typeName, sizeof(typeName), &flg));
-  if (flg) {
-    PetscCall(DMSetVecType(*odm, typeName));
-  }
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-dm_mat_type", typeName, sizeof(typeName), &flg));
-  if (flg) {
-    PetscCall(DMSetMatType(*odm, typeName));
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Basis order (unless set by -order) and receivers (serial I/O on every rank). */
-static PetscErrorCode loadOrderAndReceivers(PetgemParams *params, Vec *receivers) {
-  PetscFunctionBeginUser;
-  PetscViewer viewer;
-  PetscCall(PetscViewerHDF5Open(PETSC_COMM_SELF, params->inputFile, FILE_MODE_READ, &viewer));
-
-  /* /order - single-element Vec. Read from the bundle unless -order was set on the command line (params->order non-zero at entry). */
-  if (params->order <= 0) {
-    Vec                orderV;
-    const PetscScalar *nArr;
-    PetscCall(loadSerialVec(viewer, "order", &orderV));
-    PetscCall(VecGetArrayRead(orderV, &nArr));
-    params->order = (PetscInt)(PetscRealPart(nArr[0]) + 0.5);
-    PetscCall(VecRestoreArrayRead(orderV, &nArr));
-    PetscCall(VecDestroy(&orderV));
-  }
-  PetscCheck(params->order >= 1 && params->order <= 6, PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE,
-             "Basis order %" PetscInt_FMT " not in 1..6 (-order or /order of %s)", params->order, params->inputFile);
-
-  PetscCall(loadSerialVec(viewer, "receivers", receivers));
-  PetscCall(VecSetBlockSize(*receivers, NUM_DIMENSIONS));
-
-  PetscCall(PetscViewerDestroy(&viewer));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -14,13 +14,14 @@
 #ifndef MT_H
 #define MT_H
 
+#include <petsc.h>
+
 #include "constants.h"
 #include "grid.h"
 #include "io.h"
 
 /** @brief simulation_type tag of fm.mt products. */
 #define PETGEM_SIM_MT "fm.mt"
-#include <petsc.h>
 
 /**
  * @brief 1D equation used for the boundary field H(z).
@@ -79,7 +80,8 @@ typedef struct {
  *
  * @param[out] mtParams  MT options.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode readMtParams(MtParams *mtParams);
 
@@ -89,7 +91,8 @@ PetscErrorCode readMtParams(MtParams *mtParams);
  * @param[in]     params  Parameters (input file).
  * @param[in,out] mtParams      MT options; frequency is set.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode loadMtSettings(const PetgemParams *params, MtParams *mtParams);
 
@@ -103,7 +106,8 @@ PetscErrorCode loadMtSettings(const PetgemParams *params, MtParams *mtParams);
  * @param[in]  faces  Local boundary faces (getBoundaryFaces).
  * @param[out] tags   Box face of each entry of faces (caller frees).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode classifyMtBoxFaces(const DM dm, IS faces, MtBoxFace **tags);
 
@@ -120,7 +124,8 @@ PetscErrorCode classifyMtBoxFaces(const DM dm, IS faces, MtBoxFace **tags);
  * @param[in]  tags          Box face of each entry of faces (classifyMtBoxFaces).
  * @param[out] profile       Layered conductivity, identical on every rank.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, const MtBoxFace *tags, Mt1DProfile *profile);
 
@@ -135,7 +140,8 @@ PetscErrorCode buildMt1DProfile(const DM dm, const Vec conductivity, IS faces, c
  * @param[in]  mtParams       MT options (frequency, refine1D, equation1D).
  * @param[out] field    Nodal H(z).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mtParams, Mt1DField *field);
 
@@ -146,7 +152,8 @@ PetscErrorCode solveMt1D(const Mt1DProfile *profile, const MtParams *mtParams, M
  * @param[in]  z      Height.
  * @param[out] H      H(z).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode evalMt1DField(const Mt1DField *field, const PetscReal z, PetscScalar *H);
 
@@ -167,7 +174,8 @@ PetscErrorCode evalMt1DField(const Mt1DField *field, const PetscReal z, PetscSca
  * @param[in]  field   Nodal H(z) (solveMt1D).
  * @param[out] B       Right-hand side matrix, one column per polarization.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode assembleMtBoundaryRhs(const PetscReal frequency, const DM dm, const Grid *grid, IS faces, const MtBoxFace *tags,
                                      const Mt1DField *field, Mat *B);
@@ -181,7 +189,8 @@ PetscErrorCode assembleMtBoundaryRhs(const PetscReal frequency, const DM dm, con
  * @param[in] profile   Layered conductivity of the lateral faces.
  * @param[in] field     Nodal H(z).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mtParams, IS faces, const Mt1DProfile *profile, const Mt1DField *field);
 
@@ -207,7 +216,8 @@ PetscErrorCode logMtSetup(MPI_Comm comm, const MtParams *mtParams, IS faces, con
  * @param[in] receivers  Serial Vec of 3·N_recv receiver coordinates.
  * @param[in] X          Solution matrix, one column per polarization.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode computeMtResponses(const PetgemParams *params, const MtParams *mtParams, const DM dm, const Grid *grid, Vec receivers,
                                   const Mat X);
@@ -217,7 +227,8 @@ PetscErrorCode computeMtResponses(const PetgemParams *params, const MtParams *mt
  *
  * @param[in,out] profile  Profile to free.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyMt1DProfile(Mt1DProfile *profile);
 
@@ -226,7 +237,8 @@ PetscErrorCode destroyMt1DProfile(Mt1DProfile *profile);
  *
  * @param[in,out] field  Field to free.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyMt1DField(Mt1DField *field);
 

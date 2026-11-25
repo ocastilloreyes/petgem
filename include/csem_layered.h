@@ -54,7 +54,8 @@ typedef struct {
  * @param[in]  sigmaV      Vertical conductivity per layer (S/m, > 0).
  * @param[out] model       Layered model; release it with destroyLayeredModel().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createLayeredModel(PetscInt numLayers, const PetscReal interfaces[], const PetscReal sigmaH[], const PetscReal sigmaV[],
                                   LayeredModel *model);
@@ -64,7 +65,8 @@ PetscErrorCode createLayeredModel(PetscInt numLayers, const PetscReal interfaces
  *
  * @param[in,out] model  Layered model.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyLayeredModel(LayeredModel *model);
 
@@ -101,7 +103,8 @@ PetscInt findLayerOnSide(const LayeredModel *model, PetscReal z, PetscReal zSide
  * @param[in]  moment    Dipole moment I*L*direction (A m, z up).
  * @param[out] dipole    Dipole; release it with destroyLayeredDipole().
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode createLayeredDipole(const LayeredModel *model, PetscReal freq, const PetscReal position[3], const PetscReal moment[3],
                                    LayeredDipole *dipole);
@@ -121,7 +124,8 @@ PetscErrorCode createLayeredDipole(const LayeredModel *model, PetscReal freq, co
  * @param[out] E          Electric field, E[q * 3 + d] (V/m).
  * @param[out] H          Magnetic field, H[q * 3 + d] (A/m); NULL to skip.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode evaluateLayeredDipole(const LayeredDipole *dipole, PetscInt numPoints, const PetscReal points[], const PetscInt layers[],
                                      PetscScalar E[], PetscScalar H[]);
@@ -131,7 +135,8 @@ PetscErrorCode evaluateLayeredDipole(const LayeredDipole *dipole, PetscInt numPo
  *
  * @param[in,out] dipole  Dipole.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode destroyLayeredDipole(LayeredDipole *dipole);
 

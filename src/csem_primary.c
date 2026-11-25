@@ -28,7 +28,17 @@
 /* Relative conductivity difference below which a cell matches the background. */
 #define CSEM_SIGMA_RTOL 1.0e-10
 
-/* Layered model from /background/layer_ztop and /background/layer_sigma (viewer at /background). */
+/**
+ * @brief Loads the layered background model from /background/layer_ztop and
+ *        /background/layer_sigma.
+ *
+ * @param[in]  viewer  HDF5 viewer at the /background group.
+ * @param[in]  file    File name (error messages).
+ * @param[out] model   Layered model.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode loadBackgroundLayers(PetscViewer viewer, const char *file, LayeredModel *model) {
   PetscFunctionBeginUser;
 
@@ -67,7 +77,17 @@ static PetscErrorCode loadBackgroundLayers(PetscViewer viewer, const char *file,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Conductivity per material from /background/material_sigma (viewer at /background). */
+/**
+ * @brief Loads the conductivity per material from /background/material_sigma.
+ *
+ * @param[in]  viewer      HDF5 viewer at the /background group.
+ * @param[in]  file        File name (error messages).
+ * @param[out] background  Background model; numMaterials and materialSigma are
+ *                         set here.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
 static PetscErrorCode loadBackgroundMaterials(PetscViewer viewer, const char *file, CsemBackground *background) {
   PetscFunctionBeginUser;
 
@@ -92,6 +112,296 @@ static PetscErrorCode loadBackgroundMaterials(PetscViewer viewer, const char *fi
     PetscCheck(sm[0] > 0.0 && sm[1] > 0.0 && sm[2] > 0.0, PETSC_COMM_SELF, PETSC_ERR_FILE_UNEXPECTED,
                "loadCsemBackground: %s: material %" PetscInt_FMT " has background sigma = (%g, %g, %g) (expected > 0)", file, m,
                (double)sm[0], (double)sm[1], (double)sm[2]);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Dipole moment I L d of a transmitter, with d from its azimuth and dip.
+ *
+ * @param[in]  src     Transmitter.
+ * @param[out] moment  Dipole moment (A m).
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode sourceMoment(const CsemSource *src, PetscReal moment[NUM_DIMENSIONS]) {
+  PetscFunctionBeginUser;
+  PetscReal direction[NUM_DIMENSIONS];
+  PetscCall(computeVectorRotation(src->azimuthAngle, src->dipAngle, direction));
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) moment[d] = direction[d] * (src->current * src->length);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Creates the layered dipoles of the sources of one set.
+ *
+ * @param[in]  model    Layered model.
+ * @param[in]  set      Source set (frequency and transmitters).
+ * @param[out] dipoles  One dipole per source; release them with
+ *                      destroySetDipoles().
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode createSetDipoles(const LayeredModel *model, const CsemSourceSet *set, LayeredDipole **dipoles) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscMalloc1(set->numSources, dipoles));
+  for (PetscInt k = 0; k < set->numSources; k++) {
+    PetscReal moment[NUM_DIMENSIONS];
+    PetscCall(sourceMoment(&set->sourceArray[k], moment));
+    PetscCall(createLayeredDipole(model, set->freq, set->sourceArray[k].position, moment, &(*dipoles)[k]));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Frees the dipoles created by createSetDipoles().
+ *
+ * @param[in]     numSources  Number of dipoles.
+ * @param[in,out] dipoles     Dipoles.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode destroySetDipoles(PetscInt numSources, LayeredDipole **dipoles) {
+  PetscFunctionBeginUser;
+  for (PetscInt k = 0; k < numSources; k++) PetscCall(destroyLayeredDipole(&(*dipoles)[k]));
+  PetscCall(PetscFree(*dipoles));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Electric field of the layered dipoles at a set of points.
+ *
+ * VectorFieldFn of the Nedelec interpolation; values[(f * numPoints + q) * 3 +
+ * d] is component d of field f at point q.
+ *
+ * @param[in]  numPoints  Number of points.
+ * @param[in]  points     Point coordinates (3 per point).
+ * @param[in]  numFields  Number of dipoles.
+ * @param[out] values     Electric field of each dipole at each point.
+ * @param[in]  ctx        Array of numFields LayeredDipole.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode layeredField(PetscInt numPoints, const PetscReal points[], PetscInt numFields, PetscScalar values[], void *ctx) {
+  PetscFunctionBeginUser;
+  const LayeredDipole *dipoles = (const LayeredDipole *)ctx;
+  for (PetscInt f = 0; f < numFields; f++)
+    PetscCall(evaluateLayeredDipole(&dipoles[f], numPoints, points, NULL, &values[f * numPoints * NUM_DIMENSIONS], NULL));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Tests whether a cell conductivity differs from the background.
+ *
+ * A component differs when |sigma - sigmaB| > CSEM_SIGMA_RTOL max(sigma,
+ * sigmaB).
+ *
+ * @param[in] sigma   Cell conductivity.
+ * @param[in] sigmaB  Background conductivity.
+ *
+ * @return PetscBool PETSC_TRUE if any component differs.
+ */
+static PetscBool differsFromBackground(const PetscReal sigma[NUM_CONDUCTIVITY_COMPONENTS],
+                                       const PetscReal sigmaB[NUM_CONDUCTIVITY_COMPONENTS]) {
+  for (PetscInt d = 0; d < NUM_CONDUCTIVITY_COMPONENTS; d++)
+    if (PetscAbsReal(sigma[d] - sigmaB[d]) > CSEM_SIGMA_RTOL * PetscMax(PetscAbsReal(sigma[d]), PetscAbsReal(sigmaB[d]))) return PETSC_TRUE;
+  return PETSC_FALSE;
+}
+
+/**
+ * @brief Tests whether a point lies in a flagged cell on any rank.
+ *
+ * Points outside the mesh give PETSC_FALSE.
+ *
+ * @param[in]  dm       DMPlex mesh.
+ * @param[in]  grid     Grid (local cell range).
+ * @param[in]  cells    Flag per local cell (cell - cellStart).
+ * @param[in]  x        Point coordinates.
+ * @param[out] inCells  Same value on every rank.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode pointInCells(const DM dm, const Grid *grid, const PetscBool cells[], const PetscReal x[NUM_DIMENSIONS],
+                                   PetscBool *inCells) {
+  PetscFunctionBeginUser;
+
+  Vec                point;
+  PetscSF            sf = NULL;
+  PetscInt           n;
+  const PetscSFNode *found;
+  PetscScalar       *a;
+  PetscMPIInt        flag = 0;
+
+  PetscCall(VecCreateSeq(PETSC_COMM_SELF, NUM_DIMENSIONS, &point));
+  PetscCall(VecSetBlockSize(point, NUM_DIMENSIONS));
+  PetscCall(VecGetArrayWrite(point, &a));
+  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) a[d] = x[d];
+  PetscCall(VecRestoreArrayWrite(point, &a));
+  PetscCall(DMLocatePoints(dm, point, DM_POINTLOCATION_NONE, &sf));
+  PetscCall(PetscSFGetGraph(sf, NULL, &n, NULL, &found));
+  for (PetscInt i = 0; i < n; i++) {
+    const PetscInt c = found[i].index;
+    if (c >= grid->cellStart && c < grid->cellEnd && cells[c - grid->cellStart]) flag = 1;
+  }
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, &flag, 1, MPI_INT, MPI_MAX, PetscObjectComm((PetscObject)dm)));
+  *inCells = flag ? PETSC_TRUE : PETSC_FALSE;
+  PetscCall(PetscSFDestroy(&sf));
+  PetscCall(VecDestroy(&point));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Sums the local values of each unconstrained dof over the ranks that
+ *        share it.
+ *
+ * @param[in]     dm     DMPlex carrying the H(curl) section.
+ * @param[in,out] local  Local Vec of the H(curl) section.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode sumSharedDofs(const DM dm, Vec local) {
+  PetscFunctionBeginUser;
+  Vec global;
+  PetscCall(DMGetGlobalVector(dm, &global));
+  PetscCall(VecZeroEntries(global));
+  PetscCall(DMLocalToGlobal(dm, local, ADD_VALUES, global));
+  PetscCall(DMGlobalToLocal(dm, global, INSERT_VALUES, local));
+  PetscCall(DMRestoreGlobalVector(dm, &global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Layered primary field E_p,h by Nedelec interpolation of the analytic
+ *        field on primary->cells.
+ *
+ * Each dof is the mean of the values interpolated by the cells of
+ * primary->cells that contain it, over all ranks; constrained dofs take the
+ * local cells only.
+ *
+ * @param[in]     dm       DMPlex mesh carrying the H(curl) section.
+ * @param[in]     grid     Grid filled by setupNedelecGrid().
+ * @param[in,out] primary  Primary field; Ep is set here for every source of
+ *                         every set.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode computeLayeredPrimary(const DM dm, const Grid *grid, CsemPrimary *primary) {
+  PetscFunctionBeginUser;
+
+  MPI_Comm       comm = PetscObjectComm((PetscObject)dm);
+  const PetscInt nE   = grid->fem.numDofInCell;
+  PetscSection   section;
+  PetscScalar   *ones;
+  PetscInt       numLocal;
+  Vec            numCells;
+
+  for (PetscInt s = 0; s < primary->numSets; s++)
+    for (PetscInt k = 0; k < primary->sets[s].numSources; k++) {
+      const PetscReal *x       = primary->sets[s].sourceArray[k].position;
+      PetscBool        inCells = PETSC_FALSE;
+
+      PetscCall(pointInCells(dm, grid, primary->cells, x, &inCells));
+      PetscCheck(!inCells, comm, PETSC_ERR_ARG_WRONG,
+                 "computeCsemPrimary: source %" PetscInt_FMT " of set %" PetscInt_FMT
+                 " at (%g, %g, %g) lies in a cell with sigma != sigma_b or in extraCells (layered background)",
+                 k + 1, s + 1, (double)x[0], (double)x[1], (double)x[2]);
+    }
+
+  PetscCall(DMGetLocalSection(dm, &section));
+
+  /* Number of cells of primary->cells that contain each DOF */
+  PetscCall(DMCreateLocalVector(dm, &numCells));
+  PetscCall(VecZeroEntries(numCells));
+  PetscCall(PetscMalloc1(nE, &ones));
+  for (PetscInt i = 0; i < nE; i++) ones[i] = 1.0;
+  for (PetscInt c = grid->cellStart; c < grid->cellEnd; c++)
+    if (primary->cells[c - grid->cellStart]) PetscCall(DMPlexVecSetClosure(dm, section, numCells, c, ones, ADD_ALL_VALUES));
+  PetscCall(PetscFree(ones));
+  PetscCall(sumSharedDofs(dm, numCells));
+  PetscCall(VecGetLocalSize(numCells, &numLocal));
+
+  for (PetscInt s = 0; s < primary->numSets; s++) {
+    const CsemSourceSet *set = &primary->sets[s];
+    LayeredDipole       *dipoles;
+    PetscScalar         *coeff;
+
+    PetscCall(createSetDipoles(&primary->background->layered, set, &dipoles));
+    PetscCall(PetscMalloc1(nE * set->numSources, &coeff));
+    for (PetscInt c = grid->cellStart; c < grid->cellEnd; c++) {
+      Cell cell;
+      if (!primary->cells[c - grid->cellStart]) continue;
+      PetscCall(extractCellCoordinates(dm, c, &cell));
+      PetscCall(interpolateNedelecCell(&grid->fem, &cell, layeredField, dipoles, set->numSources, coeff));
+      for (PetscInt k = 0; k < set->numSources; k++)
+        PetscCall(DMPlexVecSetClosure(dm, section, primary->Ep[s][k], c, &coeff[k * nE], ADD_ALL_VALUES));
+    }
+    PetscCall(PetscFree(coeff));
+    PetscCall(destroySetDipoles(set->numSources, &dipoles));
+
+    for (PetscInt k = 0; k < set->numSources; k++) {
+      const PetscScalar *n;
+      PetscScalar       *e;
+      PetscCall(sumSharedDofs(dm, primary->Ep[s][k]));
+      PetscCall(VecGetArrayRead(numCells, &n));
+      PetscCall(VecGetArray(primary->Ep[s][k], &e));
+      for (PetscInt i = 0; i < numLocal; i++)
+        if (PetscRealPart(n[i]) > 0.0) e[i] /= n[i];
+      PetscCall(VecRestoreArray(primary->Ep[s][k], &e));
+      PetscCall(VecRestoreArrayRead(numCells, &n));
+    }
+  }
+  PetscCall(VecDestroy(&numCells));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Model primary field E_p,h by a finite-element solve with the
+ *        background conductivity.
+ *
+ * One solve per source set.
+ *
+ * @param[in]     dm       DMPlex mesh carrying the H(curl) section.
+ * @param[in]     grid     Grid filled by setupNedelecGrid().
+ * @param[in,out] primary  Primary field; Ep is set here for every source of
+ *                         every set.
+ *
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
+ */
+static PetscErrorCode computeModelPrimary(const DM dm, const Grid *grid, CsemPrimary *primary) {
+  PetscFunctionBeginUser;
+
+  for (PetscInt s = 0; s < primary->numSets; s++) {
+    const CsemSourceSet *set         = &primary->sets[s];
+    const PetscScalar    constFactor = iOmegaMu(set->freq);
+    Mat                  A, B, G, X;
+    IS                   primalVertices = NULL;
+
+    PetscCall(assembleCsemRhs(*set, dm, grid, constFactor, &B));
+    PetscCall(assembleMaxwellOperator(dm, grid, primary->sigmaBackground, constFactor, &A, NULL, &G));
+    PetscCall(setupPrimalVerticesFromOptions(dm, A, primary->sigmaBackground, &primalVertices));
+    PetscCall(solveMaxwellSystem(dm, A, B, G, grid->fem.order, primalVertices, &X, &primary->solveInfo));
+    for (PetscInt k = 0; k < set->numSources; k++) {
+      Vec x;
+      PetscCall(MatDenseGetColumnVecRead(X, k, &x));
+      PetscCall(DMGlobalToLocal(dm, x, INSERT_VALUES, primary->Ep[s][k]));
+      PetscCall(MatDenseRestoreColumnVecRead(X, k, &x));
+    }
+    PetscCall(ISDestroy(&primalVertices));
+    PetscCall(MatDestroy(&X));
+    PetscCall(MatDestroy(&G));
+    PetscCall(MatDestroy(&A));
+    PetscCall(MatDestroy(&B));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -183,52 +493,6 @@ PetscErrorCode destroyCsemBackground(CsemBackground *background) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* Dipole moment I L d of a transmitter, d from its azimuth and dip. */
-static PetscErrorCode sourceMoment(const CsemSource *src, PetscReal moment[NUM_DIMENSIONS]) {
-  PetscFunctionBeginUser;
-  PetscReal direction[NUM_DIMENSIONS];
-  PetscCall(computeVectorRotation(src->azimuthAngle, src->dipAngle, direction));
-  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) moment[d] = direction[d] * (src->current * src->length);
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Layered dipoles of the sources of one set. */
-static PetscErrorCode createSetDipoles(const LayeredModel *model, const CsemSourceSet *set, LayeredDipole **dipoles) {
-  PetscFunctionBeginUser;
-  PetscCall(PetscMalloc1(set->numSources, dipoles));
-  for (PetscInt k = 0; k < set->numSources; k++) {
-    PetscReal moment[NUM_DIMENSIONS];
-    PetscCall(sourceMoment(&set->sourceArray[k], moment));
-    PetscCall(createLayeredDipole(model, set->freq, set->sourceArray[k].position, moment, &(*dipoles)[k]));
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Frees the dipoles of createSetDipoles. */
-static PetscErrorCode destroySetDipoles(PetscInt numSources, LayeredDipole **dipoles) {
-  PetscFunctionBeginUser;
-  for (PetscInt k = 0; k < numSources; k++) PetscCall(destroyLayeredDipole(&(*dipoles)[k]));
-  PetscCall(PetscFree(*dipoles));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* E of the dipoles in ctx at the points: values[(f * numPoints + q) * 3 + d]. */
-static PetscErrorCode layeredField(PetscInt numPoints, const PetscReal points[], PetscInt numFields, PetscScalar values[], void *ctx) {
-  PetscFunctionBeginUser;
-  const LayeredDipole *dipoles = (const LayeredDipole *)ctx;
-  for (PetscInt f = 0; f < numFields; f++)
-    PetscCall(evaluateLayeredDipole(&dipoles[f], numPoints, points, NULL, &values[f * numPoints * NUM_DIMENSIONS], NULL));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* PETSC_TRUE if any component differs from the background by more than CSEM_SIGMA_RTOL. */
-static PetscBool differsFromBackground(const PetscReal sigma[NUM_CONDUCTIVITY_COMPONENTS],
-                                       const PetscReal sigmaB[NUM_CONDUCTIVITY_COMPONENTS]) {
-  for (PetscInt d = 0; d < NUM_CONDUCTIVITY_COMPONENTS; d++)
-    if (PetscAbsReal(sigma[d] - sigmaB[d]) > CSEM_SIGMA_RTOL * PetscMax(PetscAbsReal(sigma[d]), PetscAbsReal(sigmaB[d]))) return PETSC_TRUE;
-  return PETSC_FALSE;
-}
-
 /**
  * @brief Sets the background conductivity of every cell and the cells with sigma != sigma_b.
  *
@@ -316,154 +580,6 @@ PetscErrorCode createCsemPrimary(const CsemBackground *background, const DM dm, 
   if (counts[1] > 0)
     PetscCall(PetscPrintf(comm, "   WARNING: %s cell(s) cross an interface of the layered background; sigma_b is taken at the centroid.\n",
                           formatGroupedInt(counts[1])));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* PETSC_TRUE on every rank if x lies in a local cell flagged in cells on some rank; points outside the mesh give PETSC_FALSE. */
-static PetscErrorCode pointInCells(const DM dm, const Grid *grid, const PetscBool cells[], const PetscReal x[NUM_DIMENSIONS],
-                                   PetscBool *inCells) {
-  PetscFunctionBeginUser;
-
-  Vec                point;
-  PetscSF            sf = NULL;
-  PetscInt           n;
-  const PetscSFNode *found;
-  PetscScalar       *a;
-  PetscMPIInt        flag = 0;
-
-  PetscCall(VecCreateSeq(PETSC_COMM_SELF, NUM_DIMENSIONS, &point));
-  PetscCall(VecSetBlockSize(point, NUM_DIMENSIONS));
-  PetscCall(VecGetArrayWrite(point, &a));
-  for (PetscInt d = 0; d < NUM_DIMENSIONS; d++) a[d] = x[d];
-  PetscCall(VecRestoreArrayWrite(point, &a));
-  PetscCall(DMLocatePoints(dm, point, DM_POINTLOCATION_NONE, &sf));
-  PetscCall(PetscSFGetGraph(sf, NULL, &n, NULL, &found));
-  for (PetscInt i = 0; i < n; i++) {
-    const PetscInt c = found[i].index;
-    if (c >= grid->cellStart && c < grid->cellEnd && cells[c - grid->cellStart]) flag = 1;
-  }
-  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, &flag, 1, MPI_INT, MPI_MAX, PetscObjectComm((PetscObject)dm)));
-  *inCells = flag ? PETSC_TRUE : PETSC_FALSE;
-  PetscCall(PetscSFDestroy(&sf));
-  PetscCall(VecDestroy(&point));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Sums the local values of each unconstrained DOF over the ranks that share it. */
-static PetscErrorCode sumSharedDofs(const DM dm, Vec local) {
-  PetscFunctionBeginUser;
-  Vec global;
-  PetscCall(DMGetGlobalVector(dm, &global));
-  PetscCall(VecZeroEntries(global));
-  PetscCall(DMLocalToGlobal(dm, local, ADD_VALUES, global));
-  PetscCall(DMGlobalToLocal(dm, global, INSERT_VALUES, local));
-  PetscCall(DMRestoreGlobalVector(dm, &global));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/*
- * Layered E_p,h: Nédélec interpolation of the analytic field on primary->cells.
- * Each DOF is the mean of the values interpolated by the cells of
- * primary->cells that contain it (all ranks; constrained DOFs: local cells).
- */
-static PetscErrorCode computeLayeredPrimary(const DM dm, const Grid *grid, CsemPrimary *primary) {
-  PetscFunctionBeginUser;
-
-  MPI_Comm       comm = PetscObjectComm((PetscObject)dm);
-  const PetscInt nE   = grid->fem.numDofInCell;
-  PetscSection   section;
-  PetscScalar   *ones;
-  PetscInt       numLocal;
-  Vec            numCells;
-
-  for (PetscInt s = 0; s < primary->numSets; s++)
-    for (PetscInt k = 0; k < primary->sets[s].numSources; k++) {
-      const PetscReal *x       = primary->sets[s].sourceArray[k].position;
-      PetscBool        inCells = PETSC_FALSE;
-
-      PetscCall(pointInCells(dm, grid, primary->cells, x, &inCells));
-      PetscCheck(!inCells, comm, PETSC_ERR_ARG_WRONG,
-                 "computeCsemPrimary: source %" PetscInt_FMT " of set %" PetscInt_FMT
-                 " at (%g, %g, %g) lies in a cell with sigma != sigma_b or in extraCells (layered background)",
-                 k + 1, s + 1, (double)x[0], (double)x[1], (double)x[2]);
-    }
-
-  PetscCall(DMGetLocalSection(dm, &section));
-
-  /* Number of cells of primary->cells that contain each DOF */
-  PetscCall(DMCreateLocalVector(dm, &numCells));
-  PetscCall(VecZeroEntries(numCells));
-  PetscCall(PetscMalloc1(nE, &ones));
-  for (PetscInt i = 0; i < nE; i++) ones[i] = 1.0;
-  for (PetscInt c = grid->cellStart; c < grid->cellEnd; c++)
-    if (primary->cells[c - grid->cellStart]) PetscCall(DMPlexVecSetClosure(dm, section, numCells, c, ones, ADD_ALL_VALUES));
-  PetscCall(PetscFree(ones));
-  PetscCall(sumSharedDofs(dm, numCells));
-  PetscCall(VecGetLocalSize(numCells, &numLocal));
-
-  for (PetscInt s = 0; s < primary->numSets; s++) {
-    const CsemSourceSet *set = &primary->sets[s];
-    LayeredDipole       *dipoles;
-    PetscScalar         *coeff;
-
-    PetscCall(createSetDipoles(&primary->background->layered, set, &dipoles));
-    PetscCall(PetscMalloc1(nE * set->numSources, &coeff));
-    for (PetscInt c = grid->cellStart; c < grid->cellEnd; c++) {
-      Cell cell;
-      if (!primary->cells[c - grid->cellStart]) continue;
-      PetscCall(extractCellCoordinates(dm, c, &cell));
-      PetscCall(interpolateNedelecCell(&grid->fem, &cell, layeredField, dipoles, set->numSources, coeff));
-      for (PetscInt k = 0; k < set->numSources; k++)
-        PetscCall(DMPlexVecSetClosure(dm, section, primary->Ep[s][k], c, &coeff[k * nE], ADD_ALL_VALUES));
-    }
-    PetscCall(PetscFree(coeff));
-    PetscCall(destroySetDipoles(set->numSources, &dipoles));
-
-    for (PetscInt k = 0; k < set->numSources; k++) {
-      const PetscScalar *n;
-      PetscScalar       *e;
-      PetscCall(sumSharedDofs(dm, primary->Ep[s][k]));
-      PetscCall(VecGetArrayRead(numCells, &n));
-      PetscCall(VecGetArray(primary->Ep[s][k], &e));
-      for (PetscInt i = 0; i < numLocal; i++)
-        if (PetscRealPart(n[i]) > 0.0) e[i] /= n[i];
-      PetscCall(VecRestoreArray(primary->Ep[s][k], &e));
-      PetscCall(VecRestoreArrayRead(numCells, &n));
-    }
-  }
-  PetscCall(VecDestroy(&numCells));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/* Model E_p,h: finite-element solve with the background conductivity, one per set. */
-static PetscErrorCode computeModelPrimary(const DM dm, const Grid *grid, CsemPrimary *primary) {
-  PetscFunctionBeginUser;
-
-  for (PetscInt s = 0; s < primary->numSets; s++) {
-    const CsemSourceSet *set         = &primary->sets[s];
-    const PetscScalar    constFactor = iOmegaMu(set->freq);
-    Mat                  A, B, G, X;
-    IS                   primalVertices = NULL;
-
-    PetscCall(assembleCsemRhs(*set, dm, grid, constFactor, &B));
-    PetscCall(assembleMaxwellOperator(dm, grid, primary->sigmaBackground, constFactor, &A, NULL, &G));
-    PetscCall(setupPrimalVerticesFromOptions(dm, A, primary->sigmaBackground, &primalVertices));
-    PetscCall(solveMaxwellSystem(dm, A, B, G, grid->fem.order, primalVertices, &X, &primary->solveInfo));
-    for (PetscInt k = 0; k < set->numSources; k++) {
-      Vec x;
-      PetscCall(MatDenseGetColumnVecRead(X, k, &x));
-      PetscCall(DMGlobalToLocal(dm, x, INSERT_VALUES, primary->Ep[s][k]));
-      PetscCall(MatDenseRestoreColumnVecRead(X, k, &x));
-    }
-    PetscCall(ISDestroy(&primalVertices));
-    PetscCall(MatDestroy(&X));
-    PetscCall(MatDestroy(&G));
-    PetscCall(MatDestroy(&A));
-    PetscCall(MatDestroy(&B));
-  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -647,6 +763,18 @@ PetscErrorCode addCsemPrimaryAtReceivers(const CsemPrimary *primary, PetscInt se
     PetscCall(DMRestoreGlobalVector(dm, &x));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/**
+ * @brief Adds the primary field of source k of the single source set to the
+ *        fields at the receivers.
+ */
+PetscErrorCode addCsemPrimaryField(PetscInt k, const ReceiverInterpolationMatrices *Q, Vec receivers, Vec fields[NUM_RECEIVER_FIELDS],
+                                   void *ctx) {
+  PetscFunctionBeginUser;
+  const CsemPrimaryFieldCtx *c = (const CsemPrimaryFieldCtx *)ctx;
+  PetscCall(addCsemPrimaryAtReceivers(c->primary, 0, k, c->dm, Q, receivers, fields));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

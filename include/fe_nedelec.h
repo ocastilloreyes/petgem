@@ -35,7 +35,8 @@ PetscInt feNedelecDofCount(PetscInt order);
  * @param[in]  order  Polynomial order p (>= 1).
  * @param[out] out    Newly created handle (caller destroys with feNedelecDestroy).
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode feNedelecCreate(PetscInt order, FeNedelec **out);
 
@@ -44,14 +45,27 @@ PetscErrorCode feNedelecCreate(PetscInt order, FeNedelec **out);
  *
  * @param[in,out] fe  Handle to free; set to NULL on return.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode feNedelecDestroy(FeNedelec **fe);
 
-/** @brief Returns the number of H(curl) DOFs (0 if fe is NULL). */
+/**
+ * @brief Returns the number of H(curl) DOFs (0 if fe is NULL).
+ *
+ * @param[in] fe  Nedelec element, or NULL.
+ *
+ * @return PetscInt Number of H(curl) DOFs.
+ */
 PetscInt feNedelecGetDof(const FeNedelec *fe);
 
-/** @brief Returns the polynomial order (0 if fe is NULL). */
+/**
+ * @brief Returns the polynomial order (0 if fe is NULL).
+ *
+ * @param[in] fe  Nedelec element, or NULL.
+ *
+ * @return PetscInt Polynomial order.
+ */
 PetscInt feNedelecGetOrder(const FeNedelec *fe);
 
 /**
@@ -63,7 +77,8 @@ PetscInt feNedelecGetOrder(const FeNedelec *fe);
  * @param[in]  z      Reference-cell z coordinate.
  * @param[out] shape  dof x 3 row-major basis values.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode feNedelecCalcVShape(const FeNedelec *fe, PetscReal x, PetscReal y, PetscReal z, PetscReal *shape);
 
@@ -76,7 +91,8 @@ PetscErrorCode feNedelecCalcVShape(const FeNedelec *fe, PetscReal x, PetscReal y
  * @param[in]  z      Reference-cell z coordinate.
  * @param[out] curl   dof x 3 row-major curl values.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode feNedelecCalcCurlShape(const FeNedelec *fe, PetscReal x, PetscReal y, PetscReal z, PetscReal *curl);
 
@@ -88,7 +104,8 @@ PetscErrorCode feNedelecCalcCurlShape(const FeNedelec *fe, PetscReal x, PetscRea
  * @param[out] node     Reference-cell node coordinates (3); may be NULL.
  * @param[out] tangent  DOF tangent direction (3); may be NULL.
  *
- * @return PetscErrorCode PETSC_SUCCESS on success, or a PETSc error code.
+ * @return PetscErrorCode PETSC_SUCCESS on success,
+ *         or a PETSc error code otherwise.
  */
 PetscErrorCode feNedelecGetDofInfo(const FeNedelec *fe, PetscInt m, PetscReal node[3], PetscReal tangent[3]);
 

@@ -11,9 +11,10 @@
 #ifndef ASSEMBLY_H
 #define ASSEMBLY_H
 
-#include "grid.h"
-#include "fem.h"
 #include <petsc.h>
+
+#include "fem.h"
+#include "grid.h"
 
 /**
  * @brief Creates a global right-hand-side Vec that accepts closure insertion
